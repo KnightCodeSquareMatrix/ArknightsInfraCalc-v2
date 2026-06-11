@@ -1,0 +1,99 @@
+{
+  "version": 2,
+  "source": "工具人表26.5.xlsx @公孙长乐 2026年5月",
+  "entries": [
+    {
+      "id": "gsl_witch_long_beta",
+      "label": "巫恋Ⅱ+龙舌兰Ⅱ+裁缝β",
+      "trade_pct": 138.0,
+      "gold_pct": 46.0,
+      "tailor_tier": "beta",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long_docus",
+      "label": "巫恋Ⅱ+龙舌兰Ⅱ+但书Ⅱ",
+      "trade_pct": 178.0,
+      "gold_pct": 33.5,
+      "tailor_tier": "docus",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long_alpha",
+      "label": "巫恋Ⅱ+龙舌兰Ⅱ + 裁缝a",
+      "trade_pct": 129.0,
+      "gold_pct": 38.0,
+      "tailor_tier": "alpha",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long_blank",
+      "label": "巫恋Ⅱ+龙舌兰Ⅱ + 白板",
+      "trade_pct": 124.0,
+      "gold_pct": 33.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long0_blank",
+      "label": "巫恋Ⅱ+龙舌兰0 + 白板",
+      "trade_pct": 108.0,
+      "gold_pct": 17.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_beta_blank",
+      "label": "巫恋Ⅱ+ 裁缝β + 白板",
+      "trade_pct": 93.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "beta",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_closure_tier90",
+      "label": "可露希尔Ⅱ @ 90%档",
+      "trade_pct": 135.0,
+      "gold_pct": 42.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "closure",
+        "station_trade_pct": 114
+      }
+    },
+    {
+      "id": "gsl_closure_tier80",
+      "label": "可露希尔Ⅱ @ 80%档",
+      "trade_pct": 124.0,
+      "gold_pct": 40.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "closure",
+        "station_trade_pct": 80
+      }
+    },
+    {
+      "id": "gsl_closure_tier60",
+      "label": "可露希尔Ⅱ @ 60%档",
+      "trade_pct": 100.0,
+      "gold_pct": 36.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "closure",
+        "station_trade_pct": 60
+      }
+    }
+  ]
+}

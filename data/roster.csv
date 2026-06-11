@@ -1,0 +1,17 @@
+name,facility,elite,buff_ids,stepwise
+巫恋,trade,2,trade_ord_vodfox[000],false
+龙舌兰,trade,2,trade_ord_long[010],false
+龙舌兰,trade,0,trade_ord_long[000],false
+卡夫卡,trade,2,trade_ord_wt&cost[011],false
+卡夫卡,trade,0,trade_ord_wt&cost[001],false
+柏喙,trade,2,trade_ord_wt&cost[010],false
+折光,trade,0,trade_ord_wt&cost[002],false
+但书,trade,2,trade_ord_law[000];trade_ord_against[010],true
+但书,trade,0,trade_ord_law[000];trade_ord_against[000],true
+德克萨斯,trade,2,trade_ord_spd&cost_P[000],false
+德克萨斯,trade,0,trade_ord_spd&cost_P[000],false
+拉普兰德,trade,2,trade_ord_limit&cost_P[001],false
+能天使,trade,2,trade_ord_spd[020],false
+可露希尔,trade,2,trade_ord_closure[000],false
+琳琅诗怀雅,trade,2,trade_ord_spd[000];trade_ord_spd_variable[000],true
+杏仁,manufacture,0,manu_formula_spd&cost[000],false

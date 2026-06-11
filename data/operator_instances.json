@@ -1,0 +1,6662 @@
+{
+  "version": 1,
+  "instances": {
+    "CONFESS-47@tier_0": {
+      "name": "CONFESS-47",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[006]",
+            "power_rec_spd_ext&faction[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "CONFESS-47@tier_up": {
+      "name": "CONFESS-47",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[006]",
+            "power_rec_spd_ext&faction[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "Castle-3@tier_0": {
+      "name": "Castle-3",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Castle-3@tier_up": {
+      "name": "Castle-3",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Friston-3@tier_0": {
+      "name": "Friston-3",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]",
+            "power_rec_spd_P[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "Friston-3@tier_up": {
+      "name": "Friston-3",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]",
+            "power_rec_spd_P[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "GALLUS²@tier_0": {
+      "name": "GALLUS²",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[0010]",
+            "power_rec_spd_ext&tag[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "GALLUS²@tier_up": {
+      "name": "GALLUS²",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[0010]",
+            "power_rec_spd_ext&tag[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "Lancet-2@tier_0": {
+      "name": "Lancet-2",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[000]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Lancet-2@tier_up": {
+      "name": "Lancet-2",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[000]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Miss.Christine@tier_0": {
+      "name": "Miss.Christine",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Miss.Christine@tier_up": {
+      "name": "Miss.Christine",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[012]",
+            "manu_prod_spd_double[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "Mon3tr@tier_0": {
+      "name": "Mon3tr",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "Mon3tr@tier_up": {
+      "name": "Mon3tr",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_spd[1000]",
+            "control_mp_cost[012]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "PhonoR-0@tier_0": {
+      "name": "PhonoR-0",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[004]",
+            "power_rec_spd_P[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "PhonoR-0@tier_up": {
+      "name": "PhonoR-0",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[004]",
+            "power_rec_spd_P[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "THRM-EX@tier_0": {
+      "name": "THRM-EX",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd&cost[000]",
+            "power_rec_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "THRM-EX@tier_up": {
+      "name": "THRM-EX",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd&cost[000]",
+            "power_rec_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "U-Official@tier_0": {
+      "name": "U-Official",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&wt[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "U-Official@tier_up": {
+      "name": "U-Official",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&wt[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "三角初华@tier_0": {
+      "name": "三角初华",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "三角初华@tier_up": {
+      "name": "三角初华",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_bd[000]",
+            "control_dorm_rec2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "丰川祥子@tier_0": {
+      "name": "丰川祥子",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_bd_spd[000]",
+            "control_mp_cost&bd3[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "丰川祥子@tier_up": {
+      "name": "丰川祥子",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_bd_spd[010]",
+            "control_mp_cost&bd3[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "临光@tier_0": {
+      "name": "临光",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "临光@tier_up": {
+      "name": "临光",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[000]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "乌有@tier_up": {
+      "name": "乌有",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_bd_n2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "令@tier_0": {
+      "name": "令",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_facCostReset[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "令@tier_up": {
+      "name": "令",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_costToBD[000]",
+            "control_facCostReset[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "伊桑@tier_up": {
+      "name": "伊桑",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "伊芙利特@tier_0": {
+      "name": "伊芙利特",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "伊芙利特@tier_up": {
+      "name": "伊芙利特",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]",
+            "power_rec_spd[013]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "伺夜@tier_up": {
+      "name": "伺夜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&meet[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "但书@tier_0": {
+      "name": "但书",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_against[000]",
+            "trade_ord_law[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "但书@tier_up": {
+      "name": "但书",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_against[010]",
+            "trade_ord_law[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "余@tier_0": {
+      "name": "余",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&group[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "余@tier_up": {
+      "name": "余",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&group[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "佩佩@tier_0": {
+      "name": "佩佩",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&trade&lv[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "佩佩@tier_up": {
+      "name": "佩佩",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&trade&lv[000]",
+            "trade_ord_pepe[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "克洛丝@tier_0": {
+      "name": "克洛丝",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition[040]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "克洛丝@tier_up": {
+      "name": "克洛丝",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition[040]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "八幡海铃@tier_0": {
+      "name": "八幡海铃",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_hire_spd&bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "八幡海铃@tier_up": {
+      "name": "八幡海铃",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_hire_spd&bd[000]",
+            "control_tra_limit&spd2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "冬时@tier_0": {
+      "name": "冬时",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&manu[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "冬时@tier_up": {
+      "name": "冬时",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&manu[000]",
+            "manu_prod_spd&manu[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "冰酿@tier_0": {
+      "name": "冰酿",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[009]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "冰酿@tier_up": {
+      "name": "冰酿",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[009]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&single[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "凛冬@tier_up": {
+      "name": "凛冬",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[013]",
+            "dorm_rec_all[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "凛御银灰@tier_0": {
+      "name": "凛御银灰",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_limit&spd3[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "凛御银灰@tier_up": {
+      "name": "凛御银灰",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_limit&spd3[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "凯尔希@tier_up": {
+      "name": "凯尔希",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "初雪@tier_0": {
+      "name": "初雪",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "初雪@tier_up": {
+      "name": "初雪",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "刺玫@tier_0": {
+      "name": "刺玫",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[023]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "刺玫@tier_up": {
+      "name": "刺玫",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&tired[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "刻俄柏@tier_0": {
+      "name": "刻俄柏",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "刻俄柏@tier_up": {
+      "name": "刻俄柏",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[002]",
+            "manu_prod_spd_addition[031]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "医生@tier_up": {
+      "name": "医生",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[026]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "协律@tier_0": {
+      "name": "协律",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[008]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "协律@tier_up": {
+      "name": "协律",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself2[001]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[009]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡夫卡@tier_0": {
+      "name": "卡夫卡",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡夫卡@tier_up": {
+      "name": "卡夫卡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡缇@tier_0": {
+      "name": "卡缇",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡缇@tier_up": {
+      "name": "卡缇",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[000]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡达@tier_0": {
+      "name": "卡达",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "卡达@tier_up": {
+      "name": "卡达",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_cost[000]",
+            "manu_formula_limit[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "历阵锐枪芬@tier_0": {
+      "name": "历阵锐枪芬",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[1000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "历阵锐枪芬@tier_up": {
+      "name": "历阵锐枪芬",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[1000]",
+            "manu_prod_spd&fraction[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "古米@tier_0": {
+      "name": "古米",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "古米@tier_up": {
+      "name": "古米",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[011]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "可露希尔@tier_0": {
+      "name": "可露希尔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[014]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "可露希尔@tier_up": {
+      "name": "可露希尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[014]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_closure[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "可颂@tier_0": {
+      "name": "可颂",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "可颂@tier_up": {
+      "name": "可颂",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[030]",
+            "trade_ord_spd&limit[031]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "史都华德@tier_up": {
+      "name": "史都华德",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "司霆惊蛰@tier_0": {
+      "name": "司霆惊蛰",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[007]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "司霆惊蛰@tier_up": {
+      "name": "司霆惊蛰",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[007]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "吉星@tier_0": {
+      "name": "吉星",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&share[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "吉星@tier_up": {
+      "name": "吉星",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&share[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "吽@tier_up": {
+      "name": "吽",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "和弦@tier_up": {
+      "name": "和弦",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "响石@tier_0": {
+      "name": "响石",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&lv[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "响石@tier_up": {
+      "name": "响石",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&lv[000]",
+            "dorm_rec_all&lv[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "四月@tier_0": {
+      "name": "四月",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "四月@tier_up": {
+      "name": "四月",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "图耶@tier_0": {
+      "name": "图耶",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&gold[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "图耶@tier_up": {
+      "name": "图耶",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&gold[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "圣约送葬人@tier_0": {
+      "name": "圣约送葬人",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "圣约送葬人@tier_up": {
+      "name": "圣约送葬人",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_limit[020]",
+            "manu_formula_spd[031]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "地灵@tier_up": {
+      "name": "地灵",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[211]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "坚雷@tier_up": {
+      "name": "坚雷",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "塑心@tier_0": {
+      "name": "塑心",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_bd_num[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "塑心@tier_up": {
+      "name": "塑心",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_bd_num[000]",
+            "dorm_rec_all&bd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "夕@tier_0": {
+      "name": "夕",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&bd1[000]",
+            "control_mp_cost&bd2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "夕@tier_up": {
+      "name": "夕",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&bd1[000]",
+            "control_mp_cost&bd2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "多萝西@tier_0": {
+      "name": "多萝西",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_skill_spd1[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "多萝西@tier_up": {
+      "name": "多萝西",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]",
+            "manu_skill_spd1[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "夜刀@tier_0": {
+      "name": "夜刀",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "夜刀@tier_up": {
+      "name": "夜刀",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "夜烟@tier_up": {
+      "name": "夜烟",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[100]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "夜莺@tier_0": {
+      "name": "夜莺",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "夜莺@tier_up": {
+      "name": "夜莺",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[000]",
+            "dorm_rec_all[021]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "天空盒@tier_up": {
+      "name": "天空盒",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[024]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "妮芙@tier_0": {
+      "name": "妮芙",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[017]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "妮芙@tier_up": {
+      "name": "妮芙",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_rec[002]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[027]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "娜仁图亚@tier_0": {
+      "name": "娜仁图亚",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "娜仁图亚@tier_up": {
+      "name": "娜仁图亚",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[011]",
+            "manu_formula_spd&dorm&lv[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "娜斯提@tier_up": {
+      "name": "娜斯提",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]",
+            "manu_formula_spd&cost_bd[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "子月@tier_0": {
+      "name": "子月",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "子月@tier_up": {
+      "name": "子月",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "孑@tier_0": {
+      "name": "孑",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit_diff[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "孑@tier_up": {
+      "name": "孑",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit_count[000]",
+            "trade_ord_limit_diff[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "安哲拉@tier_up": {
+      "name": "安哲拉",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]",
+            "dorm_rec_oneself[011]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "安德切尔@tier_up": {
+      "name": "安德切尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "安比尔@tier_0": {
+      "name": "安比尔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "安比尔@tier_up": {
+      "name": "安比尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "安赛尔@tier_up": {
+      "name": "安赛尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "寒檀@tier_0": {
+      "name": "寒檀",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_power[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "寒檀@tier_up": {
+      "name": "寒檀",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_power[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "寒芒克洛丝@tier_0": {
+      "name": "寒芒克洛丝",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "寒芒克洛丝@tier_up": {
+      "name": "寒芒克洛丝",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "导火索@tier_up": {
+      "name": "导火索",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "小满@tier_0": {
+      "name": "小满",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[1010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "小满@tier_up": {
+      "name": "小满",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[025]",
+            "dorm_rec_single[1010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "崖心@tier_0": {
+      "name": "崖心",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "崖心@tier_up": {
+      "name": "崖心",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[001]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "巫恋@tier_up": {
+      "name": "巫恋",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_vodfox[000]",
+            "trade_ord_wt&cost[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "布丁@tier_up": {
+      "name": "布丁",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_token_prod_spd[000]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "帕拉斯@tier_0": {
+      "name": "帕拉斯",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "帕拉斯@tier_up": {
+      "name": "帕拉斯",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[000]",
+            "manu_prod_limit&cost[003]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "幽灵鲨@tier_up": {
+      "name": "幽灵鲨",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]",
+            "dorm_rec_oneself[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "异客@tier_0": {
+      "name": "异客",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "异客@tier_up": {
+      "name": "异客",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&power[000]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[003]",
+            "power_rec_spd[016]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "弑君者@tier_up": {
+      "name": "弑君者",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[022]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "引星棘刺@tier_0": {
+      "name": "引星棘刺",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[102]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "引星棘刺@tier_up": {
+      "name": "引星棘刺",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[102]",
+            "manu_prod_spd&trade[1000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "德克萨斯@tier_0": {
+      "name": "德克萨斯",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost_P[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "德克萨斯@tier_up": {
+      "name": "德克萨斯",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost_P[010]",
+            "trade_ord_spd&cost_P[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "怒潮凛冬@tier_0": {
+      "name": "怒潮凛冬",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "怒潮凛冬@tier_up": {
+      "name": "怒潮凛冬",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&bd[000]",
+            "manu_formula_spd&bd[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "慕斯@tier_up": {
+      "name": "慕斯",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[010]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "战车@tier_0": {
+      "name": "战车",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "战车@tier_up": {
+      "name": "战车",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd[010]",
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "截云@tier_0": {
+      "name": "截云",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_bd_to_bd[000]",
+            "manu_prod_spd_bd[200]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "截云@tier_up": {
+      "name": "截云",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_bd_to_bd[000]",
+            "manu_prod_spd_bd[200]",
+            "manu_prod_spd_bd[201]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "戴菲恩@tier_up": {
+      "name": "戴菲恩",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_limit&spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "承曦格雷伊@tier_0": {
+      "name": "承曦格雷伊",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_drone[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "承曦格雷伊@tier_up": {
+      "name": "承曦格雷伊",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_count[000]",
+            "power_rec_drone[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "折光@tier_0": {
+      "name": "折光",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "折光@tier_up": {
+      "name": "折光",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[002]",
+            "trade_ord_wt&cost[012]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "拉普兰德@tier_0": {
+      "name": "拉普兰德",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost_P[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "拉普兰德@tier_up": {
+      "name": "拉普兰德",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost_P[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "拜松@tier_0": {
+      "name": "拜松",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[032]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "拜松@tier_up": {
+      "name": "拜松",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[032]",
+            "trade_ord_spd&limit[033]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "掠风@tier_up": {
+      "name": "掠风",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&power[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "推进之王@tier_up": {
+      "name": "推进之王",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[013]",
+            "dorm_rec_all[022]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "摩根@tier_0": {
+      "name": "摩根",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_toone[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "摩根@tier_up": {
+      "name": "摩根",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_toone[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_par[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "撷英调香师@tier_0": {
+      "name": "撷英调香师",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[029]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "撷英调香师@tier_up": {
+      "name": "撷英调香师",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&tired[100]",
+            "dorm_rec_all[029]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "斑点@tier_up": {
+      "name": "斑点",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "斥罪@tier_up": {
+      "name": "斥罪",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_hireToRecAll[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "斩业星熊@tier_up": {
+      "name": "斩业星熊",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_token_prod_spd3[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "断罪者@tier_0": {
+      "name": "断罪者",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "断罪者@tier_up": {
+      "name": "断罪者",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[030]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "斯卡蒂@tier_up": {
+      "name": "斯卡蒂",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]",
+            "dorm_rec_oneself[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "新约能天使@tier_0": {
+      "name": "新约能天使",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_power[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "新约能天使@tier_up": {
+      "name": "新约能天使",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.laterano"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_power[001]",
+            "dorm_rec_single_power[100]"
+          ],
+          "stepwise": true
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_par[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "早露@tier_0": {
+      "name": "早露",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "早露@tier_up": {
+      "name": "早露",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "明椒@tier_0": {
+      "name": "明椒",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "明椒@tier_up": {
+      "name": "明椒",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[020]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]",
+            "trade_ord_wt&cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "星源@tier_0": {
+      "name": "星源",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "星源@tier_up": {
+      "name": "星源",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "暗索@tier_up": {
+      "name": "暗索",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "暴行@tier_up": {
+      "name": "暴行",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "暴雨@tier_0": {
+      "name": "暴雨",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[006]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "暴雨@tier_up": {
+      "name": "暴雨",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[006]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "月见夜@tier_0": {
+      "name": "月见夜",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "月见夜@tier_up": {
+      "name": "月见夜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[200]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "望@tier_0": {
+      "name": "望",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_tra_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "望@tier_up": {
+      "name": "望",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_tra_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "末药@tier_up": {
+      "name": "末药",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "杏仁@tier_0": {
+      "name": "杏仁",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "杏仁@tier_up": {
+      "name": "杏仁",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&cost[000]",
+            "manu_formula_spd&cost_bd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "杜宾@tier_0": {
+      "name": "杜宾",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "杜宾@tier_up": {
+      "name": "杜宾",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "杜林@tier_0": {
+      "name": "杜林",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[000]",
+            "dorm_rec_all&oneself[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "杜林@tier_up": {
+      "name": "杜林",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[000]",
+            "dorm_rec_all&oneself[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "杰克@tier_up": {
+      "name": "杰克",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "杰西卡@tier_up": {
+      "name": "杰西卡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "柏喙@tier_up": {
+      "name": "柏喙",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]",
+            "trade_ord_wt&cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "格劳克斯@tier_0": {
+      "name": "格劳克斯",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "格劳克斯@tier_up": {
+      "name": "格劳克斯",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[015]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "格雷伊@tier_0": {
+      "name": "格雷伊",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "格雷伊@tier_up": {
+      "name": "格雷伊",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "桃金娘@tier_up": {
+      "name": "桃金娘",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[013]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "梅尔@tier_up": {
+      "name": "梅尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "梓兰@tier_up": {
+      "name": "梓兰",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "森蚺@tier_up": {
+      "name": "森蚺",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_pow_bot[000]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&power[000]",
+            "manu_prod_spd&power[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "森西@tier_0": {
+      "name": "森西",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&tag[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "森西@tier_up": {
+      "name": "森西",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_bd_dungeon[000]",
+            "dorm_rec_all&tag[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "槐琥@tier_0": {
+      "name": "槐琥",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_cost_all[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "槐琥@tier_up": {
+      "name": "槐琥",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_cost_all[000]",
+            "manu_prod_spd_variable2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "歌蕾蒂娅@tier_0": {
+      "name": "歌蕾蒂娅",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_aegir2[000]",
+            "control_mp_aegir1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "歌蕾蒂娅@tier_up": {
+      "name": "歌蕾蒂娅",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_aegir2[010]",
+            "control_mp_aegir1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "正义骑士号@tier_0": {
+      "name": "正义骑士号",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]",
+            "power_prod_spd_P[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "正义骑士号@tier_up": {
+      "name": "正义骑士号",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[000]",
+            "power_prod_spd_P[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "水月@tier_0": {
+      "name": "水月",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_skill_spd1[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "水月@tier_up": {
+      "name": "水月",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]",
+            "manu_skill_spd1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "泡普卡@tier_0": {
+      "name": "泡普卡",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "泡普卡@tier_up": {
+      "name": "泡普卡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[020]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "泡泡@tier_0": {
+      "name": "泡泡",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "泡泡@tier_up": {
+      "name": "泡泡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[010]",
+            "manu_prod_spd_variable3[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "波卜@tier_0": {
+      "name": "波卜",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&unfull[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "波卜@tier_up": {
+      "name": "波卜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&unfull[000]",
+            "dorm_rec_all&unfull[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "波登可@tier_up": {
+      "name": "波登可",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[012]",
+            "dorm_rec_single[001]",
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "泰拉大陆调查团@tier_0": {
+      "name": "泰拉大陆调查团",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&bd[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit&bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "泰拉大陆调查团@tier_up": {
+      "name": "泰拉大陆调查团",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&bd[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit&bd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "洋灰@tier_0": {
+      "name": "洋灰",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "洋灰@tier_up": {
+      "name": "洋灰",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[021]",
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "流明@tier_0": {
+      "name": "流明",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_powToRecAll[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "流明@tier_up": {
+      "name": "流明",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_powToRecAll[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "流星@tier_0": {
+      "name": "流星",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "流星@tier_up": {
+      "name": "流星",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "海沫@tier_0": {
+      "name": "海沫",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_skill_change[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "海沫@tier_up": {
+      "name": "海沫",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]",
+            "manu_skill_change[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "海蒂@tier_up": {
+      "name": "海蒂",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]",
+            "trade_ord_spd[021]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "海霓@tier_0": {
+      "name": "海霓",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[025]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "海霓@tier_up": {
+      "name": "海霓",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[026]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "涤火杰西卡@tier_up": {
+      "name": "涤火杰西卡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_bd_spd[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "淬羽赫默@tier_up": {
+      "name": "淬羽赫默",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "深巡@tier_0": {
+      "name": "深巡",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_ext[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "深巡@tier_up": {
+      "name": "深巡",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_ext[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "深海色@tier_up": {
+      "name": "深海色",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "深靛@tier_0": {
+      "name": "深靛",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[002]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "深靛@tier_up": {
+      "name": "深靛",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[002]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[002]",
+            "power_rec_spd[017]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "清流@tier_0": {
+      "name": "清流",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "清流@tier_up": {
+      "name": "清流",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&trade[000]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "清道夫@tier_0": {
+      "name": "清道夫",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "清道夫@tier_up": {
+      "name": "清道夫",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[001]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "渡桥@tier_0": {
+      "name": "渡桥",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "渡桥@tier_up": {
+      "name": "渡桥",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&meet[010]",
+            "trade_ord_wt&cost[003]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "温米@tier_0": {
+      "name": "温米",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[014]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "温米@tier_up": {
+      "name": "温米",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[024]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[101]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "温蒂@tier_up": {
+      "name": "温蒂",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&power[010]",
+            "manu_prod_spd&power[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "溯光星源@tier_0": {
+      "name": "溯光星源",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_skill_limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "溯光星源@tier_up": {
+      "name": "溯光星源",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]",
+            "manu_skill_limit[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "澄闪@tier_0": {
+      "name": "澄闪",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "澄闪@tier_up": {
+      "name": "澄闪",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[003]",
+            "power_rec_spd[023]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "濯尘芙蓉@tier_0": {
+      "name": "濯尘芙蓉",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "濯尘芙蓉@tier_up": {
+      "name": "濯尘芙蓉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "火哨@tier_0": {
+      "name": "火哨",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "火哨@tier_up": {
+      "name": "火哨",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_cost[000]",
+            "trade_ord_spd&share[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "火神@tier_0": {
+      "name": "火神",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "火神@tier_up": {
+      "name": "火神",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "火龙S黑角@tier_0": {
+      "name": "火龙S黑角",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "火龙S黑角@tier_up": {
+      "name": "火龙S黑角",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd2[000]",
+            "control_token_tra_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "灰喉@tier_0": {
+      "name": "灰喉",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[005]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灰喉@tier_up": {
+      "name": "灰喉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[005]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灰毫@tier_0": {
+      "name": "灰毫",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灰毫@tier_up": {
+      "name": "灰毫",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灰烬@tier_0": {
+      "name": "灰烬",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灰烬@tier_up": {
+      "name": "灰烬",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd[000]",
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "灵知@tier_0": {
+      "name": "灵知",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "灵知@tier_up": {
+      "name": "灵知",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_limit&spd[000]",
+            "control_mp_cost&faction[030]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "炎熔@tier_0": {
+      "name": "炎熔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "炎熔@tier_up": {
+      "name": "炎熔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[210]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "炎狱炎熔@tier_0": {
+      "name": "炎狱炎熔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "炎狱炎熔@tier_up": {
+      "name": "炎狱炎熔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[900]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[022]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "烈夏@tier_up": {
+      "name": "烈夏",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd_P[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "烛煌@tier_up": {
+      "name": "烛煌",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[1022]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "焰尾@tier_0": {
+      "name": "焰尾",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[007]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "焰尾@tier_up": {
+      "name": "焰尾",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_psk[000]",
+            "control_mp_cost[007]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "焰影苇草@tier_up": {
+      "name": "焰影苇草",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_rec[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "焰狐龙梓兰@tier_0": {
+      "name": "焰狐龙梓兰",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {}
+    },
+    "焰狐龙梓兰@tier_up": {
+      "name": "焰狐龙梓兰",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_orchd2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "煌@tier_0": {
+      "name": "煌",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "煌@tier_up": {
+      "name": "煌",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "爱丽丝@tier_0": {
+      "name": "爱丽丝",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_bd_n1_n2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "爱丽丝@tier_up": {
+      "name": "爱丽丝",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_bd_n1[000]",
+            "dorm_rec_bd_n1_n2[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "特米米@tier_0": {
+      "name": "特米米",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "特米米@tier_up": {
+      "name": "特米米",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "玛恩纳@tier_0": {
+      "name": "玛恩纳",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[008]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "玛恩纳@tier_up": {
+      "name": "玛恩纳",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[008]",
+            "control_mp_lonely[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "玛露西尔@tier_0": {
+      "name": "玛露西尔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[004]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "玛露西尔@tier_up": {
+      "name": "玛露西尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[400]",
+            "manu_prod_spd[014]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "玫兰莎@tier_up": {
+      "name": "玫兰莎",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "琳琅诗怀雅@tier_up": {
+      "name": "琳琅诗怀雅",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]",
+            "trade_ord_spd_variable[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "琴柳@tier_0": {
+      "name": "琴柳",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[031]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "琴柳@tier_up": {
+      "name": "琴柳",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[031]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "瑰盐@tier_0": {
+      "name": "瑰盐",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&trade&lv[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "瑰盐@tier_up": {
+      "name": "瑰盐",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[1001]",
+            "trade_ord_limit&trade&lv[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "电弧@tier_0": {
+      "name": "电弧",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[013]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "电弧@tier_up": {
+      "name": "电弧",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_rec_tag[001]",
+            "control_mp_cost[013]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "白雪@tier_up": {
+      "name": "白雪",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "白面鸮@tier_0": {
+      "name": "白面鸮",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "白面鸮@tier_up": {
+      "name": "白面鸮",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "真言@tier_0": {
+      "name": "真言",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&tag[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "真言@tier_up": {
+      "name": "真言",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&tag[000]",
+            "trade_ord_spd&tag[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "石棉@tier_0": {
+      "name": "石棉",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "石棉@tier_up": {
+      "name": "石棉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[020]",
+            "manu_prod_spd&limit&cost[011]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "石英@tier_0": {
+      "name": "石英",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "石英@tier_up": {
+      "name": "石英",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&formula[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "砾@tier_up": {
+      "name": "砾",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[110]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "稀音@tier_0": {
+      "name": "稀音",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition[041]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "稀音@tier_up": {
+      "name": "稀音",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_limit[0000]",
+            "manu_prod_spd_addition[041]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "空@tier_0": {
+      "name": "空",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "空@tier_up": {
+      "name": "空",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[011]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "空弦@tier_0": {
+      "name": "空弦",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&dorm&lv[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "空弦@tier_up": {
+      "name": "空弦",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&dorm&lv[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "空构@tier_0": {
+      "name": "空构",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd&addition[000]",
+            "power_rec_spd&cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "空构@tier_up": {
+      "name": "空构",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd&addition[001]",
+            "power_rec_spd&cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "空爆@tier_0": {
+      "name": "空爆",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "空爆@tier_up": {
+      "name": "空爆",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "米格鲁@tier_0": {
+      "name": "米格鲁",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "米格鲁@tier_up": {
+      "name": "米格鲁",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[000]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红@tier_0": {
+      "name": "红",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红@tier_up": {
+      "name": "红",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红云@tier_0": {
+      "name": "红云",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[0000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红云@tier_up": {
+      "name": "红云",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[0000]",
+            "manu_prod_spd_variable[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "红豆@tier_up": {
+      "name": "红豆",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红隼@tier_0": {
+      "name": "红隼",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_rec[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "红隼@tier_up": {
+      "name": "红隼",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_dorm_rec[001]",
+            "control_mp_cost[011]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "纯烬艾雅法拉@tier_up": {
+      "name": "纯烬艾雅法拉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&profession[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "绮良@tier_0": {
+      "name": "绮良",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_line_gold[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "绮良@tier_up": {
+      "name": "绮良",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_line_gold[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "维什戴尔@tier_up": {
+      "name": "维什戴尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_expand_double[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "维伊@tier_up": {
+      "name": "维伊",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_train&lv[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "维娜·维多利亚@tier_0": {
+      "name": "维娜·维多利亚",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&par[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "维娜·维多利亚@tier_up": {
+      "name": "维娜·维多利亚",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&par[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "缠丸@tier_up": {
+      "name": "缠丸",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "缪尔赛思@tier_0": {
+      "name": "缪尔赛思",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[022]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "缪尔赛思@tier_up": {
+      "name": "缪尔赛思",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[022]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_rhine[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "罗比菈塔@tier_up": {
+      "name": "罗比菈塔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "翎羽@tier_up": {
+      "name": "翎羽",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "老鲤@tier_0": {
+      "name": "老鲤",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_allCost_condChar[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "老鲤@tier_up": {
+      "name": "老鲤",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_allCost_condChar[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "聆音@tier_0": {
+      "name": "聆音",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[033]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "聆音@tier_up": {
+      "name": "聆音",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[033]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "能天使@tier_0": {
+      "name": "能天使",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "能天使@tier_up": {
+      "name": "能天使",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[010]",
+            "trade_ord_spd[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "至简@tier_0": {
+      "name": "至简",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[100]",
+            "manu_constrLv[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "至简@tier_up": {
+      "name": "至简",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[110]",
+            "manu_constrLv[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "艾丝黛尔@tier_up": {
+      "name": "艾丝黛尔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "艾雅法拉@tier_0": {
+      "name": "艾雅法拉",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[213]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "艾雅法拉@tier_up": {
+      "name": "艾雅法拉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[213]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "芙蓉@tier_up": {
+      "name": "芙蓉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "芬@tier_0": {
+      "name": "芬",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "芬@tier_up": {
+      "name": "芬",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition[030]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "芳汀@tier_up": {
+      "name": "芳汀",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "苇草@tier_up": {
+      "name": "苇草",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[004]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "苍苔@tier_up": {
+      "name": "苍苔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[100]",
+            "manu_skill_spd1[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "若叶睦@tier_0": {
+      "name": "若叶睦",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd&trade[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "若叶睦@tier_up": {
+      "name": "若叶睦",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd&trade[000]",
+            "control_mp_cost_reset[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "菲亚梅塔@tier_0": {
+      "name": "菲亚梅塔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_exchangeAp[000]",
+            "dorm_recExcludeOther[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "菲亚梅塔@tier_up": {
+      "name": "菲亚梅塔",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_exchangeAp[000]",
+            "dorm_recExcludeOther[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "菲莱@tier_0": {
+      "name": "菲莱",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[005]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "菲莱@tier_up": {
+      "name": "菲莱",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[005]",
+            "power_rec_spd&dorm&lv[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "蕾缪安@tier_0": {
+      "name": "蕾缪安",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&multiPar[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "蕾缪安@tier_up": {
+      "name": "蕾缪安",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&multiPar[000]",
+            "trade_ord_spd&multiPar[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "薄绿@tier_up": {
+      "name": "薄绿",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[201]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "薇薇安娜@tier_0": {
+      "name": "薇薇安娜",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "薇薇安娜@tier_up": {
+      "name": "薇薇安娜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_prod_fraction[000]",
+            "control_mp_cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "蛇屠箱@tier_0": {
+      "name": "蛇屠箱",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "蛇屠箱@tier_up": {
+      "name": "蛇屠箱",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[001]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "蜜莓@tier_up": {
+      "name": "蜜莓",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[032]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "衡沙@tier_0": {
+      "name": "衡沙",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[034]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "衡沙@tier_up": {
+      "name": "衡沙",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[034]",
+            "trade_ord_spd&limit[035]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "裁度@tier_0": {
+      "name": "裁度",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "裁度@tier_up": {
+      "name": "裁度",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[100]",
+            "manu_prod_spd&limit&cost[200]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "裂响@tier_0": {
+      "name": "裂响",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[040]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "裂响@tier_up": {
+      "name": "裂响",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[040]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&limit&cost[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "褐果@tier_0": {
+      "name": "褐果",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "褐果@tier_up": {
+      "name": "褐果",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[201]",
+            "manu_prod_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "角峰@tier_0": {
+      "name": "角峰",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "角峰@tier_up": {
+      "name": "角峰",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "讯使@tier_0": {
+      "name": "讯使",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "讯使@tier_up": {
+      "name": "讯使",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "诗怀雅@tier_0": {
+      "name": "诗怀雅",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "诗怀雅@tier_up": {
+      "name": "诗怀雅",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "调香师@tier_up": {
+      "name": "调香师",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "豆苗@tier_0": {
+      "name": "豆苗",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "豆苗@tier_up": {
+      "name": "豆苗",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "贝娜@tier_0": {
+      "name": "贝娜",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "贝娜@tier_up": {
+      "name": "贝娜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[020]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "贝洛内@tier_0": {
+      "name": "贝洛内",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_ext[020]",
+            "trade_ord_limit&cost_P[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "贝洛内@tier_up": {
+      "name": "贝洛内",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_ext[021]",
+            "trade_ord_limit&cost_P[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "赫德雷@tier_0": {
+      "name": "赫德雷",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_par&per[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "赫德雷@tier_up": {
+      "name": "赫德雷",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_par&per[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "赫拉格@tier_0": {
+      "name": "赫拉格",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "赫拉格@tier_up": {
+      "name": "赫拉格",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[010]",
+            "dorm_rec_all&oneself[011]",
+            "dorm_rec_all&oneself[012]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "赫默@tier_0": {
+      "name": "赫默",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "赫默@tier_up": {
+      "name": "赫默",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[011]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "车尔尼@tier_0": {
+      "name": "车尔尼",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_bd_n1_n3[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "车尔尼@tier_up": {
+      "name": "车尔尼",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_bd_n1[100]",
+            "dorm_rec_bd_n1_n3[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "远山@tier_up": {
+      "name": "远山",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "远牙@tier_0": {
+      "name": "远牙",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[042]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "远牙@tier_up": {
+      "name": "远牙",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[042]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "迷迭香@tier_0": {
+      "name": "迷迭香",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[000]",
+            "manu_prod_spd_bd_n1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "迷迭香@tier_up": {
+      "name": "迷迭香",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[000]",
+            "manu_prod_spd_bd[010]",
+            "manu_prod_spd_bd_n1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "送葬人@tier_up": {
+      "name": "送葬人",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost[003]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "遥@tier_0": {
+      "name": "遥",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[028]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "遥@tier_up": {
+      "name": "遥",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[028]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "酒神@tier_0": {
+      "name": "酒神",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "酒神@tier_up": {
+      "name": "酒神",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&limit&cost[000]",
+            "manu_formula_spd&limit&cost[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "酸糖@tier_up": {
+      "name": "酸糖",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "重岳@tier_0": {
+      "name": "重岳",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&bd_up[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "重岳@tier_up": {
+      "name": "重岳",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_bd_cost_expand[000]",
+            "control_mp_cost&bd_up[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "野鬃@tier_0": {
+      "name": "野鬃",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[002]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "野鬃@tier_up": {
+      "name": "野鬃",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[012]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "钼铅@tier_0": {
+      "name": "钼铅",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[300]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "钼铅@tier_up": {
+      "name": "钼铅",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_limit&cost[1020]",
+            "manu_prod_spd&limit&cost[300]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "铅踝@tier_0": {
+      "name": "铅踝",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_reduce[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "铅踝@tier_up": {
+      "name": "铅踝",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_addition&cost[000]",
+            "manu_prod_spd_reduce[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "铎铃@tier_0": {
+      "name": "铎铃",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_cost&bd2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "铎铃@tier_up": {
+      "name": "铎铃",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_cost&bd2[000]",
+            "trade_cost&bd2[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "银灰@tier_0": {
+      "name": "银灰",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "银灰@tier_up": {
+      "name": "银灰",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[020]",
+            "trade_ord_spd&limit[022]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "锏@tier_0": {
+      "name": "锏",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "锏@tier_up": {
+      "name": "锏",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[100]",
+            "trade_ord_spd&limit[101]",
+            "trade_ord_spd_variable3[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "锡兰@tier_up": {
+      "name": "锡兰",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[212]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "闪击@tier_0": {
+      "name": "闪击",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "闪击@tier_up": {
+      "name": "闪击",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "闪灵@tier_up": {
+      "name": "闪灵",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]",
+            "dorm_rec_single[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "阿兰娜@tier_0": {
+      "name": "阿兰娜",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_token_prod_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿兰娜@tier_up": {
+      "name": "阿兰娜",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_double[000]",
+            "manu_token_prod_spd[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "阿斯卡纶@tier_up": {
+      "name": "阿斯卡纶",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[030]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿消@tier_up": {
+      "name": "阿消",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿米娅@tier_0": {
+      "name": "阿米娅",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿米娅@tier_up": {
+      "name": "阿米娅",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_tra_spd[000]"
+          ],
+          "stepwise": false
+        },
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿罗玛@tier_0": {
+      "name": "阿罗玛",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "阿罗玛@tier_up": {
+      "name": "阿罗玛",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd&cost[001]",
+            "manu_prod_spd_addition[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "陈@tier_0": {
+      "name": "陈",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "陈@tier_up": {
+      "name": "陈",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "隐德来希@tier_0": {
+      "name": "隐德来希",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_hireToRecAll[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "隐德来希@tier_up": {
+      "name": "隐德来希",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_hireToRecAll[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "隐现@tier_up": {
+      "name": "隐现",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[040]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雪猎@tier_0": {
+      "name": "雪猎",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[101]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雪猎@tier_up": {
+      "name": "雪猎",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit&cost[101]",
+            "manu_prod_spd&limit&cost[110]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "雪雉@tier_0": {
+      "name": "雪雉",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_variable2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雪雉@tier_up": {
+      "name": "雪雉",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_variable2[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雷蛇@tier_0": {
+      "name": "雷蛇",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[014]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雷蛇@tier_up": {
+      "name": "雷蛇",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "雷狼龙S空爆@tier_0": {
+      "name": "雷狼龙S空爆",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {}
+    },
+    "雷狼龙S空爆@tier_up": {
+      "name": "雷狼龙S空爆",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd3&catap2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "霜华@tier_0": {
+      "name": "霜华",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "霜华@tier_up": {
+      "name": "霜华",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "霜叶@tier_up": {
+      "name": "霜叶",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        },
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "风笛@tier_0": {
+      "name": "风笛",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "风笛@tier_up": {
+      "name": "风笛",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all&oneself[021]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "风絮@tier_up": {
+      "name": "风絮",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]",
+            "trade_ord_spd&tag[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "食铁兽@tier_up": {
+      "name": "食铁兽",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]",
+            "manu_formula_spd[020]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "香草@tier_up": {
+      "name": "香草",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd[010]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "魔王@tier_0": {
+      "name": "魔王",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost_double[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "魔王@tier_up": {
+      "name": "魔王",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost_double[000]",
+            "control_mp_cost_double[001]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "鸿雪@tier_0": {
+      "name": "鸿雪",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&gold[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "鸿雪@tier_up": {
+      "name": "鸿雪",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_line_durin[010]",
+            "trade_ord_spd&gold[100]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "麒麟R夜刀@tier_0": {
+      "name": "麒麟R夜刀",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_mp_cost&bd2[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "麒麟R夜刀@tier_up": {
+      "name": "麒麟R夜刀",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "control": {
+          "buff_ids": [
+            "control_token_prod_spd2[000]",
+            "control_mp_cost&bd2[010]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "黍@tier_0": {
+      "name": "黍",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "黍@tier_up": {
+      "name": "黍",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd_bd[300]",
+            "manu_cost[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "黑@tier_0": {
+      "name": "黑",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "黑@tier_up": {
+      "name": "黑",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single_P[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "黑角@tier_0": {
+      "name": "黑角",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "黑角@tier_up": {
+      "name": "黑角",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&limit[001]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "黑键@tier_0": {
+      "name": "黑键",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_bd[000]",
+            "trade_ord_spd_bd_n1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "黑键@tier_up": {
+      "name": "黑键",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_bd[000]",
+            "trade_ord_spd_bd[010]",
+            "trade_ord_spd_bd_n1[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "齐尔查克@tier_0": {
+      "name": "齐尔查克",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[036]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "齐尔查克@tier_up": {
+      "name": "齐尔查克",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd_bd[100]",
+            "trade_ord_spd&limit[036]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "罗德岛隐秘队@tier_0": {
+      "name": "罗德岛隐秘队",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {}
+    },
+    "龙舌兰@tier_0": {
+      "name": "龙舌兰",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_long[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "龙舌兰@tier_up": {
+      "name": "龙舌兰",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_long[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    }
+  }
+}

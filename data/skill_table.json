@@ -1,0 +1,2244 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "id": "trade_ord_limit&cost_P[000]",
+      "skill_name": "醉翁之意·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "德克萨斯"
+            }
+          },
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&cost_P[010]",
+      "skill_name": "默契",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "能天使"
+            }
+          },
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.3,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_law[000]",
+      "skill_name": "合同法",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "gold_delivery_below": {
+              "n": 4
+            }
+          },
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "breach"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_against[000]",
+      "skill_name": "违约索赔·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "order_has_tag": {
+              "tag": "breach"
+            }
+          },
+          "action": {
+            "kind": "add_gold_delivery",
+            "params": {
+              "n": 1
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_against[010]",
+      "skill_name": "违约索赔·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "order_has_tag": {
+              "tag": "breach"
+            }
+          },
+          "action": {
+            "kind": "add_gold_delivery",
+            "params": {
+              "n": 2
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_closure[000]",
+      "skill_name": "特别订单",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "replace_order",
+            "params": {
+              "order_type": "closure_special"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 5
+        },
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit_diff[000]",
+      "skill_name": "摊贩经济",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_per_gap_eff",
+            "params": {
+              "rate": 4.0
+            }
+          },
+          "phase": "order_var",
+          "phase_order": 50
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit_count[000]",
+      "skill_name": "市井之道",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "other_ops_direct_eff",
+          "action": {
+            "kind": "reduce_limit",
+            "params": {
+              "div": 10.0,
+              "min": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        },
+        {
+          "selector": "final_order_limit",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 4.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 60
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&cost_P[000]",
+      "skill_name": "恩怨",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "拉普兰德"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 65.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 80
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&cost_P[001]",
+      "skill_name": "醉翁之意·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "德克萨斯"
+            }
+          },
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 4
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&cost[000]",
+      "skill_name": "交际",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[000]",
+      "skill_name": "订单管理·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[001]",
+      "skill_name": "订单管理·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 4
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[010]",
+      "skill_name": "供应管理",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[020]",
+      "skill_name": "喀兰贸易·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[021]",
+      "skill_name": "喀兰贸易·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 4
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[022]",
+      "skill_name": "喀兰之主",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 4
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[030]",
+      "skill_name": "企鹅物流·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[031]",
+      "skill_name": "使命必达",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[032]",
+      "skill_name": "峯驰物流",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[033]",
+      "skill_name": "少当家",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[034]",
+      "skill_name": "订单分发·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[035]",
+      "skill_name": "大巴扎管理学",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[036]",
+      "skill_name": "半身人公会代表",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 1
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[100]",
+      "skill_name": "威压",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": -2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit[101]",
+      "skill_name": "不怒自威",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": -6
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&multiPar[000]",
+      "skill_name": "订单分发·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&par[000]",
+      "skill_name": "外贸决议·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&tag[000]",
+      "skill_name": "订单分发·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[000]",
+      "skill_name": "订单分发·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[001]",
+      "skill_name": "订单分发·β",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[010]",
+      "skill_name": "企鹅物流·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[011]",
+      "skill_name": "企鹅物流·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[020]",
+      "skill_name": "物流专家",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[021]",
+      "skill_name": "名流欢会",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd[1001]",
+      "skill_name": "订单分发·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_cost[000]",
+      "skill_name": "暖场",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&cost[000]",
+      "skill_name": "谈判",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 5
+            }
+          },
+          "phase": "limit",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&share[000]",
+      "skill_name": "代为说项",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "room_peer_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 15.0
+            }
+          },
+          "phase": "peer_share",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&share[001]",
+      "skill_name": "勤俭经营·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "room_peer_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0
+            }
+          },
+          "phase": "peer_share",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&share[002]",
+      "skill_name": "勤俭经营·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "room_peer_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 20.0
+            }
+          },
+          "phase": "peer_share",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_long[000]",
+      "skill_name": "投资·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "gold_order_invest_eligible": {}
+          },
+          "action": {
+            "kind": "add_order_lmd_bonus",
+            "params": {
+              "bonus": 250
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_long[010]",
+      "skill_name": "投资·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "gold_order_invest_eligible": {}
+          },
+          "action": {
+            "kind": "add_order_lmd_bonus",
+            "params": {
+              "bonus": 500
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[000]",
+      "skill_name": "裁缝·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_alpha"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[001]",
+      "skill_name": "手工艺品·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_alpha"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[002]",
+      "skill_name": "鉴定师的眼光",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_alpha"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[003]",
+      "skill_name": "懂行",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_alpha"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[011]",
+      "skill_name": "手工艺品·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_beta"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_vodfox[000]",
+      "skill_name": "低语",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "vodfox_absorb",
+            "params": {
+              "rate_per_peer": 45.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_cost&bd2[000]",
+      "skill_name": "跋山涉水",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_per_state_step",
+            "params": {
+              "key": "HumanFireworks",
+              "step_size": 10.0,
+              "delta_per_step": -0.01,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_cost&bd2[001]",
+      "skill_name": "万里传书",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_per_state_step",
+            "params": {
+              "key": "HumanFireworks",
+              "step_size": 10.0,
+              "delta_per_step": -0.02,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&gold[100]",
+      "skill_name": "销路宣发",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_spd&gold[000]",
+      "skill_name": "物流规划·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_spd&gold[010]",
+      "skill_name": "物流规划·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_line_gold[000]",
+      "skill_name": "订单流可视化·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_line_gold[010]",
+      "skill_name": "订单流可视化·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_line_durin[010]",
+      "skill_name": "际崖居民",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "trade_ord_wt&cost[010]",
+      "skill_name": "裁缝·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_beta"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_variable[000]",
+      "skill_name": "招商引资",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "limit_excess",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 4.0
+            }
+          },
+          "phase": "limit_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&cost_P[020]",
+      "skill_name": "未偿还的债务",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "伺夜"
+            }
+          },
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&trade&lv[000]",
+      "skill_name": "多面逢源",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "facility_level",
+          "action": {
+            "kind": "add_limit_from_selector",
+            "params": {
+              "multiplier": 1.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_limit&trade&lv[001]",
+      "skill_name": "钱不我待",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "facility_level",
+          "action": {
+            "kind": "add_limit_from_selector",
+            "params": {
+              "multiplier": 1.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&limit&bd[000]",
+      "skill_name": "可爱的艾露猫",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 2
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_ext[000]",
+      "skill_name": "对陆接洽代表·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "乌尔比安"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_ext[001]",
+      "skill_name": "对陆接洽代表·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "乌尔比安"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_ext[020]",
+      "skill_name": "家族经营·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "伺夜"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_ext[021]",
+      "skill_name": "家族经营·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "伺夜"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd3&catap2[000]",
+      "skill_name": "气氛组",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_orchd2[000]",
+      "skill_name": "队长的自觉",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 3
+            }
+          },
+          "phase": "limit",
+          "phase_order": 40
+        },
+        {
+          "selector": {
+            "tagged_count_in_room": {
+              "tag": "cc.g.snhunt"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&multiPar[100]",
+      "skill_name": "相伴",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "能天使"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&par[001]",
+      "skill_name": "外贸决议·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "tag_present_in_room": {
+              "tag": "cc.g.glasgow"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_par[000]",
+      "skill_name": "帮派指南针",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_room": {
+              "tag": "cc.g.glasgow"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "推进之王"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_par[001]",
+      "skill_name": "同城加急单",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_room": {
+              "tag": "cc.g.laterano"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_par&per[000]",
+      "skill_name": "白手起家·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "伊内丝"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_par&per[001]",
+      "skill_name": "白手起家·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "伊内丝"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        },
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "W"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_pepe[000]",
+      "skill_name": "慧眼独到",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "replace_order",
+            "params": {
+              "order_type": "pepe_exclusive"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 5
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&dorm&lv[000]",
+      "skill_name": "虔诚筹款·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "dorm_level_sum",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&dorm&lv[010]",
+      "skill_name": "虔诚筹款·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "dorm_level_sum",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 2.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&formula[000]",
+      "skill_name": "精准排期",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "manu_recipe_kinds",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 2.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&meet[000]",
+      "skill_name": "新城贸易",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "meeting_max_level",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0,
+              "cap": 40.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&meet[010]",
+      "skill_name": "天生的顾问",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "meeting_max_level",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0,
+              "cap": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&tag[010]",
+      "skill_name": "精英小队",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "elite_facility_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 2.0,
+              "cap": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&tag[020]",
+      "skill_name": "“孺子可教！”",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "sui_facility_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 4.0,
+              "cap": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&wt[000]",
+      "skill_name": "天真的谈判者",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 5
+        },
+        {
+          "action": {
+            "kind": "replace_order",
+            "params": {
+              "order_type": "eureka"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 6
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_bd_n1[000]",
+      "skill_name": "乐感",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "dorm_occupant_count",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Perception",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "state_convert",
+            "params": {
+              "from": "Perception",
+              "to": "SilentEcho",
+              "ratio": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 11
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_bd[000]",
+      "skill_name": "徘徊旋律",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "SilentEcho",
+              "div": 4.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_bd[010]",
+      "skill_name": "怅惘和声",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "SilentEcho",
+              "div": 2.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_bd[100]",
+      "skill_name": "熟悉的味道",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "MonsterCuisine",
+              "div": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_bd_n2[000]",
+      "skill_name": "“愿者上钩”",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "dorm_occupant_count",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "HumanFireworks",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "HumanFireworks",
+              "div": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_variable2[000]",
+      "skill_name": "天道酬勤·α",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "other_ops_total_eff",
+          "action": {
+            "kind": "add_bucket_eff_from_selector",
+            "params": {
+              "step": 5.0,
+              "ret_per_step": 5.0,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_variable2[001]",
+      "skill_name": "天道酬勤·β",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "other_ops_total_eff",
+          "action": {
+            "kind": "add_bucket_eff_from_selector",
+            "params": {
+              "step": 5.0,
+              "ret_per_step": 5.0,
+              "cap": 35.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd_variable3[000]",
+      "skill_name": "冠军风采",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "limit_contrib_sum",
+          "action": {
+            "kind": "add_bucket_eff_from_selector",
+            "params": {
+              "step": 5.0,
+              "ret_per_step": 25.0,
+              "cap": 100.0
+            }
+          },
+          "phase": "limit_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_wt&cost[012]",
+      "skill_name": "鉴定师的手段",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "tailor_beta"
+            }
+          },
+          "phase": "order_mechanic",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    }
+  ]
+}
