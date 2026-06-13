@@ -1,0 +1,3782 @@
+[
+  {
+    "id": "xlsx_0000",
+    "name": "丰川祥子",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0001",
+    "name": "斩业星熊",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0002",
+    "name": "Mon3tr",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0003",
+    "name": "新约能天使",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 4,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0004",
+    "name": "圣聆初雪",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0005",
+    "name": "逻各斯",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0006",
+    "name": "乌尔比安",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0007",
+    "name": "望",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0008",
+    "name": "玛恩纳",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0009",
+    "name": "归溟幽灵鲨",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0010",
+    "name": "酒神",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0011",
+    "name": "维什戴尔",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0012",
+    "name": "浊心斯卡蒂",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0013",
+    "name": "塞雷娅",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0014",
+    "name": "银灰",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0015",
+    "name": "缄默德克萨斯",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0016",
+    "name": "遥",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0017",
+    "name": "煌",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0018",
+    "name": "歌蕾蒂娅",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0019",
+    "name": "澄闪",
+    "elite": 2,
+    "level": 81,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0020",
+    "name": "仇白",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0021",
+    "name": "凯尔希·思衡托",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0022",
+    "name": "伊内丝",
+    "elite": 2,
+    "level": 70,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0023",
+    "name": "史尔特尔",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0024",
+    "name": "艾雅法拉",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0025",
+    "name": "余",
+    "elite": 2,
+    "level": 72,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0026",
+    "name": "可露希尔",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0027",
+    "name": "凛御银灰",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0028",
+    "name": "灰烬",
+    "elite": 2,
+    "level": 75,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0029",
+    "name": "泥岩",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0030",
+    "name": "风笛",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 5,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0031",
+    "name": "棘刺",
+    "elite": 2,
+    "level": 74,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0032",
+    "name": "凯尔希",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0033",
+    "name": "阿斯卡纶",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0034",
+    "name": "假日威龙陈",
+    "elite": 2,
+    "level": 70,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0035",
+    "name": "铃兰",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0036",
+    "name": "水月",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0037",
+    "name": "德克萨斯",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0038",
+    "name": "极境",
+    "elite": 2,
+    "level": 50,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0039",
+    "name": "八幡海铃",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0040",
+    "name": "晓歌",
+    "elite": 2,
+    "level": 50,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0041",
+    "name": "烛煌",
+    "elite": 2,
+    "level": 57,
+    "own": true,
+    "potential": 4,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0042",
+    "name": "卡涅利安",
+    "elite": 2,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0043",
+    "name": "龙舌兰",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0044",
+    "name": "空弦",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0045",
+    "name": "灵知",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0046",
+    "name": "迷迭香",
+    "elite": 2,
+    "level": 65,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0047",
+    "name": "艾丽妮",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0048",
+    "name": "黑",
+    "elite": 2,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0049",
+    "name": "白面鸮",
+    "elite": 2,
+    "level": 80,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0050",
+    "name": "幽灵鲨",
+    "elite": 2,
+    "level": 40,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0051",
+    "name": "华法琳",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0052",
+    "name": "蜜莓",
+    "elite": 2,
+    "level": 58,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0053",
+    "name": "闪灵",
+    "elite": 2,
+    "level": 30,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0054",
+    "name": "阿米娅",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0055",
+    "name": "伊桑",
+    "elite": 2,
+    "level": 70,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0056",
+    "name": "雷蛇",
+    "elite": 2,
+    "level": 50,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0057",
+    "name": "杰西卡",
+    "elite": 2,
+    "level": 70,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0058",
+    "name": "休谟斯",
+    "elite": 2,
+    "level": 70,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0059",
+    "name": "若叶睦",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0060",
+    "name": "卡达",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0061",
+    "name": "巫恋",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0062",
+    "name": "锡人",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0063",
+    "name": "阿消",
+    "elite": 2,
+    "level": 40,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0064",
+    "name": "三角初华",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0065",
+    "name": "桃金娘",
+    "elite": 2,
+    "level": 35,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0066",
+    "name": "但书",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0067",
+    "name": "豆苗",
+    "elite": 2,
+    "level": 40,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0068",
+    "name": "号角",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0069",
+    "name": "焰影苇草",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0070",
+    "name": "傀影",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0071",
+    "name": "暗索",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0072",
+    "name": "古米",
+    "elite": 2,
+    "level": 40,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0073",
+    "name": "蕾缪安",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0074",
+    "name": "斥罪",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0075",
+    "name": "安洁莉娜",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0076",
+    "name": "赤刃明霄陈",
+    "elite": 1,
+    "level": 76,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0077",
+    "name": "砾",
+    "elite": 2,
+    "level": 40,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0078",
+    "name": "琴柳",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0079",
+    "name": "山",
+    "elite": 1,
+    "level": 70,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0080",
+    "name": "蓝毒",
+    "elite": 1,
+    "level": 70,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0081",
+    "name": "深巡",
+    "elite": 1,
+    "level": 70,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0082",
+    "name": "星熊",
+    "elite": 1,
+    "level": 69,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0083",
+    "name": "伊芙利特",
+    "elite": 1,
+    "level": 57,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0084",
+    "name": "温蒂",
+    "elite": 1,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0085",
+    "name": "霜华",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0086",
+    "name": "远山",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0087",
+    "name": "红",
+    "elite": 1,
+    "level": 50,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0088",
+    "name": "清道夫",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0089",
+    "name": "流星",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0090",
+    "name": "宴",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0091",
+    "name": "清流",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0092",
+    "name": "阿米娅（医疗）",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0093",
+    "name": "祐天寺若麦",
+    "elite": 1,
+    "level": 40,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0094",
+    "name": "冬时",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 3,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0095",
+    "name": "红豆",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0096",
+    "name": "调香师",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0097",
+    "name": "慕斯",
+    "elite": 1,
+    "level": 50,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0098",
+    "name": "流明",
+    "elite": 1,
+    "level": 52,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0099",
+    "name": "刻刀",
+    "elite": 1,
+    "level": 51,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0100",
+    "name": "安赛尔",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0101",
+    "name": "玫兰莎",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0102",
+    "name": "梓兰",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0103",
+    "name": "斑点",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0104",
+    "name": "槐琥",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0105",
+    "name": "泡普卡",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0106",
+    "name": "克洛丝",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0107",
+    "name": "月见夜",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0108",
+    "name": "史都华德",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0109",
+    "name": "炎熔",
+    "elite": 1,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0110",
+    "name": "斯卡蒂",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0111",
+    "name": "凛冬",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0112",
+    "name": "卡夫卡",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0113",
+    "name": "讯使",
+    "elite": 1,
+    "level": 18,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0114",
+    "name": "空爆",
+    "elite": 1,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0115",
+    "name": "嵯峨",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0116",
+    "name": "能天使",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0117",
+    "name": "石英",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0118",
+    "name": "白雪",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0119",
+    "name": "赫默",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0120",
+    "name": "絮雨",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0121",
+    "name": "狮蝎",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0122",
+    "name": "桑葚",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0123",
+    "name": "寻澜",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0124",
+    "name": "梅",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0125",
+    "name": "孑",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0126",
+    "name": "蛇屠箱",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0127",
+    "name": "暴行",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0128",
+    "name": "守林人",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0129",
+    "name": "石棉",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0130",
+    "name": "刻俄柏",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0131",
+    "name": "格拉尼",
+    "elite": 0,
+    "level": 41,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0132",
+    "name": "崖心",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0133",
+    "name": "食铁兽",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0134",
+    "name": "黑角",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 2
+  },
+  {
+    "id": "xlsx_0135",
+    "name": "杜林",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 2
+  },
+  {
+    "id": "xlsx_0136",
+    "name": "夜刀",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 2
+  },
+  {
+    "id": "xlsx_0137",
+    "name": "THRM-EX",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0138",
+    "name": "Lancet-2",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 4,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0139",
+    "name": "12F",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 2
+  },
+  {
+    "id": "xlsx_0140",
+    "name": "巡林者",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 2
+  },
+  {
+    "id": "xlsx_0141",
+    "name": "地灵",
+    "elite": 0,
+    "level": 28,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0142",
+    "name": "诗怀雅",
+    "elite": 0,
+    "level": 22,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0143",
+    "name": "初雪",
+    "elite": 0,
+    "level": 21,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0144",
+    "name": "燧石",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0145",
+    "name": "赤冬",
+    "elite": 0,
+    "level": 10,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0146",
+    "name": "普罗旺斯",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0147",
+    "name": "芳汀",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0148",
+    "name": "熔泉",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0149",
+    "name": "钼铅",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0150",
+    "name": "风絮",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0151",
+    "name": "掠风",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0152",
+    "name": "麒麟R夜刀",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0153",
+    "name": "引星棘刺",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0154",
+    "name": "正义骑士号",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0155",
+    "name": "星源",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0156",
+    "name": "亚叶",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0157",
+    "name": "深律",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0158",
+    "name": "莱伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0159",
+    "name": "缇缇",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0160",
+    "name": "拉普兰德",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0161",
+    "name": "布丁",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0162",
+    "name": "夏栎",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0163",
+    "name": "森西",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0164",
+    "name": "露托",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0165",
+    "name": "星极",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0166",
+    "name": "苦艾",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0167",
+    "name": "图耶",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0168",
+    "name": "承曦格雷伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0169",
+    "name": "海霓",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0170",
+    "name": "截云",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0171",
+    "name": "衡沙",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0172",
+    "name": "猎蜂",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0173",
+    "name": "安哲拉",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0174",
+    "name": "帕拉斯",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0175",
+    "name": "火神",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0176",
+    "name": "裂响",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0177",
+    "name": "柏喙",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0178",
+    "name": "特米米",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0179",
+    "name": "玫拉",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0180",
+    "name": "止颂",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0181",
+    "name": "黍",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0182",
+    "name": "微风",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0183",
+    "name": "苇草",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0184",
+    "name": "坚雷",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0185",
+    "name": "耀骑士临光",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0186",
+    "name": "四月",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0187",
+    "name": "Castle-3",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0188",
+    "name": "夜半",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0189",
+    "name": "蒂比",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0190",
+    "name": "多萝西",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0191",
+    "name": "乌有",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0192",
+    "name": "野鬃",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0193",
+    "name": "海蒂",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0194",
+    "name": "绮良",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0195",
+    "name": "酸糖",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0196",
+    "name": "至简",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0197",
+    "name": "翎羽",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0198",
+    "name": "艾丝黛尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0199",
+    "name": "罗德岛隐秘队",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0200",
+    "name": "Miss.Christine",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0201",
+    "name": "摆渡人",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0202",
+    "name": "闪击",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0203",
+    "name": "烈夏",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0204",
+    "name": "格劳克斯",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0205",
+    "name": "松桐",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0206",
+    "name": "泡泡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0207",
+    "name": "裁度",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0208",
+    "name": "阿米娅（近卫）",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0209",
+    "name": "莱恩哈特",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0210",
+    "name": "诺威尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0211",
+    "name": "聆音",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0212",
+    "name": "缪尔赛思",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0213",
+    "name": "历阵锐枪芬",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0214",
+    "name": "黑键",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0215",
+    "name": "芙兰卡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0216",
+    "name": "远牙",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0217",
+    "name": "慑砂",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0218",
+    "name": "佩佩",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0219",
+    "name": "维伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0220",
+    "name": "年",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0221",
+    "name": "深海色",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0222",
+    "name": "涤火杰西卡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0223",
+    "name": "白铁",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0224",
+    "name": "玛露西尔",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0225",
+    "name": "耶拉",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0226",
+    "name": "罗宾",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0227",
+    "name": "末药",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0228",
+    "name": "明椒",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0229",
+    "name": "刺玫",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0230",
+    "name": "杏仁",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0231",
+    "name": "断罪者",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0232",
+    "name": "海沫",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0233",
+    "name": "安比尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0234",
+    "name": "维荻",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0235",
+    "name": "双月",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0236",
+    "name": "波登可",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0237",
+    "name": "空",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0238",
+    "name": "芬",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0239",
+    "name": "吽",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0240",
+    "name": "魔王",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0241",
+    "name": "维娜·维多利亚",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0242",
+    "name": "导火索",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0243",
+    "name": "雪猎",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0244",
+    "name": "苏苏洛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0245",
+    "name": "行箸",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0246",
+    "name": "铅踝",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0247",
+    "name": "摩根",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0248",
+    "name": "天空盒",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0249",
+    "name": "暴雨",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0250",
+    "name": "温米",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0251",
+    "name": "空构",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0252",
+    "name": "信仰搅拌机",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0253",
+    "name": "陈",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0254",
+    "name": "哈蒂娅",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0255",
+    "name": "雷狼龙S空爆",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0256",
+    "name": "妮芙",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0257",
+    "name": "阿",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0258",
+    "name": "贾维",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0259",
+    "name": "死芒",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0260",
+    "name": "见行者",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0261",
+    "name": "U-Official",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0262",
+    "name": "推进之王",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0263",
+    "name": "复奏",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0264",
+    "name": "林",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0265",
+    "name": "杰克",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0266",
+    "name": "重岳",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0267",
+    "name": "可颂",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0268",
+    "name": "火哨",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0269",
+    "name": "莱欧斯",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0270",
+    "name": "洛洛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0271",
+    "name": "渡桥",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0272",
+    "name": "羽毛笔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0273",
+    "name": "贝洛内",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0274",
+    "name": "风丸",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0275",
+    "name": "鸿雪",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0276",
+    "name": "乌啾",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0277",
+    "name": "特克诺",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0278",
+    "name": "莎草",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0279",
+    "name": "雪雉",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0280",
+    "name": "拜松",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0281",
+    "name": "霍尔海雅",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0282",
+    "name": "卡缇",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0283",
+    "name": "铎铃",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0284",
+    "name": "GALLUS²",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0285",
+    "name": "隐现",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0286",
+    "name": "红云",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0287",
+    "name": "协律",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0288",
+    "name": "奥斯塔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0289",
+    "name": "送葬人",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0290",
+    "name": "阿罗玛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0291",
+    "name": "折桠",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0292",
+    "name": "深靛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0293",
+    "name": "梅尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0294",
+    "name": "撷英调香师",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0295",
+    "name": "弑君者",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0296",
+    "name": "司霆惊蛰",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0297",
+    "name": "角峰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0298",
+    "name": "达格达",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0299",
+    "name": "波卜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0300",
+    "name": "安德切尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0301",
+    "name": "米格鲁",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0302",
+    "name": "瑕光",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0303",
+    "name": "火龙S黑角",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0304",
+    "name": "暮落",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0305",
+    "name": "极光",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0306",
+    "name": "夜烟",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0307",
+    "name": "吉星",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0308",
+    "name": "鞭刃",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0309",
+    "name": "荒芜拉普兰德",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0310",
+    "name": "赫德雷",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0311",
+    "name": "罗比菈塔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0312",
+    "name": "罗小黑",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0313",
+    "name": "W",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0314",
+    "name": "水灯心",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0315",
+    "name": "艾拉",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0316",
+    "name": "麦哲伦",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0317",
+    "name": "寒檀",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0318",
+    "name": "百炼嘉维尔",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0319",
+    "name": "早露",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0320",
+    "name": "爱丽丝",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0321",
+    "name": "灰喉",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0322",
+    "name": "泰拉大陆调查团",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0323",
+    "name": "蚀清",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0324",
+    "name": "战车",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0325",
+    "name": "纯烬艾雅法拉",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0326",
+    "name": "青枳",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0327",
+    "name": "炎狱炎熔",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0328",
+    "name": "娜仁图亚",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0329",
+    "name": "焰尾",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0330",
+    "name": "谜图",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0331",
+    "name": "和弦",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0332",
+    "name": "霜叶",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0333",
+    "name": "夕",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0334",
+    "name": "贝娜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0335",
+    "name": "埃拉托",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0336",
+    "name": "戴菲恩",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0337",
+    "name": "锡兰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0338",
+    "name": "电弧",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0339",
+    "name": "录武官",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0340",
+    "name": "PhonoR-0",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0341",
+    "name": "炎客",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0342",
+    "name": "松果",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0343",
+    "name": "洋灰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0344",
+    "name": "嘉维尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0345",
+    "name": "冰酿",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0346",
+    "name": "怒潮凛冬",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0347",
+    "name": "万顷",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0348",
+    "name": "莫斯提马",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0349",
+    "name": "Friston-3",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0350",
+    "name": "折光",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0351",
+    "name": "断崖",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0352",
+    "name": "圣约送葬人",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0353",
+    "name": "格雷伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0354",
+    "name": "铸铁",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0355",
+    "name": "夜莺",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0356",
+    "name": "褐果",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0357",
+    "name": "小满",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0358",
+    "name": "淬羽赫默",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0359",
+    "name": "天火",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0360",
+    "name": "濯尘芙蓉",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0361",
+    "name": "惊蛰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0362",
+    "name": "车尔尼",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0363",
+    "name": "响石",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0364",
+    "name": "森蚺",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0365",
+    "name": "白金",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0366",
+    "name": "阿兰娜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0367",
+    "name": "提丰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0368",
+    "name": "真言",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0369",
+    "name": "陨星",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0370",
+    "name": "薇薇安娜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0371",
+    "name": "灰毫",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0372",
+    "name": "寒芒克洛丝",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0373",
+    "name": "隐德来希",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0374",
+    "name": "缠丸",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0375",
+    "name": "锏",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0376",
+    "name": "红隼",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0377",
+    "name": "稀音",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0378",
+    "name": "塑心",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0379",
+    "name": "齐尔查克",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0380",
+    "name": "医生",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0381",
+    "name": "伯塔尼",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0382",
+    "name": "忍冬",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0383",
+    "name": "夜魔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0384",
+    "name": "骋风",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0385",
+    "name": "老鲤",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0386",
+    "name": "因陀罗",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0387",
+    "name": "焰狐龙梓兰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0388",
+    "name": "菲亚梅塔",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0389",
+    "name": "琳琅诗怀雅",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0390",
+    "name": "月禾",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0391",
+    "name": "赫拉格",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0392",
+    "name": "九色鹿",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0393",
+    "name": "临光",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0394",
+    "name": "瑰盐",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0395",
+    "name": "菲莱",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0396",
+    "name": "香草",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0397",
+    "name": "雪绒",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0398",
+    "name": "真理",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0399",
+    "name": "杜宾",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0400",
+    "name": "薄绿",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0401",
+    "name": "娜斯提",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0402",
+    "name": "苍苔",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0403",
+    "name": "左乐",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0404",
+    "name": "跃跃",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0405",
+    "name": "蜜蜡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0406",
+    "name": "矩",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0407",
+    "name": "伺夜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0408",
+    "name": "布洛卡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0409",
+    "name": "溯光星源",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0410",
+    "name": "奥达",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0411",
+    "name": "云迹",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 4
+  },
+  {
+    "id": "xlsx_0412",
+    "name": "芙蓉",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "xlsx_0413",
+    "name": "凯瑟琳",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0414",
+    "name": "令",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 6
+  },
+  {
+    "id": "xlsx_0415",
+    "name": "CONFESS-47",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 1
+  },
+  {
+    "id": "xlsx_0416",
+    "name": "哈洛德",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0417",
+    "name": "子月",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0418",
+    "name": "凛视",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "xlsx_0419",
+    "name": "异客",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  }
+]

@@ -1,0 +1,167 @@
+{
+  "rooms": [
+    {
+      "room_id": "control",
+      "operators": [
+        {
+          "name": "凯尔希",
+          "elite": 2
+        },
+        {
+          "name": "明椒",
+          "elite": 2
+        },
+        {
+          "name": "森蚺",
+          "elite": 2
+        },
+        {
+          "name": "火龙S黑角",
+          "elite": 2
+        },
+        {
+          "name": "麒麟R夜刀",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "dorm_1",
+      "operators": [
+        {
+          "name": "森西",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "trade_1",
+      "operators": [
+        {
+          "name": "卡夫卡",
+          "elite": 2
+        },
+        {
+          "name": "巫恋",
+          "elite": 2
+        },
+        {
+          "name": "龙舌兰",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "trade_2",
+      "operators": [
+        {
+          "name": "蕾缪安",
+          "elite": 2
+        },
+        {
+          "name": "能天使",
+          "elite": 2
+        },
+        {
+          "name": "可露希尔",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_1",
+      "operators": [
+        {
+          "name": "雪猎",
+          "elite": 2
+        },
+        {
+          "name": "酒神",
+          "elite": 2
+        },
+        {
+          "name": "食铁兽",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_2",
+      "operators": [
+        {
+          "name": "冬时",
+          "elite": 2
+        },
+        {
+          "name": "异客",
+          "elite": 2
+        },
+        {
+          "name": "温蒂",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_3",
+      "operators": [
+        {
+          "name": "裁度",
+          "elite": 2
+        },
+        {
+          "name": "清流",
+          "elite": 2
+        },
+        {
+          "name": "砾",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_4",
+      "operators": [
+        {
+          "name": "夜烟",
+          "elite": 2
+        },
+        {
+          "name": "斑点",
+          "elite": 2
+        },
+        {
+          "name": "温米",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_1",
+      "operators": [
+        {
+          "name": "澄闪",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_2",
+      "operators": [
+        {
+          "name": "伊芙利特",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_3",
+      "operators": [
+        {
+          "name": "深靛",
+          "elite": 2
+        }
+      ]
+    }
+  ]
+}

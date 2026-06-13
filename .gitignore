@@ -1,5 +1,23 @@
 /target/
+.venv/
+
+# Python
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Rust / editor
 **/*.rs.bk
 .DS_Store
+Thumbs.db
+
+# Logs & CLI output
 *.log
+/out/
 out_*.json
+
+# Personal / local data (not repo fixtures)
+*.xlsx
+data/operbox_account.json
+data/operbox_xlsx_new.json
+data/roster_xlsx.csv

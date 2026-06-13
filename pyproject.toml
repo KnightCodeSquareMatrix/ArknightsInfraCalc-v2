@@ -1,0 +1,10 @@
+[project]
+name = "arknightsinfracalc-v2"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "pandas>=3.0.3",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"

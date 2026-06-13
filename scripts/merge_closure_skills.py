@@ -140,8 +140,16 @@ NEW_SKILLS = [
         "atoms": [
             {
                 "action": {
-                    "kind": "replace_order",
-                    "params": {"order_type": "pepe_exclusive"},
+                    "kind": "peer_eff_absorb",
+                    "params": {"rate_per_peer": 0.0},
+                },
+                "phase": "peer_absorb",
+                "phase_order": 10,
+            },
+            {
+                "action": {
+                    "kind": "tag_order",
+                    "params": {"tag": "pepe_exclusive"},
                 },
                 "phase": "order_mechanic",
                 "phase_order": 5,
@@ -300,8 +308,8 @@ NEW_SKILLS = [
             },
             {
                 "action": {
-                    "kind": "replace_order",
-                    "params": {"order_type": "eureka"},
+                    "kind": "tag_order",
+                    "params": {"tag": "eureka"},
                 },
                 "phase": "order_mechanic",
                 "phase_order": 6,

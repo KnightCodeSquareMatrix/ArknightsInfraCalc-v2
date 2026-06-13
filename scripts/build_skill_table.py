@@ -54,6 +54,31 @@ def resolve_trade_buff_ids(
     return merge_stepwise(t0_trade["buff_ids"], binding_ids)
 
 
+def resolve_manufacture_buff_ids(
+    instances: dict, name: str, tier: str
+) -> list[str]:
+    key = f"{name}@{tier}"
+    inst = instances.get(key)
+    if not inst:
+        return []
+    manu = inst.get("facilities", {}).get("manufacture")
+    if not manu:
+        return []
+    binding_ids = manu["buff_ids"]
+    stepwise = manu.get("stepwise", False)
+    if tier == "tier_0" or not stepwise:
+        return list(binding_ids)
+    t0_key = f"{name}@tier_0"
+    t0_manu = (
+        instances.get(t0_key, {}).get("facilities", {}).get("manufacture")
+        if t0_key in instances
+        else None
+    )
+    if not t0_manu:
+        return list(binding_ids)
+    return merge_stepwise(t0_manu["buff_ids"], binding_ids)
+
+
 def main() -> int:
     skills = json.loads(SKILL_TABLE.read_text(encoding="utf-8"))
     skill_ids = {s["id"] for s in skills["skills"]}
@@ -99,7 +124,32 @@ def main() -> int:
         if len(all_missing) > 15:
             print(f"  ... and {len(all_missing) - 15} more")
 
+    manu_missing: list[str] = []
+    seen_manu: set[str] = set()
+    for key, inst in sorted(instances.items()):
+        manu = inst.get("facilities", {}).get("manufacture")
+        if not manu:
+            continue
+        name = inst["name"]
+        tier = inst["tier"]
+        for bid in resolve_manufacture_buff_ids(instances, name, tier):
+            if bid in seen_manu:
+                continue
+            seen_manu.add(bid)
+            if bid not in skill_ids:
+                manu_missing.append(f"{key}: {bid}")
+
+    print(f"instances manufacture refs missing: {len(manu_missing)}")
+    if manu_missing:
+        print("\nFAIL manufacture buff_ids missing from skill_table:")
+        for line in manu_missing[:20]:
+            print(f"  {line}")
+        if len(manu_missing) > 20:
+            print(f"  ... and {len(manu_missing) - 20} more")
+        return 1
+
     print("OK: pilot operator buff_ids resolve in skill_table")
+    print("OK: all manufacture buff_ids resolve in skill_table")
     return 0
 
 

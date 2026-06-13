@@ -8,16 +8,8 @@
       "trade_pct": 138.0,
       "gold_pct": 46.0,
       "tailor_tier": "beta",
-      "match": {
-        "kind": "witch"
-      }
-    },
-    {
-      "id": "gsl_witch_long_docus",
-      "label": "巫恋Ⅱ+龙舌兰Ⅱ+但书Ⅱ",
-      "trade_pct": 178.0,
-      "gold_pct": 33.5,
-      "tailor_tier": "docus",
+      "unit_trade_anchor": 12288.8,
+      "unit_gsl_gold_anchor": 1915.52,
       "match": {
         "kind": "witch"
       }
@@ -93,6 +85,37 @@
       "match": {
         "kind": "closure",
         "station_trade_pct": 60
+      }
+    },
+    {
+      "id": "gsl_docus_syracusa",
+      "label": "但书+伺夜+贝洛内（叙拉古链；需中枢八幡海铃E2，工具45+45）",
+      "trade_pct": 90.0,
+      "gold_pct": 55.0,
+      "tailor_tier": "docus",
+      "match": {
+        "kind": "docus_syracusa"
+      }
+    },
+    {
+      "id": "gsl_docus_solo",
+      "label": "但书单走（纸面eff×1.55，trade_pct 由 L1 注入）",
+      "trade_pct": 0.0,
+      "gold_pct": 55.0,
+      "tailor_tier": "docus",
+      "unit_trade_anchor": 16747.8,
+      "match": {
+        "kind": "docus"
+      }
+    },
+    {
+      "id": "gsl_ling_jie_yaxin",
+      "label": "灵知+孑+银灰+喀兰工具人（灵孑银崖）",
+      "trade_pct": 125.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "ling_jie"
       }
     }
   ]

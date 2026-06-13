@@ -1,0 +1,159 @@
+{
+  "rooms": [
+    {
+      "room_id": "trade_1",
+      "operators": [
+        {
+          "name": "巫恋",
+          "elite": 2
+        },
+        {
+          "name": "龙舌兰",
+          "elite": 2
+        },
+        {
+          "name": "卡夫卡",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "trade_2",
+      "operators": [
+        {
+          "name": "但书",
+          "elite": 2
+        },
+        {
+          "name": "乌有",
+          "elite": 2
+        },
+        {
+          "name": "黑键",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_1",
+      "operators": [
+        {
+          "name": "红云",
+          "elite": 2
+        },
+        {
+          "name": "稀音",
+          "elite": 2
+        },
+        {
+          "name": "帕拉斯",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_2",
+      "operators": [
+        {
+          "name": "断罪者",
+          "elite": 2
+        },
+        {
+          "name": "食铁兽",
+          "elite": 2
+        },
+        {
+          "name": "弑君者",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_3",
+      "operators": [
+        {
+          "name": "苍苔",
+          "elite": 2
+        },
+        {
+          "name": "引星棘刺",
+          "elite": 2
+        },
+        {
+          "name": "夜烟",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_4",
+      "operators": [
+        {
+          "name": "阿罗玛",
+          "elite": 2
+        },
+        {
+          "name": "槐琥",
+          "elite": 2
+        },
+        {
+          "name": "迷迭香",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_1",
+      "operators": [
+        {
+          "name": "格雷伊",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_2",
+      "operators": [
+        {
+          "name": "澄闪",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_3",
+      "operators": [
+        {
+          "name": "雷蛇",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "control",
+      "operators": [
+        {
+          "name": "望",
+          "elite": 2
+        },
+        {
+          "name": "重岳",
+          "elite": 2
+        },
+        {
+          "name": "令",
+          "elite": 2
+        },
+        {
+          "name": "夕",
+          "elite": 2
+        },
+        {
+          "name": "琴柳",
+          "elite": 2
+        }
+      ]
+    }
+  ],
+  "base_workforce": []
+}

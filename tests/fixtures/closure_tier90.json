@@ -3,7 +3,7 @@
   "trade_level": 3,
   "operators": [
     { "name": "可露希尔", "elite": 2, "buff_ids": ["trade_ord_closure[000]"] },
-    { "name": "能天使", "elite": 2, "buff_ids": ["trade_ord_spd[010]", "trade_ord_spd[020]"] },
+    { "name": "能天使", "elite": 2, "buff_ids": ["trade_ord_spd[020]"] },
     { "name": "德克萨斯", "elite": 2, "buff_ids": ["trade_ord_spd&cost_P[000]"] },
     { "name": "拉普兰德", "elite": 2, "buff_ids": ["trade_ord_limit&cost_P[001]"] }
   ],
@@ -11,6 +11,6 @@
     "shortcut_id": "gsl_closure_tier90",
     "trade_pct": 135.0,
     "gold_pct": 42.0,
-    "pre_shortcut_trade_pct": 134.0
+    "pre_shortcut_trade_pct": 114.0
   }
 }

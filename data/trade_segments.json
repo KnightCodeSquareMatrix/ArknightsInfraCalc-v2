@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "source": "EffSegment 链段注册表：producer 条件 + consumer 绑定 + shortcut 锚点",
+  "segments": [
+    {
+      "id": "docus_syracusa",
+      "shortcut_id": "gsl_docus_syracusa",
+      "priority": 20,
+      "producer": {
+        "haru_e2_in_control": true
+      },
+      "consumer": "docus_syracusa"
+    },
+    {
+      "id": "ling_jie",
+      "shortcut_id": "gsl_ling_jie_yaxin",
+      "priority": 15,
+      "producer": {
+        "karlan_precision": true
+      },
+      "consumer": "ling_jie"
+    }
+  ],
+  "roles": [
+    {
+      "id": "docus",
+      "pick_steps": [
+        {
+          "kind": "segment",
+          "segment_id": "docus_syracusa",
+          "only_if_producer": true
+        },
+        {
+          "kind": "shortcut",
+          "shortcut_id": "gsl_docus_solo"
+        },
+        {
+          "kind": "unfiltered"
+        }
+      ]
+    }
+  ]
+}

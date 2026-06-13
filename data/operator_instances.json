@@ -394,7 +394,9 @@
     "令@tier_0": {
       "name": "令",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -407,7 +409,9 @@
     "令@tier_up": {
       "name": "令",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -502,7 +506,9 @@
     "余@tier_0": {
       "name": "余",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -515,7 +521,9 @@
     "余@tier_up": {
       "name": "余",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -545,7 +553,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_limit&trade&lv[000]",
             "trade_ord_pepe[000]"
           ],
           "stepwise": true
@@ -555,7 +562,9 @@
     "克洛丝@tier_0": {
       "name": "克洛丝",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -568,7 +577,9 @@
     "克洛丝@tier_up": {
       "name": "克洛丝",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -587,7 +598,9 @@
     "八幡海铃@tier_0": {
       "name": "八幡海铃",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.siracusa"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -600,7 +613,9 @@
     "八幡海铃@tier_up": {
       "name": "八幡海铃",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.siracusa"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -634,7 +649,7 @@
             "manu_prod_spd&manu[000]",
             "manu_prod_spd&manu[100]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -673,7 +688,9 @@
     "凛冬@tier_up": {
       "name": "凛冬",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -970,7 +987,9 @@
     "古米@tier_0": {
       "name": "古米",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -983,7 +1002,9 @@
     "古米@tier_up": {
       "name": "古米",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -1051,7 +1072,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit[030]",
             "trade_ord_spd&limit[031]"
           ],
           "stepwise": true
@@ -1323,7 +1343,9 @@
     "夕@tier_0": {
       "name": "夕",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -1337,7 +1359,9 @@
     "夕@tier_up": {
       "name": "夕",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -1585,8 +1609,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_limit_count[000]",
-            "trade_ord_limit_diff[000]"
+            "trade_ord_limit_count[000]"
           ],
           "stepwise": true
         }
@@ -1923,7 +1946,7 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_formula_spd[102]"
+            "manu_formula_spd[101]"
           ],
           "stepwise": false
         }
@@ -1936,7 +1959,6 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_formula_spd[102]",
             "manu_prod_spd&trade[1000]"
           ],
           "stepwise": true
@@ -1963,8 +1985,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_limit&cost_P[010]",
-            "trade_ord_spd&cost_P[000]"
+            "trade_ord_limit&cost_P[010]"
           ],
           "stepwise": true
         }
@@ -1973,7 +1994,9 @@
     "怒潮凛冬@tier_0": {
       "name": "怒潮凛冬",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -1986,7 +2009,9 @@
     "怒潮凛冬@tier_up": {
       "name": "怒潮凛冬",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -2019,7 +2044,9 @@
     "战车@tier_0": {
       "name": "战车",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2032,7 +2059,9 @@
     "战车@tier_up": {
       "name": "战车",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2075,7 +2104,9 @@
     "戴菲恩@tier_up": {
       "name": "戴菲恩",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.glasgow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2132,7 +2163,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_wt&cost[002]",
             "trade_ord_wt&cost[012]"
           ],
           "stepwise": true
@@ -2185,7 +2215,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit[032]",
             "trade_ord_spd&limit[033]"
           ],
           "stepwise": true
@@ -2309,7 +2338,9 @@
     "斩业星熊@tier_up": {
       "name": "斩业星熊",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.lgd"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2405,7 +2436,9 @@
     "早露@tier_0": {
       "name": "早露",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2418,7 +2451,9 @@
     "早露@tier_up": {
       "name": "早露",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2574,7 +2609,9 @@
     "望@tier_0": {
       "name": "望",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2587,7 +2624,9 @@
     "望@tier_up": {
       "name": "望",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2666,7 +2705,9 @@
     "杜林@tier_0": {
       "name": "杜林",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -2680,7 +2721,9 @@
     "杜林@tier_up": {
       "name": "杜林",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -2786,7 +2829,9 @@
     "桃金娘@tier_up": {
       "name": "桃金娘",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -2841,10 +2886,9 @@
         },
         "manufacture": {
           "buff_ids": [
-            "manu_prod_spd&power[000]",
             "manu_prod_spd&power[010]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -3247,7 +3291,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd[000]",
             "trade_ord_spd[021]"
           ],
           "stepwise": true
@@ -3283,7 +3326,9 @@
     "涤火杰西卡@tier_up": {
       "name": "涤火杰西卡",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.blacksteel"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -3474,8 +3519,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&meet[010]",
-            "trade_ord_wt&cost[003]"
+            "trade_ord_spd&meet[010]"
           ],
           "stepwise": true
         }
@@ -3508,6 +3552,19 @@
         "manufacture": {
           "buff_ids": [
             "manu_formula_spd[101]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "温蒂@tier_0": {
+      "name": "温蒂",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_prod_spd&power[010]"
           ],
           "stepwise": false
         }
@@ -3627,7 +3684,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_cost[000]",
             "trade_ord_spd&share[000]"
           ],
           "stepwise": true
@@ -3663,7 +3719,9 @@
     "火龙S黑角@tier_0": {
       "name": "火龙S黑角",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -3676,7 +3734,9 @@
     "火龙S黑角@tier_up": {
       "name": "火龙S黑角",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -3748,7 +3808,9 @@
     "灰烬@tier_0": {
       "name": "灰烬",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -3761,7 +3823,9 @@
     "灰烬@tier_up": {
       "name": "灰烬",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -3806,7 +3870,9 @@
     "炎熔@tier_0": {
       "name": "炎熔",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -3819,7 +3885,9 @@
     "炎熔@tier_up": {
       "name": "炎熔",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3870,7 +3938,9 @@
     "烈夏@tier_up": {
       "name": "烈夏",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.usaut"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3883,7 +3953,9 @@
     "烛煌@tier_up": {
       "name": "烛煌",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -3959,7 +4031,9 @@
     "煌@tier_0": {
       "name": "煌",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -3972,7 +4046,9 @@
     "煌@tier_up": {
       "name": "煌",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -4162,8 +4238,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd[1001]",
-            "trade_ord_limit&trade&lv[001]"
+            "trade_ord_spd[1001]"
           ],
           "stepwise": true
         }
@@ -4172,7 +4247,9 @@
     "电弧@tier_0": {
       "name": "电弧",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -4185,7 +4262,9 @@
     "电弧@tier_up": {
       "name": "电弧",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -4238,7 +4317,9 @@
     "真言@tier_0": {
       "name": "真言",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -4251,11 +4332,12 @@
     "真言@tier_up": {
       "name": "真言",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&tag[000]",
             "trade_ord_spd&tag[010]"
           ],
           "stepwise": true
@@ -4476,7 +4558,9 @@
     "米格鲁@tier_0": {
       "name": "米格鲁",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -4489,7 +4573,9 @@
     "米格鲁@tier_up": {
       "name": "米格鲁",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -4836,7 +4922,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd[010]",
             "trade_ord_spd[020]"
           ],
           "stepwise": true
@@ -4846,7 +4931,9 @@
     "至简@tier_0": {
       "name": "至简",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -4860,7 +4947,9 @@
     "至简@tier_up": {
       "name": "至简",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -4913,7 +5002,9 @@
     "芙蓉@tier_up": {
       "name": "芙蓉",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -4926,7 +5017,9 @@
     "芬@tier_0": {
       "name": "芬",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -4939,7 +5032,9 @@
     "芬@tier_up": {
       "name": "芬",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.a1"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -5103,7 +5198,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&multiPar[000]",
             "trade_ord_spd&multiPar[100]"
           ],
           "stepwise": true
@@ -5126,7 +5220,9 @@
     "薇薇安娜@tier_0": {
       "name": "薇薇安娜",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5139,7 +5235,9 @@
     "薇薇安娜@tier_up": {
       "name": "薇薇安娜",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5215,7 +5313,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit[034]",
             "trade_ord_spd&limit[035]"
           ],
           "stepwise": true
@@ -5284,7 +5381,9 @@
     "褐果@tier_0": {
       "name": "褐果",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -5297,7 +5396,9 @@
     "褐果@tier_up": {
       "name": "褐果",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.durin"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -5371,7 +5472,9 @@
     "诗怀雅@tier_0": {
       "name": "诗怀雅",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.lgd"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5384,7 +5487,9 @@
     "诗怀雅@tier_up": {
       "name": "诗怀雅",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.lgd"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5654,7 +5759,9 @@
     "迷迭香@tier_0": {
       "name": "迷迭香",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -5668,7 +5775,9 @@
     "迷迭香@tier_up": {
       "name": "迷迭香",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -5762,7 +5871,9 @@
     "重岳@tier_0": {
       "name": "重岳",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5775,7 +5886,9 @@
     "重岳@tier_up": {
       "name": "重岳",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5886,7 +5999,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_cost&bd2[000]",
             "trade_cost&bd2[001]"
           ],
           "stepwise": true
@@ -5917,10 +6029,9 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit[020]",
             "trade_ord_spd&limit[022]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -5944,7 +6055,6 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit[100]",
             "trade_ord_spd&limit[101]",
             "trade_ord_spd_variable3[000]"
           ],
@@ -5968,7 +6078,9 @@
     "闪击@tier_0": {
       "name": "闪击",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -5981,11 +6093,19 @@
     "闪击@tier_up": {
       "name": "闪击",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
             "control_mp_cost&faction[990]"
+          ],
+          "stepwise": false
+        },
+        "office": {
+          "buff_ids": [
+            "office_rec_spd[000]"
           ],
           "stepwise": false
         }
@@ -6120,7 +6240,9 @@
     "陈@tier_0": {
       "name": "陈",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.lgd"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6133,7 +6255,9 @@
     "陈@tier_up": {
       "name": "陈",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.lgd"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6287,7 +6411,9 @@
     "霜华@tier_0": {
       "name": "霜华",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6300,7 +6426,9 @@
     "霜华@tier_up": {
       "name": "霜华",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6449,8 +6577,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_line_durin[010]",
-            "trade_ord_spd&gold[100]"
+            "trade_ord_line_durin[010]"
           ],
           "stepwise": true
         }
@@ -6459,7 +6586,9 @@
     "麒麟R夜刀@tier_0": {
       "name": "麒麟R夜刀",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6472,7 +6601,9 @@
     "麒麟R夜刀@tier_up": {
       "name": "麒麟R夜刀",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6486,7 +6617,9 @@
     "黍@tier_0": {
       "name": "黍",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -6499,7 +6632,9 @@
     "黍@tier_up": {
       "name": "黍",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.sui"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -6589,9 +6724,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd_bd[000]",
-            "trade_ord_spd_bd[010]",
-            "trade_ord_spd_bd_n1[000]"
+            "trade_ord_spd_bd[010]"
           ],
           "stepwise": true
         }
@@ -6617,8 +6750,7 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_spd_bd[100]",
-            "trade_ord_spd&limit[036]"
+            "trade_ord_spd_bd[100]"
           ],
           "stepwise": true
         }

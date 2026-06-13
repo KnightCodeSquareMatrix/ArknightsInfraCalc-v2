@@ -6,6 +6,16 @@ use serde::Deserialize;
 use crate::error::Result;
 use crate::tier::PromotionTier;
 
+/// Whether an elite-2 / tier_up binding **upgrades** the tier_0 buffs (stem-matched merge),
+/// or **replaces** them entirely.
+///
+/// - `true`  → tier_up replaces same-stem tier_0 buffs while preserving others (α→β upgrade).
+/// - `false` → tier_up completely replaces the tier_0 binding; only tier_up buffs are used
+///             (entirely new skill at E2, e.g. 鸿雪 销路宣发→际崖居民).
+///
+/// The common case for `true` is "single-buff α→β" where the result is identical to `false`,
+/// but `true` is semantically correct for future multi-buff scenarios (e.g. 贝洛内 E2 keeps
+/// `trade_ord_limit&cost_P[020]` from E0 while upgrading `trade_ord_spd_ext[020]→[021]`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct FacilityBinding {
     pub buff_ids: Vec<String>,
@@ -43,8 +53,8 @@ pub fn buff_stem(id: &str) -> &str {
 ///
 /// - `tier_0`: binding ids as-is
 /// - `tier_up` + `stepwise == false`: binding ids as-is (override / replacement skills)
-/// - `tier_up` + `stepwise == true`: merge tier_0 ids with tier_up ids; when tier_up is already
-///   a superset of tier_0, return tier_up as-is; otherwise replace same-stem tier_0 ids
+/// - `tier_up` + `stepwise == true`: merge tier_0 ids with tier_up ids; same-stem tier_0 ids
+///   are replaced by the tier_up id (e.g. 温蒂 自动化·β → 仿生海龙)
 pub fn resolve_buff_ids(
     tier: PromotionTier,
     binding: &FacilityBinding,
@@ -63,9 +73,6 @@ pub fn resolve_buff_ids(
 }
 
 fn merge_stepwise(t0: &[String], up: &[String]) -> Vec<String> {
-    if t0.iter().all(|id| up.contains(id)) {
-        return up.to_vec();
-    }
     let mut out = t0.to_vec();
     for id in up {
         if out.iter().any(|x| x == id) {
@@ -112,6 +119,71 @@ impl OperatorInstances {
     pub fn trade_buff_ids_for(&self, name: &str, tier: PromotionTier) -> Vec<String> {
         self.resolve_trade_buff_ids(name, tier)
     }
+
+    pub fn resolve_control_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("control"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("control"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
+
+    pub fn resolve_manufacture_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("manufacture"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("manufacture"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
+
+    pub fn resolve_power_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("power"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("power"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
+
+    pub fn resolve_dorm_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("dorm"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("dorm"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
+
+    pub fn resolve_office_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("office"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("office"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
 }
 
 impl OperatorInstance {
@@ -135,7 +207,10 @@ mod tests {
     fn merge_stepwise_superset_returns_tier_up() {
         let t0 = vec!["trade_ord_spd[010]".into()];
         let up = vec!["trade_ord_spd[010]".into(), "trade_ord_spd[020]".into()];
-        assert_eq!(merge_stepwise(&t0, &up), up);
+        assert_eq!(
+            merge_stepwise(&t0, &up),
+            vec!["trade_ord_spd[020]".to_string()]
+        );
     }
 
     #[test]
@@ -156,18 +231,42 @@ mod tests {
     }
 
     #[test]
-    fn resolve_buff_ids_non_stepwise_override() {
+    fn merge_stepwise_weedy_manu_power_keeps_highest_only() {
+        let t0 = vec!["manu_prod_spd&power[010]".into()];
+        let up = vec![
+            "manu_prod_spd&power[010]".into(),
+            "manu_prod_spd&power[020]".into(),
+        ];
+        assert_eq!(
+            merge_stepwise(&t0, &up),
+            vec!["manu_prod_spd&power[020]".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_saria_tier_up_manu_beta_only() {
         let binding = FacilityBinding {
-            buff_ids: vec!["trade_ord_limit&cost_P[001]".into()],
-            stepwise: false,
-        };
-        let t0 = FacilityBinding {
-            buff_ids: vec!["trade_ord_limit&cost_P[000]".into()],
+            buff_ids: vec!["manu_prod_spd&power[010]".into()],
             stepwise: false,
         };
         assert_eq!(
-            resolve_buff_ids(PromotionTier::TierUp, &binding, Some(&t0)),
-            vec!["trade_ord_limit&cost_P[001]".to_string()]
+            resolve_buff_ids(PromotionTier::TierUp, &binding, None),
+            vec!["manu_prod_spd&power[010]".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_stellar_thorn_tier_up_keeps_metal_and_trade_bonus() {
+        let instances =
+            OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let ids = instances.resolve_manufacture_buff_ids("引星棘刺", PromotionTier::TierUp);
+        assert_eq!(
+            ids,
+            vec![
+                "manu_formula_spd[101]".to_string(),
+                "manu_prod_spd&trade[1000]".to_string(),
+            ],
+            "精2 应保留金属工艺并叠加原质塑金（勿用 manu_formula_spd[102] 替换金属）"
         );
     }
 }

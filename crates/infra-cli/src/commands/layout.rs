@@ -1,0 +1,371 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use crate::output::{
+    emit_base_rotation, emit_bench, BenchMeta, OutputOptions, PoolSummary,
+};
+use infra_core::instances::{default_instances_path, OperatorInstances};
+use infra_core::layout::{
+    assign_base_greedy, BaseAssignment, BaseBlueprint, resolve_base, AssignBaseOptions,
+};
+use infra_core::schedule::schedule_base_rotation_a_b_a;
+use infra_core::manufacture::input::ManuRoomInput;
+use infra_core::manufacture::solve_manufacture;
+use infra_core::manufacture::ManuSearchRecipeMode;
+use infra_core::operbox::OperBox;
+use infra_core::pool::{build_manufacture_pool, build_trade_pool};
+use infra_core::search::{
+    search_manufacture_triples, search_trade_triples, ManuSearchOptions, TradeSearchOptions,
+};
+use infra_core::skill_table::{default_skill_table_path, SkillTable};
+use infra_core::trade::input::{TradeOrderKind, TradeRoomInput, TradeSearchOrderMode};
+use infra_core::trade::solve_trade_with_shift;
+use infra_core::Error;
+
+pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
+    match args.first().map(String::as_str) {
+        Some("test") => layout_test_cmd(&args[1..]),
+        Some("eval") => layout_eval_cmd(&args[1..]),
+        Some("rotation") => layout_rotation_cmd(&args[1..]),
+        _ => {
+            eprintln!(
+                "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]"
+            );
+            eprintln!(
+                "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]"
+            );
+            eprintln!(
+                "       infra-cli layout rotation --layout <path> --operbox <path> [--top <n>] [--output-dir <dir>] [-o <file.csv>] [--text|--json]"
+            );
+            Ok(())
+        }
+    }
+}
+
+fn layout_path_from_args(args: &[String]) -> Result<PathBuf, Error> {
+    args.windows(2)
+        .find(|w| w[0] == "--layout")
+        .map(|w| PathBuf::from(&w[1]))
+        .ok_or_else(|| Error::msg("missing --layout <path>"))
+}
+
+fn operbox_path_from_args(args: &[String]) -> Result<PathBuf, Error> {
+    args.windows(2)
+        .find(|w| w[0] == "--operbox")
+        .map(|w| PathBuf::from(&w[1]))
+        .ok_or_else(|| Error::msg("missing --operbox <path>"))
+}
+
+fn assignment_path_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--assignment")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn output_dir_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--output-dir")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn layout_rotation_cmd(args: &[String]) -> Result<(), Error> {
+    let out = OutputOptions::from_args(args);
+    let layout_path = layout_path_from_args(args)?;
+    let operbox_path = operbox_path_from_args(args)?;
+    let top_k = args
+        .windows(2)
+        .find(|w| w[0] == "--top")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(20);
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+
+    let report = schedule_base_rotation_a_b_a(
+        &blueprint,
+        &operbox,
+        &instances,
+        &table,
+        &AssignBaseOptions {
+            top_k,
+            ..AssignBaseOptions::default()
+        },
+    )?;
+
+    if let Some(dir) = output_dir_from_args(args) {
+        write_rotation_assignments(&dir, &report)?;
+    }
+
+    let layout_str = layout_path.to_string_lossy();
+    let operbox_str = operbox_path.to_string_lossy();
+    emit_base_rotation(
+        &out,
+        layout_str.as_ref(),
+        operbox_str.as_ref(),
+        operbox.owned_count(),
+        &report,
+    )
+}
+
+fn write_rotation_assignments(dir: &Path, report: &infra_core::schedule::BaseRotationReport) -> Result<(), Error> {
+    fs::create_dir_all(dir)?;
+    for shift in &report.shifts {
+        let role = match shift.role {
+            infra_core::schedule::BaseShiftRole::Peak => "peak",
+            infra_core::schedule::BaseShiftRole::Recovery => "recovery",
+        };
+        let reuse = shift
+            .reused_from_shift
+            .map(|i| format!("_reuse{}", i + 1))
+            .unwrap_or_default();
+        let path = dir.join(format!(
+            "assignment_{}_{}{}.json",
+            shift.index + 1,
+            role,
+            reuse
+        ));
+        shift.assignment.save(&path)?;
+        eprintln!("wrote {}", path.display());
+    }
+    Ok(())
+}
+
+fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
+    let out = OutputOptions::from_args(args);
+    let layout_path = layout_path_from_args(args)?;
+    let operbox_path = operbox_path_from_args(args)?;
+    let top_k = args
+        .windows(2)
+        .find(|w| w[0] == "--top")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(3);
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+
+    let assignment = if let Some(path) = assignment_path_from_args(args) {
+        BaseAssignment::load(&path)?
+    } else {
+        assign_base_greedy(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k,
+                ..AssignBaseOptions::default()
+            },
+        )?
+    };
+
+    let durin_plan = operbox.durin_dorm_planning_count(&instances);
+    let resolved = resolve_base(
+        &blueprint,
+        &assignment,
+        Some(&instances),
+        Some(&table),
+        24.0,
+        Some(durin_plan),
+    )?;
+    let layout = Arc::new(resolved.layout_snapshot());
+
+    let trade_scenario = blueprint.trade_station_scenario();
+    let manu_scenario = blueprint.manu_line_scenario();
+    let trade_order_mode = if trade_scenario.total_stations() == 0 {
+        TradeSearchOrderMode::Single(TradeOrderKind::Gold)
+    } else {
+        TradeSearchOrderMode::Stations(trade_scenario)
+    };
+    let recipe_mode = ManuSearchRecipeMode::Lines(manu_scenario);
+
+    let trade_mode_label = match trade_order_mode {
+        TradeSearchOrderMode::Single(kind) => format!("single:{kind:?}"),
+        TradeSearchOrderMode::Stations(s) => format!(
+            "{} stations ({} gold + {} originium)",
+            s.total_stations(),
+            s.gold_order_stations,
+            s.originium_order_stations
+        ),
+    };
+    let manu_scenario_label = format!(
+        "{} lines ({} gold + {} battle_record + {} originium)",
+        manu_scenario.total_lines(),
+        manu_scenario.gold_lines,
+        manu_scenario.battle_record_lines,
+        manu_scenario.originium_lines
+    );
+
+    let trade_roster = operbox.trade_roster(&instances);
+    let trade_pool = build_trade_pool(&trade_roster, &instances, &table)?;
+    let trade_stats = trade_pool.stats();
+    let trade_report = search_trade_triples(
+        &trade_pool,
+        &table,
+        &TradeSearchOptions {
+            top_k,
+            layout: Arc::clone(&layout),
+            gold_production_lines: blueprint.gold_manu_line_count(),
+            order_mode: trade_order_mode,
+            ..TradeSearchOptions::default()
+        },
+    )?;
+
+    let manu_roster = operbox.manufacture_roster(&instances);
+    let manu_pool = build_manufacture_pool(&manu_roster, &instances, &table)?;
+    let manu_stats = manu_pool.stats();
+    let manu_report = search_manufacture_triples(
+        &manu_pool,
+        &table,
+        &ManuSearchOptions {
+            top_k,
+            layout: Arc::clone(&layout),
+            recipe_mode,
+            ..ManuSearchOptions::default()
+        },
+    )?;
+
+    let layout_str = layout_path.to_string_lossy();
+    let operbox_str = operbox_path.to_string_lossy();
+    emit_bench(
+        &out,
+        &BenchMeta {
+            operbox: operbox_str.as_ref(),
+            owned: operbox.owned_count(),
+            layout: Some(layout_str.as_ref()),
+            manufacture_scenario: &manu_scenario_label,
+            trade_order_mode: &trade_mode_label,
+        },
+        PoolSummary {
+            facility: "trade",
+            operbox: None,
+            owned: None,
+            roster_size: trade_roster.len(),
+            ready: trade_stats.ready,
+            skipped: trade_stats.skipped,
+            combinations_3: trade_stats.combinations_3,
+        },
+        &trade_report,
+        PoolSummary {
+            facility: "manufacture",
+            operbox: None,
+            owned: None,
+            roster_size: manu_roster.len(),
+            ready: manu_stats.ready,
+            skipped: manu_stats.skipped,
+            combinations_3: manu_stats.combinations_3,
+        },
+        &manu_report,
+    )
+}
+
+fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
+    let text = args.iter().any(|a| a == "--text");
+    let layout_path = layout_path_from_args(args)?;
+    let operbox_path = operbox_path_from_args(args)?;
+    let assignment_path = assignment_path_from_args(args)
+        .ok_or_else(|| Error::msg("layout eval requires --assignment <path>"))?;
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let assignment = BaseAssignment::load(&assignment_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+    let durin_plan = operbox.durin_dorm_planning_count(&instances);
+
+    let resolved = resolve_base(
+        &blueprint,
+        &assignment,
+        Some(&instances),
+        Some(&table),
+        24.0,
+        Some(durin_plan),
+    )?;
+
+    if text {
+        eprintln!(
+            "layout eval layout={} operbox={} assignment={} durin_in_base={}",
+            layout_path.display(),
+            operbox_path.display(),
+            assignment_path.display(),
+            resolved.layout.durin_in_base
+        );
+    }
+
+    let mut trade_total = 0.0;
+    for room in &resolved.trade_rooms {
+        if room.operators.is_empty() {
+            continue;
+        }
+        let input = TradeRoomInput {
+            level: room.level,
+            operators: room.operators.clone(),
+            order_count: None,
+            mood: 24.0,
+            gold_production_lines: Some(resolved.gold_manu_line_count()),
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: Arc::new(room.layout.clone()),
+            active_order_kind: room.order,
+        };
+        let result = solve_trade_with_shift(&input, &table, 24.0)?;
+        trade_total += result.effective_eff_multiplier;
+        if text {
+            let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
+            eprintln!(
+                "  trade {} {:?} ops={:?} score={:.3} trade%={:.1} gold%={:.1} shortcut={:?}",
+                room.id.0,
+                room.order,
+                names,
+                result.effective_eff_multiplier,
+                result.order_eff_total,
+                result.order_mechanic.mechanic_equiv_eff_pct,
+                result.trade_shortcut
+            );
+        }
+    }
+
+    let mut manu_total = 0.0;
+    for room in &resolved.manu_rooms {
+        if room.operators.is_empty() {
+            continue;
+        }
+        let input = ManuRoomInput {
+            level: room.level,
+            operators: room.operators.clone(),
+            active_recipe: room.recipe,
+            mood: 24.0,
+            layout: Arc::new(room.layout.clone()),
+        };
+        let result = solve_manufacture(&input, &table)?;
+        manu_total += result.prod_total;
+        if text {
+            let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
+            eprintln!(
+                "  manu {} {:?} ops={:?} prod%={:.1} storage={}",
+                room.id.0,
+                room.recipe,
+                names,
+                result.prod_total,
+                result.storage_limit
+            );
+        }
+    }
+
+    if text {
+        eprintln!(
+            "  total trade_score={:.3} manu_prod_sum={:.1}",
+            trade_total, manu_total
+        );
+    } else {
+        println!(
+            "{{\"trade_score\":{trade_total:.6},\"manu_prod_sum\":{manu_total:.6},\"durin_in_base\":{}}}",
+            resolved.layout.durin_in_base
+        );
+    }
+    Ok(())
+}

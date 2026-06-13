@@ -1,33 +1,67 @@
-use crate::tier::PromotionTier;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, Default)]
-pub struct TradeLayoutContext {
-    pub meeting_max_level: u8,
-    pub dorm_level_sum: u16,
-    pub manu_recipe_kinds: u8,
-    pub elite_facility_count: u8,
-    pub sui_facility_count: u8,
-    /// 全基建宿舍进驻人数合计（黑键/乌有状态链）.
-    pub dorm_occupant_count: u8,
-    /// 森西宿舍写入的魔物料理层数（齐尔查克贸易链）.
-    pub monster_cuisine_layers: u8,
-    /// Operators working anywhere in base (赫德雷·白手起家).
-    pub base_workforce: Vec<String>,
+pub use crate::layout::{LayoutContext, SharedLayout, DEFAULT_DORM_OCCUPANT_COUNT};
+
+/// 兼容旧名；新代码请用 [`LayoutContext`]。
+pub type TradeLayoutContext = LayoutContext;
+
+use crate::tier::PromotionTier;
+use crate::types::{CompiledAtom, RecipeKind};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TradeOrderKind {
+    #[default]
+    Gold,
+    Originium,
 }
 
-impl TradeLayoutContext {
-    /// 243c Lv3 公孙长乐基准：布局技能与常见基建联动干员在岗。
-    pub fn search_baseline() -> Self {
-        Self {
-            meeting_max_level: 3,
-            dorm_level_sum: 12,
-            manu_recipe_kinds: 4,
-            elite_facility_count: 6,
-            sui_facility_count: 2,
-            dorm_occupant_count: 20,
-            monster_cuisine_layers: 3,
-            base_workforce: vec!["伺夜".into(), "乌尔比安".into()],
+impl TradeOrderKind {
+    pub fn as_recipe_kind(self) -> RecipeKind {
+        match self {
+            Self::Gold => RecipeKind::Gold,
+            Self::Originium => RecipeKind::Originium,
         }
+    }
+
+    pub fn is_gold(self) -> bool {
+        matches!(self, Self::Gold)
+    }
+}
+
+/// 贸易站排班假设：同类订单站共用同一三人组（L1 搜索简化）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct TradeStationScenario {
+    pub gold_order_stations: u8,
+    pub originium_order_stations: u8,
+}
+
+impl TradeStationScenario {
+    /// 默认基准：3 站 = 2 赤金订单 + 1 源石（固源岩）订单。
+    pub fn standard_three_stations() -> Self {
+        Self {
+            gold_order_stations: 2,
+            originium_order_stations: 1,
+        }
+    }
+
+    pub fn total_stations(self) -> u8 {
+        self.gold_order_stations
+            .saturating_add(self.originium_order_stations)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum TradeSearchOrderMode {
+    /// 单订单类型求值（调试 / 专精站）。
+    Single(TradeOrderKind),
+    /// 按站数加权求和（默认 2 赤金 + 1 源石）。
+    Stations(TradeStationScenario),
+}
+
+impl Default for TradeSearchOrderMode {
+    fn default() -> Self {
+        Self::Stations(TradeStationScenario::standard_three_stations())
     }
 }
 
@@ -37,6 +71,14 @@ pub struct TradeOperator {
     pub elite: u8,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
+    /// 建池时预编译；手动构造的干员用空切片。
+    pub compiled_atoms: Arc<[CompiledAtom]>,
+}
+
+impl Default for TradeOperator {
+    fn default() -> Self {
+        Self::new("", 0, Vec::new())
+    }
 }
 
 impl TradeOperator {
@@ -54,6 +96,7 @@ impl TradeOperator {
             elite,
             buff_ids,
             tags: Vec::new(),
+            compiled_atoms: Arc::from([]),
         }
     }
 }
@@ -70,7 +113,9 @@ pub struct TradeRoomInput {
     pub durin_virtual_lines: Option<u32>,
     /// 进驻贸易站前已积累的人间烟火（铎铃心情链）。
     pub human_fireworks: Option<f64>,
-    pub layout: TradeLayoutContext,
+    pub layout: SharedLayout,
+    /// 当前贸易站处理的订单类型（赤金 / 固源岩源石订单）。
+    pub active_order_kind: TradeOrderKind,
 }
 
 impl TradeRoomInput {
@@ -87,7 +132,13 @@ impl TradeRoomInput {
             gold_production_lines: None,
             durin_virtual_lines: None,
             human_fireworks: None,
-            layout: TradeLayoutContext::default(),
+            layout: Arc::new(LayoutContext::default()),
+            active_order_kind: TradeOrderKind::Gold,
         }
+    }
+
+    pub fn with_order_kind(mut self, kind: TradeOrderKind) -> Self {
+        self.active_order_kind = kind;
+        self
     }
 }

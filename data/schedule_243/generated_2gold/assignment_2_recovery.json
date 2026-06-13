@@ -1,0 +1,167 @@
+{
+  "rooms": [
+    {
+      "room_id": "control",
+      "operators": [
+        {
+          "name": "凯尔希",
+          "elite": 2
+        },
+        {
+          "name": "明椒",
+          "elite": 2
+        },
+        {
+          "name": "森蚺",
+          "elite": 2
+        },
+        {
+          "name": "火龙S黑角",
+          "elite": 2
+        },
+        {
+          "name": "麒麟R夜刀",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "dorm_1",
+      "operators": [
+        {
+          "name": "森西",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "trade_1",
+      "operators": [
+        {
+          "name": "孑",
+          "elite": 2
+        },
+        {
+          "name": "泰拉大陆调查团",
+          "elite": 2
+        },
+        {
+          "name": "但书",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "trade_2",
+      "operators": [
+        {
+          "name": "维娜·维多利亚",
+          "elite": 2
+        },
+        {
+          "name": "摩根",
+          "elite": 2
+        },
+        {
+          "name": "伺夜",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_1",
+      "operators": [
+        {
+          "name": "弑君者",
+          "elite": 2
+        },
+        {
+          "name": "断罪者",
+          "elite": 2
+        },
+        {
+          "name": "裂响",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_2",
+      "operators": [
+        {
+          "name": "Castle-3",
+          "elite": 2
+        },
+        {
+          "name": "圣约送葬人",
+          "elite": 2
+        },
+        {
+          "name": "白雪",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_3",
+      "operators": [
+        {
+          "name": "梅尔",
+          "elite": 2
+        },
+        {
+          "name": "淬羽赫默",
+          "elite": 2
+        },
+        {
+          "name": "玛露西尔",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "manu_4",
+      "operators": [
+        {
+          "name": "史都华德",
+          "elite": 2
+        },
+        {
+          "name": "石棉",
+          "elite": 2
+        },
+        {
+          "name": "苍苔",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_1",
+      "operators": [
+        {
+          "name": "天空盒",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_2",
+      "operators": [
+        {
+          "name": "格雷伊",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "room_id": "power_3",
+      "operators": [
+        {
+          "name": "海霓",
+          "elite": 2
+        }
+      ]
+    }
+  ]
+}

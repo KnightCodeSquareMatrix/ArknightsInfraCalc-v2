@@ -1,6 +1,5 @@
 case_id,shortcut_id,operators,trade_level,expect_trade_pct,expect_gold_pct,expect_shortcut,tolerance
 reg_gsl_witch_long_beta,gsl_witch_long_beta,see_roster,3,138.0,46.0,gsl_witch_long_beta,0.5
-reg_gsl_witch_long_docus,gsl_witch_long_docus,see_roster,3,178.0,33.5,gsl_witch_long_docus,0.5
 reg_gsl_witch_long_alpha,gsl_witch_long_alpha,see_roster,3,129.0,38.0,gsl_witch_long_alpha,0.5
 reg_gsl_witch_long_blank,gsl_witch_long_blank,see_roster,3,124.0,33.0,gsl_witch_long_blank,0.5
 reg_gsl_witch_long0_blank,gsl_witch_long0_blank,see_roster,3,108.0,17.0,gsl_witch_long0_blank,0.5
@@ -8,3 +7,5 @@ reg_gsl_witch_beta_blank,gsl_witch_beta_blank,see_roster,3,93.0,0.0,gsl_witch_be
 reg_gsl_closure_tier90,gsl_closure_tier90,可露希尔+挂件,3,135.0,42.0,gsl_closure_tier90,2.0
 reg_gsl_closure_tier80,gsl_closure_tier80,可露希尔+挂件,3,124.0,40.0,gsl_closure_tier80,2.0
 reg_gsl_closure_tier60,gsl_closure_tier60,可露希尔+挂件,3,100.0,36.0,gsl_closure_tier60,2.0
+reg_gsl_docus_solo,gsl_docus_solo,但书+挂件,3,23.0,55.0,gsl_docus_solo,2.0
+reg_gsl_ling_jie_yaxin,gsl_ling_jie_yaxin,see_roster,3,125.0,0.0,gsl_ling_jie_yaxin,0.5

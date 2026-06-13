@@ -5,35 +5,75 @@ use csv::ReaderBuilder;
 
 use crate::error::{Error, Result};
 
-/// Player-owned operators: canonical name → elite level (0–2).
+/// Player-owned operator progress for tier resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OperatorProgress {
+    pub elite: u8,
+    pub level: u32,
+    /// 0 = unknown (CSV roster); tier logic treats as 5–6★.
+    pub rarity: u8,
+}
+
+impl OperatorProgress {
+    pub fn new(elite: u8, level: u32, rarity: u8) -> Self {
+        Self {
+            elite,
+            level,
+            rarity,
+        }
+    }
+
+    pub fn elite_only(elite: u8) -> Self {
+        Self {
+            elite,
+            level: 1,
+            rarity: 0,
+        }
+    }
+}
+
+/// Player-owned operators: canonical name → progress.
 #[derive(Debug, Clone, Default)]
 pub struct Roster {
-    elite_by_name: HashMap<String, u8>,
+    by_name: HashMap<String, OperatorProgress>,
 }
 
 impl Roster {
     pub fn from_elite_map(elite_by_name: HashMap<String, u8>) -> Self {
-        Self { elite_by_name }
+        Self {
+            by_name: elite_by_name
+                .into_iter()
+                .map(|(name, elite)| (name, OperatorProgress::elite_only(elite)))
+                .collect(),
+        }
     }
 
-    pub fn insert(&mut self, name: impl Into<String>, elite: u8) {
-        self.elite_by_name.insert(name.into(), elite);
+    pub fn from_progress_map(by_name: HashMap<String, OperatorProgress>) -> Self {
+        Self { by_name }
+    }
+
+    pub fn insert(&mut self, name: impl Into<String>, progress: OperatorProgress) {
+        self.by_name.insert(name.into(), progress);
     }
 
     pub fn elite(&self, name: &str) -> Option<u8> {
-        self.elite_by_name.get(name).copied()
+        self.by_name.get(name).map(|p| p.elite)
+    }
+
+    pub fn progress(&self, name: &str) -> Option<OperatorProgress> {
+        self.by_name.get(name).copied()
     }
 
     pub fn names(&self) -> impl Iterator<Item = &String> {
-        self.elite_by_name.keys()
+        self.by_name.keys()
     }
 
     pub fn len(&self) -> usize {
-        self.elite_by_name.len()
+        self.by_name.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.elite_by_name.is_empty()
+        self.by_name.is_empty()
     }
 
     /// Load `roster.csv` rows for a facility (`trade`, `manufacture`, …).
@@ -51,7 +91,7 @@ impl Roster {
         let facility_i = idx("facility")?;
         let elite_i = idx("elite")?;
 
-        let mut elite_by_name = HashMap::new();
+        let mut by_name = HashMap::new();
         for rec in rdr.records() {
             let rec = rec?;
             if rec.get(facility_i).is_none_or(|f| f != facility) {
@@ -65,12 +105,16 @@ impl Roster {
                 .trim()
                 .parse()
                 .map_err(|_| Error::msg(format!("invalid elite for {name}")))?;
-            elite_by_name
+            by_name
                 .entry(name)
-                .and_modify(|e: &mut u8| *e = (*e).max(elite))
-                .or_insert(elite);
+                .and_modify(|p: &mut OperatorProgress| {
+                    if elite > p.elite {
+                        *p = OperatorProgress::elite_only(elite);
+                    }
+                })
+                .or_insert(OperatorProgress::elite_only(elite));
         }
-        Ok(Self { elite_by_name })
+        Ok(Self { by_name })
     }
 }
 

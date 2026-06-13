@@ -125,9 +125,9 @@
       "atoms": [
         {
           "action": {
-            "kind": "replace_order",
+            "kind": "tag_order",
             "params": {
-              "order_type": "closure_special"
+              "tag": "closure_special"
             }
           },
           "phase": "order_mechanic",
@@ -170,7 +170,7 @@
       "tier": "tier_up",
       "atoms": [
         {
-          "selector": "other_ops_direct_eff",
+          "selector": "other_ops_settled_eff",
           "action": {
             "kind": "reduce_limit",
             "params": {
@@ -182,15 +182,15 @@
           "phase_order": 40
         },
         {
-          "selector": "final_order_limit",
+          "selector": "order_count",
           "action": {
             "kind": "add_flat_eff_from_selector",
             "params": {
               "multiplier": 4.0
             }
           },
-          "phase": "eff_var",
-          "phase_order": 60
+          "phase": "order_var",
+          "phase_order": 50
         }
       ]
     },
@@ -1150,7 +1150,7 @@
       "atoms": [
         {
           "action": {
-            "kind": "vodfox_absorb",
+            "kind": "peer_eff_absorb",
             "params": {
               "rate_per_peer": 45.0
             }
@@ -1411,6 +1411,18 @@
           },
           "phase": "limit",
           "phase_order": 40
+        },
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "Matatabi",
+              "div": 1.0,
+              "multiplier": 3.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 30
         }
       ]
     },
@@ -1813,9 +1825,19 @@
       "atoms": [
         {
           "action": {
-            "kind": "replace_order",
+            "kind": "peer_eff_absorb",
             "params": {
-              "order_type": "pepe_exclusive"
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "tag_order",
+            "params": {
+              "tag": "pepe_exclusive"
             }
           },
           "phase": "order_mechanic",
@@ -2018,9 +2040,9 @@
         },
         {
           "action": {
-            "kind": "replace_order",
+            "kind": "tag_order",
             "params": {
-              "order_type": "eureka"
+              "tag": "eureka"
             }
           },
           "phase": "order_mechanic",
@@ -2155,7 +2177,10 @@
       "tier": "tier_0",
       "atoms": [
         {
-          "selector": "other_ops_total_eff",
+          "condition": {
+            "tiandao_eff_var_allowed": {}
+          },
+          "selector": "peer_settled_eff_sum",
           "action": {
             "kind": "add_bucket_eff_from_selector",
             "params": {
@@ -2176,7 +2201,10 @@
       "tier": "tier_up",
       "atoms": [
         {
-          "selector": "other_ops_total_eff",
+          "condition": {
+            "tiandao_eff_var_allowed": {}
+          },
+          "selector": "peer_settled_eff_sum",
           "action": {
             "kind": "add_bucket_eff_from_selector",
             "params": {
@@ -2237,6 +2265,4039 @@
           },
           "phase": "mood",
           "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_bd_to_bd[000]",
+      "skill_name": "古老巫术",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_constrLv[000]",
+      "skill_name": "绘图设计",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "facility_level_sum_excl_meeting",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "EngineeringRobot",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_cost[000]",
+      "skill_name": "春雷响，万物长",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "room_operators"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_cost_all[000]",
+      "skill_name": "配合意识",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_cost[000]",
+      "skill_name": "Vlog",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20,
+          "condition": {
+            "active_recipe": {
+              "kind": "battle_record"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_limit[0000]",
+      "skill_name": "剪辑·α",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 12,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_limit[010]",
+      "skill_name": "剪辑·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 15,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_limit[020]",
+      "skill_name": "合理利用",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 4,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd&bd[000]",
+      "skill_name": "战阵领袖",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&bd[001]",
+      "skill_name": "战阵领袖",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&cost[000]",
+      "skill_name": "挑大梁",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&cost[001]",
+      "skill_name": "例行清扫",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&cost_bd[000]",
+      "skill_name": "挑大梁",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&cost_bd[100]",
+      "skill_name": "莱茵科技·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&dorm&lv[000]",
+      "skill_name": "齐心沙盗",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "manu_formula_spd&limit&cost[000]",
+      "skill_name": "镜中影",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd&limit&cost[010]",
+      "skill_name": "戏中人",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd&limit&cost[100]",
+      "skill_name": "“连轴转”",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[000]",
+      "skill_name": "胜利之计",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[010]",
+      "skill_name": "作战指导录像",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[020]",
+      "skill_name": "拳术指导录像",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[022]",
+      "skill_name": "逆境荣光",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[030]",
+      "skill_name": "公证所教习·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[031]",
+      "skill_name": "公证所教习·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[100]",
+      "skill_name": "金属工艺·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[101]",
+      "skill_name": "金属工艺·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[102]",
+      "skill_name": "原质塑金副产物",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "trade_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 3.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[110]",
+      "skill_name": "金属工艺·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[200]",
+      "skill_name": "源石工艺·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[201]",
+      "skill_name": "地质学·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[210]",
+      "skill_name": "源石工艺·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[211]",
+      "skill_name": "地质学·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[212]",
+      "skill_name": "源石研究",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[213]",
+      "skill_name": "火山学家",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd_P[000]",
+      "skill_name": "患难拍档",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "operator_in_trade": {
+              "name": "古米"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_bd[000]",
+      "skill_name": "实干的寡言者",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_from_state",
+            "params": {
+              "key": "UsautDrink",
+              "multiplier": 2.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[0000]",
+      "skill_name": "拾荒者",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[000]",
+      "skill_name": "拾荒者",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[001]",
+      "skill_name": "磐蟹·阿盘",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[002]",
+      "skill_name": "“都想要”",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[003]",
+      "skill_name": "智慧之境",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[010]",
+      "skill_name": "囤积者",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 10
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[011]",
+      "skill_name": "无畏豪情",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 10
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[012]",
+      "skill_name": "午休好去处",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 10
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[020]",
+      "skill_name": "探险者",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 16
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[021]",
+      "skill_name": "掘进工程",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 10
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_limit&cost[1020]",
+      "skill_name": "收纳达人",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 16
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&fraction[000]",
+      "skill_name": "重聚时光",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_room": {
+              "tag": "cc.g.a1"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&bd[000]",
+      "skill_name": "可靠的随从们",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "Matatabi",
+              "div": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[000]",
+      "skill_name": "工匠精神·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": -5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 16
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.15,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[001]",
+      "skill_name": "工匠精神·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": -5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 19
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[010]",
+      "skill_name": "麻烦制造者",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": -12
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[011]",
+      "skill_name": "特立独行",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": -12
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[020]",
+      "skill_name": "“可靠”助手",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": -20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 17
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 22
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[100]",
+      "skill_name": "得心应手",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 6
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[101]",
+      "skill_name": "虔信",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[110]",
+      "skill_name": "独当一面",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[200]",
+      "skill_name": "量体裁衣",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit&cost[300]",
+      "skill_name": "行动派",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": -8
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit[000]",
+      "skill_name": "仓库整备·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 6
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&limit[001]",
+      "skill_name": "仓库整备·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 10
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&manu[000]",
+      "skill_name": "流程优化",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "room_operator_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20,
+          "tag": "station"
+        },
+        {
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 5
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21,
+          "condition": {
+            "owner_lacks_buff": {
+              "buff_id": "manu_prod_spd&manu[100]"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&manu[100]",
+      "skill_name": "科学改造",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "room_operator_count",
+          "action": {
+            "kind": "add_limit_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 25
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&power[000]",
+      "skill_name": "自动化·α",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "power_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&power[010]",
+      "skill_name": "自动化·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "power_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&power[020]",
+      "skill_name": "仿生海龙",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "power_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 15.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&trade[000]",
+      "skill_name": "再生能源",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "trade_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 20.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&trade[1000]",
+      "skill_name": "原质塑金副产物",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "trade_station_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 3.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[000]",
+      "skill_name": "标准化·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[001]",
+      "skill_name": "莱茵科技·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[002]",
+      "skill_name": "红松骑士团·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[003]",
+      "skill_name": "磐蟹·豆豆",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[004]",
+      "skill_name": "差遣使魔·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[010]",
+      "skill_name": "标准化·β",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[011]",
+      "skill_name": "莱茵科技·β",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[012]",
+      "skill_name": "红松骑士团·β",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[014]",
+      "skill_name": "差遣使魔·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[020]",
+      "skill_name": "咪波·制造型",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[021]",
+      "skill_name": "莱茵科技·γ",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_addition&cost[000]",
+      "skill_name": "模糊视线",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "manu_prod_spd_addition[030]",
+      "skill_name": "急性子",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_ramp",
+            "params": {
+              "initial": 20.0,
+              "per_hour": 1.0,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_addition[031]",
+      "skill_name": "“等不及”",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_ramp",
+            "params": {
+              "initial": 20.0,
+              "per_hour": 1.0,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_addition[040]",
+      "skill_name": "慢性子",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_ramp",
+            "params": {
+              "initial": 15.0,
+              "per_hour": 2.0,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_addition[041]",
+      "skill_name": "延时摄影",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_ramp",
+            "params": {
+              "initial": 15.0,
+              "per_hour": 2.0,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_addition[100]",
+      "skill_name": "例行清扫",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_ramp",
+            "params": {
+              "initial": 0.0,
+              "per_hour": 2.0,
+              "cap": 20.0,
+              "style": "hourly_only"
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[000]",
+      "skill_name": "念力",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "ThoughtChainRing",
+              "div": 2.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[010]",
+      "skill_name": "意识实体",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "ThoughtChainRing",
+              "div": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[100]",
+      "skill_name": "机械辅助·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "EngineeringRobot",
+              "div": 16.0,
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[110]",
+      "skill_name": "机械辅助·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "EngineeringRobot",
+              "div": 8.0,
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[200]",
+      "skill_name": "逐水草",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "HumanFireworks",
+              "div": 5.0,
+              "multiplier": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[201]",
+      "skill_name": "问枯荣",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "HumanFireworks",
+              "div": 5.0,
+              "multiplier": 2.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[300]",
+      "skill_name": "稻禾厚，顺秋收",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "HumanFireworks",
+              "div": 3.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd[400]",
+      "skill_name": "差遣使魔·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "MonsterCuisine",
+              "div": 1.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_bd_n1[000]",
+      "skill_name": "超感",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "dorm_occupant_count",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Perception",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "state_convert",
+            "params": {
+              "from": "Perception",
+              "to": "ThoughtChainRing",
+              "ratio": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 11
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_double[000]",
+      "skill_name": "“搭把手！”",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "温米"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_double[100]",
+      "skill_name": "盛餐的回报",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "酒神"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_reduce[000]",
+      "skill_name": "模糊视线",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_train&lv[000]",
+      "skill_name": "手艺人",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "training_room_level",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0,
+              "cap": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_variable2[000]",
+      "skill_name": "团队精神",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "peer_skill_eff_sum",
+          "action": {
+            "kind": "add_bucket_eff_from_selector",
+            "params": {
+              "step": 5.0,
+              "ret_per_step": 5.0,
+              "cap": 40.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_variable3[000]",
+      "skill_name": "囤积者",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_from_limit_contrib_tiered",
+            "params": {
+              "threshold": 16,
+              "low_rate": 1.0,
+              "high_rate": 3.0
+            }
+          },
+          "phase": "limit_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd_variable[000]",
+      "skill_name": "回收利用",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_eff_from_limit_contrib_sum",
+            "params": {
+              "rate": 2.0
+            }
+          },
+          "phase": "limit_var",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "manu_skill_change[000]",
+      "skill_name": "意识兼容",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "manu_skill_limit[000]",
+      "skill_name": "勘探背包",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "rhine_skill_count_in_room",
+          "action": {
+            "kind": "add_limit_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_skill_spd1[000]",
+      "skill_name": "意识协议",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "standard_skill_count_in_room",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_skill_spd1[010]",
+      "skill_name": "源石技艺理论应用",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "rhine_skill_count_in_room",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_skill_spd1[020]",
+      "skill_name": "打工心得",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "metal_formula_skill_count_in_room",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_token_prod_spd[000]",
+      "skill_name": "机械精通·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "platform_count_in_power",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 5.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_token_prod_spd[010]",
+      "skill_name": "机械精通·β",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "platform_count_in_power",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 10.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd[1000]",
+      "skill_name": "标准化·α",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_tra_spd[000]",
+      "skill_name": "合作协议",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_spd[010]",
+      "skill_name": "大小姐",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_spd[020]",
+      "skill_name": "朝气蓬勃",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_spd[030]",
+      "skill_name": "情报主脑",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_limit&spd[000]",
+      "skill_name": "精密计算",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_karlan_precision",
+            "params": {
+              "eff_per_karlan": -15.0,
+              "limit_per_karlan": 6
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_prod_spd[000]",
+      "skill_name": "最高权限",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 2.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_prod_spd[1000]",
+      "skill_name": "最高权限",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 2.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_pow_bot[000]",
+      "skill_name": "我寻思能行",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "operator_in_power": {
+              "name": "Lancet-2"
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "VirtualPower",
+              "amount": 2.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_prod_tra_spd[000]",
+      "skill_name": "权变",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "external_momentum_gte_field": {}
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        },
+        {
+          "condition": {
+            "field_momentum_gt_external": {}
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 2.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_costToBD[000]",
+      "skill_name": "山河远阔",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "mood_above": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "HumanFireworks",
+              "amount": 15.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "condition": {
+            "mood_below_or_eq": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Perception",
+              "amount": 10.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 11
+        }
+      ]
+    },
+    {
+      "id": "control_mp_cost&bd1[000]",
+      "skill_name": "不以物喜",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "mood_below_or_eq": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "HumanFireworks",
+              "amount": 15.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_mp_cost&bd_up[000]",
+      "skill_name": "知我为我",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": {
+            "capped_sui_facility_count": {
+              "max": 5
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "HumanFireworks",
+              "amount": 5.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.5,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_mp_bd[010]",
+      "skill_name": "乌萨斯特饮",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_control": {
+              "tag": "cc.g.usaut"
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "UsautDrink",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_mp_bd2[000]",
+      "skill_name": "团队合作",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_control": {
+              "tag": "cc.g.monhun"
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Matatabi",
+              "amount": 2.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_mp_cost&bd2[010]",
+      "skill_name": "耐力回复",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Matatabi",
+              "amount": 8.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.5,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_token_tra_spd[000]",
+      "skill_name": "秘传交涉术",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "peer_tag_in_room": {
+              "tag": "cc.g.monhun"
+            }
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_token_prod_spd2[000]",
+      "skill_name": "以身作则",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "peer_tag_in_room": {
+              "tag": "cc.g.monhun"
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 2.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_mp_cost&bd2[000]",
+      "skill_name": "不以己悲",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "mood_above": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Perception",
+              "amount": 10.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.5,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_tra_limit&spd3[000]",
+      "skill_name": "商业版图",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": {
+            "trade_stations_with_tagged_gte": {
+              "tag": "cc.g.karlan",
+              "min": 3
+            }
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_limit&spd[010]",
+      "skill_name": "运筹好手",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_trade_sum": {
+              "tag": "cc.g.glasgow"
+            }
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_tra_limit&spd2[000]",
+      "skill_name": "家族认可",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_trade_sum": {
+              "tag": "cc.g.siracusa"
+            }
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "trade_global_flat"
+        }
+      ]
+    },
+    {
+      "id": "control_token_prod_spd[000]",
+      "skill_name": "超频",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "platform_count_gte": {
+              "min": 2
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 2.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_token_prod_spd3[000]",
+      "skill_name": "共事情谊",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "peer_tag_in_room": {
+              "tag": "cc.g.lgd"
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 3.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_bd_spd[000]",
+      "skill_name": "老友相聚",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_manu_sum": {
+              "tag": "cc.g.blacksteel"
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.5,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_mp_bd[000]",
+      "skill_name": "情报储备",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_control": {
+              "tag": "cc.g.rainbow"
+            }
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "IntelligenceReserve",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_prod_fraction[000]",
+      "skill_name": "烛骑士微光",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": {
+            "tagged_count_in_manu_sum": {
+              "tag": "cc.g.knight"
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 7.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_global_all"
+        }
+      ]
+    },
+    {
+      "id": "control_dorm_bd[000]",
+      "skill_name": "偶像光环",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "dorm_occupant_count",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Passion",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_hire_spd&bd[000]",
+      "skill_name": "可靠伙伴",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Passion",
+              "amount": 10.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_prod_bd_spd[000]",
+      "skill_name": "丰富工作经验",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 0.5,
+              "recipe": "gold"
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_gold_flat"
+        },
+        {
+          "selector": {
+            "state_pool_floored": {
+              "key": "Passion",
+              "div": 20.0
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 0.5,
+              "recipe": "gold"
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 11,
+          "tag": "manu_gold_passion"
+        }
+      ]
+    },
+    {
+      "id": "control_prod_bd_spd[010]",
+      "skill_name": "丰富工作经验",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 1.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10,
+          "tag": "manu_gold_flat"
+        },
+        {
+          "selector": {
+            "state_pool_floored": {
+              "key": "Passion",
+              "div": 20.0
+            }
+          },
+          "action": {
+            "kind": "global_inject_manu_eff",
+            "params": {
+              "value": 1.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 11,
+          "tag": "manu_gold_passion"
+        }
+      ]
+    },
+    {
+      "id": "control_mp_bd&trade[000]",
+      "skill_name": "演技的怪物",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Passion",
+              "amount": 20.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "selector": {
+            "state_pool_floored": {
+              "key": "Passion",
+              "div": 8.0
+            }
+          },
+          "action": {
+            "kind": "global_inject_trade_eff",
+            "params": {
+              "value": 1.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 20,
+          "tag": "trade_passion_muzu"
+        },
+        {
+          "action": {
+            "kind": "mood_drain_per_state_step",
+            "params": {
+              "key": "Passion",
+              "step_size": 8.0,
+              "delta_per_step": 0.01,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 30
+        }
+      ]
+    },
+    {
+      "id": "control_facCostReset[000]",
+      "skill_name": "设施维护",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost&faction[030]",
+      "skill_name": "幕后指挥",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost&faction[990]",
+      "skill_name": "彩虹小队",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost[012]",
+      "skill_name": "监管者",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost&bd3[000]",
+      "skill_name": "生活的重压",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_dorm_rec2[000]",
+      "skill_name": "羁绊相生",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost_reset[000]",
+      "skill_name": "互为半身",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost[007]",
+      "skill_name": "小小的领袖",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_psk[000]",
+      "skill_name": "捍卫之道",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_cost[010]",
+      "skill_name": "金盏花诗会",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_mp_bd_cost_expand[000]",
+      "skill_name": "孤光共照",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "office_rec_spd[000]",
+      "skill_name": "语言学",
+      "facility": "office",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 10
+        },
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "IntelligenceReserve",
+              "div": 1.0,
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "state_consume_to_eff",
+            "params": {
+              "key": "UsautDrink",
+              "div": 1.0,
+              "multiplier": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 30
+        }
+      ]
+    },
+    {
+      "id": "power_count[000]",
+      "skill_name": "晨曦",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "condition": {
+            "no_platform_in_other_power": {}
+          },
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "VirtualPower",
+              "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "power_prod_spd_P[000]",
+      "skill_name": "“滴滴，启动！”",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "power_rec_drone[000]",
+      "skill_name": "巡线框架",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "drone_cap",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 0.1,
+              "cap": 25.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_rhine[000]",
+      "skill_name": "生态科主任",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "rhine_life_in_base",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 3.0,
+              "cap": 15.0
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd&addition[000]",
+      "skill_name": "技术交流·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "power_rec_spd&addition[001]",
+      "skill_name": "技术交流·β",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": []
+    },
+    {
+      "id": "power_rec_spd&cost[000]",
+      "skill_name": "热情澎湃",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.52,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd&cost[010]",
+      "skill_name": "外卖水果挞",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.3,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd&dorm&lv[000]",
+      "skill_name": "灵河共鸣",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "dorm_level_sum",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 0.5
+            }
+          },
+          "phase": "eff_var",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[000]",
+      "skill_name": "备用能源",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[0010]",
+      "skill_name": "鸡电工程",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[001]",
+      "skill_name": "热能充能·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[002]",
+      "skill_name": "光能充能·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[003]",
+      "skill_name": "电磁充能·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[004]",
+      "skill_name": "挽歌充能·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[005]",
+      "skill_name": "灵河充能·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[006]",
+      "skill_name": "充能中",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[007]",
+      "skill_name": "雷法专精",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[008]",
+      "skill_name": "澎湃紊流",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[009]",
+      "skill_name": "澎湃紊流",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[010]",
+      "skill_name": "设备维护",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[011]",
+      "skill_name": "清洁能源",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[013]",
+      "skill_name": "高热充能",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[014]",
+      "skill_name": "脉冲电弧·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[015]",
+      "skill_name": "电磁充能·β",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[016]",
+      "skill_name": "聚能",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[017]",
+      "skill_name": "灯塔供能模块",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[020]",
+      "skill_name": "静电场",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[021]",
+      "skill_name": "电荷释放",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[022]",
+      "skill_name": "热能充能·γ",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[023]",
+      "skill_name": "电荷释放",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[024]",
+      "skill_name": "合法窃电",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[025]",
+      "skill_name": "穹顶物流管理·α",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[026]",
+      "skill_name": "穹顶物流管理·β",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[1022]",
+      "skill_name": "热能充能·γ",
+      "facility": "power",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd_P[000]",
+      "skill_name": "“愉快的对谈”",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "operator_in_base": {
+              "name": "凯尔希"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd_P[001]",
+      "skill_name": "咒文共鸣",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "operator_in_training": {
+              "name": "逻各斯"
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd_ext&faction[000]",
+      "skill_name": "维护中",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "other_laterano_in_power": {}
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd_ext&tag[000]",
+      "skill_name": "鸡励机制",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "condition": {
+            "other_platform_in_power": {}
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
         }
       ]
     }

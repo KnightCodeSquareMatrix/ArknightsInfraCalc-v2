@@ -1,0 +1,539 @@
+{
+  "source_page": "https://prts.wiki/w/罗德岛基建/制造站",
+  "source_xpath": "/html/body/div[3]/div[3]/div[5]/div[1]/table[2]/tbody",
+  "source_section": "拥有制造站技能的干员",
+  "fetched_at": "2026-06-12T04:22:28Z",
+  "row_count": 105,
+  "columns": [
+    "skill_name",
+    "description",
+    "operators"
+  ],
+  "rows": [
+    {
+      "skill_name": "古老巫术",
+      "description": "进驻制造站时，每5点人间烟火转化为1点巫术结晶",
+      "operators": "截云"
+    },
+    {
+      "skill_name": "戏中人",
+      "description": "进驻制造站时，作战记录类配方的生产力+35%，心情每小时消耗-0.25",
+      "operators": "酒神"
+    },
+    {
+      "skill_name": "镜中影",
+      "description": "进驻制造站时，作战记录类配方的生产力+20%，心情每小时消耗-0.25",
+      "operators": "酒神"
+    },
+    {
+      "skill_name": "实干的寡言者",
+      "description": "进驻制造站时，生产力+20%，每有1瓶乌萨斯特饮，则仓库容量上限+2",
+      "operators": "导火索"
+    },
+    {
+      "skill_name": "公证所教习·β",
+      "description": "进驻制造站时，作战记录类配方的生产力+30%",
+      "operators": "圣约送葬人"
+    },
+    {
+      "skill_name": "公证所教习·α",
+      "description": "进驻制造站时，作战记录类配方的生产力+20%",
+      "operators": "圣约送葬人"
+    },
+    {
+      "skill_name": "逆境荣光",
+      "description": "进驻制造站时，作战记录类配方的生产力+35%",
+      "operators": "弑君者"
+    },
+    {
+      "skill_name": "拳术指导录像",
+      "description": "进驻制造站时，作战记录类配方的生产力+35%",
+      "operators": "断罪者；食铁兽"
+    },
+    {
+      "skill_name": "“连轴转”",
+      "description": "进驻制造站时，作战记录类配方的生产力+35%，心情每小时消耗+0.25",
+      "operators": "裂响"
+    },
+    {
+      "skill_name": "作战指导录像",
+      "description": "进驻制造站时，作战记录类配方的生产力+30%",
+      "operators": "Castle-3；白雪；红豆；霜叶；食铁兽"
+    },
+    {
+      "skill_name": "原质塑金副产物",
+      "description": "进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+3%",
+      "operators": "引星棘刺"
+    },
+    {
+      "skill_name": "胜利之计",
+      "description": "进驻制造站时，作战记录类配方的生产力+25%",
+      "operators": "帕拉斯"
+    },
+    {
+      "skill_name": "齐心沙盗",
+      "description": "进驻制造站时，每间宿舍每级为贵金属类配方的生产力+1%",
+      "operators": "娜仁图亚"
+    },
+    {
+      "skill_name": "流程优化",
+      "description": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5",
+      "operators": "冬时"
+    },
+    {
+      "skill_name": "科学改造",
+      "description": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5",
+      "operators": "冬时"
+    },
+    {
+      "skill_name": "盛餐的回报",
+      "description": "进驻制造站时，当与酒神在同一个制造站时，作战记录类配方的生产力+30%",
+      "operators": "Miss.Christine"
+    },
+    {
+      "skill_name": "“搭把手！”",
+      "description": "进驻制造站时，当与温米在同一个制造站时，贵金属类配方的生产力+15%",
+      "operators": "阿兰娜"
+    },
+    {
+      "skill_name": "机械精通·α",
+      "description": "进驻制造站时，每有1台作业平台进驻发电站，贵金属类配方的生产力+5%",
+      "operators": "阿兰娜"
+    },
+    {
+      "skill_name": "机械精通·β",
+      "description": "进驻制造站时，每有1台作业平台进驻发电站，贵金属类配方的生产力+10%",
+      "operators": "阿兰娜"
+    },
+    {
+      "skill_name": "稻禾厚，顺秋收",
+      "description": "进驻制造站时，每3点人间烟火+1%生产力",
+      "operators": "黍"
+    },
+    {
+      "skill_name": "问枯荣",
+      "description": "进驻制造站时，每1点巫术结晶+2%生产力",
+      "operators": "截云"
+    },
+    {
+      "skill_name": "逐水草",
+      "description": "进驻制造站时，每1点巫术结晶+1%生产力",
+      "operators": "截云"
+    },
+    {
+      "skill_name": "绘图设计",
+      "description": "进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个",
+      "operators": "至简"
+    },
+    {
+      "skill_name": "机械辅助·α",
+      "description": "进驻制造站时，每16个工程机器人+5%生产力",
+      "operators": "至简"
+    },
+    {
+      "skill_name": "机械辅助·β",
+      "description": "进驻制造站时，每8个工程机器人+5%生产力",
+      "operators": "至简"
+    },
+    {
+      "skill_name": "造价高昂",
+      "description": "进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3%",
+      "operators": "娜斯提"
+    },
+    {
+      "skill_name": "打工心得",
+      "description": "进驻制造站时，当前制造站内每个金属工艺类技能为自身+5%的生产力",
+      "operators": "苍苔"
+    },
+    {
+      "skill_name": "挑大梁",
+      "description": "进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15",
+      "operators": "杏仁"
+    },
+    {
+      "skill_name": "金属工艺·β",
+      "description": "进驻制造站时，贵金属类配方的生产力+35%",
+      "operators": "砾"
+    },
+    {
+      "skill_name": "金属工艺·α",
+      "description": "进驻制造站时，贵金属类配方的生产力+30%",
+      "operators": "夜烟；引星棘刺；斑点；温米；苍苔"
+    },
+    {
+      "skill_name": "再生能源",
+      "description": "进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20%",
+      "operators": "清流"
+    },
+    {
+      "skill_name": "例行清扫",
+      "description": "进驻制造站后，生产力每小时+2%，最终达到+20%",
+      "operators": "阿罗玛"
+    },
+    {
+      "skill_name": "小奇思",
+      "description": "进驻制造站时，贵金属类配方的生产力+25%，心情每小时消耗+0.25",
+      "operators": "杏仁"
+    },
+    {
+      "skill_name": "净味香氛",
+      "description": "进驻制造站时，贵金属类配方的生产力+25%，心情每小时消耗+0.25",
+      "operators": "阿罗玛"
+    },
+    {
+      "skill_name": "莱茵科技·γ",
+      "description": "进驻制造站时，生产力+30%",
+      "operators": "淬羽赫默"
+    },
+    {
+      "skill_name": "行动派",
+      "description": "进驻制造站时，生产力+20%，仓库容量上限-8",
+      "operators": "钼铅"
+    },
+    {
+      "skill_name": "得心应手",
+      "description": "进驻制造站时，生产力+25%，仓库容量上限+6",
+      "operators": "裁度"
+    },
+    {
+      "skill_name": "掘进工程",
+      "description": "进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25",
+      "operators": "洋灰"
+    },
+    {
+      "skill_name": "独当一面",
+      "description": "进驻制造站时，生产力+30%，心情每小时消耗+0.25",
+      "operators": "雪猎"
+    },
+    {
+      "skill_name": "虔信",
+      "description": "进驻制造站时，生产力+20%，心情每小时消耗+0.25",
+      "operators": "雪猎"
+    },
+    {
+      "skill_name": "量体裁衣",
+      "description": "进驻制造站时，生产力+20%，心情每小时消耗+0.25",
+      "operators": "裁度"
+    },
+    {
+      "skill_name": "超感",
+      "description": "进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环",
+      "operators": "迷迭香"
+    },
+    {
+      "skill_name": "念力",
+      "description": "进驻制造站时，每2点思维链环+1%生产力",
+      "operators": "迷迭香"
+    },
+    {
+      "skill_name": "意识实体",
+      "description": "进驻制造站时，每1点思维链环+1%生产力",
+      "operators": "迷迭香"
+    },
+    {
+      "skill_name": "手艺人",
+      "description": "进驻制造站时，训练室每级为当前制造站+10%生产力，最多30%",
+      "operators": "维伊"
+    },
+    {
+      "skill_name": "配合意识",
+      "description": "进驻制造站时，当前制造站内其他干员提供的每5%生产力（不包含根据设施数量提供加成的生产力），额外提供5%生产力，最多提供40%生产力",
+      "operators": "槐琥"
+    },
+    {
+      "skill_name": "差遣使魔·α",
+      "description": "进驻制造站时，生产力+20%",
+      "operators": "玛露西尔"
+    },
+    {
+      "skill_name": "差遣使魔·β",
+      "description": "进驻制造站时，生产力+30%",
+      "operators": "玛露西尔"
+    },
+    {
+      "skill_name": "意想不到的美味",
+      "description": "进驻制造站时，每1点魔物料理+1%生产力",
+      "operators": "玛露西尔"
+    },
+    {
+      "skill_name": "咪波·制造型",
+      "description": "进驻制造站时，生产力+30%",
+      "operators": "梅尔"
+    },
+    {
+      "skill_name": "红松骑士团·β",
+      "description": "进驻制造站时，生产力+25%",
+      "operators": "灰毫；远牙；野鬃"
+    },
+    {
+      "skill_name": "莱茵科技·β",
+      "description": "进驻制造站时，生产力+25%",
+      "operators": "多萝西；娜斯提；星源；溯光星源；白面鸮；赫默"
+    },
+    {
+      "skill_name": "标准化·β",
+      "description": "进驻制造站时，生产力+25%",
+      "operators": "史都华德；杰西卡；水月；海沫；罗比菈塔；调香师；香草"
+    },
+    {
+      "skill_name": "探险者",
+      "description": "进驻制造站时，仓库容量上限+16，心情每小时消耗-0.25",
+      "operators": "石棉"
+    },
+    {
+      "skill_name": "收纳达人",
+      "description": "进驻制造站时，仓库容量上限+16，心情每小时消耗-0.25",
+      "operators": "钼铅"
+    },
+    {
+      "skill_name": "特立独行",
+      "description": "进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25",
+      "operators": "石棉"
+    },
+    {
+      "skill_name": "麻烦制造者",
+      "description": "进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25",
+      "operators": "泡普卡"
+    },
+    {
+      "skill_name": "急性子",
+      "description": "进驻制造站后，生产力首小时+20%，此后每小时+1%，最终达到+25%",
+      "operators": "芬"
+    },
+    {
+      "skill_name": "延时摄影",
+      "description": "进驻制造站后，生产力首小时+15%，此后每小时+2%，最终达到+25%",
+      "operators": "稀音"
+    },
+    {
+      "skill_name": "慢性子",
+      "description": "进驻制造站后，生产力首小时+15%，此后每小时+2%，最终达到+25%",
+      "operators": "克洛丝"
+    },
+    {
+      "skill_name": "红松骑士团·α",
+      "description": "进驻制造站时，生产力+15%",
+      "operators": "灰毫；远牙；野鬃"
+    },
+    {
+      "skill_name": "莱茵科技·α",
+      "description": "进驻制造站时，生产力+15%",
+      "operators": "星源；白面鸮；赫默"
+    },
+    {
+      "skill_name": "磐蟹·豆豆",
+      "description": "进驻制造站时，生产力+15%",
+      "operators": "豆苗"
+    },
+    {
+      "skill_name": "标准化·α",
+      "description": "进驻制造站时，生产力+15%",
+      "operators": "历阵锐枪芬；夜刀；洋灰；流星；石英；褐果"
+    },
+    {
+      "skill_name": "仿生海龙",
+      "description": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力",
+      "operators": "温蒂"
+    },
+    {
+      "skill_name": "自动化·β",
+      "description": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力",
+      "operators": "森蚺；温蒂"
+    },
+    {
+      "skill_name": "意识兼容",
+      "description": "进驻制造站时，当前制造站内所有莱茵科技类、红松骑士团类技能也全都视作标准化类技能",
+      "operators": "海沫"
+    },
+    {
+      "skill_name": "自动化·α",
+      "description": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力",
+      "operators": "异客；掠风；森蚺"
+    },
+    {
+      "skill_name": "源石技艺理论应用",
+      "description": "进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5%的生产力",
+      "operators": "多萝西"
+    },
+    {
+      "skill_name": "意识协议",
+      "description": "进驻制造站时，当前制造站内每个标准化类技能为自身+5%的生产力",
+      "operators": "水月"
+    },
+    {
+      "skill_name": "可靠的随从们",
+      "description": "进驻制造站时，仓库容量上限+8，生产力+5%，同时每有1个木天蓼，则生产力+1%",
+      "operators": "泰拉大陆调查团"
+    },
+    {
+      "skill_name": "仓库整备·β",
+      "description": "进驻制造站时，仓库容量上限+10，生产力+10%",
+      "operators": "蛇屠箱；黑角"
+    },
+    {
+      "skill_name": "仓库整备·α",
+      "description": "进驻制造站时，仓库容量上限+6，生产力+10%",
+      "operators": "卡缇；米格鲁"
+    },
+    {
+      "skill_name": "重聚时光",
+      "description": "进驻制造站时，当前制造站内每个A1小队干员为自身+10%的生产力",
+      "operators": "历阵锐枪芬"
+    },
+    {
+      "skill_name": "勘探背包",
+      "description": "进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5的仓库上限容量",
+      "operators": "溯光星源"
+    },
+    {
+      "skill_name": "工匠精神·β",
+      "description": "进驻制造站时，生产力-5%，仓库容量上限+19，心情每小时消耗-0.25",
+      "operators": "火神"
+    },
+    {
+      "skill_name": "工匠精神·α",
+      "description": "进驻制造站时，生产力-5%，仓库容量上限+16，心情每小时消耗-0.15",
+      "operators": "火神"
+    },
+    {
+      "skill_name": "合理利用",
+      "description": "进驻制造站时，生产作战记录类配方时，仓库容量上限+4",
+      "operators": "圣约送葬人"
+    },
+    {
+      "skill_name": "“可靠”助手",
+      "description": "进驻制造站时，生产力-20%，仓库容量上限+17，心情每小时消耗-0.25",
+      "operators": "贝娜"
+    },
+    {
+      "skill_name": "剪辑·β",
+      "description": "进驻制造站时，生产作战记录类配方时，仓库容量上限+15",
+      "operators": "卡达"
+    },
+    {
+      "skill_name": "剪辑·α",
+      "description": "进驻制造站时，生产作战记录类配方时，仓库容量上限+12",
+      "operators": "稀音"
+    },
+    {
+      "skill_name": "模糊视线",
+      "description": "进驻制造站时，生产力+30%，自身每有4点心情落差，生产力-5%",
+      "operators": "铅踝"
+    },
+    {
+      "skill_name": "窗外雪啸",
+      "description": "进驻制造站时，当自身心情落差大于12时，生产力+10%，仓库容量+6",
+      "operators": "铅踝"
+    },
+    {
+      "skill_name": "午休好去处",
+      "description": "进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25",
+      "operators": "Miss.Christine"
+    },
+    {
+      "skill_name": "无畏豪情",
+      "description": "进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25",
+      "operators": "娜仁图亚"
+    },
+    {
+      "skill_name": "囤积者",
+      "description": "进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25",
+      "operators": "泡泡"
+    },
+    {
+      "skill_name": "大就是好！",
+      "description": "进驻制造站时，当前制造站内干员根据自身提升的仓库容量提供一定的生产力。提升16格以下的，每格仓库容量提供1%生产力；提升大于16格的，每格仓库容量提供3%生产力（无法与回收利用叠加，且优先生效）",
+      "operators": "泡泡"
+    },
+    {
+      "skill_name": "智慧之境",
+      "description": "进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25",
+      "operators": "帕拉斯"
+    },
+    {
+      "skill_name": "“等不及”",
+      "description": "进驻制造站后，生产力首小时+20%，此后每小时+1%，最终达到+25%",
+      "operators": "刻俄柏"
+    },
+    {
+      "skill_name": "“都想要”",
+      "description": "进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25",
+      "operators": "刻俄柏"
+    },
+    {
+      "skill_name": "磐蟹·阿盘",
+      "description": "进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25",
+      "operators": "豆苗"
+    },
+    {
+      "skill_name": "回收利用",
+      "description": "进驻制造站时，当前制造站内干员提升的每格仓库容量，提供2%生产力",
+      "operators": "红云"
+    },
+    {
+      "skill_name": "拾荒者",
+      "description": "进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25",
+      "operators": "清道夫；红云"
+    },
+    {
+      "skill_name": "Vlog",
+      "description": "进驻制造站时，生产作战记录类配方时，心情每小时消耗-0.25",
+      "operators": "卡达"
+    },
+    {
+      "skill_name": "战阵领袖",
+      "description": "进驻制造站时，作战记录类配方的生产力+30%",
+      "operators": "怒潮凛冬"
+    },
+    {
+      "skill_name": "情同手足",
+      "description": "进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10%",
+      "operators": "怒潮凛冬"
+    },
+    {
+      "skill_name": "患难拍档",
+      "description": "进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35%",
+      "operators": "烈夏"
+    },
+    {
+      "skill_name": "火山学家",
+      "description": "进驻制造站时，源石类配方的生产力+35%",
+      "operators": "艾雅法拉"
+    },
+    {
+      "skill_name": "源石研究",
+      "description": "进驻制造站时，源石类配方的生产力+35%",
+      "operators": "锡兰"
+    },
+    {
+      "skill_name": "地质学·β",
+      "description": "进驻制造站时，源石类配方的生产力+35%",
+      "operators": "地灵"
+    },
+    {
+      "skill_name": "源石工艺·β",
+      "description": "进驻制造站时，源石类配方的生产力+35%",
+      "operators": "炎熔"
+    },
+    {
+      "skill_name": "地质学·α",
+      "description": "进驻制造站时，源石类配方的生产力+30%",
+      "operators": "薄绿；褐果"
+    },
+    {
+      "skill_name": "源石工艺·α",
+      "description": "进驻制造站时，源石类配方的生产力+30%",
+      "operators": "月见夜"
+    },
+    {
+      "skill_name": "春雷响，万物长",
+      "description": "进驻制造站时，当前制造站内所有干员心情每小时消耗-0.1",
+      "operators": "黍"
+    },
+    {
+      "skill_name": "团队精神",
+      "description": "进驻制造站时，消除当前制造站内所有干员自身心情消耗的影响",
+      "operators": "槐琥"
+    }
+  ]
+}

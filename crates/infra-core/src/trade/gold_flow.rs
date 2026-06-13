@@ -65,9 +65,13 @@ pub fn apply_gold_flow_chain(ctx: &mut TradeContext, table: &SkillTable) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use super::*;
     use crate::skill_table::default_skill_table_path;
     use crate::skill_table::SkillTable;
-    use crate::trade::input::{TradeOperator, TradeRoomInput};
+    use crate::layout::LayoutContext;
+    use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput};
     use crate::trade::interpreter::{apply_trade_phases, TradeContext};
 
     fn table() -> SkillTable {
@@ -84,6 +88,7 @@ mod tests {
                 elite: 0,
                 buff_ids: vec!["trade_ord_spd&gold[100]".into()],
             tags: vec![],
+                ..Default::default()
             }],
             order_count: None,
             mood: 24.0,
@@ -91,6 +96,7 @@ mod tests {
             durin_virtual_lines: None,
             human_fireworks: None,
             layout: Default::default(),
+            active_order_kind: TradeOrderKind::Gold,
         };
         let mut ctx = TradeContext::from_room(&input);
         apply_trade_phases(&mut ctx, &table);
@@ -108,7 +114,8 @@ mod tests {
                     name: "绮良".into(),
                     elite: 2,
                     buff_ids: vec!["trade_ord_line_gold[010]".into()],
-                tags: vec![],
+                    tags: vec![],
+                    ..Default::default()
                 },
                 TradeOperator {
                     name: "鸿雪".into(),
@@ -117,13 +124,15 @@ mod tests {
                         "trade_ord_line_durin[010]".into(),
                         "trade_ord_spd&gold[100]".into(),
                     ],
-            tags: vec![],
-        },
+                    tags: vec![],
+                    ..Default::default()
+                },
                 TradeOperator {
                     name: "图耶".into(),
                     elite: 2,
                     buff_ids: vec!["trade_ord_spd&gold[010]".into()],
-                tags: vec![],
+                    tags: vec![],
+                    ..Default::default()
                 },
             ],
             order_count: None,
@@ -132,6 +141,7 @@ mod tests {
             durin_virtual_lines: Some(4),
             human_fireworks: None,
             layout: Default::default(),
+            active_order_kind: TradeOrderKind::Gold,
         };
         let mut ctx = TradeContext::from_room(&input);
         apply_trade_phases(&mut ctx, &table);
@@ -143,6 +153,61 @@ mod tests {
         assert!(
             (skill_total - 160.0).abs() < 1.0,
             "gold-flow chain total={skill_total}"
+        );
+    }
+
+    #[test]
+    fn gold_flow_chain_reads_durin_and_gold_lines_from_layout() {
+        let table = table();
+        let mut layout = crate::layout::LayoutContext::default();
+        layout.durin_in_base = 4;
+        layout.gold_manu_line_count = 4;
+        let input = TradeRoomInput {
+            level: 3,
+            operators: vec![
+                TradeOperator {
+                    name: "绮良".into(),
+                    elite: 2,
+                    buff_ids: vec!["trade_ord_line_gold[010]".into()],
+                        tags: vec![],
+                    ..Default::default()
+                },
+                TradeOperator {
+                    name: "鸿雪".into(),
+                    elite: 2,
+                    buff_ids: vec![
+                        "trade_ord_line_durin[010]".into(),
+                        "trade_ord_spd&gold[100]".into(),
+                    ],
+                        tags: vec![],
+                    ..Default::default()
+                },
+                TradeOperator {
+                    name: "图耶".into(),
+                    elite: 2,
+                    buff_ids: vec!["trade_ord_spd&gold[010]".into()],
+                        tags: vec![],
+                    ..Default::default()
+                },
+            ],
+            order_count: None,
+            mood: 24.0,
+            gold_production_lines: None,
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: Arc::new(layout),
+            active_order_kind: TradeOrderKind::Gold,
+        };
+        let mut ctx = TradeContext::from_room(&input);
+        apply_trade_phases(&mut ctx, &table);
+        let skill_total: f64 = ctx
+            .operators
+            .iter()
+            .map(|o| o.settled_eff + o.variable_eff)
+            .sum();
+        assert!(
+            (skill_total - 160.0).abs() < 1.0,
+            "layout-injected gold/durin lines total={skill_total}"
         );
     }
 }

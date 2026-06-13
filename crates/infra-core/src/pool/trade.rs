@@ -1,10 +1,67 @@
+use std::collections::HashSet;
+use std::sync::Arc;
+
 use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::roster::Roster;
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::trade::TradeOperator;
-use crate::types::{Action, Phase, SkillDef};
+use crate::types::{Action, CompiledAtom, Phase, SkillDef};
+
+/// 建池时按 buff 展开并排序 atom，供 solve 热路径归并。
+pub fn compile_operator_atoms(buff_ids: &[String], table: &SkillTable) -> Arc<[CompiledAtom]> {
+    let mut atoms = Vec::new();
+    let mut seq = 0u16;
+    for bid in buff_ids {
+        let Some(skill) = table.get(bid) else {
+            continue;
+        };
+        for atom in &skill.atoms {
+            atoms.push(CompiledAtom {
+                atom: atom.clone(),
+                sort_key: (atom.phase.sort_key(), atom.phase_order),
+                seq,
+            });
+            seq = seq.saturating_add(1);
+        }
+    }
+    atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
+    atoms.into()
+}
+
+/// 贸易站精0 孑（摊贩）；轮换余量班强制用此带队，无视 operbox 更高练度。
+pub const JIE_TRADE_NAME: &str = "孑";
+
+/// 控制中枢灵知·精密计算已激活（贸易房按谢拉格人数注入 ±效率/上限）。
+pub fn karlan_precision_active(inject: &crate::global_resource::GlobalInjectManifest) -> bool {
+    inject.karlan_precision().is_some()
+}
+
+pub fn jie_e0_trade_operator(instances: &OperatorInstances, table: &SkillTable) -> Option<TradeOperator> {
+    let buff_ids = instances.resolve_trade_buff_ids(JIE_TRADE_NAME, PromotionTier::Tier0);
+    if buff_ids.is_empty() {
+        return None;
+    }
+    let mut op = TradeOperator::new(JIE_TRADE_NAME, 0, buff_ids.clone());
+    op.compiled_atoms = compile_operator_atoms(&buff_ids, table);
+    Some(op)
+}
+
+/// 灵知线精1+ 孑（市井之道）；仅 `karlan_precision` 激活时的固定搭配注入，不进通用池。
+pub fn jie_market_trade_operator(
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Option<TradeOperator> {
+    const JIE_MARKET_BUFF: &str = "trade_ord_limit_count[000]";
+    let buff_ids = instances.resolve_trade_buff_ids(JIE_TRADE_NAME, PromotionTier::TierUp);
+    if !buff_ids.iter().any(|b| b == JIE_MARKET_BUFF) {
+        return None;
+    }
+    let mut op = TradeOperator::new(JIE_TRADE_NAME, 1, buff_ids);
+    op.compiled_atoms = compile_operator_atoms(&op.buff_ids, table);
+    Some(op)
+}
 
 #[derive(Debug, Clone)]
 pub struct TradePoolEntry {
@@ -12,6 +69,7 @@ pub struct TradePoolEntry {
     pub elite: u8,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
+    pub compiled_atoms: Arc<[CompiledAtom]>,
     /// Sum of `AddFlatEff` in `constant` phase — sort hint only, not final score.
     pub flat_eff_hint: f64,
     pub is_mechanic: bool,
@@ -24,8 +82,28 @@ impl TradePoolEntry {
             elite: self.elite,
             buff_ids: self.buff_ids.clone(),
             tags: self.tags.clone(),
+            compiled_atoms: self.compiled_atoms.clone(),
         }
     }
+}
+
+/// 从池索引组装三人组（保留进驻顺序）；孑 E0 override 由调用方注入。
+pub fn build_trade_combo_operators(
+    pool: &TradePool,
+    combo: [usize; 3],
+    must_name: Option<&str>,
+    override_op: Option<&TradeOperator>,
+) -> [TradeOperator; 3] {
+    std::array::from_fn(|slot| {
+        let entry = &pool.entries[combo[slot]];
+        if must_name.is_some_and(|n| entry.name == n) {
+            override_op
+                .cloned()
+                .unwrap_or_else(|| entry.to_trade_operator())
+        } else {
+            entry.to_trade_operator()
+        }
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,12 +149,12 @@ pub fn build_trade_pool(
     let mut skipped = Vec::new();
 
     for name in roster.names() {
-        let Some(elite) = roster.elite(name) else {
+        let Some(progress) = roster.progress(name) else {
             continue;
         };
-        match try_entry(name, elite, instances, table) {
+        match try_entry(name, progress, instances, table) {
             Ok(entry) => entries.push(entry),
-            Err(skip) => skipped.push((name.clone(), elite, skip)),
+            Err(skip) => skipped.push((name.clone(), progress.elite, skip)),
         }
     }
 
@@ -90,13 +168,26 @@ pub fn build_trade_pool(
     Ok(TradePool { entries, skipped })
 }
 
+/// Sub-pool excluding operators already assigned in the same shift.
+pub fn filter_trade_pool(pool: &TradePool, exclude: &HashSet<String>) -> TradePool {
+    TradePool {
+        entries: pool
+            .entries
+            .iter()
+            .filter(|e| !exclude.contains(&e.name))
+            .cloned()
+            .collect(),
+        skipped: pool.skipped.clone(),
+    }
+}
+
 fn try_entry(
     name: &str,
-    elite: u8,
+    progress: crate::roster::OperatorProgress,
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> std::result::Result<TradePoolEntry, PoolSkip> {
-    let tier = PromotionTier::from_elite(elite);
+    let tier = PromotionTier::from_progress(progress);
     let inst = instances.get(name, tier);
     if inst.is_none_or(|i| !i.facilities.contains_key("trade")) {
         return Err(PoolSkip::NoTradeBinding);
@@ -104,6 +195,11 @@ fn try_entry(
 
     let buff_ids = instances.resolve_trade_buff_ids(name, tier);
     if buff_ids.is_empty() {
+        return Err(PoolSkip::NoTradeBinding);
+    }
+
+    // 精1+ 孑（市井）不进通用池；仅恢复班 `jie_e0_trade_operator` 或灵知线固定注入。
+    if name == JIE_TRADE_NAME && progress.elite > 0 {
         return Err(PoolSkip::NoTradeBinding);
     }
 
@@ -124,9 +220,10 @@ fn try_entry(
 
     Ok(TradePoolEntry {
         name: name.to_string(),
-        elite,
-        buff_ids,
+        elite: progress.elite,
+        buff_ids: buff_ids.clone(),
         tags,
+        compiled_atoms: compile_operator_atoms(&buff_ids, table),
         flat_eff_hint,
         is_mechanic,
     })
@@ -137,14 +234,11 @@ fn skill_hints(skill: &SkillDef) -> (f64, bool) {
     let mut mech = false;
     for atom in &skill.atoms {
         if atom.phase == Phase::Constant {
-            if let Action::AddFlatEff { value } = atom.action {
+            if let Action::AddFlatEff { value, .. } = atom.action {
                 flat += value;
             }
         }
         if atom.phase == Phase::OrderMechanic {
-            mech = true;
-        }
-        if matches!(atom.action, Action::ReplaceOrder { .. }) {
             mech = true;
         }
     }
@@ -210,6 +304,76 @@ pub fn combinations_indices(n: usize, k: usize) -> impl Iterator<Item = Vec<usiz
     })
 }
 
+/// `C(n,3)` 零堆分配枚举（`k=3` 热路径专用）。
+pub fn combinations_triples(n: usize) -> CombinationsTripleIter {
+    CombinationsTripleIter {
+        n,
+        combo: [0, 1, 2],
+        started: false,
+        done: n < 3,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CombinationsTripleIter {
+    n: usize,
+    combo: [usize; 3],
+    started: bool,
+    done: bool,
+}
+
+impl Iterator for CombinationsTripleIter {
+    type Item = [usize; 3];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        if !self.started {
+            self.started = true;
+            return Some(self.combo);
+        }
+        let k = 3usize;
+        let mut i = k;
+        while i > 0 {
+            i -= 1;
+            if self.combo[i] != i + self.n - k {
+                self.combo[i] += 1;
+                for j in i + 1..k {
+                    self.combo[j] = self.combo[j - 1] + 1;
+                }
+                return Some(self.combo);
+            }
+        }
+        self.done = true;
+        None
+    }
+}
+
+/// 固定锚点干员 + 从其余池成员中选 2 人（孑带队等）。
+pub fn combinations_triples_with_anchor(
+    n: usize,
+    anchor: usize,
+) -> impl Iterator<Item = [usize; 3]> {
+    let mut i = 0usize;
+    let mut j = 1usize;
+    std::iter::from_fn(move || {
+        while i < n {
+            while j < n {
+                if i != anchor && j != anchor && i < j {
+                    let out = [anchor, i, j];
+                    j += 1;
+                    return Some(out);
+                }
+                j += 1;
+            }
+            i += 1;
+            j = i + 1;
+        }
+        None
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,8 +404,11 @@ mod tests {
     fn exusiai_e2_expands_stepwise_buffs() {
         let pool = fixture_pool();
         let ex = pool.entry("能天使").expect("能天使");
-        assert!(ex.buff_ids.contains(&"trade_ord_spd[010]".to_string()));
-        assert!(ex.buff_ids.contains(&"trade_ord_spd[020]".to_string()));
+        assert_eq!(
+            ex.buff_ids,
+            vec!["trade_ord_spd[020]".to_string()],
+            "精2 仅物流专家，不得叠精0 企鹅物流·α"
+        );
     }
 
     #[test]
@@ -276,5 +443,29 @@ mod tests {
     fn n_choose_k_matches_small_cases() {
         assert_eq!(n_choose_k_u64(4, 3), 4);
         assert_eq!(n_choose_k_u64(10, 3), 120);
+    }
+
+    #[test]
+    fn elite_jie_excluded_from_general_trade_pool() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut roster = Roster::default();
+        roster.insert(
+            JIE_TRADE_NAME,
+            crate::roster::OperatorProgress::new(2, 90, 4),
+        );
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        assert!(
+            pool.entry(JIE_TRADE_NAME).is_none(),
+            "精2 孑不应进入通用贸易池"
+        );
+        assert!(
+            jie_e0_trade_operator(&instances, &table).is_some(),
+            "摊贩形态仍可通过 override 使用"
+        );
+        assert!(
+            jie_market_trade_operator(&instances, &table).is_some(),
+            "市井形态仅用于灵知线固定注入"
+        );
     }
 }

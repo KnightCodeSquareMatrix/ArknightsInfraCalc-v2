@@ -1,0 +1,24 @@
+{
+  "rooms": [
+    {
+      "room_id": "manu_3",
+      "operators": [
+        { "name": "冬时", "elite": 2 },
+        { "name": "清流", "elite": 2 },
+        { "name": "温蒂", "elite": 2 }
+      ]
+    },
+    {
+      "room_id": "power_1",
+      "operators": [{ "name": "承曦格雷伊", "elite": 2 }]
+    },
+    {
+      "room_id": "power_2",
+      "operators": [{ "name": "格雷伊", "elite": 2 }]
+    },
+    {
+      "room_id": "power_3",
+      "operators": [{ "name": "布丁", "elite": 2 }]
+    }
+  ]
+}

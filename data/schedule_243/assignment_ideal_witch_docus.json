@@ -1,0 +1,20 @@
+{
+  "rooms": [
+    {
+      "room_id": "trade_1",
+      "operators": [
+        { "name": "巫恋", "elite": 2 },
+        { "name": "龙舌兰", "elite": 2 },
+        { "name": "卡夫卡", "elite": 2 }
+      ]
+    },
+    {
+      "room_id": "trade_2",
+      "operators": [
+        { "name": "蕾缪安", "elite": 2 },
+        { "name": "能天使", "elite": 2 },
+        { "name": "但书", "elite": 2 }
+      ]
+    }
+  ]
+}

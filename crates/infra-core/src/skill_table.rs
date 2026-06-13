@@ -161,10 +161,92 @@ mod tests {
     }
 
     #[test]
-    fn exusiai_tier_up_stepwise_includes_both_spd_buffs() {
+    fn exusiai_tier_up_stepwise_replaces_alpha_with_expert() {
         let (_table, instances) = load_pair();
         let ids = instances.resolve_trade_buff_ids("能天使", crate::tier::PromotionTier::TierUp);
-        assert!(ids.contains(&"trade_ord_spd[010]".to_string()));
-        assert!(ids.contains(&"trade_ord_spd[020]".to_string()));
+        assert_eq!(ids, vec!["trade_ord_spd[020]".to_string()]);
+    }
+
+    #[test]
+    fn all_manufacture_buff_ids_resolve_in_skill_table() {
+        let (table, instances) = load_pair();
+        let mut missing = Vec::new();
+        for (_key, inst) in instances.iter() {
+            let name = inst.name.clone();
+            for tier in [crate::tier::PromotionTier::Tier0, crate::tier::PromotionTier::TierUp] {
+                for bid in instances.resolve_manufacture_buff_ids(&name, tier) {
+                    if table.get(&bid).is_none() {
+                        missing.push(format!("{}@{}: {bid}", name, tier.as_str()));
+                    }
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "manufacture buff_ids missing from skill_table:\n{}",
+            missing.join("\n")
+        );
+    }
+
+    #[test]
+    fn manufacture_constant_skills_have_atoms() {
+        let (table, _instances) = load_pair();
+        let mut empty_constants = Vec::new();
+        for skill in table.skills() {
+            if skill.facility != "manufacture" {
+                continue;
+            }
+            let id = skill.id.as_str();
+            let delegated = id.contains("variable")
+                || id.contains("skill_change")
+                || id.contains("skill_spd1")
+                || id.contains("skill_limit")
+                || id.contains("bd[")
+                || id.contains("bd_to")
+                || id.contains("constrLv")
+                || id.contains("cost_all")
+                || id.contains("double[")
+                || id.contains("fraction")
+                || id.contains("addition")
+                || id.contains("reduce[")
+                || id.contains("train&lv")
+                || id.contains("token_prod")
+                || id.contains("formula_spd&cost")
+                || id.contains("formula_spd&bd")
+                || id.contains("formula_spd&dorm")
+                || id.contains("formula_spd_P")
+                || id.contains("bd_n1")
+                || id.contains("prod_bd[")
+                || id == "manu_prod_spd[1000]";
+            if !delegated && skill.atoms.is_empty() {
+                empty_constants.push(id.to_string());
+            }
+        }
+        assert!(
+            empty_constants.is_empty(),
+            "expected constant manufacture skills to have atoms: {:?}",
+            empty_constants
+        );
+    }
+
+    #[test]
+    fn all_power_buff_ids_resolve_in_skill_table() {
+        let (table, instances) = load_pair();
+        let mut missing = Vec::new();
+        for (_key, inst) in instances.iter() {
+            let name = inst.name.clone();
+            for tier in [crate::tier::PromotionTier::Tier0, crate::tier::PromotionTier::TierUp] {
+                for bid in instances.resolve_power_buff_ids(&name, tier) {
+                    if table.get(&bid).is_none() {
+                        missing.push(format!("{}@{}: {bid}", name, tier.as_str()));
+                    }
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "power buff_ids missing from skill_table:\n{}",
+            missing.join("\n")
+        );
     }
 }
