@@ -13,6 +13,7 @@ use crate::layout::{
 use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::solve_manufacture;
 use crate::operbox::OperBox;
+use crate::power::{solve_power, PowerRoomInput};
 use crate::skill_table::SkillTable;
 use crate::trade::input::TradeRoomInput;
 use crate::trade::solve_trade_with_shift;
@@ -24,10 +25,27 @@ pub enum BaseShiftRole {
     Recovery,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ShiftScores {
     pub trade_score: f64,
     pub manu_prod_sum: f64,
+    /// 发电站充能速度 % 合计（按 `shift_hours` 评估，含空构爬升）。
+    pub power_charge_sum: f64,
+}
+
+impl ShiftScores {
+    /// 贸易分按时长折算（不与制造/发电混合量纲）。
+    pub fn weighted_trade(&self, shift_hours: f64) -> f64 {
+        self.trade_score * (shift_hours / 24.0)
+    }
+    /// 制造产量按时长折算。
+    pub fn weighted_manu(&self, shift_hours: f64) -> f64 {
+        self.manu_prod_sum * (shift_hours / 24.0)
+    }
+    /// 发电充能% 按时长折算。
+    pub fn weighted_power(&self, shift_hours: f64) -> f64 {
+        self.power_charge_sum * (shift_hours / 24.0)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -62,12 +80,13 @@ fn assert_disjoint(a: &HashSet<String>, b: &HashSet<String>, label: &str) -> Res
     }
 }
 
-/// 对编制逐房求贸易/制造纸面分（满心情）。
+/// 对编制逐房求贸易/制造/发电纸面分（满心情）；`shift_hours` 影响发电爬升与产出折算。
 pub fn score_base_assignment(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
     instances: &OperatorInstances,
     table: &SkillTable,
+    shift_hours: f64,
     durin_plan: Option<u8>,
 ) -> Result<ShiftScores> {
     let resolved = resolve_base(
@@ -95,7 +114,7 @@ pub fn score_base_assignment(
             layout: Arc::new(room.layout.clone()),
             active_order_kind: room.order,
         };
-        trade_score += solve_trade_with_shift(&input, table, 24.0)?.effective_eff_multiplier;
+        trade_score += solve_trade_with_shift(&input, table, shift_hours)?.effective_eff_multiplier;
     }
 
     let mut manu_prod_sum = 0.0;
@@ -113,9 +132,21 @@ pub fn score_base_assignment(
         manu_prod_sum += solve_manufacture(&input, table)?.prod_total;
     }
 
+    let mut power_charge_sum = 0.0;
+    for room in &resolved.power_rooms {
+        let input = PowerRoomInput {
+            operator: room.operator.clone(),
+            mood: 24.0,
+            shift_hours,
+            layout: room.layout.clone(),
+        };
+        power_charge_sum += solve_power(&input, table)?.charge_speed_pct;
+    }
+
     Ok(ShiftScores {
         trade_score,
         manu_prod_sum,
+        power_charge_sum,
     })
 }
 
@@ -161,15 +192,15 @@ pub fn schedule_base_rotation_a_b_a(
     let recovery_rotating = rotating_workers(&recovery_assignment, blueprint);
     assert_disjoint(&peak_rotating, &recovery_rotating, "高峰班与恢复班")?;
 
-    let peak_scores = score_base_assignment(blueprint, &peak_assignment, instances, table, Some(durin_plan))?;
+    let peak_scores = score_base_assignment(blueprint, &peak_assignment, instances, table, 24.0, Some(durin_plan))?;
     let recovery_scores =
-        score_base_assignment(blueprint, &recovery_assignment, instances, table, Some(durin_plan))?;
+        score_base_assignment(blueprint, &recovery_assignment, instances, table, 24.0, Some(durin_plan))?;
 
     let shift1 = BaseShiftPlan {
         index: 0,
         role: BaseShiftRole::Peak,
         assignment: peak_assignment.clone(),
-        scores: peak_scores,
+        scores: peak_scores.clone(),
         rotating_workers: workers_sorted(&peak_rotating),
         reused_from_shift: None,
     };
@@ -183,8 +214,8 @@ pub fn schedule_base_rotation_a_b_a(
         reused_from_shift: None,
     };
 
-    let shift3_scores =
-        score_base_assignment(blueprint, &peak_assignment, instances, table, Some(durin_plan))?;
+    // shift3 复用 shift1 的 peak_assignment 评分，避免重复求解。
+    let shift3_scores = peak_scores;
     let shift3 = BaseShiftPlan {
         index: 2,
         role: BaseShiftRole::Peak,
@@ -247,6 +278,51 @@ mod tests {
                 names.len(),
                 shift.assignment.rooms.iter().map(|r| r.operators.len()).sum::<usize>(),
                 "shift {} has duplicate operators",
+                shift.index + 1
+            );
+        }
+    }
+
+    #[test]
+    fn rosemary_blackkey_bound_to_peak_shifts_rest_one() {
+        // 文档 §6.1：迷迭香+黑键「同上同下，上 2 休 1」。
+        // A-B-A 下二者同属 peak-only 的 rosemary 链 → 同在第一/三班（reuse），
+        // 恢复班（第二班）排除高峰轮换岗 → 二者同时缺席。
+        let (blueprint, operbox, instances, table) = fixtures_243_2gold();
+        if !operbox.owns("迷迭香") || !operbox.owns("黑键") {
+            return;
+        }
+        let report = schedule_base_rotation_a_b_a(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 10,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let in_shift = |i: usize, name: &str| {
+            assignment_operator_names(&report.shifts[i].assignment).contains(name)
+        };
+
+        // 第一/三班（peak）：二者同时在岗。
+        for i in [0usize, 2usize] {
+            assert!(in_shift(i, "迷迭香"), "shift{} 应有迷迭香", i + 1);
+            assert!(in_shift(i, "黑键"), "shift{} 应有黑键", i + 1);
+        }
+        // 第二班（recovery）：二者同时休息。
+        assert!(!in_shift(1, "迷迭香"), "恢复班不应有迷迭香");
+        assert!(!in_shift(1, "黑键"), "恢复班不应有黑键");
+        // 同上同下：任一班次中二者要么同在、要么同不在。
+        for shift in &report.shifts {
+            let names = assignment_operator_names(&shift.assignment);
+            assert_eq!(
+                names.contains("迷迭香"),
+                names.contains("黑键"),
+                "shift{} 迷迭香与黑键应同上同下",
                 shift.index + 1
             );
         }

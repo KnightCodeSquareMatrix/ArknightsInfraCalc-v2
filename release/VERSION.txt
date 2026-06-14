@@ -1,0 +1,16 @@
+ArknightsInfraCalc frontend release bundle
+Build date: 2026-06-15
+Git commit: 1a37932
+Platform: windows-x86_64 (infra-cli.exe)
+
+Contents:
+  infra-cli.exe           — team-rotation + MAA export (--maa-out)
+  layout-gen/index.html   — BaseBlueprint layout editor (static, any browser)
+  fixtures/               — sample layout + operbox for 243
+
+Requires separately:
+  data/                   — operator_instances.json, skill_table.json, …
+
+Docs:
+  release/README.md
+  docs/FRONTEND_CLI.md

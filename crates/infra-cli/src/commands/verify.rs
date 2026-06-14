@@ -1,6 +1,6 @@
 use crate::verify::{
-    closure_fixture, docus_fixture, ling_jie_fixture, load_regression_cases, load_unit_anchor_cases,
-    unit_fixture, witch_fixture,
+    blackkey_closure_fixture, closure_fixture, docus_fixture, ling_jie_fixture,
+    load_regression_cases, load_unit_anchor_cases, unit_fixture, witch_fixture,
 };
 use infra_core::skill_table::{data_path, default_skill_table_path, SkillTable};
 use infra_core::trade::solve_trade_with_shift;
@@ -31,6 +31,7 @@ pub fn verify_cmd(args: &[String]) -> Result<(), Error> {
 
         if !case.operators.starts_with("可露希尔")
             && !case.operators.starts_with("但书")
+            && !case.operators.starts_with("黑键")
             && case.operators != "see_roster"
             && !case.expect_shortcut.starts_with("gsl_witch_")
             && !case.expect_shortcut.starts_with("gsl_ling_jie_")
@@ -39,7 +40,9 @@ pub fn verify_cmd(args: &[String]) -> Result<(), Error> {
             continue;
         }
 
-        let input = if case.expect_shortcut.starts_with("gsl_ling_jie_") {
+        let input = if case.expect_shortcut == "gsl_blackkey_closure" {
+            blackkey_closure_fixture(case.trade_level)
+        } else if case.expect_shortcut.starts_with("gsl_ling_jie_") {
             ling_jie_fixture(case.trade_level)
         } else if case.expect_shortcut.starts_with("gsl_witch_") {
             witch_fixture(&case.expect_shortcut, case.trade_level)

@@ -1,9 +1,14 @@
 mod base_rotation;
+mod team_rotation;
 mod trade_rotation;
 
 pub use base_rotation::{
     schedule_base_rotation_a_b_a, score_base_assignment, BaseRotationReport, BaseShiftPlan,
     BaseShiftRole, ShiftScores,
+};
+pub use team_rotation::{
+    operator_team_map, schedule_team_rotation, DailyTotals, TeamAssignment, TeamLabel,
+    TeamRotationReport, TeamShiftResult,
 };
 pub use trade_rotation::{
     schedule_jie_remainder_shift_from_pool, schedule_meta_shift_from_pool,

@@ -60,6 +60,11 @@ pub struct SystemSlotDef {
     #[serde(default)]
     pub trade_role: Option<String>,
     pub operators: Vec<SystemOperatorSpec>,
+    /// 可选 slot：缺房 / 缺干员时静默跳过，不导致整链不可行。
+    /// 用于感知 producer（夕中枢、絮雨办公室、爱丽丝/车尔尼宿舍）等非核心位，
+    /// 以及蓝图无该设施（如无办公室）的情形。核心位（黑键/迷迭香）保持必需。
+    #[serde(default)]
+    pub optional: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -141,6 +146,7 @@ fn facility_kind(raw: &str) -> Option<FacilityKind> {
         "factory" => Some(FacilityKind::Factory),
         "power_plant" => Some(FacilityKind::PowerPlant),
         "dormitory" => Some(FacilityKind::Dormitory),
+        "office" => Some(FacilityKind::Office),
         _ => None,
     }
 }
@@ -251,6 +257,34 @@ pub fn claim_base_systems(
     Ok(())
 }
 
+/// slot 能否在当前蓝图 / operbox / used 下落位（房 + 干员均可解）。
+fn slot_resolvable(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    slot: &SystemSlotDef,
+) -> bool {
+    if facility_kind(&slot.facility).is_none() {
+        return false;
+    }
+    if resolve_slot_room(blueprint, assignment, slot).is_none() {
+        return false;
+    }
+    let resolved = match resolve_slot_operators(operbox, slot, used) {
+        Some(ops) => ops,
+        None => return false,
+    };
+    if slot.facility == "control" {
+        let current = assignment.control_operators().len();
+        if current + resolved.len() > 5 {
+            return false;
+        }
+    }
+    true
+}
+
+/// 系统是否可认领：所有**非可选** slot 都能落位即可（可选 slot 缺失只会被裁剪）。
 fn system_feasible(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -258,25 +292,11 @@ fn system_feasible(
     used: &HashSet<String>,
     system: &BaseSystemDef,
 ) -> bool {
-    for slot in &system.slots {
-        if facility_kind(&slot.facility).is_none() {
-            return false;
-        }
-        if resolve_slot_room(blueprint, assignment, slot).is_none() {
-            return false;
-        }
-        let resolved = match resolve_slot_operators(operbox, slot, used) {
-            Some(ops) => ops,
-            None => return false,
-        };
-        if slot.facility == "control" {
-            let current = assignment.control_operators().len();
-            if current + resolved.len() > 5 {
-                return false;
-            }
-        }
-    }
-    true
+    system
+        .slots
+        .iter()
+        .filter(|slot| !slot.optional)
+        .all(|slot| slot_resolvable(blueprint, operbox, assignment, used, slot))
 }
 
 fn claim_system(
@@ -287,6 +307,10 @@ fn claim_system(
     system: &BaseSystemDef,
 ) -> Result<()> {
     for slot in &system.slots {
+        // 可选 slot 无法落位（缺设施 / 缺干员 / 中枢满员）时静默裁剪，不影响核心链。
+        if slot.optional && !slot_resolvable(blueprint, operbox, assignment, used, slot) {
+            continue;
+        }
         let room = resolve_slot_room(blueprint, assignment, slot)
             .ok_or_else(|| Error::msg(format!("system {} slot room vanished", system.id)))?;
         let resolved = resolve_slot_operators(operbox, slot, used)
@@ -336,6 +360,7 @@ mod tests {
         assert!(ids.contains("rosemary_perception"));
         assert!(ids.contains("witch_long_beta"));
         assert!(ids.contains("lungmen_manu_pair"));
+        assert!(ids.contains("gongsun_greyy2_power_line"));
     }
 
     #[test]
@@ -371,32 +396,32 @@ mod tests {
             control
         );
 
-        let trade_1: HashSet<_> = assignment
-            .operators_in(&RoomId::from("trade_1"))
-            .iter()
-            .map(|o| o.name.clone())
-            .collect();
-        assert!(trade_1.contains("黑键"));
-        assert!(trade_1.contains("吉星"));
-        assert!(trade_1.contains("可露希尔"));
+        // 迷迭香链改为「定位不定队友」：claim 只钉单人锚点（黑键贸易 / 迷迭香制造），
+        // 队友由 assign 阶段贪心补满，这里只校验锚点定站。
+        let trade_anchored = assignment.rooms.iter().any(|r| {
+            blueprint
+                .rooms
+                .iter()
+                .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
+                && r.operators.iter().any(|o| o.name == "黑键")
+        });
+        assert!(trade_anchored, "黑键应定位到某贸易站");
 
-        let trade_2: HashSet<_> = assignment
-            .operators_in(&RoomId::from("trade_2"))
-            .iter()
-            .map(|o| o.name.clone())
-            .collect();
-        assert!(trade_2.contains("但书"));
-        assert!(trade_2.contains("伺夜"));
-        assert!(trade_2.contains("贝洛内"));
+        let manu_anchored = assignment.rooms.iter().any(|r| {
+            blueprint
+                .rooms
+                .iter()
+                .any(|b| b.id == r.room_id && b.kind == FacilityKind::Factory)
+                && r.operators.iter().any(|o| o.name == "迷迭香")
+        });
+        assert!(manu_anchored, "迷迭香应定位到某制造站");
 
-        let manu_4: HashSet<_> = assignment
-            .operators_in(&RoomId::from("manu_4"))
-            .iter()
-            .map(|o| o.name.clone())
-            .collect();
-        assert!(manu_4.contains("迷迭香"));
-        assert!(manu_4.contains("阿罗玛"));
-        assert!(manu_4.contains("砾"));
+        let docus_room = assignment.rooms.iter().any(|r| {
+            r.operators.iter().any(|o| o.name == "但书")
+                && r.operators.iter().any(|o| o.name == "伺夜")
+                && r.operators.iter().any(|o| o.name == "贝洛内")
+        });
+        assert!(docus_room, "但书三人组应认领一个贸易站");
     }
 
     #[test]
@@ -424,5 +449,46 @@ mod tests {
             .map(|o| o.name.clone())
             .collect();
         assert!(trade_2.contains("但书"));
+    }
+
+    #[test]
+    fn claim_gongsun_greyy2_power_line_on_ideal_e2_peak() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = ideal_e2_operbox();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+        )
+        .unwrap();
+
+        let power_ops: Vec<String> = blueprint
+            .rooms
+            .iter()
+            .filter(|r| r.kind == FacilityKind::PowerPlant)
+            .flat_map(|r| {
+                assignment
+                    .operators_in(&r.id)
+                    .iter()
+                    .map(|o| o.name.clone())
+            })
+            .collect();
+        assert!(
+            power_ops.contains(&"承曦格雷伊".to_string()),
+            "发电组应认领承曦格雷伊: {:?}",
+            power_ops
+        );
+        assert!(power_ops.contains(&"格雷伊".to_string()), "{power_ops:?}");
+        assert!(
+            power_ops.iter().any(|n| n == "布丁" || n == "炎熔"),
+            "第三发电位: {power_ops:?}"
+        );
     }
 }

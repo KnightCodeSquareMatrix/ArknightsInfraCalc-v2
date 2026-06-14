@@ -13,6 +13,7 @@ pub mod tier;
 pub mod types;
 
 pub mod control;
+pub mod export;
 pub mod layout;
 pub mod manufacture;
 pub mod office;
@@ -39,9 +40,10 @@ pub use manufacture::{
 };
 pub use roster::{OperatorProgress, Roster};
 pub use schedule::{
-    schedule_base_rotation_a_b_a, schedule_jie_remainder_shift_from_pool,
-    schedule_meta_shift_from_pool, schedule_trade_rotation_a_b_a, schedule_trade_shift,
-    score_base_assignment, BaseRotationReport, BaseShiftPlan, BaseShiftRole, ShiftScores,
+    operator_team_map, schedule_base_rotation_a_b_a, schedule_jie_remainder_shift_from_pool,
+    schedule_meta_shift_from_pool, schedule_team_rotation, schedule_trade_rotation_a_b_a,
+    schedule_trade_shift, score_base_assignment, BaseRotationReport, BaseShiftPlan, BaseShiftRole,
+    DailyTotals, ShiftScores, TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult,
     TradeRotationReport, TradeShiftPlan, TradeStationPlan, TradeStationRole,
     TRADE_STATIONS_PER_SHIFT, WORKERS_PER_SHIFT,
 };
@@ -56,6 +58,7 @@ pub use search::{
 pub use control::{
     apply_control_to_layout, solve_control, ControlCenterResult, ControlOperator, ControlRoomInput,
 };
+pub use export::{build_from_base_rotation, build_from_team_rotation, MaaExportOptions, MaaSchedule};
 pub use layout::{
     assign_base_greedy, assign_shift, assignment_operator_names, pinned_assignment,
     rotating_workers, resolve_automation_group_1_layout, resolve_base,

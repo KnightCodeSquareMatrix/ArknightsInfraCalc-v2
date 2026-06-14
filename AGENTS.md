@@ -36,6 +36,7 @@
 | 制造站（勿按贸易站假设改） | [docs/MANUFACTURE_STATUS.md](docs/MANUFACTURE_STATUS.md) |
 | 回归夹具 | `infra-cli/src/verify/fixtures.rs` + `PROJECT_MAP.md` 夹具表 |
 | **自定义布局 + operbox 探测** | **`layout test`** — 见 [INFRA_CLI.md](docs/INFRA_CLI.md)「自定义布局 + 练度盒测试」；**不要**用 `bench` 代替 |
+| **Agent 默认测试夹具（243 + 全精2）** | **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** — 见本文 **§6** |
 | **全基建进驻编制 / 宏观排班** | [docs/BASE_ASSIGNMENT.md](docs/BASE_ASSIGNMENT.md)（`assign_base_greedy` 已落地；`layout test` 默认调用） |
 | 数据一致性 | `scripts/check_trade_roster.py`、`instances.rs` |
 
@@ -130,13 +131,37 @@
 
 ## 6. 验证
 
+### 6.1 机制回归（改 skill / interpreter / shortcut 后）
+
 ```bash
 python scripts/build_skill_table.py    # pilot 干员硬失败
 cargo test -p infra-core
 cargo run -p infra-cli -- verify --all
-# 用户给了布局 JSON + 练度表时：
-cargo run -p infra-cli -- layout test --layout <蓝图.json> --operbox <练度盒.json> --text
 ```
+
+### 6.2 Agent 默认端到端探测（243 + 全精2）
+
+**除非用户明确给了其他布局或 operbox，后续 Agent 一律用仓库标准夹具跑 `layout test`：**
+
+| 用途 | 路径 |
+|------|------|
+| 243 布局（`BaseBlueprint`） | `data/fixtures/243/layout.json` |
+| 全精2 练度盒（`OperBox`） | `data/fixtures/243/operbox_full_e2.json` |
+
+```bash
+cargo run -p infra-cli -- layout test \
+  --layout data/fixtures/243/layout.json \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --text
+```
+
+说明：
+
+- **不要**用 `bench` 代替（布局锁死、不含用户蓝图）。
+- **不要**默认 `operbox_gongsun.json` 或用户 xlsx 导出——那是较小/个人练度；标准集成探测用 **`operbox_full_e2.json`**。
+- 用户提供了自己的 `--layout` / `--operbox` 时，以用户路径为准；否则固定上述两文件。
+- 代码侧等价路径：`default_operbox_full_e2_path()`；布局同 `BaseBlueprint::template_243_use_this()`。
+- 夹具说明见 [data/fixtures/243/README.md](data/fixtures/243/README.md)。
 
 ## 7. 数据不变式
 

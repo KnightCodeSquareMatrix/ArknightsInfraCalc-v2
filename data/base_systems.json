@@ -34,40 +34,57 @@
   "systems": [
     {
       "id": "rosemary_perception",
-      "label": "迷迭香感知链：黑键贸+夕中枢+感知宿舍+迷迭香赤金（243-高配3班 peak）",
+      "label": "迷迭香感知链·全链(档1-2)：黑键定贸+迷迭香定制(队友贪心)+夕中枢+絮雨办公室+爱丽丝车尔尼宿舍；高于但书组",
       "priority": 21,
       "shift_modes": ["peak"],
       "slots": [
         {
           "facility": "trade_post",
-          "room_id": "trade_1",
-          "operators": [
-            { "name": "黑键", "elite": 2 },
-            { "name": "吉星", "elite": 2 },
-            { "name": "可露希尔", "elite": 2 }
-          ]
-        },
-        {
-          "facility": "control",
-          "operators": [{ "name": "夕", "elite": 2 }]
-        },
-        {
-          "facility": "dormitory",
-          "room_id": "dorm_1",
-          "operators": [
-            { "name": "车尔尼", "elite": 2 },
-            { "name": "爱丽丝", "elite": 2 },
-            { "name": "塑心", "elite": 2 }
-          ]
+          "operators": [{ "name": "黑键", "elite": 2 }]
         },
         {
           "facility": "factory",
-          "room_id": "manu_4",
-          "operators": [
-            { "name": "阿罗玛", "elite": 2 },
-            { "name": "砾", "elite": 2 },
-            { "name": "迷迭香", "elite": 2 }
-          ]
+          "operators": [{ "name": "迷迭香", "elite": 2 }]
+        },
+        {
+          "facility": "control",
+          "operators": [{ "name": "夕", "elite": 0 }]
+        },
+        {
+          "facility": "office",
+          "optional": true,
+          "operators": [{ "name": "絮雨", "elite": 2 }]
+        },
+        {
+          "facility": "dormitory",
+          "optional": true,
+          "operators": [{ "name": "爱丽丝", "elite": 2 }]
+        },
+        {
+          "facility": "dormitory",
+          "optional": true,
+          "operators": [{ "name": "车尔尼", "elite": 2 }]
+        }
+      ]
+    },
+    {
+      "id": "rosemary_perception_core",
+      "label": "迷迭香感知链·三核心(档3)：仅黑键+迷迭香+絮雨，无夕；降级至但书组之下",
+      "priority": 15,
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "trade_post",
+          "operators": [{ "name": "黑键", "elite": 2 }]
+        },
+        {
+          "facility": "factory",
+          "operators": [{ "name": "迷迭香", "elite": 2 }]
+        },
+        {
+          "facility": "office",
+          "optional": true,
+          "operators": [{ "name": "絮雨", "elite": 2 }]
         }
       ]
     },
@@ -135,6 +152,31 @@
             { "name": "龙舌兰", "elite": 2 },
             {
               "pick_one": ["卡夫卡", "柏喙", "明椒", "折光"],
+              "elite": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gongsun_greyy2_power_line",
+      "label": "243 自动化发电组：承曦格雷伊晨曦+格雷伊+布丁（虚拟+1；金线清流/温蒂/森蚺 140%）",
+      "priority": 17,
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "power_plant",
+          "operators": [{ "name": "承曦格雷伊", "elite": 2 }]
+        },
+        {
+          "facility": "power_plant",
+          "operators": [{ "name": "格雷伊", "elite": 2 }]
+        },
+        {
+          "facility": "power_plant",
+          "operators": [
+            {
+              "pick_one": ["布丁", "炎熔"],
               "elite": 2
             }
           ]

@@ -103,6 +103,25 @@ pub fn closure_fixture(case_id: &str, level: u8) -> TradeRoomInput {
     TradeRoomInput::with_operators(level, operators)
 }
 
+pub fn blackkey_closure_fixture(level: u8) -> TradeRoomInput {
+    let op = |name: &str, elite: u8, buff_ids: Vec<&str>| {
+        TradeOperator::new(
+            name,
+            elite,
+            buff_ids.into_iter().map(str::to_string).collect(),
+        )
+    };
+    let blackkey = op(
+        "黑键",
+        2,
+        vec!["trade_ord_spd_bd_n1[000]", "trade_ord_spd_bd[010]"],
+    );
+    let closure = op("可露希尔", 2, vec!["trade_ord_closure[000]"]);
+    let jixing = op("吉星", 2, vec!["trade_ord_spd&share[002]"]);
+
+    TradeRoomInput::with_operators(level, vec![blackkey, closure, jixing])
+}
+
 pub fn ling_jie_fixture(level: u8) -> TradeRoomInput {
     let op = |name: &str, elite: u8, buff_ids: Vec<&str>, tags: Vec<&str>| {
         TradeOperator {

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>基建 Layout 生成器（临时）</title>
+  <style>
+    :root {
+      --bg: #1a1b26;
+      --panel: #24283b;
+      --text: #c0caf5;
+      --muted: #565f89;
+      --border: #3b4261;
+      --accent: #7aa2f7;
+      --page-bg: #16161e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.25rem; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    main { padding: 16px 24px 48px; max-width: 1280px; margin: 0 auto; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    button, select, input[type="text"], input[type="number"] {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.9rem;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #3d59a1; border-color: #3d59a1; }
+    button.active { outline: 2px solid var(--accent); }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: 1rem; }
+    .preset-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    pre {
+      background: #11111b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow: auto;
+      max-height: 360px;
+      font-size: 12px;
+    }
+    /* yituliu scheduleV2 room-wrap (from schedule-DCmH-EbA.css) */
+    .maa-schedule-wrap-v2 { margin-top: 8px; }
+    .room-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      margin: auto;
+      justify-content: center;
+    }
+    .room-wrap-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: center;
+      width: 594px;
+    }
+    .room-wrap-center {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 320px;
+    }
+    .room-wrap-right {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      width: 200px;
+    }
+    .room-template {
+      padding: 4px;
+      display: flex;
+      justify-content: center;
+      margin: 4px;
+      border-radius: 3px;
+      flex-wrap: wrap;
+      font-weight: 600;
+      height: 80px;
+      --room-operator-short: 180px;
+      --room-operator-long: 300px;
+      border: 1px solid var(--page-bg);
+      user-select: none;
+      cursor: pointer;
+      align-content: flex-start;
+    }
+    .room-name {
+      width: 100%;
+      font-size: 12px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .room-product-badge {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(0,0,0,.25);
+    }
+    .trading { background: rgba(2,136,209,.15); color: #7dcfff; width: var(--room-operator-short); }
+    .manufacture { background: rgba(255,181,0,.15); color: #e0af68; width: var(--room-operator-short); }
+    .power { background: rgba(67,160,71,.15); color: #9ece6a; width: var(--room-operator-short); }
+    .control { background: rgba(67,160,71,.15); color: #9ece6a; width: var(--room-operator-long); }
+    .dormitory { background: rgba(0,159,180,.15); color: #73daca; width: var(--room-operator-long); }
+    .meeting, .processing, .hire {
+      background: rgba(126,126,126,.15);
+      color: #a9b1d6;
+      width: var(--room-operator-short);
+    }
+    .trading-selected { background: transparent; border: 1px solid #0288d1; }
+    .manufacture-selected { background: transparent; border: 1px solid #ffb500; }
+    .power-selected, .control-selected { background: transparent; border: 1px solid #43a047; }
+    .dormitory-selected { background: transparent; border: 1px solid #009fb4; }
+    .meeting-selected, .processing-selected, .hire-selected {
+      background: transparent;
+      border: 1px solid #7e7e7e;
+    }
+    .room-template.blank {
+      width: 100px;
+      border: none;
+      background: transparent;
+      cursor: default;
+    }
+    .hint { color: var(--muted); font-size: 0.85rem; }
+    .status { color: #9ece6a; font-size: 0.85rem; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>基建 Layout 生成器（临时）</h1>
+    <p>UI 参考 <a href="https://ark.yituliu.cn/tools/scheduleV2" style="color:#7aa2f7">一图流排班表 V2</a> 的 <code>room-wrap</code> 三区布局；导出 <code>data/layout/*.json</code>（<code>BaseBlueprint</code>）。</p>
+  </header>
+  <main>
+    <div class="toolbar">
+      <button class="primary" id="btnExport">导出 JSON</button>
+      <button id="btnCopy">复制 JSON</button>
+      <label style="margin:0"><input type="file" id="fileImport" accept="application/json" hidden /><button type="button" id="btnImport">导入 JSON</button></label>
+      <span class="hint">保存到 <code>data/layout/&lt;name&gt;.json</code> 后可用 <code>BaseBlueprint::load_template</code></span>
+    </div>
+
+    <div class="panel">
+      <h2>基建类型预设（一图流 schedule_menu）</h2>
+      <div class="preset-row" id="presetButtons"></div>
+    </div>
+
+    <div class="panel">
+      <h2>场景假设</h2>
+      <div class="field-grid">
+        <div><label>模板名 template</label><input type="text" id="template" value="custom" /></div>
+        <div><label>无人机上限 drone_cap</label><input type="number" id="droneCap" value="135" min="0" /></div>
+        <div><label>精英干员设施数 elite_facility_count（无进驻编制时的回退）</label><input type="number" id="eliteCount" value="0" min="0" /></div>
+        <div><label>岁设施数 sui_facility_count</label><input type="number" id="suiCount" value="2" min="0" /></div>
+        <div><label>宿舍人数 dorm_occupant_count</label><input type="number" id="dormOccupants" value="20" min="0" /></div>
+        <div><label>base_workforce（逗号分隔，仅显式覆盖；有进驻编制时由房间名单派生）</label><input type="text" id="baseWorkforce" value="" placeholder="留空" /></div>
+        <div><label>魔物料理 monster_cuisine</label><input type="number" id="monsterCuisine" value="3" step="0.1" /></div>
+      </div>
+    </div>
+
+    <div class="panel maa-schedule-wrap-v2">
+      <h2>基建布局 <span class="hint">点击房间编辑等级与产物</span></h2>
+      <div class="room-wrap" id="roomWrap"></div>
+      <p class="status" id="selectionStatus"></p>
+    </div>
+
+    <div class="panel" id="roomEditor" hidden>
+      <h2 id="roomEditorTitle">房间设置</h2>
+      <div class="field-grid">
+        <div><label>等级 level</label><input type="number" id="roomLevel" min="1" max="3" value="3" /></div>
+        <div id="productField" hidden>
+          <label id="productLabel">产物</label>
+          <select id="roomProduct"></select>
+        </div>
+        <div id="dormBedsField" hidden>
+          <label>床位数 dorm_beds</label><input type="number" id="dormBeds" min="1" max="8" value="5" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>预览 JSON</h2>
+      <pre id="jsonPreview"></pre>
+    </div>
+  </main>
+
+  <script>
+    const PRESETS = [
+      { label: "243", trading: 2, manufacture: 4, power: 3 },
+      { label: "153", trading: 1, manufacture: 5, power: 3 },
+      { label: "333", trading: 3, manufacture: 3, power: 3 },
+      { label: "252", trading: 2, manufacture: 5, power: 2 },
+      { label: "342", trading: 3, manufacture: 4, power: 2 },
+    ];
+
+    const ROOM_LABELS = {
+      trading: "贸易站",
+      manufacture: "制造站",
+      power: "发电站",
+      control: "控制中枢",
+      dormitory: "宿舍",
+      meeting: "会客室",
+      processing: "加工站",
+      hire: "办公室",
+    };
+
+    const TRADE_PRODUCTS = [
+      { id: "gold", label: "龙门币 LMD" },
+      { id: "originium", label: "合成玉 Orundum" },
+    ];
+
+    const FACTORY_PRODUCTS = [
+      { id: "gold", label: "赤金 Pure Gold" },
+      { id: "battle_record", label: "经验 Battle Record" },
+      { id: "originium", label: "源石碎片 Originium" },
+    ];
+
+    const state = {
+      preset: "243",
+      counts: { trading: 2, manufacture: 4, power: 3, dormitory: 4 },
+      rooms: {},
+      selected: null,
+    };
+
+    function defaultTradeProduct(index, total) {
+      return index === total - 1 && total >= 3 ? "originium" : "gold";
+    }
+
+    function defaultFactoryProduct(index, total) {
+      const goldCount = Math.ceil(total / 2);
+      return index < goldCount ? "gold" : "battle_record";
+    }
+
+    function roomKey(kind, index) {
+      return `${kind}:${index}`;
+    }
+
+    function ensureRooms() {
+      const kinds = [
+        ["trading", state.counts.trading],
+        ["manufacture", state.counts.manufacture],
+        ["power", state.counts.power],
+        ["dormitory", state.counts.dormitory],
+        ["control", 1],
+        ["meeting", 1],
+        ["processing", 1],
+        ["hire", 1],
+      ];
+      const next = {};
+      for (const [kind, count] of kinds) {
+        for (let i = 0; i < count; i++) {
+          const key = roomKey(kind, i);
+          const prev = state.rooms[key];
+          if (prev) {
+            next[key] = prev;
+            continue;
+          }
+          const room = { kind, index: i, level: 3 };
+          if (kind === "trading") {
+            room.tradeOrder = defaultTradeProduct(i, count);
+          } else if (kind === "manufacture") {
+            room.factoryRecipe = defaultFactoryProduct(i, count);
+          } else if (kind === "dormitory") {
+            room.dormBeds = 5;
+          }
+          next[key] = room;
+        }
+      }
+      state.rooms = next;
+    }
+
+    function applyPreset(preset) {
+      state.preset = preset.label;
+      state.counts.trading = preset.trading;
+      state.counts.manufacture = preset.manufacture;
+      state.counts.power = preset.power;
+      document.getElementById("template").value = preset.label;
+      ensureRooms();
+      render();
+    }
+
+    function selectedClass(kind) {
+      if (!state.selected || state.selected.kind !== kind) return "";
+      return `${kind}-selected`;
+    }
+
+    function productBadge(room) {
+      if (room.kind === "trading") {
+        const p = TRADE_PRODUCTS.find((x) => x.id === room.tradeOrder);
+        return p ? p.label.split(" ")[0] : room.tradeOrder;
+      }
+      if (room.kind === "manufacture") {
+        const p = FACTORY_PRODUCTS.find((x) => x.id === room.factoryRecipe);
+        return p ? p.label.split(" ")[0] : room.factoryRecipe;
+      }
+      return "";
+    }
+
+    function renderRoomWrap() {
+      const wrap = document.getElementById("roomWrap");
+      const mkRoom = (kind, index, labelSuffix = "") => {
+        const key = roomKey(kind, index);
+        const room = state.rooms[key];
+        const selected =
+          state.selected &&
+          state.selected.kind === kind &&
+          state.selected.index === index;
+        const cls = selected ? `${kind}-selected` : "";
+        const badge = productBadge(room);
+        const num = index + 1;
+        const label = `${ROOM_LABELS[kind]}#${num}${labelSuffix}`;
+        return `<div class="room-template ${kind} ${cls}" data-kind="${kind}" data-index="${index}">
+          <div class="room-name">
+            <span>${label}</span>
+            ${badge ? `<span class="room-product-badge">${badge}</span>` : ""}
+          </div>
+        </div>`;
+      };
+
+      const left = [];
+      for (let i = 0; i < state.counts.trading; i++) left.push(mkRoom("trading", i));
+      for (let i = 0; i < state.counts.manufacture; i++) left.push(mkRoom("manufacture", i));
+      for (let i = 0; i < state.counts.power; i++) left.push(mkRoom("power", i));
+
+      const center = [mkRoom("control", 0)];
+      for (let i = 0; i < state.counts.dormitory; i++) center.push(mkRoom("dormitory", i));
+
+      const right = [
+        '<div class="room-template blank"></div>',
+        mkRoom("meeting", 0),
+        mkRoom("processing", 0),
+        mkRoom("hire", 0),
+        '<div class="room-template blank"></div>',
+      ];
+
+      wrap.innerHTML = `
+        <div class="room-wrap-left">${left.join("")}</div>
+        <div class="room-wrap-center">${center.join("")}</div>
+        <div class="room-wrap-right">${right.join("")}</div>
+      `;
+
+      wrap.querySelectorAll(".room-template[data-kind]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.selected = {
+            kind: el.dataset.kind,
+            index: Number(el.dataset.index),
+          };
+          render();
+        });
+      });
+    }
+
+    function renderEditor() {
+      const panel = document.getElementById("roomEditor");
+      const status = document.getElementById("selectionStatus");
+      if (!state.selected) {
+        panel.hidden = true;
+        status.textContent = "未选中房间";
+        return;
+      }
+      const key = roomKey(state.selected.kind, state.selected.index);
+      const room = state.rooms[key];
+      panel.hidden = false;
+      status.textContent = `当前选中：${ROOM_LABELS[room.kind]} #${room.index + 1}`;
+      document.getElementById("roomEditorTitle").textContent =
+        `${ROOM_LABELS[room.kind]} #${room.index + 1} 设置`;
+      document.getElementById("roomLevel").value = room.level;
+
+      const productField = document.getElementById("productField");
+      const dormField = document.getElementById("dormBedsField");
+      const productSelect = document.getElementById("roomProduct");
+
+      if (room.kind === "trading" || room.kind === "manufacture") {
+        productField.hidden = false;
+        const options = room.kind === "trading" ? TRADE_PRODUCTS : FACTORY_PRODUCTS;
+        const current = room.kind === "trading" ? room.tradeOrder : room.factoryRecipe;
+        productSelect.innerHTML = options
+          .map((o) => `<option value="${o.id}" ${o.id === current ? "selected" : ""}>${o.label}</option>`)
+          .join("");
+        document.getElementById("productLabel").textContent =
+          room.kind === "trading" ? "贸易订单" : "制造配方";
+      } else {
+        productField.hidden = true;
+      }
+
+      dormField.hidden = room.kind !== "dormitory";
+      if (room.kind === "dormitory") {
+        document.getElementById("dormBeds").value = room.dormBeds ?? 5;
+      }
+    }
+
+    function roomId(kind, index) {
+      const map = {
+        trading: "trade",
+        manufacture: "manu",
+        power: "power",
+        dormitory: "dorm",
+        control: "control",
+        meeting: "meeting",
+        processing: "workshop",
+        hire: "office",
+      };
+      const base = map[kind] ?? kind;
+      if (kind === "control" || kind === "meeting" || kind === "processing" || kind === "hire") {
+        return base;
+      }
+      return `${base}_${index + 1}`;
+    }
+
+    function kindToBlueprint(kind) {
+      return {
+        trading: "trade_post",
+        manufacture: "factory",
+        power: "power_plant",
+        control: "control_center",
+        dormitory: "dormitory",
+        meeting: "meeting_room",
+        processing: "workshop",
+        hire: "office",
+      }[kind];
+    }
+
+    function buildBlueprint() {
+      const order = [
+        ["control", 1],
+        ["trading", state.counts.trading],
+        ["manufacture", state.counts.manufacture],
+        ["power", state.counts.power],
+        ["meeting", 1],
+        ["dormitory", state.counts.dormitory],
+        ["processing", 1],
+        ["hire", 1],
+      ];
+
+      const rooms = [];
+      for (const [kind, count] of order) {
+        for (let i = 0; i < count; i++) {
+          const key = roomKey(kind, i);
+          const room = state.rooms[key];
+          const entry = {
+            id: roomId(kind, i),
+            kind: kindToBlueprint(kind),
+            level: Number(room.level) || 3,
+          };
+          if (kind === "trading") {
+            entry.product = { trade: { order: room.tradeOrder || "gold" } };
+          } else if (kind === "manufacture") {
+            entry.product = { factory: { recipe: room.factoryRecipe || "gold" } };
+          } else if (kind === "dormitory") {
+            entry.dorm_beds = Number(room.dormBeds) || 5;
+          }
+          rooms.push(entry);
+        }
+      }
+
+      const workforce = document
+        .getElementById("baseWorkforce")
+        .value.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      return {
+        template: document.getElementById("template").value || state.preset,
+        drone_cap: Number(document.getElementById("droneCap").value) || 135,
+        scenario: {
+          elite_facility_count: Number(document.getElementById("eliteCount").value) || 0,
+          sui_facility_count: Number(document.getElementById("suiCount").value) || 0,
+          dorm_occupant_count: Number(document.getElementById("dormOccupants").value) || 0,
+          base_workforce: workforce,
+          initial_global: {
+            monster_cuisine: Number(document.getElementById("monsterCuisine").value) || 0,
+          },
+        },
+        rooms,
+      };
+    }
+
+    function renderPreview() {
+      const json = JSON.stringify(buildBlueprint(), null, 2);
+      document.getElementById("jsonPreview").textContent = json;
+      return json;
+    }
+
+    function renderPresets() {
+      const row = document.getElementById("presetButtons");
+      row.innerHTML = PRESETS.map(
+        (p) =>
+          `<button type="button" data-preset="${p.label}" class="${state.preset === p.label ? "active" : ""}">
+            ${p.label}（贸${p.trading}/制${p.manufacture}/电${p.power}）
+          </button>`
+      ).join("");
+      row.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const preset = PRESETS.find((p) => p.label === btn.dataset.preset);
+          applyPreset(preset);
+        });
+      });
+    }
+
+    function render() {
+      renderPresets();
+      renderRoomWrap();
+      renderEditor();
+      renderPreview();
+    }
+
+    function importBlueprint(data) {
+      if (!data || !Array.isArray(data.rooms)) {
+        alert("无效的 layout JSON：缺少 rooms 数组");
+        return;
+      }
+      const kindFromBlueprint = {
+        trade_post: "trading",
+        factory: "manufacture",
+        power_plant: "power",
+        control_center: "control",
+        dormitory: "dormitory",
+        meeting_room: "meeting",
+        workshop: "processing",
+        office: "hire",
+      };
+      const counts = { trading: 0, manufacture: 0, power: 0, dormitory: 0 };
+      const rooms = {};
+      for (const r of data.rooms) {
+        const kind = kindFromBlueprint[r.kind];
+        if (!kind) continue;
+        let index = 0;
+        if (["trading", "manufacture", "power", "dormitory"].includes(kind)) {
+          index = counts[kind];
+          counts[kind] += 1;
+        }
+        const key = roomKey(kind, index);
+        const room = { kind, index, level: r.level ?? 3 };
+        if (kind === "trading" && r.product?.trade?.order) {
+          room.tradeOrder = r.product.trade.order;
+        }
+        if (kind === "manufacture" && r.product?.factory?.recipe) {
+          room.factoryRecipe = r.product.factory.recipe;
+        }
+        if (kind === "dormitory" && r.dorm_beds) {
+          room.dormBeds = r.dorm_beds;
+        }
+        rooms[key] = room;
+      }
+      state.counts.trading = counts.trading;
+      state.counts.manufacture = counts.manufacture;
+      state.counts.power = counts.power;
+      state.counts.dormitory = counts.dormitory || 4;
+      state.rooms = rooms;
+      state.preset = data.template || "custom";
+      state.selected = null;
+
+      document.getElementById("template").value = data.template || "custom";
+      document.getElementById("droneCap").value = data.drone_cap ?? 135;
+      const sc = data.scenario || {};
+      document.getElementById("eliteCount").value = sc.elite_facility_count ?? 0;
+      document.getElementById("suiCount").value = sc.sui_facility_count ?? 2;
+      document.getElementById("dormOccupants").value = sc.dorm_occupant_count ?? 20;
+      document.getElementById("baseWorkforce").value = (sc.base_workforce || []).join(",");
+      document.getElementById("monsterCuisine").value =
+        sc.initial_global?.monster_cuisine ?? 3;
+      render();
+    }
+
+    document.getElementById("roomLevel").addEventListener("input", (e) => {
+      if (!state.selected) return;
+      const key = roomKey(state.selected.kind, state.selected.index);
+      state.rooms[key].level = Number(e.target.value);
+      renderPreview();
+    });
+
+    document.getElementById("roomProduct").addEventListener("change", (e) => {
+      if (!state.selected) return;
+      const key = roomKey(state.selected.kind, state.selected.index);
+      const room = state.rooms[key];
+      if (room.kind === "trading") room.tradeOrder = e.target.value;
+      if (room.kind === "manufacture") room.factoryRecipe = e.target.value;
+      render();
+    });
+
+    document.getElementById("dormBeds").addEventListener("input", (e) => {
+      if (!state.selected) return;
+      const key = roomKey(state.selected.kind, state.selected.index);
+      state.rooms[key].dormBeds = Number(e.target.value);
+      renderPreview();
+    });
+
+    ["template", "droneCap", "eliteCount", "suiCount", "dormOccupants", "baseWorkforce", "monsterCuisine"].forEach(
+      (id) => {
+        document.getElementById(id).addEventListener("input", renderPreview);
+      }
+    );
+
+    document.getElementById("btnExport").addEventListener("click", () => {
+      const json = renderPreview();
+      const name = (document.getElementById("template").value || "layout").trim();
+      const blob = new Blob([json], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById("btnCopy").addEventListener("click", async () => {
+      const json = renderPreview();
+      await navigator.clipboard.writeText(json);
+      document.getElementById("selectionStatus").textContent = "已复制 JSON 到剪贴板";
+    });
+
+    document.getElementById("btnImport").addEventListener("click", () => {
+      document.getElementById("fileImport").click();
+    });
+
+    document.getElementById("fileImport").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        importBlueprint(JSON.parse(await file.text()));
+      } catch (err) {
+        alert(`导入失败：${err}`);
+      }
+      e.target.value = "";
+    });
+
+    applyPreset(PRESETS[0]);
+  </script>
+</body>
+</html>

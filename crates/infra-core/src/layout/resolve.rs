@@ -279,6 +279,10 @@ const ROSEMARY_PERCEPTION_BUFF: &str = "manu_prod_spd_bd_n1[000]";
 /// 宿舍感知 producer（爱丽丝·梦境呓语 / 车尔尼·琴键漫步；每级 +1 感知，精2 生效）。
 /// `skill_table` 未建模其感知子效果（主效果是心情恢复，属非目标），故按名在 resolve 注入。
 const DORM_PERCEPTION_PRODUCERS: &[&str] = &["爱丽丝", "车尔尼"];
+/// 办公室感知 producer（絮雨·追忆：记忆碎片 → 感知）。
+/// 产出按办公室等级：Lv3 → 20，Lv2 → 10，Lv1 → 0，即 `(level-1)*10`（@公孙长乐 2026-06-15）。
+/// 与爱丽丝/车尔尼同款：主效果（招募）属非目标，故不入 `skill_table`，按名在 resolve 注入。
+const OFFICE_PERCEPTION_PRODUCER: &str = "絮雨";
 
 /// 感知信息（全基建共享）汇总：所有 producer 写入 `layout.global`，
 /// 由黑键/迷迭香各自读全量。中枢令/夕的感知已在 `apply_control_to_layout` 写回，这里补齐贸易/制造/宿舍侧。
@@ -319,6 +323,12 @@ fn apply_perception_producers(
                         layout
                             .global
                             .add(GlobalResourceKey::Perception, f64::from(room.level));
+                    }
+                }
+                FacilityKind::Office => {
+                    if op.elite >= 2 && op.name == OFFICE_PERCEPTION_PRODUCER {
+                        let amount = f64::from(room.level.saturating_sub(1)) * 10.0;
+                        layout.global.add(GlobalResourceKey::Perception, amount);
                     }
                 }
                 _ => {}
@@ -696,6 +706,71 @@ mod tests {
     }
 
     #[test]
+    fn office_xuyu_perception_chain_drives_rosemary_and_blackkey() {
+        use crate::manufacture::{solve_manufacture, ManuRoomInput};
+        use crate::types::RecipeKind;
+
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("trade_1", vec![AssignedOperator::new("黑键", 2)]);
+        assignment.set_room("manu_4", vec![AssignedOperator::new("迷迭香", 2)]);
+        assignment.set_room("control", vec![AssignedOperator::new("夕", 2)]);
+        assignment.set_room(
+            "dorm_1",
+            vec![
+                AssignedOperator::new("爱丽丝", 2),
+                AssignedOperator::new("车尔尼", 2),
+            ],
+        );
+        assignment.set_room("office_1", vec![AssignedOperator::new("絮雨", 2)]);
+
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+
+        // 三核心+夕+爱丽丝+车尔尼 = 56；絮雨办公室(Lv3 → (3-1)*10 = 20) → 76。
+        assert!(
+            (resolved.layout.global.get(GlobalResourceKey::Perception) - 76.0).abs() < f64::EPSILON,
+            "絮雨办公室应 +20 感知 → 76, got {}",
+            resolved.layout.global.get(GlobalResourceKey::Perception)
+        );
+
+        // 迷迭香房扣回自产 → 读全量 76；意识实体 /1 = +76% 生产力（文档 §7.1「整十」满配上限 ~75-80%）。
+        let manu = resolved.manu_rooms.iter().find(|r| r.id.0 == "manu_4").unwrap();
+        let manu_result = solve_manufacture(
+            &ManuRoomInput {
+                level: manu.level,
+                operators: manu.operators.clone(),
+                active_recipe: RecipeKind::Gold,
+                mood: 24.0,
+                layout: std::sync::Arc::new(manu.layout.clone()),
+            },
+            &table,
+        )
+        .unwrap();
+        assert!(
+            (manu_result.prod_skill - 76.0).abs() < 0.01,
+            "迷迭香感知链 → +76% 生产力, got {}",
+            manu_result.prod_skill
+        );
+
+        // 黑键房读全量 76；怅惘和声 /2 = +38% 贸易效率（文档 §7.2 ~37.5-40%）。
+        let trade = resolved.trade_rooms.iter().find(|r| r.id.0 == "trade_1").unwrap();
+        assert!(
+            (trade.layout.global.get(GlobalResourceKey::Perception) - 56.0).abs() < f64::EPSILON,
+            "黑键房应扣回自产 20 → 56, got {}",
+            trade.layout.global.get(GlobalResourceKey::Perception)
+        );
+    }
+
+    #[test]
     fn snhunt_baseline_produces_matatabi_from_control() {
         let layout = resolve_snhunt_baseline_layout().unwrap();
         assert_eq!(layout.trade_station_count, 3);
@@ -733,7 +808,7 @@ mod tests {
         assert_eq!(layout.drone_cap, 135);
         assert_eq!(layout.gold_manu_line_count, 2);
         assert_eq!(layout.durin_in_base, 0);
-        assert_eq!(layout.facility_level_sum_excl_meeting, 42);
+        assert_eq!(layout.facility_level_sum_excl_meeting, 45);
         assert!((layout.global.get(crate::global_resource::GlobalResourceKey::MonsterCuisine)
             - 3.0)
             .abs()
@@ -973,17 +1048,9 @@ mod tests {
 
     #[test]
     fn rainbow_intelligence_reaches_blitz_office_hire() {
-        use crate::layout::blueprint::RoomBlueprint;
-
         let (instances, table) = pair();
-        let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
-        blueprint.rooms.push(RoomBlueprint {
-            id: "office_1".into(),
-            kind: FacilityKind::Office,
-            level: 3,
-            product: None,
-            dorm_beds: None,
-        });
+        // 243_use_this_ 已含 office_1 (Lv3)；此处直接复用，不再手动追加。
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room(
             "control",

@@ -141,18 +141,34 @@ crates/infra-cli/src/
 ## 自定义布局 + 练度盒测试（Agent 默认路径）
 
 > **给 Cursor / 协作者**：用户给出「某布局 JSON + operbox / 练度表」要跑一遍贸易/制造搜索时，**优先用 `layout test`**，不要用 `bench`（`bench` 布局锁死 243c 基准）、也不要在 CLI 里临时拼 `TradeLayoutContext`。
+>
+> **无用户指定文件时，Agent 默认固定用：**
+> - 布局：`data/fixtures/243/layout.json`
+> - 练度盒：`data/fixtures/243/operbox_full_e2.json`（243 三班干员全精2 / 90）
 
 ### 何时用
 
 | 场景 | 用哪个 |
 |------|--------|
-| 用户提供了 `BaseBlueprint` JSON（如 `243测试用布局.json`、排班工具导出的布局） | **`layout test`** |
-| 对比固定 243c 基准 + operbox（无自定义房间结构） | `bench --operbox …` |
+| **Agent 本地探测 / 改机制后 smoke test（无用户路径）** | **`layout test`** + **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** |
+| 用户提供了 `BaseBlueprint` JSON（如 `243测试用布局.json`、排班工具导出的布局） | **`layout test`** + 用户 `--layout` + 用户或标准 `--operbox` |
+| 对比固定 243c 基准 + operbox（无自定义房间结构） | `bench --operbox data/fixtures/243/operbox_full_e2.json` |
 | 怪猎账号（木天蓼 12、泰拉调查团、精2 全局 +7/+2） | 代码侧 `TradeLayoutContext::snhunt_baseline()` / `snhunt_elite2_baseline()` 传入搜索；或蓝图 + assignment 含中枢双人 |
 | 机制回归、shortcut 断言 | `verify --case …` / `verify --all` |
 | 单站硬编码三人组产量 | `trade yield <fixture>` |
 
-### 命令
+### 命令（Agent 默认）
+
+```bash
+cargo run -p infra-cli -- layout test \
+  --layout data/fixtures/243/layout.json \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  [--top <n>] \
+  [-o <file.csv>] \
+  [--text]
+```
+
+用户指定路径时，将 `--layout` / `--operbox` 换成用户文件即可：
 
 ```bash
 cargo run -p infra-cli -- layout test \
@@ -165,8 +181,8 @@ cargo run -p infra-cli -- layout test \
 
 | 参数 | 说明 |
 |------|------|
-| `--layout` | **必填**。任意路径的 `BaseBlueprint` JSON（格式同 `data/layout/243c.json`） |
-| `--operbox` | **必填**。玩家练度盒 JSON（`OperBox`；常用 `data/operbox_gongsun.json` 或用户自己的 xlsx 转 JSON） |
+| `--layout` | **必填**。任意路径的 `BaseBlueprint` JSON；**Agent 默认** `data/fixtures/243/layout.json` |
+| `--operbox` | **必填**。玩家练度盒 JSON（`OperBox`）；**Agent 默认** `data/fixtures/243/operbox_full_e2.json`（全精2）；用户自有练度或 `data/operbox_gongsun.json` 仅在用户指定时用 |
 | `--top` | Top-K 条数，默认 3 |
 | `-o` / `--output` | 写 CSV（UTF-8 BOM）；缺省 stdout |
 | `--text` | 人类可读摘要写 stderr（**Agent 本地探测时推荐**） |

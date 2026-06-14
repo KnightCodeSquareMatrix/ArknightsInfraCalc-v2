@@ -3,13 +3,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::output::{
-    emit_base_rotation, emit_bench, BenchMeta, OutputOptions, PoolSummary,
+    emit_base_rotation, emit_bench, emit_team_rotation, print_base_rotation_text,
+    print_team_rotation_text, BenchMeta, OutputFormat, OutputOptions, PoolSummary,
 };
+use infra_core::export::{build_from_base_rotation, build_from_team_rotation, MaaExportOptions, MaaSchedule};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::{
     assign_base_greedy, BaseAssignment, BaseBlueprint, resolve_base, AssignBaseOptions,
 };
-use infra_core::schedule::schedule_base_rotation_a_b_a;
+use infra_core::schedule::{schedule_base_rotation_a_b_a, schedule_team_rotation};
 use infra_core::manufacture::input::ManuRoomInput;
 use infra_core::manufacture::solve_manufacture;
 use infra_core::manufacture::ManuSearchRecipeMode;
@@ -28,6 +30,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
         Some("test") => layout_test_cmd(&args[1..]),
         Some("eval") => layout_eval_cmd(&args[1..]),
         Some("rotation") => layout_rotation_cmd(&args[1..]),
+        Some("team-rotation") => layout_team_rotation_cmd(&args[1..]),
         _ => {
             eprintln!(
                 "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]"
@@ -36,7 +39,10 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]"
             );
             eprintln!(
-                "       infra-cli layout rotation --layout <path> --operbox <path> [--top <n>] [--output-dir <dir>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout rotation --layout <path> --operbox <path> [--top <n>] [--output-dir <dir>] [--maa-out <file.json>] [-o <file.csv>] [--text|--json]"
+            );
+            eprintln!(
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Ok(())
         }
@@ -67,6 +73,43 @@ fn output_dir_from_args(args: &[String]) -> Option<PathBuf> {
     args.windows(2)
         .find(|w| w[0] == "--output-dir")
         .map(|w| PathBuf::from(&w[1]))
+}
+
+fn maa_out_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--maa-out")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn maa_export_options(args: &[String], blueprint: &BaseBlueprint) -> MaaExportOptions {
+    let mut opts = MaaExportOptions::for_blueprint(blueprint);
+    if let Some(title) = args
+        .windows(2)
+        .find(|w| w[0] == "--maa-title")
+        .map(|w| w[1].clone())
+    {
+        opts.title = title;
+    }
+    opts
+}
+
+fn write_maa_schedule(path: &Path, schedule: &MaaSchedule) -> Result<(), Error> {
+    schedule.save(path)?;
+    Ok(())
+}
+
+fn emit_maa_hint(path: &Path, layout: &str, operbox: &str, owned: usize) {
+    eprintln!();
+    eprintln!("MAA 排班 JSON 已写入: {}", path.display());
+    eprintln!("  layout={layout} operbox={operbox} owned={owned}");
+    eprintln!("  导入 MAA：任务设置 → 基建换班 → 自定义模式 → 选择该 JSON（plan_index 从 0 起）");
+}
+
+fn should_emit_primary_output(out: &OutputOptions, wrote_maa: bool) -> bool {
+    if !wrote_maa {
+        return true;
+    }
+    out.path.is_some() || out.format != OutputFormat::Csv
 }
 
 fn layout_rotation_cmd(args: &[String]) -> Result<(), Error> {
@@ -101,13 +144,29 @@ fn layout_rotation_cmd(args: &[String]) -> Result<(), Error> {
 
     let layout_str = layout_path.to_string_lossy();
     let operbox_str = operbox_path.to_string_lossy();
-    emit_base_rotation(
-        &out,
-        layout_str.as_ref(),
-        operbox_str.as_ref(),
-        operbox.owned_count(),
-        &report,
-    )
+    let owned = operbox.owned_count();
+    let maa_path = maa_out_from_args(args);
+
+    if let Some(ref maa_path) = maa_path {
+        let maa_opts = maa_export_options(args, &blueprint);
+        let schedule = build_from_base_rotation(&blueprint, &report, &maa_opts)?;
+        write_maa_schedule(maa_path, &schedule)?;
+        if out.format != OutputFormat::Text {
+            print_base_rotation_text(layout_str.as_ref(), operbox_str.as_ref(), owned, &report)?;
+        }
+        emit_maa_hint(maa_path, layout_str.as_ref(), operbox_str.as_ref(), owned);
+    }
+
+    if should_emit_primary_output(&out, maa_path.is_some()) {
+        emit_base_rotation(
+            &out,
+            layout_str.as_ref(),
+            operbox_str.as_ref(),
+            owned,
+            &report,
+        )?;
+    }
+    Ok(())
 }
 
 fn write_rotation_assignments(dir: &Path, report: &infra_core::schedule::BaseRotationReport) -> Result<(), Error> {
@@ -129,6 +188,68 @@ fn write_rotation_assignments(dir: &Path, report: &infra_core::schedule::BaseRot
         ));
         shift.assignment.save(&path)?;
         eprintln!("wrote {}", path.display());
+    }
+    Ok(())
+}
+
+fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
+    let out = OutputOptions::from_args(args);
+    let layout_path = layout_path_from_args(args)?;
+    let operbox_path = operbox_path_from_args(args)?;
+    let top_k = args
+        .windows(2)
+        .find(|w| w[0] == "--top")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(20);
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+
+    let report = schedule_team_rotation(
+        &blueprint,
+        &operbox,
+        &instances,
+        &table,
+        &AssignBaseOptions {
+            top_k,
+            ..AssignBaseOptions::default()
+        },
+    )?;
+
+    if let Some(dir) = output_dir_from_args(args) {
+        fs::create_dir_all(&dir)?;
+        for shift in &report.shifts {
+            let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
+            shift.assignment.save(&path)?;
+            eprintln!("wrote {}", path.display());
+        }
+    }
+
+    let layout_str = layout_path.to_string_lossy();
+    let operbox_str = operbox_path.to_string_lossy();
+    let owned = operbox.owned_count();
+    let maa_path = maa_out_from_args(args);
+
+    if let Some(ref maa_path) = maa_path {
+        let maa_opts = maa_export_options(args, &blueprint);
+        let schedule = build_from_team_rotation(&blueprint, &report, &maa_opts)?;
+        write_maa_schedule(maa_path, &schedule)?;
+        if out.format != OutputFormat::Text {
+            print_team_rotation_text(layout_str.as_ref(), operbox_str.as_ref(), owned, &report)?;
+        }
+        emit_maa_hint(maa_path, layout_str.as_ref(), operbox_str.as_ref(), owned);
+    }
+
+    if should_emit_primary_output(&out, maa_path.is_some()) {
+        emit_team_rotation(
+            &out,
+            layout_str.as_ref(),
+            operbox_str.as_ref(),
+            owned,
+            &report,
+        )?;
     }
     Ok(())
 }

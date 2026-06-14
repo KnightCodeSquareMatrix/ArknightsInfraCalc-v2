@@ -9,8 +9,9 @@ mod workforce;
 
 pub use shift::AssignShiftMode;
 pub use assign::{
-    assign_base_greedy, assign_shift, assignment_operator_names, pinned_assignment,
-    rotating_workers, AssignBaseOptions,
+    assign_base_greedy, assign_power_rooms, assign_power_stations, assign_shift,
+    assign_team_producer_rooms, assignment_operator_names, blackkey_witch_same_trade_room,
+    pinned_assignment, rotating_workers, AssignBaseOptions,
 };
 pub use system::{claim_base_systems, default_base_systems_path, load_base_systems};
 pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment};

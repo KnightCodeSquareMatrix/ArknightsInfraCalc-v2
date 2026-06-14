@@ -1414,8 +1414,8 @@ mod tests {
             .copied()
             .unwrap_or(0.0);
         assert!(
-            (robots - 42.0).abs() < f64::EPSILON,
-            "243_use_this_ 设施等级和 42，got {robots}"
+            (robots - 45.0).abs() < f64::EPSILON,
+            "243_use_this_ 设施等级和 45（含办公室 Lv3），got {robots}"
         );
     }
 

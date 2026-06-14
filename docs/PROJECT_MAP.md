@@ -122,6 +122,8 @@ ArknightsInfraCalc-v2/
 | `schedule rotation --operbox <path> [--layout-baseline] [--json]` | 三班 A-B-A 轮换报告 |
 | `trade yield <fixture> [--level] [--shift]` | 单站产量探测（fixture 名见 `verify/fixtures.rs` 的 `unit_fixture`） |
 
+**Agent 默认夹具**（无用户路径时）：`data/fixtures/243/layout.json` + `data/fixtures/243/operbox_full_e2.json` — 见 [AGENTS.md](../AGENTS.md) §6.2、[INFRA_CLI.md](INFRA_CLI.md)「自定义布局 + 练度盒测试」。
+
 **模块职责（必读）**：[INFRA_CLI.md](INFRA_CLI.md) — 约定 `commands` / `verify` / `output` 分工，避免把机制或夹具塞回 `main.rs`。
 
 ### `infra-cli` 源码索引

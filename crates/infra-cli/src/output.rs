@@ -4,8 +4,12 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use csv::Writer;
+use infra_core::layout::BaseAssignment;
 use infra_core::pool::PoolSkip;
-use infra_core::schedule::{BaseRotationReport, BaseShiftRole, TradeRotationReport, TradeStationRole};
+use infra_core::schedule::{
+    BaseRotationReport, BaseShiftRole, TeamLabel, TeamRotationReport, TradeRotationReport,
+    TradeStationRole,
+};
 use infra_core::search::{ManuSearchHit, ManuSearchReport, TradeSearchHit, TradeSearchReport};
 use infra_core::Error;
 
@@ -907,6 +911,15 @@ pub fn emit_base_rotation(
     }
 }
 
+pub fn print_base_rotation_text(
+    layout: &str,
+    operbox: &str,
+    owned: usize,
+    report: &BaseRotationReport,
+) -> Result<(), Error> {
+    write_base_rotation_text(layout, operbox, owned, report)
+}
+
 fn write_base_rotation_csv(
     path: Option<&Path>,
     layout: &str,
@@ -957,6 +970,266 @@ fn shift_role_label(role: BaseShiftRole) -> &'static str {
     }
 }
 
+fn team_label(label: TeamLabel) -> &'static str {
+    match label {
+        TeamLabel::Alpha => "α",
+        TeamLabel::Beta => "β",
+        TeamLabel::Gamma => "γ",
+    }
+}
+
+fn team_by_label<'a>(teams: &'a [infra_core::schedule::TeamAssignment], label: TeamLabel) -> &'a infra_core::schedule::TeamAssignment {
+    teams
+        .iter()
+        .find(|t| t.label == label)
+        .expect("team label in report")
+}
+
+fn assignment_room_ops<'a>(
+    assignment: &'a BaseAssignment,
+    room_id: &str,
+) -> Option<Vec<&'a str>> {
+    assignment
+        .rooms
+        .iter()
+        .find(|r| r.room_id.0 == room_id)
+        .filter(|r| !r.operators.is_empty())
+        .map(|r| r.operators.iter().map(|o| o.name.as_str()).collect())
+}
+
+fn shift_room_ops<'a>(
+    shift: &'a infra_core::schedule::TeamShiftResult,
+    room_id: &str,
+) -> Option<Vec<&'a str>> {
+    assignment_room_ops(&shift.assignment, room_id)
+}
+
+/// 某设施本班由哪支队伍在岗：取其在岗干员所属队伍（同设施同队）。
+fn room_active_team(
+    op_team: &std::collections::HashMap<String, TeamLabel>,
+    ops: &[&str],
+) -> Option<TeamLabel> {
+    ops.iter().find_map(|name| op_team.get(*name).copied())
+}
+
+fn room_display_name(room_id: &str) -> String {
+    if let Some(n) = room_id.strip_prefix("trade_") {
+        return format!("贸易站{n}");
+    }
+    if let Some(n) = room_id.strip_prefix("manu_") {
+        return format!("制造站{n}");
+    }
+    if let Some(n) = room_id.strip_prefix("power_") {
+        return format!("发电站{n}");
+    }
+    if let Some(n) = room_id.strip_prefix("dorm_") {
+        return format!("宿舍{n}");
+    }
+    if let Some(n) = room_id.strip_prefix("office_") {
+        return format!("办公室{n}");
+    }
+    if room_id == "office" {
+        return "办公室".to_string();
+    }
+    match room_id {
+        "control" => "中枢".to_string(),
+        "meeting" => "会客室".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// 排班表按设施编号顺序列出（与蓝图 trade_1→…→control→办公室→会客室→宿舍 一致）。
+const SHIFT_STATION_ORDER: &[&str] = &[
+    "trade_1",
+    "trade_2",
+    "manu_1",
+    "manu_2",
+    "manu_3",
+    "manu_4",
+    "power_1",
+    "power_2",
+    "power_3",
+    "control",
+    "office_1",
+    "meeting",
+    "dorm_1",
+    "dorm_2",
+    "dorm_3",
+    "dorm_4",
+];
+
+fn format_shift_station_line(
+    shift: &infra_core::schedule::TeamShiftResult,
+    op_team: &std::collections::HashMap<String, TeamLabel>,
+    room_id: &str,
+) -> String {
+    let label = room_display_name(room_id);
+    if let Some(ops) = shift_room_ops(shift, room_id) {
+        let names = ops.join(", ");
+        if let Some(team) = room_active_team(op_team, &ops) {
+            format!("  {label}: {names}（{t}队）", t = team_label(team))
+        } else if matches!(room_id, "control" | "meeting" | "office" | "office_1" | "office_2")
+            || room_id.starts_with("office_")
+            || room_id.starts_with("dorm_")
+        {
+            format!("  {label}: {names}（共享）")
+        } else {
+            format!("  {label}: {names}")
+        }
+    } else {
+        format!("  {label}: —")
+    }
+}
+
+pub fn emit_team_rotation(
+    opts: &OutputOptions,
+    layout: &str,
+    operbox: &str,
+    owned: usize,
+    report: &TeamRotationReport,
+) -> Result<(), Error> {
+    match opts.format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(report)?);
+            Ok(())
+        }
+        OutputFormat::Csv => write_team_rotation_csv(opts.path.as_deref(), layout, operbox, owned, report),
+        OutputFormat::Text => write_team_rotation_text(layout, operbox, owned, report),
+    }
+}
+
+pub fn print_team_rotation_text(
+    layout: &str,
+    operbox: &str,
+    owned: usize,
+    report: &TeamRotationReport,
+) -> Result<(), Error> {
+    write_team_rotation_text(layout, operbox, owned, report)
+}
+
+fn write_team_rotation_csv(
+    path: Option<&Path>,
+    layout: &str,
+    operbox: &str,
+    owned: usize,
+    report: &TeamRotationReport,
+) -> Result<(), Error> {
+    let mut wtr = csv_writer(path)?;
+    wtr.write_record([
+        "layout",
+        "operbox",
+        "owned",
+        "班次",
+        "时长h",
+        "上岗队",
+        "休息队",
+        "贸易分",
+        "制造prod合计",
+        "发电充能%合计",
+        "贸易加权",
+        "制造加权",
+        "发电加权",
+        "耗时秒",
+    ])?;
+    for shift in &report.shifts {
+        let active: Vec<&str> = shift.active_teams.iter().map(|t| team_label(*t)).collect();
+        wtr.write_record([
+            layout,
+            operbox,
+            &owned.to_string(),
+            &(shift.index + 1).to_string(),
+            &format!("{:.0}", shift.duration_hours),
+            &active.join("+"),
+            team_label(shift.resting_team),
+            &format!("{:.3}", shift.scores.trade_score),
+            &format!("{:.1}", shift.scores.manu_prod_sum),
+            &format!("{:.1}", shift.scores.power_charge_sum),
+            &format!("{:.3}", shift.weighted_trade),
+            &format!("{:.1}", shift.weighted_manu),
+            &format!("{:.1}", shift.weighted_power),
+            &elapsed_secs(report.elapsed),
+        ])?;
+    }
+    flush_csv(wtr)
+}
+
+fn write_team_rotation_text(
+    layout: &str,
+    operbox: &str,
+    owned: usize,
+    report: &TeamRotationReport,
+) -> Result<(), Error> {
+    let op_team = infra_core::schedule::operator_team_map(report);
+
+    eprintln!(
+        "αβγ team rotation: layout={} operbox={} owned={} elapsed={:.2?}",
+        layout, operbox, owned, report.elapsed
+    );
+    eprintln!(
+        "  每日加权产出（三类分开评分）: 贸易={:.3}  制造={:.1}  发电={:.1}",
+        report.daily.trade, report.daily.manu, report.daily.power
+    );
+
+    eprintln!("\n--- 三队花名册（每班两队上岗、一队休息；设施始终满编不空转）---");
+    for team in &report.teams {
+        eprintln!(
+            "  {} 队 ({} 人): {}",
+            team_label(team.label),
+            team.operators.len(),
+            team.operators.join(", ")
+        );
+    }
+
+    eprintln!("\n--- 轮换一览 ---");
+    eprintln!("  班次   时长   上班队        休息队");
+    for shift in &report.shifts {
+        let active: Vec<&str> = shift.active_teams.iter().map(|t| team_label(*t)).collect();
+        eprintln!(
+            "  {:>5}  {:>3.0}h   {:<12}  {}",
+            format!("shift{}", shift.index + 1),
+            shift.duration_hours,
+            active.join("+"),
+            team_label(shift.resting_team),
+        );
+    }
+
+    for shift in &report.shifts {
+        let active_names: Vec<&str> = shift.active_teams.iter().map(|t| team_label(*t)).collect();
+        let resting = team_by_label(&report.teams, shift.resting_team);
+        eprintln!(
+            "\n======== Shift {} · {:.0}h · 上班 {} · 休息 {} ========",
+            shift.index + 1,
+            shift.duration_hours,
+            active_names.join("+"),
+            team_label(shift.resting_team),
+        );
+        eprintln!(
+            "  休息干员（{}队）: {}",
+            team_label(resting.label),
+            resting.operators.join(", ")
+        );
+        eprintln!(
+            "  分数(原值): trade={:.3}  manu={:.1}  power={:.1}",
+            shift.scores.trade_score, shift.scores.manu_prod_sum, shift.scores.power_charge_sum,
+        );
+        eprintln!(
+            "  分数(按{:.0}h加权): trade={:.3}  manu={:.1}  power={:.1}",
+            shift.duration_hours, shift.weighted_trade, shift.weighted_manu, shift.weighted_power,
+        );
+
+        eprintln!("\n  【各设施上岗情况】");
+        for room_id in SHIFT_STATION_ORDER {
+            eprintln!("{}", format_shift_station_line(shift, &op_team, room_id));
+        }
+    }
+
+    eprintln!(
+        "\n每日加权产出（三类分开，12h×αβ + 6h×βγ + 6h×γα）: 贸易={:.3}  制造={:.1}  发电={:.1}",
+        report.daily.trade, report.daily.manu, report.daily.power
+    );
+    Ok(())
+}
+
 fn write_base_rotation_text(
     layout: &str,
     operbox: &str,
@@ -982,12 +1255,22 @@ fn write_base_rotation_text(
             shift.rotating_workers.len()
         );
         eprintln!("  rotating_workers: {:?}", shift.rotating_workers);
+        eprintln!("  【各设施上岗情况】");
+        for room_id in SHIFT_STATION_ORDER {
+            if let Some(ops) = assignment_room_ops(&shift.assignment, room_id) {
+                let names = ops.join(", ");
+                eprintln!("  {}: {}", room_display_name(room_id), names);
+            }
+        }
         for room in &shift.assignment.rooms {
             if room.operators.is_empty() {
                 continue;
             }
+            if SHIFT_STATION_ORDER.contains(&room.room_id.0.as_str()) {
+                continue;
+            }
             let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
-            eprintln!("  {}: {:?}", room.room_id.0, names);
+            eprintln!("  {}: {}", room_display_name(&room.room_id.0), names.join(", "));
         }
     }
     let avg_trade: f64 = report.shifts.iter().map(|s| s.scores.trade_score).sum::<f64>()

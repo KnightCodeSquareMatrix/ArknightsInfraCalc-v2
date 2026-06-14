@@ -240,11 +240,37 @@ fn resolve_trade_shortcut_inner(
     if let Some(m) = match_witch_group_shortcut(ops, table) {
         return Some(m);
     }
+    if let Some(m) = match_blackkey_closure_shortcut(ops, table) {
+        return Some(m);
+    }
     match_closure_shortcut(ops, table, order_eff_pre, trade_level)
+}
+
+/// 公孙感知链贸站：黑键 E2（乐感）+ 可露希尔 closure，第三人任意高效散件；不与但书/巫恋同房。
+pub fn is_blackkey_closure_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && room_has_blackkey_perception(ops, table)
+        && has_closure(ops, table)
+        && !room_has_witch_side_group(ops, table)
+        && !room_has_docus_mechanic(ops, table)
+}
+
+pub fn match_blackkey_closure_shortcut(
+    ops: &[TradeOperator],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_blackkey_closure_station(ops, table) {
+        return None;
+    }
+    let cache = trade_shortcut_cache()?;
+    let entry = cache.get_by_id("gsl_blackkey_closure")?.clone();
+    Some(TradeShortcutMatch { entry })
 }
 
 const JIE_MARKET_BUFF: &str = "trade_ord_limit_count[000]";
 const KARLAN_TAG: &str = "cc.g.karlan";
+/// 黑键·乐感（宿舍人数 → 感知）；E2 组合短路识别用。
+const BLACKKEY_PERCEPTION_BUFF: &str = "trade_ord_spd_bd_n1[000]";
 
 /// 灵知 E2 + 精1 孑 + 银灰 + 另一名 `cc.g.karlan` 贸易干员；需中枢精密计算已激活。
 pub fn match_ling_jie_shortcut(
@@ -367,6 +393,12 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
 
 fn room_has_docus_mechanic(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.iter().any(|o| has_docus_buff(o, table))
+}
+
+fn room_has_blackkey_perception(ops: &[TradeOperator], _table: &SkillTable) -> bool {
+    ops.iter().any(|op| {
+        op.elite >= 2 && op.buff_ids.iter().any(|b| b == BLACKKEY_PERCEPTION_BUFF)
+    })
 }
 
 fn room_has_pepe_exclusive(ops: &[TradeOperator], table: &SkillTable) -> bool {
@@ -746,6 +778,47 @@ mod tests {
         ];
         let m = resolve_trade_shortcut(&ops, &table, 114.0, 3, &GlobalInjectManifest::default()).expect("match");
         assert_eq!(m.entry.id, "gsl_closure_tier90");
+    }
+
+    #[test]
+    fn gsl_blackkey_closure_shortcut() {
+        let table = table();
+        let ops = vec![
+            mk_op(
+                "黑键",
+                2,
+                vec!["trade_ord_spd_bd_n1[000]", "trade_ord_spd_bd[010]"],
+            ),
+            mk_op("可露希尔", 2, vec!["trade_ord_closure[000]"]),
+            mk_op("吉星", 2, vec!["trade_ord_spd&share[002]"]),
+        ];
+        let m = match_blackkey_closure_shortcut(&ops, &table).expect("match");
+        assert_eq!(m.entry.id, "gsl_blackkey_closure");
+        assert!((m.entry.trade_pct - 114.0).abs() < f64::EPSILON);
+        assert!((m.entry.gold_pct - 38.4).abs() < f64::EPSILON);
+        let resolved =
+            resolve_trade_shortcut(&ops, &table, 82.0, 3, &GlobalInjectManifest::default())
+                .expect("resolve");
+        assert_eq!(resolved.entry.id, "gsl_blackkey_closure");
+    }
+
+    #[test]
+    fn blackkey_closure_beats_generic_closure_tier() {
+        let table = table();
+        let ops = vec![
+            mk_op(
+                "黑键",
+                2,
+                vec!["trade_ord_spd_bd_n1[000]", "trade_ord_spd_bd[010]"],
+            ),
+            mk_op("可露希尔", 2, vec!["trade_ord_closure[000]"]),
+            mk_op("吉星", 2, vec!["trade_ord_spd&share[002]"]),
+        ];
+        assert!(is_blackkey_closure_station(&ops, &table));
+        let m = resolve_trade_shortcut(&ops, &table, 82.0, 3, &GlobalInjectManifest::default())
+            .expect("match");
+        assert_ne!(m.entry.id, "gsl_closure_tier90");
+        assert_eq!(m.entry.id, "gsl_blackkey_closure");
     }
 
     #[test]

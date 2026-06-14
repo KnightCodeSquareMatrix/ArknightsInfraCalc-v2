@@ -346,9 +346,9 @@ pub fn hit_witch_shortcut(hit: &TradeSearchHit) -> bool {
 }
 
 pub fn hit_closure_shortcut(hit: &TradeSearchHit) -> bool {
-    hit.shortcut
-        .as_deref()
-        .is_some_and(|id| id.starts_with("gsl_closure"))
+    hit.shortcut.as_deref().is_some_and(|id| {
+        id.starts_with("gsl_closure") || id == "gsl_blackkey_closure"
+    })
 }
 
 pub fn hit_docus_solo_shortcut(hit: &TradeSearchHit) -> bool {

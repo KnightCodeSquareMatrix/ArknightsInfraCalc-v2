@@ -555,7 +555,7 @@
           "buff_ids": [
             "trade_ord_pepe[000]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -894,7 +894,7 @@
           "buff_ids": [
             "trade_ord_wt&cost[011]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -1145,7 +1145,7 @@
           "buff_ids": [
             "trade_ord_spd&share[002]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -1256,7 +1256,7 @@
           "buff_ids": [
             "trade_ord_spd&gold[010]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -2191,7 +2191,7 @@
           "buff_ids": [
             "trade_ord_limit&cost_P[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -3379,7 +3379,7 @@
           "buff_ids": [
             "trade_ord_spd_ext[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -3521,7 +3521,7 @@
           "buff_ids": [
             "trade_ord_spd&meet[010]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -3686,7 +3686,7 @@
           "buff_ids": [
             "trade_ord_spd&share[000]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -4240,7 +4240,7 @@
           "buff_ids": [
             "trade_ord_spd[1001]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -4497,7 +4497,7 @@
           "buff_ids": [
             "trade_ord_spd&dorm&lv[010]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -4719,7 +4719,7 @@
           "buff_ids": [
             "trade_ord_line_gold[010]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -4775,7 +4775,7 @@
           "buff_ids": [
             "trade_ord_spd&par[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -5620,7 +5620,7 @@
           "buff_ids": [
             "trade_ord_par&per[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -6355,7 +6355,7 @@
           "buff_ids": [
             "trade_ord_spd_variable2[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -6579,7 +6579,7 @@
           "buff_ids": [
             "trade_ord_line_durin[010]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -6703,6 +6703,32 @@
         }
       }
     },
+    "絮雨@tier_0": {
+      "name": "絮雨",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "office": {
+          "buff_ids": [
+            "office_rec_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "絮雨@tier_up": {
+      "name": "絮雨",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "office": {
+          "buff_ids": [
+            "office_rec_spd[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
     "黑键@tier_0": {
       "name": "黑键",
       "tier": "tier_0",
@@ -6752,7 +6778,7 @@
           "buff_ids": [
             "trade_ord_spd_bd[100]"
           ],
-          "stepwise": true
+          "stepwise": false
         }
       }
     },
@@ -6786,7 +6812,7 @@
           "buff_ids": [
             "trade_ord_long[010]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     }

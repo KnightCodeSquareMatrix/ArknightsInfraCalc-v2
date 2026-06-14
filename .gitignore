@@ -16,6 +16,11 @@ Thumbs.db
 /out/
 out_*.json
 
+# Local release artifacts (binaries / zip bundles — not for remote)
+/release.zip
+/release/*.exe
+/release/**/*.exe
+
 # Personal / local data (not repo fixtures)
 *.xlsx
 data/operbox_account.json

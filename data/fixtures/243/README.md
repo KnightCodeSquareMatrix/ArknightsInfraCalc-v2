@@ -1,6 +1,6 @@
 # 243 标准测试样例
 
-仓库默认的 layout + operbox 组合，用于 `layout test`、`bench`、排班脚本与集成测试。
+仓库默认的 layout + operbox 组合。**后续 Agent 无用户指定路径时，固定用本目录下 `layout.json` + `operbox_full_e2.json` 跑 `layout test`**（见 [AGENTS.md](../../AGENTS.md) §6.2、[INFRA_CLI.md](../../docs/INFRA_CLI.md)）。
 
 | 文件 | 格式 | 说明 |
 |------|------|------|
