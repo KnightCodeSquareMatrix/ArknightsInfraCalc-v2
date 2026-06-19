@@ -99,7 +99,7 @@ None → 走 L2
 
 - 条件：`inject.karlan_precision()` 有值（中枢灵知 E2 已 resolve）+ 孑带 `trade_ord_limit_count[000]` + 同房有 **银灰** 与另一名 **`cc.g.karlan` 干员**（崖心/角峰/讯使等）。
 - `trade_pct` 固定 **125.0**（工具人表）；`gold_pct` 0。
-- 与巫恋/可露希尔/但书无互斥；未命中时 L1 裸算约 132%（见 `需要完成的干员建模.md` §一）。
+- 与巫恋/可露希尔/但书无互斥；未命中时 L1 裸算约 132%（见 `docs/需要完成的干员建模.md` §一）。
 
 ## 可露希尔分档（`match.kind == "closure"`）
 

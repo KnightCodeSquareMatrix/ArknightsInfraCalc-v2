@@ -5,9 +5,10 @@
 ## 1. 必读顺序
 
 1. **[docs/PROJECT_MAP.md](docs/PROJECT_MAP.md)** — 目录、模块索引、域状态、常见任务路由
-2. 改机制 → 本文 **§4 协作工序** + **[docs/EFFECT_ATOM_DESIGN.md](docs/EFFECT_ATOM_DESIGN.md) §一、§八** + **[docs/COLLAB_WORKFLOW.md](docs/COLLAB_WORKFLOW.md)**
-3. 改 CLI → **[docs/INFRA_CLI.md](docs/INFRA_CLI.md)**（禁止在 CLI 写求解公式）
-4. 大文件内部边界 → **[docs/INTERNAL/](docs/INTERNAL/)**
+2. **下一步主工程** → **[docs/ORCHESTRATION_LAYER.md](docs/ORCHESTRATION_LAYER.md)** — 编排层 `System → Plan → Execute`；组合进编、global effect、search 边界
+3. 改机制 → 本文 **§4 协作工序** + **[docs/EFFECT_ATOM_DESIGN.md](docs/EFFECT_ATOM_DESIGN.md) §一、§八** + **[docs/COLLAB_WORKFLOW.md](docs/COLLAB_WORKFLOW.md)**
+4. 改 CLI → **[docs/INFRA_CLI.md](docs/INFRA_CLI.md)**（禁止在 CLI 写求解公式）
+5. 大文件内部边界 → **[docs/INTERNAL/](docs/INTERNAL/)**
 
 ## 2. 分层约束（违反即错）
 
@@ -16,6 +17,7 @@
 | **L1** | `trade/interpreter.rs`、`manufacture/interpreter.rs` | 只认 `buff_id`，不认识干员名 |
 | **L2** | `gold_flow.rs`、`order_mechanic.rs` | 机制域最优解；`skill_table` 空 `atoms` = 委托 |
 | **L3** | `shortcut.rs` + `trade_shortcuts.json` | 组合表化；热路径 + 回归锚点 |
+| **GL** | `cross_facility/` | 跨设施编排；只处理 `scope=Global` atom；`resolve.rs` 集成 |
 | **CLI** | `infra-cli` | 编排 + 输出 + 回归；机制在 `infra-core` |
 
 求解入口：`trade/solver.rs` 的 `solve_trade_with_shift`（约 50 行看清 L1→L2/L3 调用链）。
@@ -29,20 +31,24 @@
 | 赤金虚拟产线 | `trade/gold_flow.rs` |
 | 订单 tag / 违约 / 裁缝 | `trade/order_mechanic.rs` |
 | L3 但书 / 巫恋 / 可露希尔 / 灵孑银崖 | [docs/INTERNAL/SHORTCUT_MATCHING.md](docs/INTERNAL/SHORTCUT_MATCHING.md) |
-| 孑精0 vs 精1 / 灵知喀兰跨设施 | `需要完成的干员建模.md` §一；`seed_karlan_precision`、`global_resource/inject.rs` |
+| 跨设施 buff / scope=Global atom | [docs/INTERNAL/CROSS_FACILITY.md](docs/INTERNAL/CROSS_FACILITY.md) + [EFFECT_ATOM_DESIGN.md](docs/EFFECT_ATOM_DESIGN.md) §9 |
+| 孑精0 vs 精1 / 灵知喀兰跨设施 | `docs/需要完成的干员建模.md` §一；`seed_karlan_precision`、`global_resource/inject.rs` |
 | 同房互斥 | `shortcut.rs`：`trade_station_exclusive_violation` |
 | 全局资源 / 中枢注入 | `global_resource/`、`control/`、`layout/resolve.rs`；§4.8–4.12、§8.13 |
 | 怪猎木天蓼链（调查团 / 火龙S黑角 / 麒麟R夜刀） | `snhunt_baseline()`、`data/layout/snhunt.json`；≠ 三星黑角/夜刀 |
 | 制造站（勿按贸易站假设改） | [docs/MANUFACTURE_STATUS.md](docs/MANUFACTURE_STATUS.md) |
 | 回归夹具 | `infra-cli/src/verify/fixtures.rs` + `PROJECT_MAP.md` 夹具表 |
+| **用户说「跑一遍模拟」** | **`layout team-rotation`** + 标准夹具 + **`--maa-out`** — 见本文 **§6.2**、**[SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md)**；**不要**用 `layout rotation`（A-B-A 已废弃）或 `layout test` 代替 |
 | **自定义布局 + operbox 探测** | **`layout test`** — 见 [INFRA_CLI.md](docs/INFRA_CLI.md)「自定义布局 + 练度盒测试」；**不要**用 `bench` 代替 |
 | **Agent 默认测试夹具（243 + 全精2）** | **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** — 见本文 **§6** |
-| **全基建进驻编制 / 宏观排班** | [docs/BASE_ASSIGNMENT.md](docs/BASE_ASSIGNMENT.md)（`assign_base_greedy` 已落地；`layout test` 默认调用） |
+| **全基建进驻编制 / 宏观排班** | [docs/BASE_ASSIGNMENT.md](docs/BASE_ASSIGNMENT.md)（现行）；**重构路线** → [docs/ORCHESTRATION_LAYER.md](docs/ORCHESTRATION_LAYER.md) |
+| **贸易 meta 组合 / 并站 / 体系认领** | **[docs/ORCHESTRATION_LAYER.md](docs/ORCHESTRATION_LAYER.md)** — 改 `base_systems.json` / `trade_segments.json`，**禁止**用 search/solve 发现组合 |
+| **global 池 / scope=Global atom** | [docs/INTERNAL/CROSS_FACILITY.md](docs/INTERNAL/CROSS_FACILITY.md) — 只在 `resolve_base`，不参与进编 |
 | 数据一致性 | `scripts/check_trade_roster.py`、`instances.rs` |
 
 ## 4. 协作工序（改机制按层走）
 
-新干员 / 新技能协作时，**分段通读**下列层即可；不必 grep 碎片 patch。完整样本（跨设施 + L3 锚 + 搜索绑定）：[需要完成的干员建模.md](需要完成的干员建模.md) §孑/灵知喀兰。
+新干员 / 新技能协作时，**分段通读**下列层即可；不必 grep 碎片 patch。完整样本（跨设施 + L3 锚 + 搜索绑定）：[需要完成的干员建模.md](docs/需要完成的干员建模.md) §孑/灵知喀兰。
 
 ### 4.1 数据层（改干员必先动）
 
@@ -76,15 +82,18 @@
 
 决策：能表化成 atom → L1；要订单分布/产能闭环 → L2；算不准或固定最优 → L3。
 
-### 4.4 L3 短路 + 搜索 / 排班
+### 4.4 L3 短路 + 编排 + 搜索 / 排班
 
 | 模块 | 反复要想 |
 |------|----------|
-| `trade/shortcut.rs` | 新组合怎么 `match_*`？要不要 `global_inject` 上下文？ |
+| **`layout/orchestrate/`（待建）** | System 选型、Plan、Execute；见 [ORCHESTRATION_LAYER.md](docs/ORCHESTRATION_LAYER.md) |
+| `data/base_systems.json` | 固定/ bond / core 组合进编；`exclusive_group` |
+| `trade/shortcut.rs` | 新组合 `match_*` + L3 锚点（**verify 用，不驱动 assign 选型**） |
 | `pool/trade.rs` | 建池、编译 atoms、孑 E0 降级、`karlan_precision_active` |
-| `search/trade.rs` | 三人组搜索、互斥预筛 |
-| `layout/resolve.rs` | 蓝图 → layout、control 注入、trade 房上下文 |
-| `layout/assign.rs` / `schedule/trade_rotation.rs` | 宏观排班：谁强制、谁贪心 |
+| `search/trade.rs` | **仅** Plain 站 / `pick_one` 散件；互斥预筛 |
+| `cross_facility/` | resolve 内 global 池（**不参与进编**） |
+| `layout/resolve.rs` | 给定 assignment → layout + solve |
+| `layout/assign.rs` | 逐步瘦身为 orchestrate 入口；**勿新增** solve 并站/ meta search patch |
 
 制造站搜索**刻意全池 `C(n,3)`**，无贸易式 L3 金标组合表 — 见 [MANUFACTURE_STATUS.md](docs/MANUFACTURE_STATUS.md)。
 
@@ -101,7 +110,7 @@
 
 | 文件 | 写什么 |
 |------|--------|
-| `需要完成的干员建模.md` | 谁还没完全建模、固定搭配、域策略 |
+| `docs/需要完成的干员建模.md` | 谁还没完全建模、固定搭配、域策略 |
 | `docs/EFFECT_ATOM_DESIGN.md` | atom 设计、§九 待办 |
 | `docs/INTERNAL/SHORTCUT_MATCHING.md` | L3 匹配优先级 |
 
@@ -139,9 +148,35 @@ cargo test -p infra-core
 cargo run -p infra-cli -- verify --all
 ```
 
-### 6.2 Agent 默认端到端探测（243 + 全精2）
+### 6.2 用户说「跑一遍模拟」（Agent 默认）
 
-**除非用户明确给了其他布局或 operbox，后续 Agent 一律用仓库标准夹具跑 `layout test`：**
+**用户说「跑一遍模拟」「跑模拟」「三班模拟」等，且未指定其他命令时，一律理解为：全精2 练度盒 + αβγ 三队 ABC 轮换 + 写出 MAA JSON。**
+
+| 用途 | 路径 |
+|------|------|
+| 243 布局（`BaseBlueprint`） | `data/fixtures/243/layout.json` |
+| 全精2 练度盒（`OperBox`） | `data/fixtures/243/operbox_full_e2.json` |
+| MAA 排班输出 | `out/243_maa.json`（`/out/` 已在 `.gitignore`） |
+
+```bash
+cargo run -p infra-cli -- layout team-rotation \
+  --layout data/fixtures/243/layout.json \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --maa-out out/243_maa.json
+```
+
+说明：
+
+- **默认是 `layout team-rotation`（αβγ ABC 三队轮换）**；`layout rotation`（A-B-A）**已废弃**（见 [SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md)）。不要用 `layout test`（单班搜索探测）代替模拟。
+- **`--maa-out` 必带**；stderr 为人类可读排班表，MAA JSON 写入 `--maa-out` 路径（父目录不存在时 CLI 自动创建）。
+- 用户提供了自己的 `--layout` / `--operbox` / `--maa-out` 时，以用户路径为准；否则固定上述三路径。
+- **不要**默认 `operbox_gongsun.json` 或用户 xlsx 导出——那是较小/个人练度；标准模拟用 **`operbox_full_e2.json`**。
+- 代码侧等价路径：`default_operbox_full_e2_path()`；布局同 `BaseBlueprint::template_243_use_this()`。
+- 夹具说明见 [data/fixtures/243/README.md](data/fixtures/243/README.md)；CLI 细节见 [INFRA_CLI.md](docs/INFRA_CLI.md)「跑一遍模拟」。
+
+### 6.3 改机制后 smoke test（243 + 全精2）
+
+**改 skill / interpreter / shortcut 等机制后，用 `layout test` 做单班贸易/制造搜索探测：**
 
 | 用途 | 路径 |
 |------|------|
@@ -158,10 +193,7 @@ cargo run -p infra-cli -- layout test \
 说明：
 
 - **不要**用 `bench` 代替（布局锁死、不含用户蓝图）。
-- **不要**默认 `operbox_gongsun.json` 或用户 xlsx 导出——那是较小/个人练度；标准集成探测用 **`operbox_full_e2.json`**。
-- 用户提供了自己的 `--layout` / `--operbox` 时，以用户路径为准；否则固定上述两文件。
-- 代码侧等价路径：`default_operbox_full_e2_path()`；布局同 `BaseBlueprint::template_243_use_this()`。
-- 夹具说明见 [data/fixtures/243/README.md](data/fixtures/243/README.md)。
+- 这是机制改动后的**搜索/评分探测**，不是用户口中的「跑一遍模拟」。
 
 ## 7. 数据不变式
 

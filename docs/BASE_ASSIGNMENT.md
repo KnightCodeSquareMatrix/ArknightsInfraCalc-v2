@@ -1,7 +1,7 @@
 # 全基建进驻编制（宏观排班）
 
-> **状态**：设计定稿；**P0 已落地**（`assign_base_greedy`、`search_control_combos`、`filter_manufacture_pool`；`layout test` 默认调用宏观落位）。  
-> 与贸易三班轮换（§8.10）并列：轮换只管**同一班次内 3 个贸易站**；本文管**单班全蓝图各房间谁上岗**。  
+> **状态**：**已落地**（`assign_base_greedy`、`assign_shift`、`search_control_combos`、`assign_dorm_producers`、`assign_trade_meta`、`assign_manufacture_lines`、`assign_power_stations`、`claim_base_systems`；`layout test` 默认调用宏观落位）。
+> 多班轮换见 **[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)**（现行 αβγ ABC；A-B-A 已废弃）。本文管**单班全蓝图各房间谁上岗**。
 > 心情 / 宿管 / 跨班连班仍属非目标，见 [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md) §8.12。
 
 ---
@@ -16,7 +16,7 @@
 
 输出一份 **`BaseAssignment`**：每个 `room_id` 进驻哪些干员，且**同一人只占一个岗位**。
 
-当前 `layout test` / `bench` 只对贸易、制造**各搜一组最优三人**，不合并编制，**会出现同一人重复出现在两份结果里**。宏观排班要在输出前用全局 `used` 集合消歧。
+当前 `layout test` **默认已调用 `assign_base_greedy`** 进行全基建宏观排班，用全局 `used` 集合消歧，同一人不会重复上岗。`bench` 仍为分搜模式（仅用于基准对比）。宏观排班在输出前用全局 `used` 集合消歧。
 
 ---
 
@@ -39,7 +39,7 @@ operbox + blueprint
         ↓
 ┌───────────────────────────────────────────────────┐
 │ 阶段 A：分设施搜索（可并行）                        │
-│  · 中枢  C(n,k)  k∈[1,5]（待实现 search_control） │
+│  · 中枢  C(n,k)  k∈[1,5]（search_control_combos ✅） │
 │  · 贸易  每站 C(n,3)；meta 站带 shortcut 过滤       │
 │  · 制造  每产线类型 C(n,3)（同 243c split-line）   │
 │  · 发电  每站 1 人贪心（已有 search_power_*）      │
@@ -164,15 +164,19 @@ operbox + blueprint
 
 ---
 
-## 10. 实现清单（待开发）
+## 10. 实现状态
 
-| 项 | 模块建议 | 说明 |
-|----|----------|------|
-| `assign_base_greedy` | `layout/assign.rs` 或 `layout/resolve.rs` | §3～§5 主入口 |
-| `search_control_combos` | `search/control.rs` | 中枢 `C(n,k)` + rayon |
-| `filter_manufacture_pool` | `pool/manufacture.rs` | 对称 `filter_trade_pool` |
-| `layout test --assignment` | `infra-cli/commands/layout.rs` | 读可选 JSON，写出编制 |
-| 测试 | `layout/resolve.rs` | 全图无重名；森西宿舍 → 齐尔查克贸易分 |
+| 项 | 位置 | 状态 |
+|----|------|------|
+| `assign_base_greedy` / `assign_shift` | `layout/assign.rs` | ✅ 已落地 |
+| `search_control_combos` | `search/control.rs` | ✅ 已落地（含 `ControlFillPolicy`） |
+| `filter_manufacture_pool` | `pool/manufacture.rs` | ✅ 已落地（基于 `filter_pool` 泛型） |
+| `assign_dorm_producers` | `layout/assign.rs` | ✅ 已落地（森西宿舍 producer） |
+| `claim_base_systems` | `layout/system.rs` | ✅ 已落地（`base_systems.json` 认领） |
+| `layout test --assignment` | `infra-cli/commands/layout.rs` | ✅ 已落地（默认调用 `assign_base_greedy`） |
+| 单元测试 | `layout/assign.rs` tests | ✅ 无重名、黑键≠巫恋、金线 trio、怪猎中枢 |
+| MAA 导出 | `export/maa.rs` | ✅ `layout team-rotation --maa-out` |
+| **待增强** | `layout/assign.rs` / `schedule/` | αβγ 三队轮换需更多回归测试；制造 `complete_manu_anchor_rooms` 策略有待公孙夹具验证 |
 
 ---
 
@@ -182,11 +186,18 @@ operbox + blueprint
 |------|------|
 | `layout/assignment.rs` | `BaseAssignment`、`AssignedOperator` |
 | `layout/blueprint.rs` | `BaseBlueprint`、产线/贸易站场景推导 |
+| **`layout/assign.rs`** | **`assign_base_greedy` / `assign_shift`：宏观排班主入口** |
+| `layout/system.rs` | `claim_base_systems`：`base_systems.json` 成套方案认领 |
 | `layout/resolve.rs` | `resolve_base`、全局资源 producer 注入 |
 | `layout/workforce.rs` | `WorkforceIndex`、`apply_to_layout` |
-| `schedule/trade_rotation.rs` | 贸易班内 `used` + meta 站贪心（**参考实现**） |
+| `schedule/team_rotation.rs` | `schedule_team_rotation`：αβγ ABC 三队轮换 |
+| `schedule/shift_bind.rs` | 迷迭香+黑键等同上同下约束 |
+| `schedule/base_rotation.rs` | `schedule_base_rotation_a_b_a`（A-B-A legacy）+ `score_base_assignment` |
+| `schedule/team_rotation.rs` | `schedule_team_rotation`：αβγ 三队轮换 |
+| `search/control.rs` | `search_control_combos`：中枢 C(n,k) + `ControlFillPolicy` |
 | `search/trade.rs` / `manufacture.rs` / `power.rs` | 分设施搜索 |
 | `pool/trade.rs` | `filter_trade_pool` |
+| `pool/base.rs` | 泛型 `PoolCore<T>`、`filter_pool` |
 
 ---
 

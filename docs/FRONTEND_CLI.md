@@ -1,6 +1,7 @@
 # infra-cli + Layout 生成器 — 前端对接说明
 
-> 面向前端 / 排班 UI。**Layout 蓝图**用静态页 `layout-gen` 编辑；**排班求解 + MAA JSON** 用 `infra-cli`（子进程或后续 WASM）。
+> 面向前端 / 排班 UI。**Layout 蓝图**用静态页 `layout-gen` 编辑；**排班求解 + MAA JSON** 用 `infra-cli`（子进程或后续 WASM）。  
+> **Release 构建**：2026-06-18 · commit `482cf71` · 见 `release/VERSION.txt`
 
 ---
 
@@ -8,17 +9,19 @@
 
 ```
 release/
-├── infra-cli.exe              Windows x64 CLI（约 2 MB）
+├── infra-cli.exe              Windows x64 CLI（约 3 MB）
 ├── layout-gen/
 │   └── index.html             基建 Layout 生成器（浏览器打开，无构建）
 ├── fixtures/
 │   ├── layout.json            243 样例蓝图
 │   └── operbox_full_e2.json   243 样例练度（全精2）
+├── docs/
+│   └── FRONTEND_CLI.md        本文件副本
 ├── README.md                  快速上手
 └── VERSION.txt
 ```
 
-另需从仓库拷贝 **`data/`**（CLI 机制数据，必需）及本文档。
+另需从仓库拷贝 **`data/`**（CLI 机制数据，必需）。
 
 Linux / macOS CLI：
 
@@ -81,9 +84,46 @@ infra-cli team-rotation ──→  stderr 排班表 + --maa-out MAA JSON
 
 ---
 
-## 4. 主命令：αβγ 三队排班 + MAA 导出
+## 4. 主命令
 
-### 4.1 推荐用法（前端默认）
+### 4.0 `plan`（推荐：账号分析 + 排班一体）
+
+```bash
+infra-cli plan \
+  --operbox <练度盒.json | 一图流.xlsx> \
+  [--layout <蓝图.json>] \
+  [--maa-out <输出/schedule.json>] \
+  [--profile-out <画像.json>]
+```
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--operbox <path>` | 是 | `OperBox` JSON 数组，或一图流导出的 **xlsx** |
+| `--layout <path>` | 否 | 默认 `data/fixtures/243/layout.json` |
+| `--maa-out <path>` | 否* | MAA 自定义基建 JSON |
+| `--profile-out <path>` | 否 | 账号画像 JSON；默认 `data/box_profile_<operbox名>.json` |
+| `--baseline <operbox>` | 否 | 对比基准练度盒（画像用） |
+| `--maa-title <text>` | 否 | 覆盖 MAA JSON 顶层 `title` |
+| `--top <n>` | 否 | 搜索深度，默认 `20` |
+| `--output-dir <dir>` | 否 | 额外写出每班 `team_shift_*.json` |
+| `--json` | 否 | 仅输出画像 JSON 到 stdout（调试） |
+
+**输出约定（默认，无 `--json`）：**
+
+| 流 | 内容 |
+|----|------|
+| **stdout** | 账号画像摘要 + αβγ 三队排班人类可读表 |
+| **stderr** | `layout=` / `operbox=` 元数据；`profile JSON →` / `MAA 排班 JSON →` 路径提示 |
+
+**示例：**
+
+```bash
+infra-cli plan \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --maa-out out/243_maa.json
+```
+
+### 4.1 `layout team-rotation`（仅排班 + MAA）
 
 ```bash
 infra-cli layout team-rotation \
@@ -101,7 +141,7 @@ infra-cli layout team-rotation \
   --maa-out out/243_maa.json
 ```
 
-### 4.2 参数一览
+### 4.2 参数一览（team-rotation）
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
@@ -115,22 +155,22 @@ infra-cli layout team-rotation \
 | `--text` | 否 | 若未使用 `--maa-out`，人类可读排班走 stderr |
 | `--json` | 否 | 内部 `TeamRotationReport` 走 stdout（调试） |
 
-\* 带 `--maa-out` 时：**stderr = 人类可读排班表**；**stdout 默认无 CSV**；末尾提示 JSON 路径。
+\* 带 `--maa-out` 时：`team-rotation` 的 **stderr = 人类可读排班表**；`plan` 的排班表在 **stdout**。
 
 ### 4.3 标准输出 / 标准错误
 
-| 流 | `--maa-out` 时 | 说明 |
-|----|----------------|------|
-| **stderr** | 人类可读排班表 | 三队花名册、每班设施上岗、分数；可直接展示或原样日志 |
-| **stderr** 末尾 | 固定提示块 | `MAA 排班 JSON 已写入: <path>` + MAA 导入说明 |
-| **stdout** | 空（默认） | 除非另加 `-o` / `--json` |
-| **文件** | `--maa-out` 指定路径 | MAA 协议 JSON（见 §5） |
+| 流 | `plan`（默认） | `team-rotation` + `--maa-out` |
+|----|----------------|-------------------------------|
+| **stdout** | 画像 + 排班表 | 空（除非 `-o` / `--json`） |
+| **stderr** | 路径提示、元数据 | 人类可读排班表 + MAA 写入提示 |
+| **文件** | `--maa-out` / `--profile-out` | `--maa-out` |
 
 **前端解析建议：**
 
-- 排班 UI：读 **stderr** 全文展示，或只展示「各设施上岗」段落（以 `【各设施上岗情况】` 为锚点）。
-- 下载 / 导入 MAA：使用 **`--maa-out` 已知路径** 读文件，勿依赖 stdout。
-- 成功：`exit code == 0`；失败：stderr 含 `Error` 信息，非零退出码。
+- 一体化 UI：优先 **`plan`**，读 **stdout** 展示分析 + 排班。
+- 仅排班 UI：用 **`layout team-rotation`**，读 **stderr** 展示排班。
+- 下载 / 导入 MAA：使用 **`--maa-out` 已知路径** 读文件。
+- 成功：`exit code == 0`；失败：stderr 含 `error:`，非零退出码。
 
 ### 4.4 stderr 提示示例
 
@@ -255,21 +295,54 @@ JSON **数组**，每项一名干员：
 
 ---
 
-## 7. 其它 layout 子命令（可选）
+## 7. 其它子命令（可选）
 
 | 命令 | 用途 |
 |------|------|
+| **`plan`** | **账号画像 + αβγ 排班 + MAA**（前端首选） |
+| `layout team-rotation` | 仅 αβγ 三队排班 + MAA |
 | `layout test` | 单班贸易/制造 Top-K 搜索（无轮换） |
-| `layout rotation` | 旧版 A-B-A 三班；同样支持 `--maa-out` |
+| `layout analyze` | 账号画像（不写 MAA） |
 | `layout eval` | 给定 `--assignment` 评估分数 |
+| **`layout rotation`** | **已废弃**（A-B-A）；请用 `team-rotation` 或 `plan` |
 
-前端若只做「算排班 + 导出 MAA」，**只需 `layout team-rotation`**。
+前端若做「练度导入 → 分析 → 排班 → 导出 MAA」，**用 `plan` 一条命令即可**。
 
 ---
 
 ## 8. 前端集成示例（Node）
 
+### 8.1 `plan`（推荐）
+
 ```javascript
+import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+
+async function runPlan({ cliPath, repoRoot, operbox, layout, maaOut, profileOut }) {
+  const args = ["plan", "--operbox", operbox];
+  if (layout) args.push("--layout", layout);
+  if (maaOut) args.push("--maa-out", maaOut);
+  if (profileOut) args.push("--profile-out", profileOut);
+
+  const { stdout, stderr } = await new Promise((resolve, reject) => {
+    let out = "", err = "";
+    const child = spawn(cliPath, args, { cwd: repoRoot });
+    child.stdout.on("data", (d) => { out += d; });
+    child.stderr.on("data", (d) => { err += d; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) reject(new Error(`infra-cli exit ${code}\n${err}`));
+      else resolve({ stdout: out, stderr: err });
+    });
+  });
+
+  const maaJson = maaOut ? JSON.parse(await readFile(maaOut, "utf8")) : null;
+  const profileJson = profileOut ? JSON.parse(await readFile(profileOut, "utf8")) : null;
+  return { reportText: stdout, logs: stderr, maaJson, profileJson };
+}
+```
+
+### 8.2 `layout team-rotation`（仅排班）
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -315,17 +388,19 @@ async function runTeamRotation({ cliPath, repoRoot, layout, operbox, maaOut, tit
 ```bash
 # 0. 浏览器打开 release/layout-gen/index.html，导出 layout 或使用 fixtures
 
-# 1. 排班 + MAA
+# 1. 一体化（推荐）
+infra-cli plan \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --maa-out out/test_maa.json
+
+# 2. 仅排班
 infra-cli layout team-rotation \
   --layout data/fixtures/243/layout.json \
   --operbox data/fixtures/243/operbox_full_e2.json \
   --maa-out out/test_maa.json
 
-# 2. 确认 JSON 三班
-# plans.length === 3
-
-# 3. 确认贸易产物字段
-# plans[0].rooms.trading[0].product === "LMD"
+# 3. 确认 JSON 三班：plans.length === 3
+# 4. 确认贸易产物：plans[0].rooms.trading[0].product === "LMD"
 ```
 
 ---

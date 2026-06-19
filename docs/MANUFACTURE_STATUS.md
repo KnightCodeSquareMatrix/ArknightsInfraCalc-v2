@@ -13,7 +13,7 @@
 | 池 | `pool/trade.rs` | `pool/manufacture.rs` |
 | 搜索 | `search/trade.rs` | `search/manufacture.rs` |
 | 求解 | `solve_trade_with_shift` | `solve_manufacture` |
-| 排班 | `schedule/trade_rotation.rs` | **无** |
+| 排班 | `schedule/base_rotation.rs`（`assign_shift` 内制造产线） | ✅ `assign_shift`（高峰/恢复班覆盖） |
 | CLI 回归 | `verify` + CSV | **无** dedicated verify case |
 
 ## 已实现
@@ -41,6 +41,9 @@
 | `pool --manufacture --operbox <path>` | 制造池统计（**必须** operbox，无默认 roster） |
 | `bench --operbox <path>` | 同时 bench 贸易 + 制造搜索 |
 | `search` | 子命令内可触发制造搜索（见 `main.rs` `search_cmd`） |
+| **`layout test`** | 默认调用 `assign_base_greedy` 宏观落位→ `resolve_base` → 制造搜索（含产线拆解） |
+| **`layout team-rotation`** | αβγ ABC：三班均覆盖制造产线（现行） |
+| **`layout rotation`** | ~~A-B-A~~ 已废弃 |
 
 输出在 `infra-cli/output.rs` 的 `emit_bench` / pool 相关段。
 
@@ -75,8 +78,9 @@
 - [ ] 制造专用 L2 域引擎（若出现大量 `atoms: []` 委托）
 - [ ] 制造 L3 组合表（若出现类似巫恋核的表化最优解）
 - [ ] `verify` 制造回归 CSV + 夹具
-- [ ] 制造三班排班 / 产线轮换
+- [x] **制造产线排班** — 已通过 `assign_shift`（`Peak` / `Recovery`）覆盖；`schedule_base_rotation_a_b_a` 含制造评分
 - [ ] `市井之道产能耦合` 类问题在制造侧重算 score 时尚未完全对齐贸易站讨论（见设计文档 §九）
+- [ ] 制造 `GlobalInject` 特定 buff（目前走 `control/interpreter.rs`，未单独拆制造侧 `global_inject` 阶段）
 
 ## 改制造站时推荐顺序
 

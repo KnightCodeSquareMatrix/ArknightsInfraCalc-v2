@@ -35,7 +35,7 @@ crates/infra-cli/src/
 ├── main.rs              # 进程入口 + 子命令路由（其余子命令暂留此处，见「待拆」）
 ├── commands/
 │   ├── mod.rs           # 子命令模块聚合；对外 re-export
-│   ├── layout.rs        # `layout test`：自定义蓝图 + operbox 搜索探测
+│   ├── layout.rs        # `layout test` / `rotation` / `team-rotation` / `analyze` / `eval` 全部子命令
 │   └── verify.rs        # `verify` 子命令：跑回归、汇总失败
 ├── verify/
 │   ├── mod.rs           # 回归资产门面；re-export loaders 与 fixtures
@@ -60,7 +60,7 @@ crates/infra-cli/src/
 
 | 模块 | 职责 | 不负责 |
 |------|------|--------|
-| `layout.rs` | `layout test`：加载 `BaseBlueprint` JSON → `resolve_base` → 贸易/制造池 Top-K 搜索；复用 `emit_bench` 输出 | 蓝图格式定义（`infra-core::layout::blueprint`）；进驻编制（当前固定空 `BaseAssignment`） |
+| `layout.rs` | `layout test` / `rotation` / `team-rotation` / `analyze` / `eval`：蓝图 JSON + operbox → `assign_base_greedy` 宏观落位（或自定义 `--assignment`）→ `resolve_base` → 搜索/评分 | 蓝图格式定义（`infra-core::layout::blueprint`）；求解公式（在 `infra-core`） |
 | `verify.rs` | `verify_cmd`：遍历 `REGRESSION_CASES.csv`；按 `expect_shortcut` 选夹具；对比 trade%/gold%/shortcut；再跑 `UNIT_OUTPUT_ANCHORS.csv` | 夹具定义（在 `verify/fixtures.rs`）；CSV 列定义（在 `verify/cases.rs`） |
 
 项目结构已定型：`pool` / `search` 等编排暂留 `main.rs`，**不再计划拆文件**。新增子命令仍应优先新建 `commands/foo.rs`，避免继续膨胀 `main.rs`。
@@ -117,8 +117,12 @@ crates/infra-cli/src/
 | `pool` | `main.rs` | `output::emit_pool` | operbox / roster → `infra-core::pool` |
 | `search trade` | `main.rs` | `output::emit_trade_search` | roster / operbox |
 | `bench` | `main.rs` | `output::emit_bench` | 必选 `--operbox`；布局固定 `search_baseline`（`243_use_this_.json`） |
-| `layout test` | `commands/layout.rs` | `output::emit_bench` | 必选 `--layout` + `--operbox` |
-| `schedule rotation` | `main.rs` | `output::emit_schedule` | operbox |
+| **`layout test`** | `commands/layout.rs` | `output::emit_bench` | 必选 `--layout` + `--operbox`；默认调用 `assign_base_greedy` |
+| **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation` | 必选 `--layout` + `--operbox`；**αβγ ABC 轮换（现行）**；用户说「跑一遍模拟」时的 Agent 默认 |
+| **`layout rotation`** | `commands/layout.rs` | `output::emit_base_rotation` | **已废弃**（A-B-A）；启动时 stderr 警告，请改用 `team-rotation` |
+| **`layout analyze`** | `commands/layout.rs` | `print_box_profile_report` | 必选 `--layout` + `--operbox`；练度概况分析 |
+| **`layout eval`** | `commands/layout.rs` | stderr 文本 / JSON | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
+| `schedule rotation` | `main.rs` | `output::emit_schedule` | 贸易站 A-B-A（旧入口，已废弃） |
 | `trade yield` | `main.rs` | `output::emit_trade_yield` | `verify::unit_fixture` |
 
 ---
@@ -138,9 +142,50 @@ crates/infra-cli/src/
 
 ---
 
-## 自定义布局 + 练度盒测试（Agent 默认路径）
+## 跑一遍模拟（Agent 默认）
 
-> **给 Cursor / 协作者**：用户给出「某布局 JSON + operbox / 练度表」要跑一遍贸易/制造搜索时，**优先用 `layout test`**，不要用 `bench`（`bench` 布局锁死 243c 基准）、也不要在 CLI 里临时拼 `TradeLayoutContext`。
+> **给 Cursor / 协作者**：用户说「跑一遍模拟」「跑模拟」「三班模拟」等，且未指定其他命令时，**默认**跑 **αβγ 三队 ABC 轮换**并**写出 MAA JSON**。不要用 `layout rotation`（A-B-A）或 `layout test`（单班搜索）代替。
+
+**无用户指定路径时，Agent 固定用：**
+
+| 项 | 路径 |
+|----|------|
+| 布局 | `data/fixtures/243/layout.json` |
+| 练度盒 | `data/fixtures/243/operbox_full_e2.json`（243 三班干员全精2 / 90） |
+| MAA 输出 | `out/243_maa.json` |
+
+### 命令（Agent 默认）
+
+```bash
+cargo run -p infra-cli -- layout team-rotation \
+  --layout data/fixtures/243/layout.json \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --maa-out out/243_maa.json
+```
+
+| 参数 | 说明 |
+|------|------|
+| `--layout` | **必填**。`BaseBlueprint` JSON；**Agent 默认** `data/fixtures/243/layout.json` |
+| `--operbox` | **必填**。`OperBox` JSON；**Agent 默认** `data/fixtures/243/operbox_full_e2.json` |
+| `--maa-out` | **Agent 默认必带**。写出 MAA 基建排班 JSON；默认 `out/243_maa.json` |
+| `--maa-title` | 可选。覆盖 JSON 顶层 `title` |
+| `--top` | Top-K 搜索条数，默认 20 |
+| `--text` | 可选。带 `--maa-out` 时 stderr 默认已有人类可读排班表 |
+
+### 输出约定
+
+| 流 | 说明 |
+|----|------|
+| **stderr** | 三队花名册、轮换表、各班设施上岗与加权产出 |
+| **`--maa-out` 文件** | MAA 协议 JSON（见 [FRONTEND_CLI.md](FRONTEND_CLI.md) §6） |
+
+用户指定 `--layout` / `--operbox` / `--maa-out` 时以用户为准。MAA 映射实现见 `crates/infra-core/src/export/maa.rs`。
+
+---
+
+## 自定义布局 + 练度盒测试（改机制 smoke test）
+
+> **给 Cursor / 协作者**：用户给出「某布局 JSON + operbox / 练度表」要跑**单班贸易/制造搜索探测**时，**优先用 `layout test`**，不要用 `bench`（`bench` 布局锁死 243c 基准）、也不要在 CLI 里临时拼 `TradeLayoutContext`。若用户只说「跑一遍模拟」，见上节 **`layout team-rotation`**。
 >
 > **无用户指定文件时，Agent 默认固定用：**
 > - 布局：`data/fixtures/243/layout.json`
@@ -150,7 +195,8 @@ crates/infra-cli/src/
 
 | 场景 | 用哪个 |
 |------|--------|
-| **Agent 本地探测 / 改机制后 smoke test（无用户路径）** | **`layout test`** + **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** |
+| **用户说「跑一遍模拟」（无用户路径）** | **`layout team-rotation`** + 标准夹具 + **`--maa-out out/243_maa.json`**（见上节） |
+| **改机制后 smoke test（无用户路径）** | **`layout test`** + **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** |
 | 用户提供了 `BaseBlueprint` JSON（如 `243测试用布局.json`、排班工具导出的布局） | **`layout test`** + 用户 `--layout` + 用户或标准 `--operbox` |
 | 对比固定 243c 基准 + operbox（无自定义房间结构） | `bench --operbox data/fixtures/243/operbox_full_e2.json` |
 | 怪猎账号（木天蓼 12、泰拉调查团、精2 全局 +7/+2） | 代码侧 `TradeLayoutContext::snhunt_baseline()` / `snhunt_elite2_baseline()` 传入搜索；或蓝图 + assignment 含中枢双人 |
@@ -187,23 +233,21 @@ cargo run -p infra-cli -- layout test \
 | `-o` / `--output` | 写 CSV（UTF-8 BOM）；缺省 stdout |
 | `--text` | 人类可读摘要写 stderr（**Agent 本地探测时推荐**） |
 
-### 内部链路（编排层只做转发）
+### 内部链路（`layout test`）
 
 ```
 BaseBlueprint::load(--layout)
-  + BaseAssignment::default()   # 进驻编制暂为空
   + OperBox::load(--operbox)
   + operator_instances.json + skill_table.json
         ↓
-resolve_base()  →  TradeLayoutContext（宿舍/发电/全局资源/贸易站数等）
+assign_base_greedy()  →  BaseAssignment（全基建宏观落位；可选 --assignment 覆盖）
+        ↓
+resolve_base()  →  LayoutContext（宿舍/发电/全局资源/贸易站数等）
         ↓
 blueprint.trade_station_scenario()  →  TradeSearchOrderMode
 blueprint.manu_line_scenario()      →  ManuSearchRecipeMode::Lines
-blueprint.gold_manu_line_count()    →  gold_production_lines
         ↓
-build_trade_pool / build_manufacture_pool（来自 operbox）
-        ↓
-search_trade_triples + search_manufacture_triples
+build_trade_pool / build_manufacture_pool → search_*_triples
         ↓
 emit_bench（meta.layout = 蓝图路径）
 ```
@@ -213,8 +257,9 @@ emit_bench（meta.layout = 蓝图路径）
 - 结构与 `data/layout/243c.json` 一致：`rooms[]`（`kind` / `level` / `product`）、`scenario`（`dorm_occupant_count`、`sui_facility_count`、`initial_global` 等）、可选 `template` 元数据。
 - 贸易订单分布、制造产线数**从 `rooms` 自动推导**，不必与 243c 相同（例如 2 贸易站 = 1 赤金 + 1 源石）。
 - `scenario` 在无进驻编制时作为布局聚合量回退（精英设施数、宿舍人数等）。
-- 进驻编制（`BaseAssignment`）**尚未**通过 CLI 传入；怪猎木天蓼 / 精2 全局注入在 `infra-core` 用 `snhunt_default_assignment()`、`resolve_snhunt_*_layout()` 测；完整模拟需在蓝图 JSON 的 assignment 中编 `control`（**火龙S黑角** + **麒麟R夜刀**，≠ 三星黑角/夜刀）。
-- **全基建宏观排班**（并行搜 + 全局 `used` 落位、消重复上岗）设计见 **[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)**；目标入口 `assign_base_greedy` + 可选 `layout test --assignment`（待实现）。
+- 进驻编制（`BaseAssignment`）**可通过 `--assignment` 传入**（`layout test --assignment <path>` 或 `layout eval --assignment <path>`）；不传时**默认调用 `assign_base_greedy`** 自动生成全基建宏观落位。
+- 怪猎木天蓼 / 精2 全局注入在 `infra-core` 用 `snhunt_default_assignment()`、`resolve_snhunt_*_layout()` 测；完整模拟需在蓝图 JSON 的 assignment 中编 `control`（**火龙S黑角** + **麒麟R夜刀**，≠ 三星黑角/夜刀）。
+- **全基建宏观排班**（`assign_base_greedy` / `assign_shift` + 全局 `used` 落位）设计见 **[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)**；**已落地**，`layout test` 默认调用。
 
 ### 布局基准对照
 

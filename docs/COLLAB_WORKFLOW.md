@@ -12,11 +12,16 @@
 
 ## 下批推荐（贸易站常数类）
 
-| 干员 | 预期 EffectAtom | 新词汇 |
-|------|-----------------|--------|
-| 角峰 / 讯使 | `AddFlatEff(15)` + `AddLimitDelta` | 无 |
-| 银灰 | `AddFlatEff(20)` + `AddLimitDelta(4)` | 无 |
-| 诗怀雅 | per-order / per-excess | 可能 `PerOrderCount` |
+> 贸易站 PRTS 干员 L1 已覆盖完毕 —— 以下干员已在 `skill_table` 注册，无新增词汇缺口：
+
+| 干员 | 状态 | 说明 |
+|------|------|------|
+| 角峰 / 讯使 | ✅ | `AddFlatEff(15/20)` + `AddLimitDelta` |
+| 银灰 | ✅ | `AddFlatEff(20)` + `AddLimitDelta(4)` |
+| 诗怀雅 | ✅ | per-excess `AddFlatEff` |
+| U-Official | ✅ | `eureka` tag + L2 |
+| 雪雉 | ✅ | `TiandaoEffVarAllowed` + `PeerSettledEffSum` |
+| 佩佩 | ✅ | `PeerEffAbsorb(0)` + `pepe_exclusive` |
 
 ## 数据文件职责
 

@@ -1,6 +1,6 @@
 # ArknightsInfraCalc v2
 
-明日方舟基建效率求解器（v2 绿场重写）。给定干员练度与布局假设，计算贸易站同房三人组的订单效率、机制等效效率、单位产出；支持穷举搜索、自定义蓝图探测与三班 A-B-A 轮换排班。
+明日方舟基建效率求解器（v2 绿场重写）。给定干员练度与布局假设，计算贸易站同房三人组的订单效率、机制等效效率、单位产出；支持穷举搜索、自定义蓝图探测与 **αβγ ABC 三队轮换**排班（`layout team-rotation`）。旧版 A-B-A 已废弃，见 [docs/SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md)。
 
 **当前主力域**：贸易站（L1 解释器 + L2 域引擎 + L3 组合短路 + 回归齐全）。制造站、控制中枢、全局资源已有基础实现，详见 [docs/PROJECT_MAP.md](docs/PROJECT_MAP.md)。
 
@@ -11,7 +11,7 @@
 | 单站求解 | 三人同房 → trade% / gold% / 机制等效 / 日产量 |
 | 池搜索 | 从 operbox 可建模干员中穷举 C(n,3) Top-K |
 | 自定义布局 | 加载 `BaseBlueprint` JSON，按你的基建结构搜索 |
-| 三班轮换 | A-B-A 贪心逐站排班报告 |
+| 三班轮换 | αβγ ABC 三队轮换（`layout team-rotation`） |
 | 回归验证 | CSV 锚点 + 硬编码夹具，防止机制回退 |
 
 **不做**：心情排班、宿管恢复、全基建连班优化——本求解器只输出效率，上层规划器再排班。
@@ -64,12 +64,13 @@ cargo run -p infra-cli -- layout test \
   --text
 ```
 
-### 三班轮换
+### 三班模拟（默认：αβγ ABC 轮换 + MAA）
 
 ```bash
-cargo run -p infra-cli -- schedule rotation \
+cargo run -p infra-cli -- layout team-rotation \
+  --layout data/fixtures/243/layout.json \
   --operbox data/fixtures/243/operbox_full_e2.json \
-  --layout-baseline
+  --maa-out out/243_maa.json
 ```
 
 ### 其他常用命令
@@ -146,7 +147,7 @@ cargo run -p infra-cli -- verify --all
 
 - **Cursor / AI 协作**：先读 [AGENTS.md](AGENTS.md) → [docs/PROJECT_MAP.md](docs/PROJECT_MAP.md)
 - **改 CLI**：见 [docs/INFRA_CLI.md](docs/INFRA_CLI.md)（禁止在 CLI 写求解公式）
-- **待建模干员**：[需要完成的干员建模.md](需要完成的干员建模.md)
+- **待建模干员**：[docs/需要完成的干员建模.md](docs/需要完成的干员建模.md)
 
 ## License
 
