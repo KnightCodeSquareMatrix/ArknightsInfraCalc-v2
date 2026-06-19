@@ -1,5 +1,6 @@
 pub mod maa;
 
 pub use maa::{
-    build_from_base_rotation, build_from_team_rotation, MaaExportOptions, MaaSchedule,
+    assignment_from_maa_plan, build_from_base_rotation, build_from_team_rotation, load_maa_schedule,
+    MaaExportOptions, MaaPlanImport, MaaSchedule, MaaScheduleImport,
 };

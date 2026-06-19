@@ -1,12 +1,14 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::layout::{
-    assignment_operator_names, BaseAssignment, BaseBlueprint, FacilityKind, RoomProduct,
+    assignment_operator_names, AssignedOperator, AssignmentPlan, AssignShiftMode, BaseAssignment,
+    BaseBlueprint, FacilityKind, RoomProduct,
 };
+use crate::operbox::OperBox;
 use crate::schedule::{BaseRotationReport, BaseShiftRole, TeamLabel, TeamRotationReport};
 use crate::trade::input::TradeOrderKind;
 use crate::types::RecipeKind;
@@ -439,6 +441,114 @@ fn team_label_zh(label: TeamLabel) -> &'static str {
     }
 }
 
+// ── 一图流 / MAA 排班 JSON 导入 ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MaaScheduleImport {
+    #[serde(default)]
+    pub title: Option<String>,
+    pub plans: Vec<MaaPlanImport>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MaaPlanImport {
+    #[serde(default)]
+    pub name: String,
+    pub rooms: MaaRoomsImport,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct MaaRoomsImport {
+    #[serde(default)]
+    pub trading: Vec<MaaRoomSlotImport>,
+    #[serde(default)]
+    pub manufacture: Vec<MaaRoomSlotImport>,
+    #[serde(default)]
+    pub power: Vec<MaaRoomSlotImport>,
+    #[serde(default)]
+    pub dormitory: Vec<MaaRoomSlotImport>,
+    #[serde(default)]
+    pub control: Vec<MaaRoomSlotImport>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MaaRoomSlotImport {
+    #[serde(default)]
+    pub skip: bool,
+    #[serde(default)]
+    pub operators: Vec<String>,
+}
+
+pub fn load_maa_schedule(path: &Path) -> Result<MaaScheduleImport> {
+    let raw = std::fs::read_to_string(path)
+        .map_err(|e| Error::msg(format!("maa schedule read {}: {e}", path.display())))?;
+    let mut raw = raw;
+    if raw.starts_with('\u{feff}') {
+        raw = raw.trim_start_matches('\u{feff}').to_string();
+    }
+    serde_json::from_str(&raw)
+        .map_err(|e| Error::msg(format!("maa schedule parse {}: {e}", path.display())))
+}
+
+/// 将一图流 plan 转为 `BaseAssignment`；elite 取自 operbox 练度。
+pub fn assignment_from_maa_plan(plan: &MaaPlanImport, operbox: &OperBox) -> BaseAssignment {
+    let mut assignment = BaseAssignment::default();
+    let rooms = &plan.rooms;
+
+    for (i, slot) in rooms.trading.iter().enumerate() {
+        if slot.skip {
+            continue;
+        }
+        push_room_ops(&mut assignment, &format!("trade_{}", i + 1), slot, operbox);
+    }
+    for (i, slot) in rooms.manufacture.iter().enumerate() {
+        if slot.skip {
+            continue;
+        }
+        push_room_ops(&mut assignment, &format!("manu_{}", i + 1), slot, operbox);
+    }
+    for (i, slot) in rooms.power.iter().enumerate() {
+        if slot.skip {
+            continue;
+        }
+        push_room_ops(&mut assignment, &format!("power_{}", i + 1), slot, operbox);
+    }
+    for (i, slot) in rooms.dormitory.iter().enumerate() {
+        if slot.skip {
+            continue;
+        }
+        push_room_ops(&mut assignment, &format!("dorm_{}", i + 1), slot, operbox);
+    }
+    for slot in &rooms.control {
+        if slot.skip {
+            continue;
+        }
+        push_room_ops(&mut assignment, "control", slot, operbox);
+    }
+
+    assignment
+}
+
+fn push_room_ops(
+    assignment: &mut BaseAssignment,
+    room_id: &str,
+    slot: &MaaRoomSlotImport,
+    operbox: &OperBox,
+) {
+    let ops: Vec<AssignedOperator> = slot
+        .operators
+        .iter()
+        .filter(|n| !n.is_empty())
+        .map(|name| {
+            let elite = operbox.elite_of(name).unwrap_or(0);
+            AssignedOperator::new(name, elite)
+        })
+        .collect();
+    if !ops.is_empty() {
+        assignment.set_room(room_id, ops);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -494,6 +604,7 @@ mod tests {
         assignment.set_power_operator("power_1", AssignedOperator::new("格雷伊", 2));
 
         let report = TeamRotationReport {
+            peak_plan: AssignmentPlan::recovery(AssignShiftMode::Peak),
             teams: vec![TeamAssignment {
                 label: TeamLabel::Gamma,
                 operators: vec!["休息干员".into()],

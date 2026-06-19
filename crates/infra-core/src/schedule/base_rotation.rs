@@ -283,51 +283,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rosemary_blackkey_bound_to_peak_shifts_rest_one() {
-        // 文档 §6.1：迷迭香+黑键「同上同下，上 2 休 1」。
-        // A-B-A 下二者同属 peak-only 的 rosemary 链 → 同在第一/三班（reuse），
-        // 恢复班（第二班）排除高峰轮换岗 → 二者同时缺席。
-        let (blueprint, operbox, instances, table) = fixtures_243_2gold();
-        if !operbox.owns("迷迭香") || !operbox.owns("黑键") {
-            return;
-        }
-        let report = schedule_base_rotation_a_b_a(
-            &blueprint,
-            &operbox,
-            &instances,
-            &table,
-            &AssignBaseOptions {
-                top_k: 10,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-
-        let in_shift = |i: usize, name: &str| {
-            assignment_operator_names(&report.shifts[i].assignment).contains(name)
-        };
-
-        // 第一/三班（peak）：二者同时在岗。
-        for i in [0usize, 2usize] {
-            assert!(in_shift(i, "迷迭香"), "shift{} 应有迷迭香", i + 1);
-            assert!(in_shift(i, "黑键"), "shift{} 应有黑键", i + 1);
-        }
-        // 第二班（recovery）：二者同时休息。
-        assert!(!in_shift(1, "迷迭香"), "恢复班不应有迷迭香");
-        assert!(!in_shift(1, "黑键"), "恢复班不应有黑键");
-        // 同上同下：任一班次中二者要么同在、要么同不在。
-        for shift in &report.shifts {
-            let names = assignment_operator_names(&shift.assignment);
-            assert_eq!(
-                names.contains("迷迭香"),
-                names.contains("黑键"),
-                "shift{} 迷迭香与黑键应同上同下",
-                shift.index + 1
-            );
-        }
-    }
-
+    // 迷迭香+黑键「上 2 休 1」已迁至 αβγ：`team_rotation::team_rotation_rosemary_blackkey_shift_bind`。
+    // A-B-A 已废弃，不再维护该约束。
     #[test]
     fn base_rotation_peak_beats_recovery_on_trade_paper() {
         let (blueprint, operbox, instances, table) = fixtures_243_2gold();

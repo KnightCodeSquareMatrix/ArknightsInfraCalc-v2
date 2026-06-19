@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use csv::Writer;
 use infra_core::layout::BaseAssignment;
+use infra_core::box_profile::{render_box_profile_narrative, BoxProfile};
 use infra_core::pool::PoolSkip;
 use infra_core::schedule::{
     BaseRotationReport, BaseShiftRole, TeamLabel, TeamRotationReport, TradeRotationReport,
@@ -1153,6 +1154,16 @@ fn write_team_rotation_csv(
     flush_csv(wtr)
 }
 
+// ── box profile（用户报告 → stdout）────────────────────────────────────────
+
+pub fn print_box_profile_report(profile: &BoxProfile) {
+    print!("{}", render_box_profile_narrative(profile));
+}
+
+fn report_line(line: &str) {
+    println!("{line}");
+}
+
 fn write_team_rotation_text(
     layout: &str,
     operbox: &str,
@@ -1161,72 +1172,85 @@ fn write_team_rotation_text(
 ) -> Result<(), Error> {
     let op_team = infra_core::schedule::operator_team_map(report);
 
-    eprintln!(
-        "αβγ team rotation: layout={} operbox={} owned={} elapsed={:.2?}",
-        layout, operbox, owned, report.elapsed
-    );
-    eprintln!(
+    report_line(&format!(
+        "αβγ team rotation: layout={layout} operbox={operbox} owned={owned} elapsed={:.2?}",
+        report.elapsed
+    ));
+    if !report.peak_plan.registry_claims.is_empty() {
+        let systems: Vec<&str> = report.peak_plan.registry_system_ids();
+        report_line(&format!("  peak 编排体系: {}", systems.join(", ")));
+        let trade_rooms: Vec<String> = report
+            .peak_plan
+            .registry_trade_room_ids()
+            .into_iter()
+            .map(|r| r.0)
+            .collect();
+        if !trade_rooms.is_empty() {
+            report_line(&format!("  peak 贸易 meta 房间: {}", trade_rooms.join(", ")));
+        }
+    }
+    report_line(&format!(
         "  每日加权产出（三类分开评分）: 贸易={:.3}  制造={:.1}  发电={:.1}",
         report.daily.trade, report.daily.manu, report.daily.power
-    );
+    ));
 
-    eprintln!("\n--- 三队花名册（每班两队上岗、一队休息；设施始终满编不空转）---");
+    report_line("\n--- 三队花名册（每班两队上岗、一队休息；设施始终满编不空转）---");
     for team in &report.teams {
-        eprintln!(
+        report_line(&format!(
             "  {} 队 ({} 人): {}",
             team_label(team.label),
             team.operators.len(),
             team.operators.join(", ")
-        );
+        ));
     }
 
-    eprintln!("\n--- 轮换一览 ---");
-    eprintln!("  班次   时长   上班队        休息队");
+    report_line("\n--- 轮换一览 ---");
+    report_line("  班次   时长   上班队        休息队");
     for shift in &report.shifts {
         let active: Vec<&str> = shift.active_teams.iter().map(|t| team_label(*t)).collect();
-        eprintln!(
+        report_line(&format!(
             "  {:>5}  {:>3.0}h   {:<12}  {}",
             format!("shift{}", shift.index + 1),
             shift.duration_hours,
             active.join("+"),
             team_label(shift.resting_team),
-        );
+        ));
     }
 
     for shift in &report.shifts {
         let active_names: Vec<&str> = shift.active_teams.iter().map(|t| team_label(*t)).collect();
         let resting = team_by_label(&report.teams, shift.resting_team);
-        eprintln!(
+        report_line(&format!(
             "\n======== Shift {} · {:.0}h · 上班 {} · 休息 {} ========",
             shift.index + 1,
             shift.duration_hours,
             active_names.join("+"),
             team_label(shift.resting_team),
-        );
-        eprintln!(
+        ));
+        report_line(&format!(
             "  休息干员（{}队）: {}",
             team_label(resting.label),
             resting.operators.join(", ")
-        );
-        eprintln!(
+        ));
+        report_line(&format!(
             "  分数(原值): trade={:.3}  manu={:.1}  power={:.1}",
             shift.scores.trade_score, shift.scores.manu_prod_sum, shift.scores.power_charge_sum,
-        );
-        eprintln!(
+        ));
+        report_line(&format!(
             "  分数(按{:.0}h加权): trade={:.3}  manu={:.1}  power={:.1}",
             shift.duration_hours, shift.weighted_trade, shift.weighted_manu, shift.weighted_power,
-        );
+        ));
 
-        eprintln!("\n  【各设施上岗情况】");
+        report_line("\n  【各设施上岗情况】");
         for room_id in SHIFT_STATION_ORDER {
-            eprintln!("{}", format_shift_station_line(shift, &op_team, room_id));
+            report_line(&format_shift_station_line(shift, &op_team, room_id));
         }
     }
 
-    eprintln!(
+    report_line(&format!(
         "\n每日加权产出（三类分开，12h×αβ + 6h×βγ + 6h×γα）: 贸易={:.3}  制造={:.1}  发电={:.1}",
         report.daily.trade, report.daily.manu, report.daily.power
-    );
+    ));
     Ok(())
 }
 

@@ -4,7 +4,11 @@ use std::sync::Arc;
 
 use crate::output::{
     emit_base_rotation, emit_bench, emit_team_rotation, print_base_rotation_text,
-    print_team_rotation_text, BenchMeta, OutputFormat, OutputOptions, PoolSummary,
+    print_box_profile_report, print_team_rotation_text, BenchMeta, OutputFormat, OutputOptions,
+    PoolSummary,
+};
+use infra_core::box_profile::{
+    baseline_path_or_default, build_box_profile, BoxProfileOptions,
 };
 use infra_core::export::{build_from_base_rotation, build_from_team_rotation, MaaExportOptions, MaaSchedule};
 use infra_core::instances::{default_instances_path, OperatorInstances};
@@ -28,12 +32,16 @@ use infra_core::Error;
 pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
     match args.first().map(String::as_str) {
         Some("test") => layout_test_cmd(&args[1..]),
+        Some("analyze") => layout_analyze_cmd(&args[1..]),
         Some("eval") => layout_eval_cmd(&args[1..]),
         Some("rotation") => layout_rotation_cmd(&args[1..]),
         Some("team-rotation") => layout_team_rotation_cmd(&args[1..]),
         _ => {
             eprintln!(
                 "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]"
+            );
+            eprintln!(
+                "       infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]"
             );
             eprintln!(
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]"
@@ -113,6 +121,9 @@ fn should_emit_primary_output(out: &OutputOptions, wrote_maa: bool) -> bool {
 }
 
 fn layout_rotation_cmd(args: &[String]) -> Result<(), Error> {
+    eprintln!(
+        "警告: `layout rotation`（A-B-A）已废弃，请改用 `layout team-rotation`（αβγ ABC 轮换）。见 docs/SCHEDULE_ROTATION.md"
+    );
     let out = OutputOptions::from_args(args);
     let layout_path = layout_path_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
@@ -254,6 +265,73 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
     Ok(())
 }
 
+fn baseline_path_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--baseline")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn profile_out_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--profile-out")
+        .map(|w| PathBuf::from(&w[1]))
+        .or_else(|| {
+            args.windows(2)
+                .find(|w| w[0] == "-o")
+                .map(|w| PathBuf::from(&w[1]))
+        })
+}
+
+fn layout_analyze_cmd(args: &[String]) -> Result<(), Error> {
+    let layout_path = layout_path_from_args(args)?;
+    let operbox_path = operbox_path_from_args(args)?;
+    let top_k = args
+        .windows(2)
+        .find(|w| w[0] == "--top")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(10);
+    let json_only = args.iter().any(|a| a == "--json");
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+
+    let baseline_path = baseline_path_or_default(
+        baseline_path_from_args(args).as_deref(),
+    )?;
+
+    let profile = build_box_profile(
+        &blueprint,
+        &operbox,
+        &instances,
+        &table,
+        &layout_path.to_string_lossy(),
+        &operbox_path.to_string_lossy(),
+        &BoxProfileOptions {
+            top_k,
+            baseline_operbox: Some(baseline_path),
+            ..BoxProfileOptions::default()
+        },
+    )?;
+
+    if let Some(out_path) = profile_out_from_args(args) {
+        let json = serde_json::to_string_pretty(&profile)?;
+        std::fs::write(&out_path, json + "\n")?;
+        eprintln!("profile JSON → {}", out_path.display());
+    }
+
+    if json_only {
+        print_box_profile_report(&profile);
+        println!();
+        print!("{}", serde_json::to_string_pretty(&profile)?);
+    } else {
+        print_box_profile_report(&profile);
+    }
+
+    Ok(())
+}
+
 fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
     let out = OutputOptions::from_args(args);
     let layout_path = layout_path_from_args(args)?;
@@ -323,7 +401,7 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
 
     let trade_roster = operbox.trade_roster(&instances);
     let trade_pool = build_trade_pool(&trade_roster, &instances, &table)?;
-    let trade_stats = trade_pool.stats();
+    let trade_stats = trade_pool.stats(3);
     let trade_report = search_trade_triples(
         &trade_pool,
         &table,
@@ -338,7 +416,7 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
 
     let manu_roster = operbox.manufacture_roster(&instances);
     let manu_pool = build_manufacture_pool(&manu_roster, &instances, &table)?;
-    let manu_stats = manu_pool.stats();
+    let manu_stats = manu_pool.stats(3);
     let manu_report = search_manufacture_triples(
         &manu_pool,
         &table,

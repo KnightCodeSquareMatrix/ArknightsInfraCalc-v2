@@ -3,18 +3,19 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
 use crate::layout::{
-    assign_power_rooms, assign_shift, assign_team_producer_rooms, blackkey_witch_same_trade_room,
-    pinned_assignment, resolve_base, AssignBaseOptions, AssignShiftMode, BaseAssignment,
-    BaseBlueprint, FacilityKind, RoomId,
+    assign_shift_with_plan, assign_team_gamma_half, blackkey_witch_same_trade_room,
+    pinned_assignment, resolve_base, AssignBaseOptions, AssignShiftMode, AssignmentPlan,
+    BaseAssignment, BaseBlueprint, FacilityKind, RoomId,
 };
 use crate::operbox::OperBox;
 use crate::pool::{build_manufacture_pool, build_power_pool, build_trade_pool};
 use crate::skill_table::SkillTable;
 
 use super::base_rotation::{score_base_assignment, ShiftScores};
+use super::shift_bind::align_shift_binds_in_halves;
 
 /// αβγ 三队标签。每班两队上岗、一队休息；设施每班全部满编（不空转）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -64,6 +65,8 @@ pub struct DailyTotals {
 /// αβγ 三队轮换报告。
 #[derive(Debug, Clone, Serialize)]
 pub struct TeamRotationReport {
+    /// peak 班编排计划（只读；α/β 切半与 γ plain 贸易均据此对齐）。
+    pub peak_plan: AssignmentPlan,
     pub teams: Vec<TeamAssignment>,
     pub shifts: Vec<TeamShiftResult>,
     /// 三类各自的每日加权产出（12h×αβ + 6h×βγ + 6h×γα，分别汇总）。
@@ -73,10 +76,10 @@ pub struct TeamRotationReport {
 
 /// 生产设施一个半区（trade/manu/power 各一组完整房间）。
 #[derive(Debug, Clone, Default)]
-struct FacilityHalf {
-    trade: Vec<RoomId>,
-    manu: Vec<RoomId>,
-    power: Vec<RoomId>,
+pub struct FacilityHalf {
+    pub trade: Vec<RoomId>,
+    pub manu: Vec<RoomId>,
+    pub power: Vec<RoomId>,
 }
 
 /// 把全部生产设施（贸易/制造/发电）按同类房间交替切成两半，尽量均衡负载。
@@ -94,9 +97,9 @@ fn split_production_facilities(blueprint: &BaseBlueprint) -> [FacilityHalf; 2] {
     halves
 }
 
-/// 填一个半区的全部贸易/制造/发电房间（受 `used` 约束的可用最优）。
+/// γ 替补半区：贸易 plain 贪心（不重搜 meta），制造/发电站绑定搜索。
 #[allow(clippy::too_many_arguments)]
-fn assign_half(
+fn assign_gamma_half(
     blueprint: &BaseBlueprint,
     pools: &ProductionPools,
     table: &SkillTable,
@@ -106,24 +109,16 @@ fn assign_half(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    assign_team_producer_rooms(
+    assign_team_gamma_half(
         blueprint,
         &pools.trade,
         &pools.manu,
+        &pools.power,
         table,
         layout,
         options,
         &half.trade,
         &half.manu,
-        assignment,
-        used,
-    )?;
-    assign_power_rooms(
-        blueprint,
-        &pools.power,
-        table,
-        layout,
-        options,
         &half.power,
         assignment,
         used,
@@ -187,8 +182,8 @@ pub fn schedule_team_rotation(
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
 
-    // 1) 参考高峰班 → 取中枢 + 宿舍作为三班共享脚手架。
-    let peak = assign_shift(
+    // 1) 参考高峰班 + 编排计划 → 取中枢/宿舍作为三班共享脚手架。
+    let peak_result = assign_shift_with_plan(
         blueprint,
         operbox,
         instances,
@@ -197,6 +192,8 @@ pub fn schedule_team_rotation(
         AssignShiftMode::Peak,
         &BaseAssignment::default(),
     )?;
+    let peak = peak_result.assignment;
+    let peak_plan = peak_result.plan;
     let shared = pinned_assignment(&peak, blueprint);
     let scaffold_used: HashSet<String> = operators_of(&shared).into_iter().collect();
 
@@ -217,11 +214,15 @@ pub fn schedule_team_rotation(
         power: build_power_pool(&operbox.power_roster(instances), instances, table)?,
     };
 
-    let [h1, h2] = split_production_facilities(blueprint);
+    let [mut h1, mut h2] = split_production_facilities(blueprint);
+    align_shift_binds_in_halves(&peak, operbox, &mut h1, &mut h2);
 
-    // 3) α/β 从 peak 编制按 H1/H2 切半（保留黑键/迷迭香等体系锚点），γ 仍贪心替补。
+    // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ plain 贸易替补。
     let alpha = production_half_from_peak(&peak, &h1);
     let beta = production_half_from_peak(&peak, &h2);
+    peak_plan
+        .verify_registry_trade_in_alpha_beta(&alpha, &beta)
+        .map_err(Error::msg)?;
     let mut used = scaffold_used.clone();
     for name in operators_of(&alpha).into_iter().chain(operators_of(&beta)) {
         used.insert(name);
@@ -232,11 +233,11 @@ pub fn schedule_team_rotation(
 
     let mut gamma_h1 = BaseAssignment::default();
     let mut used_g1 = used_ab.clone();
-    assign_half(blueprint, &pools, table, &layout, options, &h1, &mut gamma_h1, &mut used_g1)?;
+    assign_gamma_half(blueprint, &pools, table, &layout, options, &h1, &mut gamma_h1, &mut used_g1)?;
 
     let mut gamma_h2 = BaseAssignment::default();
     let mut used_g2 = used_ab.clone();
-    assign_half(blueprint, &pools, table, &layout, options, &h2, &mut gamma_h2, &mut used_g2)?;
+    assign_gamma_half(blueprint, &pools, table, &layout, options, &h2, &mut gamma_h2, &mut used_g2)?;
 
     // 队伍花名册（cohort）。
     let mut gamma_ops: Vec<String> = operators_of(&gamma_h1);
@@ -286,6 +287,7 @@ pub fn schedule_team_rotation(
     }
 
     Ok(TeamRotationReport {
+        peak_plan,
         teams,
         shifts,
         daily,
@@ -308,6 +310,7 @@ pub fn operator_team_map(report: &TeamRotationReport) -> HashMap<String, TeamLab
 mod tests {
     use super::*;
     use crate::instances::default_instances_path;
+    use crate::layout::assign_shift;
     use crate::operbox::{default_operbox_full_e2_path, default_operbox_gongsun_path};
     use crate::skill_table::default_skill_table_path;
 
@@ -386,6 +389,30 @@ mod tests {
     }
 
     #[test]
+    fn team_rotation_carries_peak_plan() {
+        let (blueprint, operbox, instances, table) = fixtures();
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(report.peak_plan.mode, AssignShiftMode::Peak);
+        if operbox.owns("但书") {
+            assert!(
+                report.peak_plan.registry_system_ids().contains(&"docus_syracusa"),
+                "peak_plan 应含但书链: {:?}",
+                report.peak_plan.registry_system_ids()
+            );
+        }
+    }
+
+    #[test]
     fn team_rotation_carries_peak_blackkey_trade_station() {
         let (blueprint, operbox, instances, table) = fixtures();
         if !operbox.owns("黑键") {
@@ -455,6 +482,111 @@ mod tests {
                 !blackkey_witch_same_trade_room(&shift.assignment, &blueprint),
                 "shift {} 黑键与巫恋不得同房",
                 shift.index + 1
+            );
+        }
+    }
+
+    #[test]
+    fn team_rotation_rosemary_blackkey_shift_bind() {
+        use crate::schedule::shift_bind::{team_of_operator, verify_shift_binds};
+
+        let (blueprint, operbox, instances, table) = fixtures();
+        if !operbox.owns("迷迭香") || !operbox.owns("黑键") {
+            return;
+        }
+        let peak = assign_shift(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+        )
+        .unwrap();
+        if !peak.rooms.iter().any(|r| r.operators.iter().any(|o| o.name == "迷迭香"))
+            || !peak.rooms.iter().any(|r| r.operators.iter().any(|o| o.name == "黑键"))
+        {
+            return;
+        }
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        verify_shift_binds(&report, &operbox, &peak).expect("迷迭香+黑键 应同上同下、上2休1");
+        let team = team_of_operator(&report, "迷迭香").unwrap();
+        assert_eq!(
+            team_of_operator(&report, "黑键"),
+            Some(team),
+            "迷迭香与黑键应同队"
+        );
+    }
+
+    /// γ 队贸易站不得抢占 peak α/β 已认领的 meta 干员（如但书、巫恋）。
+    #[test]
+    fn team_rotation_gamma_trade_disjoint_from_peak_meta() {
+        const META_TRADE_OPS: &[&str] = &["但书", "巫恋", "龙舌兰", "可露希尔"];
+
+        let (blueprint, operbox, instances, table) = fixtures();
+        let peak = assign_shift(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+        )
+        .unwrap();
+
+        let peak_meta: HashSet<String> = peak
+            .rooms
+            .iter()
+            .filter(|r| {
+                blueprint
+                    .rooms
+                    .iter()
+                    .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
+            })
+            .flat_map(|r| r.operators.iter().map(|o| o.name.clone()))
+            .filter(|n| META_TRADE_OPS.contains(&n.as_str()))
+            .collect();
+        if peak_meta.is_empty() {
+            return;
+        }
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let gamma_ops: HashSet<_> = report.teams[2].operators.iter().cloned().collect();
+        for name in peak_meta {
+            assert!(
+                !gamma_ops.contains(&name),
+                "γ 队不应含 peak meta 干员 {name}"
             );
         }
     }
