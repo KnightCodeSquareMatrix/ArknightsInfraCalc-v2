@@ -5,7 +5,7 @@
     "sui_facility_count": 2,
     "dorm_occupant_count": 20,
     "initial_global": {
-      "monster_cuisine": 3.0
+      "monster_cuisine": 0.0
     }
   },
   "rooms": [

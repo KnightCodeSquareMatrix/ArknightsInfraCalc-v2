@@ -1,6 +1,9 @@
 # 243 标准测试样例
 
-仓库默认的 layout + operbox 组合。**后续 Agent 无用户指定路径时，固定用本目录下 `layout.json` + `operbox_full_e2.json` 跑 `layout test`**（见 [AGENTS.md](../../AGENTS.md) §6.2、[INFRA_CLI.md](../../docs/INFRA_CLI.md)）。
+仓库默认的 layout + operbox 组合。
+
+- **用户说「跑一遍模拟」**：`layout team-rotation` + 本目录夹具 + `--maa-out out/243_maa.json`（见 [AGENTS.md](../../AGENTS.md) §6.2）
+- **改机制 smoke test**：`layout test` + 本目录夹具（见 [AGENTS.md](../../AGENTS.md) §6.3）
 
 | 文件 | 格式 | 说明 |
 |------|------|------|
@@ -11,6 +14,13 @@
 ## 快速命令
 
 ```bash
+# 默认模拟：αβγ 三队 ABC 轮换 + MAA JSON
+cargo run -p infra-cli -- layout team-rotation \
+  --layout data/fixtures/243/layout.json \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --maa-out out/243_maa.json
+
+# 改机制 smoke test：单班贸易/制造搜索
 cargo run -p infra-cli -- layout test \
   --layout data/fixtures/243/layout.json \
   --operbox data/fixtures/243/operbox_full_e2.json \
