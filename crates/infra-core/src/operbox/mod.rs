@@ -1,3 +1,5 @@
+mod xlsx;
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -8,6 +10,8 @@ use crate::instances::OperatorInstances;
 use crate::layout::TAG_DURIN;
 use crate::roster::{OperatorProgress, Roster};
 use crate::tier::PromotionTier;
+
+pub use xlsx::from_xlsx_path;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct OperBoxEntry {
@@ -31,8 +35,14 @@ pub struct OperBox {
 }
 
 impl OperBox {
+    /// 加载练度盒：`.json` 或一图流导出的 `.xlsx` / `.xls`。
     pub fn load(path: &Path) -> Result<Self> {
-        let json = std::fs::read_to_string(path)?;
+        if is_xlsx_path(path) {
+            return from_xlsx_path(path);
+        }
+        let json = std::fs::read_to_string(path).map_err(|e| {
+            Error::msg(format!("operbox read {}: {e}", path.display()))
+        })?;
         Self::from_json(&json).map_err(|error| {
             Error::msg(format!("operbox parse {}: {error}", path.display()))
         })
@@ -79,6 +89,11 @@ impl OperBox {
 
     pub fn progress_of(&self, name: &str) -> Option<OperatorProgress> {
         self.owned.get(name.trim()).copied()
+    }
+
+    pub fn tier_of(&self, name: &str) -> Option<PromotionTier> {
+        self.progress_of(name)
+            .map(PromotionTier::from_progress)
     }
 
     pub fn owned_count(&self) -> usize {
@@ -168,6 +183,14 @@ impl OperBox {
     }
 }
 
+fn is_xlsx_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| {
+            ext.eq_ignore_ascii_case("xlsx") || ext.eq_ignore_ascii_case("xls")
+        })
+}
+
 fn owned_operator_has_tag(
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -194,6 +217,11 @@ pub fn default_operbox_gongsun_path() -> Result<std::path::PathBuf> {
 /// 243 标准测试样例：全精2 operbox（`data/fixtures/243/operbox_full_e2.json`）。
 pub fn default_operbox_full_e2_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("fixtures/243/operbox_full_e2.json")
+}
+
+/// 243 标准布局（`data/fixtures/243/layout.json`）。
+pub fn default_layout_243_path() -> Result<std::path::PathBuf> {
+    crate::skill_table::data_path("fixtures/243/layout.json")
 }
 
 #[cfg(test)]

@@ -46,6 +46,32 @@ impl PromotionTier {
             _ => None,
         }
     }
+
+    /// 当前练度是否已启用 tier_up 技能（与 pool / search 一致）。
+    pub fn is_tier_up(progress: OperatorProgress) -> bool {
+        Self::from_progress(progress) == Self::TierUp
+    }
+
+    /// 距 tier_up 还差什么（按星级规则）。
+    pub fn tier_up_requirement_label(progress: OperatorProgress) -> &'static str {
+        match progress.rarity {
+            1 | 2 => "30级",
+            3 | 4 => "精1",
+            _ => "精2",
+        }
+    }
+
+    /// 练度简短描述（用于建议文案）。
+    pub fn format_progress_brief(progress: OperatorProgress) -> String {
+        if progress.rarity >= 1 {
+            format!(
+                "{}★精{} {}级",
+                progress.rarity, progress.elite, progress.level
+            )
+        } else {
+            format!("精{} {}级", progress.elite, progress.level)
+        }
+    }
 }
 
 #[cfg(test)]

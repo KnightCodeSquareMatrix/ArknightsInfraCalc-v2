@@ -7,7 +7,8 @@ use crate::roster::Roster;
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
-pub use crate::pool::trade::{PoolSkip, PoolStats};
+use super::base::{build_roster_pool, filter_pool, HasName, PoolCore};
+pub use super::trade::PoolSkip;
 
 #[derive(Debug, Clone)]
 pub struct ControlPoolEntry {
@@ -15,6 +16,12 @@ pub struct ControlPoolEntry {
     pub elite: u8,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
+}
+
+impl HasName for ControlPoolEntry {
+    fn pool_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ControlPoolEntry {
@@ -28,60 +35,20 @@ impl ControlPoolEntry {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ControlPool {
-    pub entries: Vec<ControlPoolEntry>,
-    pub skipped: Vec<(String, u8, PoolSkip)>,
-}
-
-impl ControlPool {
-    pub fn stats(&self) -> PoolStats {
-        let n = self.entries.len();
-        PoolStats {
-            ready: n,
-            skipped: self.skipped.len(),
-            combinations_3: 0,
-        }
-    }
-
-    pub fn entry(&self, name: &str) -> Option<&ControlPoolEntry> {
-        self.entries.iter().find(|e| e.name == name)
-    }
-}
+/// 向后兼容别名
+pub type ControlPool = PoolCore<ControlPoolEntry>;
 
 pub fn build_control_pool(
     roster: &Roster,
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> Result<ControlPool> {
-    let mut entries = Vec::new();
-    let mut skipped = Vec::new();
-
-    for name in roster.names() {
-        let Some(progress) = roster.progress(name) else {
-            continue;
-        };
-        match try_entry(name, progress, instances, table) {
-            Ok(entry) => entries.push(entry),
-            Err(skip) => skipped.push((name.clone(), progress.elite, skip)),
-        }
-    }
-
-    entries.sort_by(|a, b| a.name.cmp(&b.name));
-
-    Ok(ControlPool { entries, skipped })
+    // control 按 name 排序（无 eff hint），用常数 0.0 作为 sort_key 统一排序逻辑
+    build_roster_pool(roster, instances, table, |_| 0.0, try_entry)
 }
 
 pub fn filter_control_pool(pool: &ControlPool, exclude: &HashSet<String>) -> ControlPool {
-    ControlPool {
-        entries: pool
-            .entries
-            .iter()
-            .filter(|e| !exclude.contains(&e.name))
-            .cloned()
-            .collect(),
-        skipped: pool.skipped.clone(),
-    }
+    filter_pool(pool, exclude)
 }
 
 fn try_entry(

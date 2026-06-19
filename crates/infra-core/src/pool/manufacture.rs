@@ -8,7 +8,8 @@ use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::types::{Action, Phase, RecipeKind, SkillDef};
 
-pub use crate::pool::trade::{n_choose_k_u64, PoolSkip, PoolStats};
+use super::base::{build_roster_pool, filter_pool, HasName, PoolCore};
+pub use super::trade::PoolSkip;
 
 #[derive(Debug, Clone)]
 pub struct ManuPoolEntry {
@@ -19,6 +20,12 @@ pub struct ManuPoolEntry {
     /// Sum of general `AddFlatEff` in `constant` phase — sort hint only.
     pub flat_eff_hint: f64,
     pub has_l2_delegate: bool,
+}
+
+impl HasName for ManuPoolEntry {
+    fn pool_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl ManuPoolEntry {
@@ -32,65 +39,19 @@ impl ManuPoolEntry {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ManuPool {
-    pub entries: Vec<ManuPoolEntry>,
-    pub skipped: Vec<(String, u8, PoolSkip)>,
-}
-
-impl ManuPool {
-    pub fn stats(&self) -> PoolStats {
-        let n = self.entries.len();
-        PoolStats {
-            ready: n,
-            skipped: self.skipped.len(),
-            combinations_3: n_choose_k_u64(n, 3),
-        }
-    }
-
-    pub fn entry(&self, name: &str) -> Option<&ManuPoolEntry> {
-        self.entries.iter().find(|e| e.name == name)
-    }
-}
+/// 向后兼容别名
+pub type ManuPool = PoolCore<ManuPoolEntry>;
 
 pub fn build_manufacture_pool(
     roster: &Roster,
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> Result<ManuPool> {
-    let mut entries = Vec::new();
-    let mut skipped = Vec::new();
-
-    for name in roster.names() {
-        let Some(progress) = roster.progress(name) else {
-            continue;
-        };
-        match try_entry(name, progress, instances, table) {
-            Ok(entry) => entries.push(entry),
-            Err(skip) => skipped.push((name.clone(), progress.elite, skip)),
-        }
-    }
-
-    entries.sort_by(|a, b| {
-        b.flat_eff_hint
-            .partial_cmp(&a.flat_eff_hint)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.name.cmp(&b.name))
-    });
-
-    Ok(ManuPool { entries, skipped })
+    build_roster_pool(roster, instances, table, |e| e.flat_eff_hint, try_entry)
 }
 
 pub fn filter_manufacture_pool(pool: &ManuPool, exclude: &HashSet<String>) -> ManuPool {
-    ManuPool {
-        entries: pool
-            .entries
-            .iter()
-            .filter(|e| !exclude.contains(&e.name))
-            .cloned()
-            .collect(),
-        skipped: pool.skipped.clone(),
-    }
+    filter_pool(pool, exclude)
 }
 
 fn try_entry(
@@ -119,7 +80,7 @@ fn try_entry(
         if skill.facility != "manufacture" {
             return Err(PoolSkip::UnmodeledBuff(bid.clone()));
         }
-        let (flat, delegated) = skill_hints(skill);
+        let (flat, delegated) = manu_skill_hints(skill);
         flat_eff_hint += flat;
         has_l2_delegate |= delegated;
     }
@@ -136,7 +97,7 @@ fn try_entry(
     })
 }
 
-fn skill_hints(skill: &SkillDef) -> (f64, bool) {
+fn manu_skill_hints(skill: &SkillDef) -> (f64, bool) {
     if skill.atoms.is_empty() {
         return (0.0, true);
     }
@@ -172,7 +133,7 @@ mod tests {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = operbox.manufacture_roster(&instances);
         let pool = build_manufacture_pool(&roster, &instances, &table).unwrap();
-        assert!(pool.stats().ready > 20);
+        assert!(pool.stats(3).ready > 20);
         assert!(pool.entry("蛇屠箱").is_some());
     }
 }

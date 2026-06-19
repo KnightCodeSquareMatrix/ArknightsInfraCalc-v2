@@ -6,7 +6,8 @@ use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::types::{Action, Phase, SkillDef};
 
-pub use crate::pool::trade::{PoolSkip, PoolStats};
+use super::base::{build_roster_pool, HasName, PoolCore};
+pub use super::trade::PoolSkip;
 
 #[derive(Debug, Clone)]
 pub struct PowerPoolEntry {
@@ -17,6 +18,12 @@ pub struct PowerPoolEntry {
     /// Sum of constant `AddFlatEff` — sort hint only.
     pub flat_charge_hint: f64,
     pub has_l2_delegate: bool,
+}
+
+impl HasName for PowerPoolEntry {
+    fn pool_name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl PowerPoolEntry {
@@ -30,53 +37,15 @@ impl PowerPoolEntry {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct PowerPool {
-    pub entries: Vec<PowerPoolEntry>,
-    pub skipped: Vec<(String, u8, PoolSkip)>,
-}
-
-impl PowerPool {
-    pub fn stats(&self) -> PoolStats {
-        let n = self.entries.len();
-        PoolStats {
-            ready: n,
-            skipped: self.skipped.len(),
-            combinations_3: n as u64,
-        }
-    }
-
-    pub fn entry(&self, name: &str) -> Option<&PowerPoolEntry> {
-        self.entries.iter().find(|e| e.name == name)
-    }
-}
+/// 向后兼容别名
+pub type PowerPool = PoolCore<PowerPoolEntry>;
 
 pub fn build_power_pool(
     roster: &Roster,
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> Result<PowerPool> {
-    let mut entries = Vec::new();
-    let mut skipped = Vec::new();
-
-    for name in roster.names() {
-        let Some(progress) = roster.progress(name) else {
-            continue;
-        };
-        match try_entry(name, progress, instances, table) {
-            Ok(entry) => entries.push(entry),
-            Err(skip) => skipped.push((name.clone(), progress.elite, skip)),
-        }
-    }
-
-    entries.sort_by(|a, b| {
-        b.flat_charge_hint
-            .partial_cmp(&a.flat_charge_hint)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.name.cmp(&b.name))
-    });
-
-    Ok(PowerPool { entries, skipped })
+    build_roster_pool(roster, instances, table, |e| e.flat_charge_hint, try_entry)
 }
 
 fn try_entry(
@@ -105,7 +74,7 @@ fn try_entry(
         if skill.facility != "power" {
             return Err(PoolSkip::UnmodeledBuff(bid.clone()));
         }
-        let (flat, delegated) = skill_hints(skill);
+        let (flat, delegated) = power_skill_hints(skill);
         flat_charge_hint += flat;
         has_l2_delegate |= delegated;
     }
@@ -122,7 +91,7 @@ fn try_entry(
     })
 }
 
-fn skill_hints(skill: &SkillDef) -> (f64, bool) {
+fn power_skill_hints(skill: &SkillDef) -> (f64, bool) {
     if skill.atoms.is_empty() {
         return (0.0, true);
     }
