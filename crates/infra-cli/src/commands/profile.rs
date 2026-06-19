@@ -2,6 +2,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use infra_core::box_profile::{
+    build_box_profile, default_schedule_export_path, run_layout_probe, BoxProfileOptions,
+};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::{
     assign_base_greedy, resolve_base, AssignBaseOptions, BaseBlueprint,
@@ -10,7 +13,7 @@ use infra_core::manufacture::input::ManuSearchRecipeMode;
 use infra_core::operbox::OperBox;
 use infra_core::pool::{build_manufacture_pool, build_trade_pool};
 use infra_core::profile::{hot_path_snapshot, reset_hot_path_counters, HotPathSnapshot};
-use infra_core::schedule::schedule_base_rotation_a_b_a;
+use infra_core::schedule::schedule_team_rotation;
 use infra_core::search::{
     search_manufacture_triples, search_trade_triples, ManuSearchOptions, TradeSearchOptions,
 };
@@ -49,9 +52,10 @@ struct RunProfile {
 pub fn profile_cmd(args: &[String]) -> Result<(), Error> {
     match args.first().map(String::as_str) {
         Some("layout-full") => profile_layout_full_cmd(&args[1..]),
+        Some("analyze-compare") => profile_analyze_compare_cmd(&args[1..]),
         _ => {
             eprintln!(
-                "usage: infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]"
+                "usage:\n  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>]\n  infra-cli profile analyze-compare [--layout <path>] [--operbox <path>] [--schedule <path>] [--runs <n>]"
             );
             Ok(())
         }
@@ -228,7 +232,7 @@ fn run_layout_full(
     });
 
     let t6 = Instant::now();
-    let rotation = schedule_base_rotation_a_b_a(
+    let rotation = schedule_team_rotation(
         blueprint,
         operbox,
         instances,
@@ -239,7 +243,7 @@ fn run_layout_full(
         },
     )?;
     phases.push(PhaseTiming {
-        name: "schedule_base_rotation_a_b_a",
+        name: "schedule_team_rotation",
         elapsed: t6.elapsed(),
     });
 
@@ -348,4 +352,103 @@ fn print_profile_report(runs: &[RunProfile]) {
 
 fn ms(d: Duration) -> f64 {
     d.as_secs_f64() * 1000.0
+}
+
+fn profile_analyze_compare_cmd(args: &[String]) -> Result<(), Error> {
+    let layout_path = args
+        .windows(2)
+        .find(|w| w[0] == "--layout")
+        .map(|w| PathBuf::from(&w[1]))
+        .unwrap_or_else(|| PathBuf::from("data/fixtures/243/layout.json"));
+    let operbox_path = args
+        .windows(2)
+        .find(|w| w[0] == "--operbox")
+        .map(|w| PathBuf::from(&w[1]))
+        .unwrap_or_else(|| PathBuf::from("data/operbox_knightcode.json"));
+    let schedule_path = args
+        .windows(2)
+        .find(|w| w[0] == "--schedule")
+        .map(|w| PathBuf::from(&w[1]))
+        .unwrap_or_else(|| default_schedule_export_path().unwrap_or_else(|_| {
+            PathBuf::from("data/fixtures/243/schedule_export.json")
+        }));
+    let runs = args
+        .windows(2)
+        .find(|w| w[0] == "--runs")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(3)
+        .max(1);
+
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+
+    let layout_label = layout_path.to_string_lossy().into_owned();
+    let operbox_label = operbox_path.to_string_lossy().into_owned();
+    let options = BoxProfileOptions {
+        top_k: 10,
+        ..BoxProfileOptions::default()
+    };
+
+    eprintln!("=== profile analyze-compare (release) ===");
+    eprintln!(
+        "layout={} operbox={} owned={} schedule={} runs={}",
+        layout_path.display(),
+        operbox_path.display(),
+        operbox.owned_count(),
+        schedule_path.display(),
+        runs
+    );
+    eprintln!("hybrid:  user team_rotation vs 公孙 schedule_export (full_e2 eval)");
+    eprintln!("legacy:  2x full search probe (old analyze)");
+
+    let mut hybrid_ms = Vec::new();
+    let mut legacy_ms = Vec::new();
+
+    for i in 0..runs {
+        let t0 = Instant::now();
+        let _ = build_box_profile(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &layout_label,
+            &operbox_label,
+            &BoxProfileOptions {
+                top_k: 10,
+                baseline_schedule: Some(schedule_path.clone()),
+                ..options.clone()
+            },
+        )?;
+        hybrid_ms.push(ms(t0.elapsed()));
+
+        let t1 = Instant::now();
+        let _ = run_layout_probe(&blueprint, &operbox, &instances, &table, 10)?;
+        let _ = run_layout_probe(
+            &blueprint,
+            &OperBox::load(&infra_core::operbox::default_operbox_full_e2_path()?)?,
+            &instances,
+            &table,
+            10,
+        )?;
+        legacy_ms.push(ms(t1.elapsed()));
+        eprintln!(
+            "  run {}: hybrid={:.1}ms legacy={:.1}ms speedup={:.1}x",
+            i + 1,
+            hybrid_ms[i],
+            legacy_ms[i],
+            legacy_ms[i] / hybrid_ms[i].max(0.001)
+        );
+    }
+
+    let avg = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+    let hybrid_avg = avg(&hybrid_ms);
+    let legacy_avg = avg(&legacy_ms);
+    eprintln!();
+    eprintln!(
+        "average: hybrid={hybrid_avg:.1}ms legacy={legacy_avg:.1}ms speedup={:.1}x",
+        legacy_avg / hybrid_avg.max(0.001)
+    );
+    Ok(())
 }

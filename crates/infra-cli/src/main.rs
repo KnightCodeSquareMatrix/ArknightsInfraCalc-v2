@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use std::path::PathBuf;
 
-use commands::{layout_cmd, profile_cmd, verify_cmd};
+use commands::{layout_cmd, plan_cmd, profile_cmd, verify_cmd};
 use output::{
     emit_bench, emit_pool, emit_schedule, emit_trade_search, emit_trade_yield, BenchMeta, OutputOptions,
     PoolSummary, SearchMeta, TradeYieldRow,
@@ -48,6 +48,7 @@ fn run() -> Result<(), Error> {
     }
 
     match args[1].as_str() {
+        "plan" => plan_cmd(&args[2..])?,
         "verify" => verify_cmd(&args[2..])?,
         "pool" => pool_cmd(&args[2..])?,
         "search" => search_cmd(&args[2..])?,
@@ -63,6 +64,9 @@ fn run() -> Result<(), Error> {
 
 fn print_usage() {
     eprintln!("Usage:");
+    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>]");
+    eprintln!("      [--profile-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--json]");
+    eprintln!("      (default layout: data/fixtures/243/layout.json)");
     eprintln!("  infra-cli verify --case <case_id>");
     eprintln!("  infra-cli verify --all");
     eprintln!("  infra-cli pool --trade [--manufacture] [--roster <path>] [--operbox <path>] [-o <file.csv>] [--text]");
@@ -71,9 +75,11 @@ fn print_usage() {
     eprintln!("      (default manufacture: 4 lines = 2 gold + 2 battle_record; --recipe = single-line debug)");
     eprintln!("  infra-cli schedule rotation --operbox <path> [--layout-baseline] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]");
+    eprintln!("  infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]");
     eprintln!("  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]");
     eprintln!("  infra-cli layout rotation --layout <path> --operbox <path> [--top <n>] [--output-dir <dir>] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]");
+    eprintln!("  infra-cli profile analyze-compare [--layout <path>] [--operbox <path>] [--schedule <path>] [--runs <n>]");
     eprintln!("  infra-cli trade yield <fixture> [--level <n>] [--shift <hours>] [-o <file.csv>] [--text]");
     eprintln!();
     eprintln!("Output: CSV by default (UTF-8 BOM when writing to file). Use --text for human-readable stderr.");
@@ -157,7 +163,7 @@ fn emit_trade_pool(
     owned: usize,
 ) -> Result<(), Error> {
     let pool = build_trade_pool(roster, instances, table)?;
-    let stats = pool.stats();
+    let stats = pool.stats(3);
     emit_pool(
         out,
         &PoolSummary {
@@ -182,7 +188,7 @@ fn emit_manufacture_pool(
     owned: usize,
 ) -> Result<(), Error> {
     let pool = build_manufacture_pool(roster, instances, table)?;
-    let stats = pool.stats();
+    let stats = pool.stats(3);
     emit_pool(
         out,
         &PoolSummary {
@@ -237,7 +243,7 @@ fn bench_cmd(args: &[String]) -> Result<(), Error> {
 
     let trade_roster = operbox.trade_roster(&instances);
     let trade_pool = build_trade_pool(&trade_roster, &instances, &table)?;
-    let trade_stats = trade_pool.stats();
+    let trade_stats = trade_pool.stats(3);
     let trade_report = search_trade_triples(
         &trade_pool,
         &table,
@@ -259,7 +265,7 @@ fn bench_cmd(args: &[String]) -> Result<(), Error> {
 
     let manu_roster = operbox.manufacture_roster(&instances);
     let manu_pool = build_manufacture_pool(&manu_roster, &instances, &table)?;
-    let manu_stats = manu_pool.stats();
+    let manu_stats = manu_pool.stats(3);
     let manu_report = search_manufacture_triples(
         &manu_pool,
         &table,
