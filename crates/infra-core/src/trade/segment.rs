@@ -14,7 +14,9 @@ use crate::global_resource::GlobalInjectManifest;
 use crate::skill_table::{data_path, SkillTable};
 use crate::trade::input::TradeOperator;
 use crate::trade::shortcut::{
-    is_docus_syracusa_station, match_ling_jie_shortcut, trade_shortcut_cache, TradeShortcutMatch,
+    is_blackkey_closure_station, is_docus_syracusa_station, is_penguin_exusiai_lemuen_station,
+    is_penguin_texangel_e2_station, is_penguin_texlap_e0_station, is_vina_lungmen_station,
+    match_ling_jie_shortcut, trade_shortcut_cache, TradeShortcutMatch,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -39,6 +41,8 @@ pub struct SegmentProducerDef {
     pub haru_e2_in_control: bool,
     #[serde(default)]
     pub karlan_precision: bool,
+    #[serde(default)]
+    pub daifeen_e2_in_control: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -115,13 +119,22 @@ pub(crate) fn trade_segment_cache() -> Option<&'static TradeSegmentCache> {
 }
 
 pub fn segment_producer_active(producer: &SegmentProducerDef, inject: &GlobalInjectManifest) -> bool {
+    let any_required = producer.haru_e2_in_control
+        || producer.karlan_precision
+        || producer.daifeen_e2_in_control;
+    if !any_required {
+        return true;
+    }
     if producer.haru_e2_in_control && !inject.haru_e2_in_control() {
         return false;
     }
     if producer.karlan_precision && inject.karlan_precision().is_none() {
         return false;
     }
-    producer.haru_e2_in_control || producer.karlan_precision
+    if producer.daifeen_e2_in_control && !inject.daifeen_e2_in_control() {
+        return false;
+    }
+    true
 }
 
 fn segment_consumer_matches(
@@ -133,6 +146,11 @@ fn segment_consumer_matches(
     match kind {
         "docus_syracusa" => is_docus_syracusa_station(ops, table),
         "ling_jie" => match_ling_jie_shortcut(ops, inject).is_some(),
+        "blackkey_closure" => is_blackkey_closure_station(ops, table),
+        "vina_lungmen" => is_vina_lungmen_station(ops, table),
+        "penguin_texlap_e0" => is_penguin_texlap_e0_station(ops, table),
+        "penguin_texangel_e2" => is_penguin_texangel_e2_station(ops, table),
+        "penguin_exusiai_lemuen" => is_penguin_exusiai_lemuen_station(ops, table),
         _ => false,
     }
 }
@@ -169,12 +187,24 @@ mod tests {
         SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap()
     }
 
+    fn mk_op(name: &str, elite: u8, buff_ids: Vec<&str>) -> TradeOperator {
+        TradeOperator::new(
+            name,
+            elite,
+            buff_ids.into_iter().map(str::to_string).collect(),
+        )
+    }
+
     #[test]
-    fn segment_registry_loads_docus_and_ling_jie() {
+    fn segment_registry_loads_phase2_entries() {
         let cache = trade_segment_cache().expect("segments loaded");
         assert!(cache.segment("docus_syracusa").is_some());
         assert!(cache.segment("ling_jie").is_some());
+        assert!(cache.segment("blackkey_closure").is_some());
+        assert!(cache.segment("vina_lungmen").is_some());
+        assert!(cache.segment("penguin_exusiai_lemuen").is_some());
         assert!(cache.role("docus").is_some());
+        assert!(cache.role("meta_vina").is_some());
     }
 
     #[test]
@@ -196,5 +226,36 @@ mod tests {
         inject.record_haru_e2_in_control();
         let m = resolve_trade_shortcut(&ops, &table, 80.0, 3, &inject).expect("match");
         assert_eq!(m.entry.id, "gsl_docus_syracusa");
+    }
+
+    #[test]
+    fn registered_segment_vina_lungmen_matches_via_resolve() {
+        let table = table();
+        let ops = vec![
+            mk_op("推进之王", 2, vec!["trade_ord_spd[010]"]),
+            mk_op("摩根", 2, vec!["trade_ord_spd_par[000]"]),
+            mk_op("维娜·维多利亚", 2, vec!["trade_ord_spd&par[001]"]),
+        ];
+        let mut inject = GlobalInjectManifest::default();
+        inject.record_daifeen_e2_in_control();
+        let m = resolve_trade_shortcut(&ops, &table, 80.0, 3, &inject).expect("match");
+        assert_eq!(m.entry.id, "gsl_vina_lungmen");
+    }
+
+    #[test]
+    fn registered_segment_blackkey_closure_matches_via_resolve() {
+        let table = table();
+        let ops = vec![
+            mk_op(
+                "黑键",
+                2,
+                vec!["trade_ord_spd_bd_n1[000]", "trade_ord_spd_bd[010]"],
+            ),
+            mk_op("可露希尔", 2, vec!["trade_ord_closure[000]"]),
+            mk_op("吉星", 2, vec!["trade_ord_spd&share[002]"]),
+        ];
+        let m = resolve_trade_shortcut(&ops, &table, 82.0, 3, &GlobalInjectManifest::default())
+            .expect("match");
+        assert_eq!(m.entry.id, "gsl_blackkey_closure");
     }
 }

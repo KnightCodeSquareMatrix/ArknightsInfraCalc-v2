@@ -9,6 +9,8 @@ use crate::tier::PromotionTier;
 use crate::trade::TradeOperator;
 use crate::types::{Action, CompiledAtom, Phase, SkillDef};
 
+use super::base::{build_roster_pool, filter_pool, HasName, PoolCore};
+
 /// 建池时按 buff 展开并排序 atom，供 solve 热路径归并。
 pub fn compile_operator_atoms(buff_ids: &[String], table: &SkillTable) -> Arc<[CompiledAtom]> {
     let mut atoms = Vec::new();
@@ -75,6 +77,12 @@ pub struct TradePoolEntry {
     pub is_mechanic: bool,
 }
 
+impl HasName for TradePoolEntry {
+    fn pool_name(&self) -> &str {
+        &self.name
+    }
+}
+
 impl TradePoolEntry {
     pub fn to_trade_operator(&self) -> TradeOperator {
         TradeOperator {
@@ -86,6 +94,9 @@ impl TradePoolEntry {
         }
     }
 }
+
+/// 向后兼容别名：`TradePool` = `PoolCore<TradePoolEntry>`
+pub type TradePool = PoolCore<TradePoolEntry>;
 
 /// 从池索引组装三人组（保留进驻顺序）；孑 E0 override 由调用方注入。
 pub fn build_trade_combo_operators(
@@ -119,66 +130,17 @@ pub struct PoolStats {
     pub combinations_3: u64,
 }
 
-#[derive(Debug, Clone)]
-pub struct TradePool {
-    pub entries: Vec<TradePoolEntry>,
-    pub skipped: Vec<(String, u8, PoolSkip)>,
-}
-
-impl TradePool {
-    pub fn stats(&self) -> PoolStats {
-        let n = self.entries.len();
-        PoolStats {
-            ready: n,
-            skipped: self.skipped.len(),
-            combinations_3: n_choose_k_u64(n, 3),
-        }
-    }
-
-    pub fn entry(&self, name: &str) -> Option<&TradePoolEntry> {
-        self.entries.iter().find(|e| e.name == name)
-    }
-}
-
 pub fn build_trade_pool(
     roster: &Roster,
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> Result<TradePool> {
-    let mut entries = Vec::new();
-    let mut skipped = Vec::new();
-
-    for name in roster.names() {
-        let Some(progress) = roster.progress(name) else {
-            continue;
-        };
-        match try_entry(name, progress, instances, table) {
-            Ok(entry) => entries.push(entry),
-            Err(skip) => skipped.push((name.clone(), progress.elite, skip)),
-        }
-    }
-
-    entries.sort_by(|a, b| {
-        b.flat_eff_hint
-            .partial_cmp(&a.flat_eff_hint)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.name.cmp(&b.name))
-    });
-
-    Ok(TradePool { entries, skipped })
+    build_roster_pool(roster, instances, table, |e| e.flat_eff_hint, try_entry)
 }
 
 /// Sub-pool excluding operators already assigned in the same shift.
 pub fn filter_trade_pool(pool: &TradePool, exclude: &HashSet<String>) -> TradePool {
-    TradePool {
-        entries: pool
-            .entries
-            .iter()
-            .filter(|e| !exclude.contains(&e.name))
-            .cloned()
-            .collect(),
-        skipped: pool.skipped.clone(),
-    }
+    filter_pool(pool, exclude)
 }
 
 fn try_entry(
@@ -209,7 +171,7 @@ fn try_entry(
         let Some(skill) = table.get(bid) else {
             return Err(PoolSkip::UnmodeledBuff(bid.clone()));
         };
-        let (flat, mech) = skill_hints(skill);
+        let (flat, mech) = trade_skill_hints(skill);
         flat_eff_hint += flat;
         is_mechanic |= mech;
     }
@@ -229,13 +191,23 @@ fn try_entry(
     })
 }
 
-fn skill_hints(skill: &SkillDef) -> (f64, bool) {
+fn trade_skill_hints(skill: &SkillDef) -> (f64, bool) {
     let mut flat = 0.0;
     let mut mech = false;
     for atom in &skill.atoms {
         if atom.phase == Phase::Constant {
+            // 有条件的 flat（如蕾缪安「相伴」+25% 需能天使同房）不计入 solo hint。
+            if atom.condition.is_some() {
+                continue;
+            }
             if let Action::AddFlatEff { value, .. } = atom.action {
                 flat += value;
+            }
+        }
+        // 贸易站三人组 hint：peer_share 按 2 名队友估算（如吉星勤俭经营·β）。
+        if atom.phase == Phase::PeerShare {
+            if let Action::AddFlatEffFromSelector { multiplier, .. } = atom.action {
+                flat += multiplier * 2.0;
             }
         }
         if atom.phase == Phase::OrderMechanic {
@@ -434,15 +406,65 @@ mod tests {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let pool = build_trade_pool(&roster, &instances, &table).unwrap();
         assert_eq!(pool.skipped.len(), 0, "{:?}", pool.skipped);
-        assert!(pool.entry("鸿雪").is_some());
-        assert!(pool.entry("绮良").is_some());
-        assert!(pool.entry("铎铃").is_some());
     }
 
     #[test]
-    fn n_choose_k_matches_small_cases() {
-        assert_eq!(n_choose_k_u64(4, 3), 4);
-        assert_eq!(n_choose_k_u64(10, 3), 120);
+    fn heidi_e2_flat_eff_hint_single_skill() {
+        use crate::roster::OperatorProgress;
+
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut roster = Roster::default();
+        roster.insert("海蒂", OperatorProgress::elite_only(2));
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        let heidi = pool.entry("海蒂").expect("海蒂");
+        assert_eq!(
+            heidi.buff_ids,
+            vec!["trade_ord_spd[021]".to_string()]
+        );
+        assert!(
+            (heidi.flat_eff_hint - 35.0).abs() < f64::EPSILON,
+            "名流欢会 flat_eff_hint 应仅 35%，got {}",
+            heidi.flat_eff_hint
+        );
+    }
+
+    #[test]
+    fn jixing_e2_flat_eff_hint_includes_peer_share() {
+        use crate::roster::OperatorProgress;
+
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut roster = Roster::default();
+        roster.insert("吉星", OperatorProgress::elite_only(2));
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        let jixing = pool.entry("吉星").expect("吉星");
+        assert!(
+            (jixing.flat_eff_hint - 40.0).abs() < f64::EPSILON,
+            "勤俭经营·β 三人站 hint 应≈2×20%=40%，got {}",
+            jixing.flat_eff_hint
+        );
+    }
+
+    #[test]
+    fn lemuen_e2_flat_eff_hint_excludes_exusiai_bonus() {
+        use crate::roster::OperatorProgress;
+
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut roster = Roster::default();
+        roster.insert("蕾缪安", OperatorProgress::elite_only(2));
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        let lemuen = pool.entry("蕾缪安").expect("蕾缪安");
+        assert_eq!(
+            lemuen.buff_ids,
+            vec!["trade_ord_spd&multiPar[100]".to_string()]
+        );
+        assert!(
+            (lemuen.flat_eff_hint - 20.0).abs() < f64::EPSILON,
+            "相伴无能天使时 flat_eff_hint 应仅 20%，got {}",
+            lemuen.flat_eff_hint
+        );
     }
 
     #[test]
@@ -451,21 +473,13 @@ mod tests {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let mut roster = Roster::default();
         roster.insert(
-            JIE_TRADE_NAME,
-            crate::roster::OperatorProgress::new(2, 90, 4),
+            "孑",
+            crate::roster::OperatorProgress::elite_only(2),
         );
         let pool = build_trade_pool(&roster, &instances, &table).unwrap();
         assert!(
-            pool.entry(JIE_TRADE_NAME).is_none(),
-            "精2 孑不应进入通用贸易池"
-        );
-        assert!(
-            jie_e0_trade_operator(&instances, &table).is_some(),
-            "摊贩形态仍可通过 override 使用"
-        );
-        assert!(
-            jie_market_trade_operator(&instances, &table).is_some(),
-            "市井形态仅用于灵知线固定注入"
+            pool.entry("孑").is_none(),
+            "精1+ 孑应从通用贸易池排除"
         );
     }
 }

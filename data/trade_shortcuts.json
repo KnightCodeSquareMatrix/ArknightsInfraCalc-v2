@@ -127,6 +127,46 @@
       "match": {
         "kind": "blackkey_closure"
       }
+    },
+    {
+      "id": "gsl_vina_lungmen",
+      "label": "推王组：推进之王+摩根+维娜·维多利亚（95%贸；需中枢戴菲恩E2）",
+      "trade_pct": 95.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "vina_lungmen"
+      }
+    },
+    {
+      "id": "gsl_penguin_texlap_e0",
+      "label": "企鹅物流：德E0恩怨+拉普兰德+挂件",
+      "trade_pct": 88.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "penguin_texlap_e0"
+      }
+    },
+    {
+      "id": "gsl_penguin_texangel_e2",
+      "label": "企鹅物流：德E2默契+能天使+挂件",
+      "trade_pct": 55.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "penguin_texangel_e2"
+      }
+    },
+    {
+      "id": "gsl_penguin_exusiai_lemuen",
+      "label": "企鹅物流：能天使+蕾缪安E2相伴+挂件",
+      "trade_pct": 70.0,
+      "gold_pct": 0.0,
+      "tailor_tier": "regular",
+      "match": {
+        "kind": "penguin_exusiai_lemuen"
+      }
     }
   ]
 }

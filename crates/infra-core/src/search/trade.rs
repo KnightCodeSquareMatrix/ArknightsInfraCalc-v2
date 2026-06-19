@@ -351,6 +351,10 @@ pub fn hit_closure_shortcut(hit: &TradeSearchHit) -> bool {
     })
 }
 
+pub fn hit_blackkey_closure_shortcut(hit: &TradeSearchHit) -> bool {
+    hit.shortcut.as_deref() == Some("gsl_blackkey_closure")
+}
+
 pub fn hit_docus_solo_shortcut(hit: &TradeSearchHit) -> bool {
     hit.shortcut.as_deref() == Some("gsl_docus_solo")
 }
@@ -369,9 +373,10 @@ mod tests {
         let opts = TradeSearchOptions::default();
         assert_eq!(opts.layout.meeting_max_level, 3);
         assert_eq!(opts.layout.dorm_occupant_count, 20);
+        // MonsterCuisine 基线已移除；无 assignment 时编排层不运行，所以初始为 0
         assert_eq!(
             opts.layout.global.get(crate::global_resource::GlobalResourceKey::MonsterCuisine),
-            3.0
+            0.0
         );
         assert!(opts.layout.base_workforce.is_empty());
     }

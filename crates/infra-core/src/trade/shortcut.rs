@@ -243,6 +243,18 @@ fn resolve_trade_shortcut_inner(
     if let Some(m) = match_blackkey_closure_shortcut(ops, table) {
         return Some(m);
     }
+    if let Some(m) = match_vina_lungmen_shortcut(ops, table) {
+        return Some(m);
+    }
+    if let Some(m) = match_penguin_exusiai_lemuen_shortcut(ops, table) {
+        return Some(m);
+    }
+    if let Some(m) = match_penguin_texangel_e2_shortcut(ops, table) {
+        return Some(m);
+    }
+    if let Some(m) = match_penguin_texlap_e0_shortcut(ops, table) {
+        return Some(m);
+    }
     match_closure_shortcut(ops, table, order_eff_pre, trade_level)
 }
 
@@ -269,6 +281,10 @@ pub fn match_blackkey_closure_shortcut(
 
 const JIE_MARKET_BUFF: &str = "trade_ord_limit_count[000]";
 const KARLAN_TAG: &str = "cc.g.karlan";
+/// 德克萨斯 E0「恩怨」；企鹅物流德狼 bond 识别用。
+const TEX_ENEMY_BUFF: &str = "trade_ord_spd&cost_P[000]";
+/// 德克萨斯 E2「默契」；企鹅物流德能 bond 识别用。
+const TEX_MOQI_BUFF: &str = "trade_ord_limit&cost_P[010]";
 /// 黑键·乐感（宿舍人数 → 感知）；E2 组合短路识别用。
 const BLACKKEY_PERCEPTION_BUFF: &str = "trade_ord_spd_bd_n1[000]";
 
@@ -299,6 +315,88 @@ pub fn match_ling_jie_shortcut(
     }
     let cache = trade_shortcut_cache()?;
     let entry = cache.get_by_id("gsl_ling_jie_yaxin")?.clone();
+    Some(TradeShortcutMatch { entry })
+}
+
+/// 德克萨斯 E0「恩怨」+ 拉普兰德；第三人任意。
+pub fn is_penguin_texlap_e0_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && room_has_named_buff(ops, "德克萨斯", TEX_ENEMY_BUFF)
+        && !room_has_named_buff(ops, "德克萨斯", TEX_MOQI_BUFF)
+        && ops.iter().any(|o| o.name == "拉普兰德")
+        && !penguin_bond_excluded(ops, table)
+}
+
+pub fn match_penguin_texlap_e0_shortcut(
+    ops: &[TradeOperator],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_texlap_e0_station(ops, table) {
+        return None;
+    }
+    let cache = trade_shortcut_cache()?;
+    let entry = cache.get_by_id("gsl_penguin_texlap_e0")?.clone();
+    Some(TradeShortcutMatch { entry })
+}
+
+/// 德克萨斯 E2「默契」+ 能天使；不含蕾缪安 E2 相伴链。
+pub fn is_penguin_texangel_e2_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && room_has_named_buff(ops, "德克萨斯", TEX_MOQI_BUFF)
+        && ops.iter().any(|o| o.name == "能天使")
+        && !ops.iter().any(|o| o.name == "蕾缪安" && o.elite >= 2)
+        && !penguin_bond_excluded(ops, table)
+}
+
+pub fn match_penguin_texangel_e2_shortcut(
+    ops: &[TradeOperator],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_texangel_e2_station(ops, table) {
+        return None;
+    }
+    let cache = trade_shortcut_cache()?;
+    let entry = cache.get_by_id("gsl_penguin_texangel_e2")?.clone();
+    Some(TradeShortcutMatch { entry })
+}
+
+/// 能天使 + 蕾缪安 E2「相伴」；第三人任意。
+pub fn is_penguin_exusiai_lemuen_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && ops.iter().any(|o| o.name == "能天使")
+        && ops.iter().any(|o| o.name == "蕾缪安" && o.elite >= 2)
+        && !penguin_bond_excluded(ops, table)
+}
+
+pub fn match_penguin_exusiai_lemuen_shortcut(
+    ops: &[TradeOperator],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_exusiai_lemuen_station(ops, table) {
+        return None;
+    }
+    let cache = trade_shortcut_cache()?;
+    let entry = cache.get_by_id("gsl_penguin_exusiai_lemuen")?.clone();
+    Some(TradeShortcutMatch { entry })
+}
+
+/// 推王组：推进之王 + 摩根 + 维娜·维多利亚（需中枢戴菲恩 E2 producer）。
+pub fn is_vina_lungmen_station(ops: &[TradeOperator], _table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && ops.iter().any(|o| o.name == "推进之王")
+        && ops.iter().any(|o| o.name == "摩根")
+        && ops.iter().any(|o| o.name == "维娜·维多利亚")
+}
+
+pub fn match_vina_lungmen_shortcut(
+    ops: &[TradeOperator],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_vina_lungmen_station(ops, table) {
+        return None;
+    }
+    let cache = trade_shortcut_cache()?;
+    let entry = cache.get_by_id("gsl_vina_lungmen")?.clone();
     Some(TradeShortcutMatch { entry })
 }
 
@@ -393,6 +491,18 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
 
 fn room_has_docus_mechanic(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.iter().any(|o| has_docus_buff(o, table))
+}
+
+fn room_has_named_buff(ops: &[TradeOperator], name: &str, buff: &str) -> bool {
+    ops.iter()
+        .any(|o| o.name == name && o.buff_ids.iter().any(|b| b == buff))
+}
+
+fn penguin_bond_excluded(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    room_has_docus_mechanic(ops, table)
+        || room_has_witch_side_group(ops, table)
+        || is_blackkey_closure_station(ops, table)
+        || has_closure(ops, table)
 }
 
 fn room_has_blackkey_perception(ops: &[TradeOperator], _table: &SkillTable) -> bool {
@@ -699,6 +809,7 @@ impl TradeShortcutMatch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instances::OperatorInstances;
     use crate::skill_table::default_skill_table_path;
 
     fn table() -> SkillTable {
@@ -711,6 +822,61 @@ mod tests {
             elite,
             buff_ids.into_iter().map(str::to_string).collect(),
         )
+    }
+
+    #[test]
+    fn gsl_penguin_exusiai_lemuen_shortcut() {
+        let table = table();
+        let instances = OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let exu = instances
+            .resolve_trade_buff_ids("能天使", crate::tier::PromotionTier::TierUp);
+        let lemuen = instances
+            .resolve_trade_buff_ids("蕾缪安", crate::tier::PromotionTier::TierUp);
+        let ops = vec![
+            mk_op("能天使", 2, exu.iter().map(String::as_str).collect()),
+            mk_op("蕾缪安", 2, lemuen.iter().map(String::as_str).collect()),
+            mk_op("芬", 0, vec!["trade_ord_spd[000]"]),
+        ];
+        let m = match_penguin_exusiai_lemuen_shortcut(&ops, &table).expect("match");
+        assert_eq!(m.entry.id, "gsl_penguin_exusiai_lemuen");
+        let resolved =
+            resolve_trade_shortcut(&ops, &table, 70.0, 3, &GlobalInjectManifest::default())
+                .expect("resolve");
+        assert_eq!(resolved.entry.id, "gsl_penguin_exusiai_lemuen");
+    }
+
+    #[test]
+    fn gsl_penguin_texlap_e0_shortcut() {
+        let table = table();
+        let ops = vec![
+            mk_op("德克萨斯", 0, vec!["trade_ord_spd&cost_P[000]"]),
+            mk_op("拉普兰德", 2, vec!["trade_ord_limit&cost_P[001]"]),
+            mk_op("芬", 0, vec!["trade_ord_spd[000]"]),
+        ];
+        let m = match_penguin_texlap_e0_shortcut(&ops, &table).expect("match");
+        assert_eq!(m.entry.id, "gsl_penguin_texlap_e0");
+    }
+
+    #[test]
+    fn gsl_vina_lungmen_shortcut_requires_daifeen_producer_for_segment() {
+        let table = table();
+        let ops = vec![
+            mk_op("推进之王", 2, vec!["trade_ord_spd[010]"]),
+            mk_op("摩根", 2, vec!["trade_ord_spd[010]"]),
+            mk_op("维娜·维多利亚", 2, vec!["trade_ord_spd[010]"]),
+        ];
+        assert!(match_vina_lungmen_shortcut(&ops, &table).is_some());
+        let without_producer =
+            resolve_trade_shortcut(&ops, &table, 80.0, 3, &GlobalInjectManifest::default());
+        assert_eq!(
+            without_producer.map(|m| m.entry.id),
+            Some("gsl_vina_lungmen".to_string())
+        );
+        let mut inject = GlobalInjectManifest::default();
+        inject.record_daifeen_e2_in_control();
+        let with_segment =
+            resolve_trade_shortcut(&ops, &table, 80.0, 3, &inject).expect("segment");
+        assert_eq!(with_segment.entry.id, "gsl_vina_lungmen");
     }
 
     #[test]

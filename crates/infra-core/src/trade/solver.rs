@@ -318,8 +318,14 @@ mod tests {
     fn heidi_e2_stepwise_buff_binding() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         assert_eq!(
+            instances.resolve_trade_buff_ids("海蒂", PromotionTier::Tier0),
+            vec!["trade_ord_spd&multiPar[000]".to_string()],
+            "精0 仅订单分发·α +20%"
+        );
+        assert_eq!(
             instances.resolve_trade_buff_ids("海蒂", PromotionTier::TierUp),
-            vec!["trade_ord_spd[021]".to_string()]
+            vec!["trade_ord_spd[021]".to_string()],
+            "精2 名流欢会应替换订单分发·α，不得双挂 [000]+[021]"
         );
     }
 
