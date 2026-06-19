@@ -6,9 +6,9 @@ use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId, RoomProduct};
+use crate::layout::orchestrate::{build_plan, execute_plan, AssignmentPlan};
 use crate::layout::resolve::resolve_base;
 use crate::layout::shift::AssignShiftMode;
-use crate::layout::system::claim_base_systems;
 use crate::manufacture::input::ManuSearchRecipeMode;
 use crate::operbox::OperBox;
 use crate::pool::{
@@ -18,16 +18,15 @@ use crate::pool::{
     ControlPool, ManuPool, PowerPool, TradePool, JIE_TRADE_NAME,
 };
 use crate::search::{
-    hit_closure_shortcut, hit_witch_shortcut, pick_docus_trade_hit, search_control_combos,
+    hit_witch_shortcut, pick_docus_trade_hit, search_control_combos,
     search_manufacture_triples, search_power_assignment, search_trade_triples,
     search_trade_triples_filtered, control_entry_hr_mood_fill, ControlFillPolicy,
-    ControlSearchOptions, ManuSearchHit, MATATABI_CONSUMER_NAME,
-    ManuSearchOptions, PowerSearchOptions, SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
+    ControlSearchOptions, ManuSearchHit, MATATABI_CONSUMER_NAME, ManuSearchOptions,
+    PowerSearchOptions, SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
 };
 use crate::skill_table::SkillTable;
 use crate::layout::LayoutContext;
-use crate::trade::input::{TradeOrderKind, TradeRoomInput, TradeSearchOrderMode};
-use crate::trade::solve_trade_with_shift;
+use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
 use crate::types::RecipeKind;
 
 const SENXI_DORM_CUISINE_BUFF: &str = "dorm_rec_bd_dungeon[000]";
@@ -68,6 +67,13 @@ pub fn assign_base_greedy(
     )
 }
 
+/// `assign_shift` 完整输出：编制 + 编排计划（轮换层只读 plan，不重跑 `build_plan`）。
+#[derive(Debug, Clone)]
+pub struct AssignShiftResult {
+    pub assignment: BaseAssignment,
+    pub plan: AssignmentPlan,
+}
+
 /// 单班进驻；`seed` 非空时保留已钉死房间（中枢/宿舍），仅补贸易/制造/发电。
 pub fn assign_shift(
     blueprint: &BaseBlueprint,
@@ -78,21 +84,29 @@ pub fn assign_shift(
     mode: AssignShiftMode,
     seed: &BaseAssignment,
 ) -> Result<BaseAssignment> {
+    Ok(assign_shift_with_plan(
+        blueprint, operbox, instances, table, options, mode, seed,
+    )?
+    .assignment)
+}
+
+/// 同 [`assign_shift`]，额外返回编排 `AssignmentPlan`（peak 班供 αβγ 轮换只读）。
+pub fn assign_shift_with_plan(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    mode: AssignShiftMode,
+    seed: &BaseAssignment,
+) -> Result<AssignShiftResult> {
     blueprint.validate()?;
 
-    let mut assignment = seed.clone();
-    let mut used = assignment_operator_names(&assignment);
+    let plan = build_plan(blueprint, operbox, mode, seed)?;
 
-    if mode == AssignShiftMode::Peak {
-        claim_base_systems(
-            blueprint,
-            operbox,
-            table,
-            mode,
-            &mut assignment,
-            &mut used,
-        )?;
-    }
+    let executed = execute_plan(blueprint, operbox, table, &plan, seed)?;
+    let mut assignment = executed.assignment;
+    let mut used = executed.used;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
     let producer_layout = resolve_base(
@@ -119,6 +133,7 @@ pub fn assign_shift(
     }
 
     if mode == AssignShiftMode::Peak {
+        assign_perception_producers(blueprint, operbox, &mut assignment, &mut used)?;
         assign_dorm_producers(blueprint, operbox, instances, &mut assignment, &mut used)?;
     }
 
@@ -140,40 +155,6 @@ pub fn assign_shift(
 
     match mode {
         AssignShiftMode::Peak => {
-            // 迷迭香等制造锚点（base_systems 只钉了单人）先补满队友——它因感知是全基建最高产
-            // 制造位，应优先于普通制造贪心拿到最佳队友。
-            complete_manu_anchor_rooms(
-                blueprint,
-                &manu_pool,
-                table,
-                &layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            assign_trade_meta(
-                blueprint,
-                &trade_pool,
-                table,
-                &layout,
-                gold_lines,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            // 黑键贸易锚点在但书/巫恋/可露希尔认领贸位后补满——高效散件优先给但书，
-            // 黑键拿剩余次优（文档 §5.1）。锚点已占非巫恋贸位，故天然不与巫恋同站。
-            complete_trade_anchor_rooms(
-                blueprint,
-                &trade_pool,
-                table,
-                &layout,
-                gold_lines,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            // 发电先于制造搜索：虚拟发电站计入 layout，金线 automation trio 才到 140。
             assign_power_stations(
                 blueprint,
                 &power_pool,
@@ -201,25 +182,24 @@ pub fn assign_shift(
                 &mut assignment,
                 &mut used,
             )?;
+            let trade_layout = resolve_base(
+                blueprint,
+                &assignment,
+                Some(instances),
+                Some(table),
+                options.mood,
+                Some(durin_plan),
+            )?
+            .layout_snapshot();
             assign_trade_remainder(
                 blueprint,
                 &trade_pool,
                 table,
-                &layout,
+                &trade_layout,
                 gold_lines,
                 options,
                 &mut assignment,
                 &mut used,
-            )?;
-            // 文档 §5.1：黑键可与但书/可露希尔同站（黑键感知效率是优质 docus 队友）。
-            // 仅当同站后两房合计贸易分提升时才合并，否则保留已验证的 docus 工具组合。
-            try_colocate_blackkey_with_meta(
-                blueprint,
-                instances,
-                table,
-                options,
-                Some(durin_plan),
-                &mut assignment,
             )?;
         }
         AssignShiftMode::Recovery => {
@@ -255,18 +235,12 @@ pub fn assign_shift(
         }
     }
 
-    Ok(assignment)
+    Ok(AssignShiftResult { assignment, plan })
 }
 
 /// 编制内所有上岗干员。
 pub fn assignment_operator_names(assignment: &BaseAssignment) -> HashSet<String> {
-    let mut names = HashSet::new();
-    for room in &assignment.rooms {
-        for op in &room.operators {
-            names.insert(op.name.clone());
-        }
-    }
-    names
+    assignment.operator_names()
 }
 
 /// 贸易 / 制造 / 发电岗位干员（跨班互斥池）。
@@ -469,6 +443,53 @@ fn commit_control_combo(
     Ok(())
 }
 
+/// 感知链 producer 落位（非编排 System）：黑键/迷迭香在盒时堆感知源，供 resolve + 贪心消费。
+fn assign_perception_producers(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    if !operbox.owns("黑键") || !operbox.owns("迷迭香") {
+        return Ok(());
+    }
+    if operbox.owns("夕") && !used.contains("夕") {
+        let control = assignment.control_operators();
+        if control.len() < 5 {
+            let elite = operbox.elite_of("夕").unwrap_or(0);
+            let mut ops = control;
+            ops.push(AssignedOperator::new("夕", elite));
+            used.insert("夕".into());
+            assignment.set_room(RoomId::from("control"), ops);
+        }
+    }
+    if operbox.elite_of("絮雨").unwrap_or(0) >= 2 && !used.contains("絮雨") {
+        for room in blueprint.rooms_of(FacilityKind::Office) {
+            if !assignment.operators_in(&room.id).is_empty() {
+                continue;
+            }
+            used.insert("絮雨".into());
+            assignment.set_room(room.id.clone(), vec![AssignedOperator::new("絮雨", 2)]);
+            break;
+        }
+    }
+    for name in ["爱丽丝", "车尔尼"] {
+        if operbox.elite_of(name).unwrap_or(0) < 2 || used.contains(name) {
+            continue;
+        }
+        let Some(room) = blueprint
+            .rooms_of(FacilityKind::Dormitory)
+            .into_iter()
+            .find(|r| assignment.operators_in(&r.id).is_empty())
+        else {
+            continue;
+        };
+        used.insert(name.into());
+        assignment.set_room(room.id.clone(), vec![AssignedOperator::new(name, 2)]);
+    }
+    Ok(())
+}
+
 fn assign_dorm_producers(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -515,241 +536,37 @@ fn best_dorm_producer(
     best.map(|(name, elite, _)| (name, elite))
 }
 
-fn assignment_has_operator(assignment: &BaseAssignment, name: &str) -> bool {
-    assignment.rooms.iter().any(|room| {
-        room.operators
-            .iter()
-            .any(|op| op.name == name)
-    })
+fn trade_hit_excludes_blackkey_witch_collide(hit: &TradeSearchHit) -> bool {
+    !hit.names.iter().any(|n| n == WITCH_TRADE_NAME) && !hit_witch_shortcut(hit)
 }
 
-fn next_empty_trade_room<'a>(
-    trade_rooms: &'a [&crate::layout::blueprint::RoomBlueprint],
+fn trade_hit_ok_for_greedy(hit: &TradeSearchHit) -> bool {
+    let has_blackkey = hit.names.iter().any(|n| n == BLACKKEY_NAME);
+    if !has_blackkey {
+        return true;
+    }
+    trade_hit_excludes_blackkey_witch_collide(hit)
+}
+
+/// 黑键贸站不得与巫恋同房（含巫恋 shortcut 三人组）。
+pub fn blackkey_witch_same_trade_room(
     assignment: &BaseAssignment,
-    from: usize,
-) -> Option<(usize, &'a crate::layout::blueprint::RoomBlueprint)> {
-    trade_rooms.iter().enumerate().skip(from).find_map(|(i, r)| {
-        if assignment.operators_in(&r.id).is_empty() {
-            Some((i, *r))
-        } else {
-            None
-        }
-    })
-}
-
-fn assign_trade_meta(
     blueprint: &BaseBlueprint,
-    pool: &TradePool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    gold_lines: u32,
-    options: &AssignBaseOptions,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    let trade_rooms: Vec<_> = blueprint
+) -> bool {
+    blueprint
         .rooms
         .iter()
         .filter(|r| r.kind == FacilityKind::TradePost)
-        .collect();
-    let mut cursor = 0;
-
-    // 243 等双贸布局：黑键已占一站时，剩余仅一站给 meta（但书 > 巫恋 > 可露希尔），
-    // 不可再尝试把巫恋/可露希尔各塞独立第三站——否则 complete_trade 会把巫恋补进黑键房。
-    let compact_meta = assignment_has_blackkey_trade_anchor(assignment, blueprint);
-
-    if !assignment_has_operator(assignment, "但书") {
-        if let Some((next, room)) = next_empty_trade_room(&trade_rooms, assignment, cursor) {
-            let hit = pick_docus_trade_hit(
-                pool,
-                table,
-                trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
-                layout,
-                used,
-                options.top_k,
-            )
-            .map_err(|e| Error::msg(format!("trade meta docus: {e}")))?;
-            commit_trade_room(assignment, &room.id, &hit, pool, used)?;
-            cursor = next + 1;
-            if compact_meta {
-                return Ok(());
-            }
-        }
-    }
-
-    for (label, hit_filter, anchor) in [
-        ("witch", hit_witch_shortcut as fn(&TradeSearchHit) -> bool, "巫恋"),
-        ("closure", hit_closure_shortcut, "可露希尔"),
-    ] {
-        if assignment_has_operator(assignment, anchor) {
-            continue;
-        }
-        let Some((next, room)) = next_empty_trade_room(&trade_rooms, assignment, cursor) else {
-            return Ok(());
-        };
-        let hit = pick_trade_hit(
-            pool,
-            table,
-            trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
-            SearchTripleFilter {
-                hit_filter: Some(hit_filter),
-                ..SearchTripleFilter::default()
-            },
-            used,
-            options.top_k,
-        )
-        .map_err(|e| Error::msg(format!("trade meta {label}: {e}")))?;
-        commit_trade_room(assignment, &room.id, &hit, pool, used)?;
-        cursor = next + 1;
-        if compact_meta {
-            return Ok(());
-        }
-    }
-    Ok(())
-}
-
-/// 补满已被 base_systems 钉了单人锚点（如黑键）的贸易站：must_include 锚点搜三人组，
-/// 队友取当前可用最优。锚点已在 `used`，仅新增队友计入 `used`。补不满则保留锚点单人。
-fn complete_trade_anchor_rooms(
-    blueprint: &BaseBlueprint,
-    pool: &TradePool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    gold_lines: u32,
-    options: &AssignBaseOptions,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    let trade_rooms: Vec<_> = blueprint
-        .rooms
-        .iter()
-        .filter(|r| r.kind == FacilityKind::TradePost)
-        .collect();
-    for room in trade_rooms {
-        let anchors = partial_room_anchors(assignment, &room.id);
-        let Some(anchors) = anchors else { continue };
-        let order = trade_order_from_room(room)?;
-
-        let mut used_wo = used.clone();
-        for a in &anchors {
-            used_wo.remove(a);
-        }
-        let sub = filter_trade_pool(pool, &used_wo);
-        if sub.entries.len() < 3 {
-            continue;
-        }
-        let mut opts = trade_room_options(layout, gold_lines, options, order);
-        opts.top_k = options.top_k;
-        let blackkey_anchor = anchors.iter().any(|a| a == BLACKKEY_NAME);
-        let filter = SearchTripleFilter {
-            must_include_name: Some(anchors[0].clone()),
-            hit_filter: if blackkey_anchor {
-                Some(trade_hit_excludes_blackkey_witch_collide)
-            } else {
-                None
-            },
-            ..SearchTripleFilter::default()
-        };
-        let Ok(report) = search_trade_triples_filtered(&sub, table, &opts, filter) else {
-            continue;
-        };
-        let Ok(hit) = pick_disjoint_from_report(
-            report.best,
-            report.top,
-            trade_hit_names,
-            &used_wo,
-            "no disjoint trade anchor triple",
-        ) else {
-            continue;
-        };
-        commit_anchor_room(
-            assignment,
-            &room.id,
-            trade_hit_names(&hit),
-            |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
-            used,
-            &anchors,
-            "trade anchor",
-        )?;
-    }
-    Ok(())
-}
-
-/// 补满已被 base_systems 钉了单人锚点（如迷迭香）的制造站：搜本配方最优三人组，
-/// 取首个包含全部锚点且队友可用的命中。锚点已在 `used`，仅新增队友计入 `used`。
-fn complete_manu_anchor_rooms(
-    blueprint: &BaseBlueprint,
-    pool: &ManuPool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    options: &AssignBaseOptions,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    for room in blueprint.rooms.iter().filter(|r| r.kind == FacilityKind::Factory) {
-        let Some(anchors) = partial_room_anchors(assignment, &room.id) else {
-            continue;
-        };
-        let recipe = match room.product.as_ref() {
-            Some(RoomProduct::Factory { recipe }) => *recipe,
-            _ => continue,
-        };
-
-        let mut used_wo = used.clone();
-        for a in &anchors {
-            used_wo.remove(a);
-        }
-        let sub = filter_manufacture_pool(pool, &used_wo);
-        if sub.entries.len() < 3 {
-            continue;
-        }
-        let mut opts = manu_options(layout, options, recipe);
-        opts.top_k = options.top_k.max(30);
-
-        if anchors.iter().any(|a| a == ROSEMARY_NAME) {
-            if try_commit_fixed_manu_team(
-                assignment,
-                &room.id,
-                &ROSEMARY_MANU_TEAM,
-                pool,
-                used,
-                &anchors,
-            )? {
-                continue;
-            }
-        }
-
-        let report = search_manufacture_triples(&sub, table, &opts)?;
-        let hit = std::iter::once(report.best.clone())
-            .chain(report.top.into_iter())
-            .find(|h| {
-                let names = manu_hit_names(h);
-                anchors.iter().all(|a| names.contains(a))
-                    && names_disjoint_except(names, &used_wo)
-                    && !manu_hit_forbidden_with_rosemary(names)
-            });
-        let Some(hit) = hit else { continue };
-        commit_anchor_room(
-            assignment,
-            &room.id,
-            manu_hit_names(&hit),
-            |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
-            used,
-            &anchors,
-            "manufacture anchor",
-        )?;
-    }
-    Ok(())
+        .any(|r| {
+            trade_room_has_operator(assignment, &r.id, BLACKKEY_NAME)
+                && trade_room_has_operator(assignment, &r.id, WITCH_TRADE_NAME)
+        })
 }
 
 const BLACKKEY_NAME: &str = "黑键";
-const CLOSURE_NAME: &str = "可露希尔";
 const WITCH_TRADE_NAME: &str = "巫恋";
-const ROSEMARY_NAME: &str = "迷迭香";
 /// 公孙 243 金线固定 trio（`ideal_e2_saria_qingliu_weedy_gold_140`）。
 const GONGSUN_GOLD_MANU_TEAM: [&str; 3] = ["清流", "温蒂", "森蚺"];
-/// 感知链制造锚点推荐队友（文档 §3.3；优于槐琥等 BR 纸面散件）。
-const ROSEMARY_MANU_TEAM: [&str; 3] = ["阿罗玛", "食铁兽", ROSEMARY_NAME];
 
 fn manu_recipe_fill_priority(recipe: RecipeKind) -> u8 {
     match recipe {
@@ -758,10 +575,6 @@ fn manu_recipe_fill_priority(recipe: RecipeKind) -> u8 {
         RecipeKind::Originium => 2,
         RecipeKind::All => 3,
     }
-}
-
-fn manu_hit_forbidden_with_rosemary(names: &[String]) -> bool {
-    names.contains(&"清流".to_string()) && names.contains(&"温蒂".to_string())
 }
 
 fn try_commit_fixed_manu_team(
@@ -827,172 +640,6 @@ fn trade_room_has_operator(assignment: &BaseAssignment, room_id: &RoomId, name: 
         .operators_in(room_id)
         .iter()
         .any(|o| o.name == name)
-}
-
-fn assignment_has_blackkey_trade_anchor(
-    assignment: &BaseAssignment,
-    blueprint: &BaseBlueprint,
-) -> bool {
-    blueprint
-        .rooms
-        .iter()
-        .filter(|r| r.kind == FacilityKind::TradePost)
-        .any(|r| trade_room_has_operator(assignment, &r.id, BLACKKEY_NAME))
-}
-
-fn trade_hit_excludes_blackkey_witch_collide(hit: &TradeSearchHit) -> bool {
-    !hit.names.iter().any(|n| n == WITCH_TRADE_NAME) && !hit_witch_shortcut(hit)
-}
-
-/// 文档 §5.1 / §8.4：黑键贸站不得与巫恋同房（含巫恋 shortcut 三人组）。
-pub fn blackkey_witch_same_trade_room(
-    assignment: &BaseAssignment,
-    blueprint: &BaseBlueprint,
-) -> bool {
-    blueprint
-        .rooms
-        .iter()
-        .filter(|r| r.kind == FacilityKind::TradePost)
-        .any(|r| {
-            trade_room_has_operator(assignment, &r.id, BLACKKEY_NAME)
-                && trade_room_has_operator(assignment, &r.id, WITCH_TRADE_NAME)
-        })
-}
-
-/// 文档 §5.1：尝试把黑键并入但书（或可露希尔）所在贸易站，组成「meta + 黑键 + 高效散件」。
-/// 仅当并站后这两间贸易房合计 `effective_eff_multiplier` 严格提升时才采用——否则保留
-/// 已验证的 docus 工具组合（黑键留在自己的贸易站）。`used` 不变（同 6 人重排两房）。
-fn try_colocate_blackkey_with_meta(
-    blueprint: &BaseBlueprint,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    durin_plan: Option<u8>,
-    assignment: &mut BaseAssignment,
-) -> Result<()> {
-    let trade_ids: Vec<RoomId> = blueprint
-        .rooms
-        .iter()
-        .filter(|r| r.kind == FacilityKind::TradePost)
-        .map(|r| r.id.clone())
-        .collect();
-
-    let room_full_with = |name: &str| -> Option<RoomId> {
-        trade_ids.iter().find_map(|id| {
-            let ops = assignment.operators_in(id);
-            (ops.len() == 3 && ops.iter().any(|o| o.name == name)).then(|| id.clone())
-        })
-    };
-
-    let Some(bk_id) = room_full_with(BLACKKEY_NAME) else {
-        return Ok(());
-    };
-    // meta 优先但书，其次可露希尔；不能是黑键自己那间，也不能是巫恋站。
-    let meta = [DOCUS_TRADE_NAME, CLOSURE_NAME].into_iter().find_map(|lead| {
-        room_full_with(lead).filter(|id| {
-            *id != bk_id && !trade_room_has_operator(assignment, id, WITCH_TRADE_NAME)
-        }).map(|id| (lead, id))
-    });
-    let Some((lead, meta_id)) = meta else {
-        return Ok(());
-    };
-
-    let base = score_trade_rooms(
-        blueprint, assignment, instances, table, options, durin_plan, &[&bk_id, &meta_id],
-    )?;
-
-    // 六人池：两房当前干员。候选 = {lead, 黑键, 第三人} 占 meta 房（机制位），其余三人占另一房。
-    let mut six: Vec<AssignedOperator> = assignment.operators_in(&bk_id).to_vec();
-    six.extend(assignment.operators_in(&meta_id).iter().cloned());
-    let lead_op = six.iter().find(|o| o.name == lead).cloned();
-    let bk_op = six.iter().find(|o| o.name == BLACKKEY_NAME).cloned();
-    let (Some(lead_op), Some(bk_op)) = (lead_op, bk_op) else {
-        return Ok(());
-    };
-
-    let mut best: Option<(f64, BaseAssignment)> = None;
-    for third in &six {
-        if third.name == lead || third.name == BLACKKEY_NAME {
-            continue;
-        }
-        let meta_ops = vec![lead_op.clone(), bk_op.clone(), third.clone()];
-        let other_ops: Vec<AssignedOperator> = six
-            .iter()
-            .filter(|o| o.name != lead && o.name != BLACKKEY_NAME && o.name != third.name)
-            .cloned()
-            .collect();
-        if other_ops.len() != 2 && other_ops.len() != 3 {
-            continue;
-        }
-        let mut cand = assignment.clone();
-        cand.set_room(meta_id.clone(), meta_ops);
-        cand.set_room(bk_id.clone(), other_ops);
-        // 同站机制互斥（如 docus+可露希尔）会让 solve 报错 → 跳过该候选。
-        let Ok(score) = score_trade_rooms(
-            blueprint, &cand, instances, table, options, durin_plan, &[&bk_id, &meta_id],
-        ) else {
-            continue;
-        };
-        if best.as_ref().is_none_or(|(b, _)| score > *b) {
-            best = Some((score, cand));
-        }
-    }
-
-    if let Some((score, cand)) = best {
-        if score > base + 1e-6 {
-            *assignment = cand;
-        }
-    }
-    Ok(())
-}
-
-/// 解析编制后，对指定贸易房求 `effective_eff_multiplier` 之和（满心情、按 shift_hours）。
-/// 任一房 solve 失败（含同房机制互斥）→ 整体返回 Err，供候选筛除。
-fn score_trade_rooms(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    durin_plan: Option<u8>,
-    room_ids: &[&RoomId],
-) -> Result<f64> {
-    let resolved = resolve_base(
-        blueprint,
-        assignment,
-        Some(instances),
-        Some(table),
-        options.mood,
-        durin_plan,
-    )?;
-    let mut total = 0.0;
-    for room in &resolved.trade_rooms {
-        if room.operators.is_empty() || !room_ids.iter().any(|id| **id == room.id) {
-            continue;
-        }
-        let input = TradeRoomInput {
-            level: room.level,
-            operators: room.operators.clone(),
-            order_count: None,
-            mood: options.mood,
-            gold_production_lines: Some(resolved.gold_manu_line_count()),
-            durin_virtual_lines: None,
-            human_fireworks: None,
-            layout: Arc::new(room.layout.clone()),
-            active_order_kind: room.order,
-        };
-        total += solve_trade_with_shift(&input, table, options.shift_hours)?.effective_eff_multiplier;
-    }
-    Ok(total)
-}
-
-/// 房内已有 1-2 人（base_systems 单人锚点）时返回其名单；空房 / 已满（≥3）返回 None。
-fn partial_room_anchors(assignment: &BaseAssignment, room_id: &RoomId) -> Option<Vec<String>> {
-    let ops = assignment.operators_in(room_id);
-    if ops.is_empty() || ops.len() >= 3 {
-        return None;
-    }
-    Some(ops.iter().map(|o| o.name.clone()).collect())
 }
 
 /// `names` 中非锚点成员均不在 `used_wo`（锚点已从 `used_wo` 剔除，天然通过）。
@@ -1116,7 +763,10 @@ fn assign_trade_remainder(
             pool,
             table,
             trade_room_options(layout, gold_lines, options, order),
-            SearchTripleFilter::default(),
+            SearchTripleFilter {
+                hit_filter: Some(trade_hit_ok_for_greedy),
+                ..SearchTripleFilter::default()
+            },
             used,
             options.top_k,
         )
@@ -1185,6 +835,52 @@ pub fn assign_team_producer_rooms(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    assign_team_trade_meta_rooms(
+        blueprint, trade_pool, table, layout, options, trade_rooms, assignment, used,
+    )?;
+    assign_team_manu_rooms(
+        blueprint, manu_pool, table, layout, options, manu_rooms, assignment, used,
+    )
+}
+
+/// γ 替补半区：贸易 plain 贪心（与 peak `assign_trade_remainder` 同路径），制造/发电仍站绑定搜索。
+#[allow(clippy::too_many_arguments)]
+pub fn assign_team_gamma_half(
+    blueprint: &BaseBlueprint,
+    trade_pool: &TradePool,
+    manu_pool: &ManuPool,
+    power_pool: &PowerPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    trade_rooms: &[RoomId],
+    manu_rooms: &[RoomId],
+    power_rooms: &[RoomId],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    assign_team_trade_plain_rooms(
+        blueprint, trade_pool, table, layout, options, trade_rooms, assignment, used,
+    )?;
+    assign_team_manu_rooms(
+        blueprint, manu_pool, table, layout, options, manu_rooms, assignment, used,
+    )?;
+    assign_power_rooms(
+        blueprint, power_pool, table, layout, options, power_rooms, assignment, used,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assign_team_trade_meta_rooms(
+    blueprint: &BaseBlueprint,
+    trade_pool: &TradePool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    trade_rooms: &[RoomId],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
     let gold_lines = blueprint.gold_manu_line_count();
     for room_id in trade_rooms {
         if !assignment.operators_in(room_id).is_empty() {
@@ -1194,9 +890,6 @@ pub fn assign_team_producer_rooms(
             .room(room_id)
             .ok_or_else(|| Error::msg(format!("team trade room {} not in blueprint", room_id.0)))?;
         let order = trade_order_from_room(room)?;
-        // 但书（docus）效率最高（≈纸面工具效率×1.55），必须最优先进站：
-        // 搜索按 effective_eff_multiplier 排序时 docus 不一定自动浮顶，故显式置顶。
-        // 因 αβγ 顺序填充且共享 `used`，但书会落到最先填充的峰值队（最长班 + 最佳队友）。
         let hit = pick_trade_meta_then_plain(
             trade_pool,
             table,
@@ -1209,6 +902,58 @@ pub fn assign_team_producer_rooms(
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room_id.0)))?;
         commit_trade_room(assignment, room_id, &hit, trade_pool, used)?;
     }
+    Ok(())
+}
+
+/// peak / γ 余站贸易：plain C(n,3)，不走 meta/但书置顶（编排已认领的 meta 由 α/β 切半保留）。
+#[allow(clippy::too_many_arguments)]
+fn assign_team_trade_plain_rooms(
+    blueprint: &BaseBlueprint,
+    trade_pool: &TradePool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    trade_rooms: &[RoomId],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    let gold_lines = blueprint.gold_manu_line_count();
+    for room_id in trade_rooms {
+        if !assignment.operators_in(room_id).is_empty() {
+            continue;
+        }
+        let room = blueprint
+            .room(room_id)
+            .ok_or_else(|| Error::msg(format!("team trade room {} not in blueprint", room_id.0)))?;
+        let order = trade_order_from_room(room)?;
+        let hit = pick_trade_hit(
+            trade_pool,
+            table,
+            trade_room_options(layout, gold_lines, options, order),
+            SearchTripleFilter {
+                hit_filter: Some(trade_hit_ok_for_greedy),
+                ..SearchTripleFilter::default()
+            },
+            used,
+            options.top_k,
+        )
+        .map_err(|e| Error::msg(format!("team trade plain {}: {e}", room_id.0)))?;
+        commit_trade_room(assignment, room_id, &hit, trade_pool, used)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assign_team_manu_rooms(
+    blueprint: &BaseBlueprint,
+    manu_pool: &ManuPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    manu_rooms: &[RoomId],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
     for room_id in manu_rooms {
         if !assignment.operators_in(room_id).is_empty() {
             continue;
@@ -1621,76 +1366,16 @@ mod tests {
             },
         )
         .unwrap();
-        // 迷迭香链「定位不定队友」：黑键定贸易站、迷迭香定制造站，各自补满三人。
-        let blackkey_room = assignment.rooms.iter().find(|r| {
-            blueprint
-                .rooms
-                .iter()
-                .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
-                && r.operators.iter().any(|o| o.name == "黑键")
-        });
-        let blackkey_room = blackkey_room.expect("黑键应定位某贸易站");
-        assert_eq!(blackkey_room.operators.len(), 3, "黑键站应补满三人: {:?}", blackkey_room.operators);
-
-        let rosemary_room = assignment.rooms.iter().find(|r| {
-            blueprint
-                .rooms
-                .iter()
-                .any(|b| b.id == r.room_id && b.kind == FacilityKind::Factory)
-                && r.operators.iter().any(|o| o.name == "迷迭香")
-        });
-        let rosemary_room = rosemary_room.expect("迷迭香应定位某制造站");
-        assert_eq!(rosemary_room.operators.len(), 3, "迷迭香站应补满三人: {:?}", rosemary_room.operators);
-
-        // 但书必在岗；§5.1 评分门控可能把黑键并入但书站（替换工具人），故只校验
-        // 「但书三人组完整」或「但书+黑键同站」二者其一，且黑键在某满员贸易站。
-        let blackkey_in_full_trade = blackkey_room.operators.len() == 3;
-        assert!(blackkey_in_full_trade, "黑键应在满员贸易站: {:?}", blackkey_room.operators);
-        assert!(
-            !blackkey_witch_same_trade_room(&assignment, &blueprint),
-            "黑键不得与巫恋同站: {:?}",
-            blackkey_room.operators
-        );
-        let docus_intact = assignment.rooms.iter().any(|r| {
+        // 但书链 meta（registry）；迷迭香/黑键感知链不在编排层进编（Phase 4 global effect）。
+        let docus_room = assignment.rooms.iter().find(|r| {
             r.operators.iter().any(|o| o.name == "但书")
                 && r.operators.iter().any(|o| o.name == "伺夜")
                 && r.operators.iter().any(|o| o.name == "贝洛内")
         });
-        let docus_blackkey_colocated = assignment.rooms.iter().any(|r| {
-            r.operators.iter().any(|o| o.name == "但书")
-                && r.operators.iter().any(|o| o.name == "黑键")
-        });
-        assert!(
-            docus_intact || docus_blackkey_colocated,
-            "但书应保持工具三人组，或按 §5.1 与黑键同站"
-        );
+        assert!(docus_room.is_some(), "但书三人组应独占一站");
 
-        // 感知 producer（爱丽丝/车尔尼宿舍、絮雨办公室）作为可选 slot 进驻。
-        let dorm_producers: HashSet<_> = blueprint
-            .rooms
-            .iter()
-            .filter(|b| b.kind == FacilityKind::Dormitory)
-            .flat_map(|b| assignment.operators_in(&b.id))
-            .map(|o| o.name.clone())
-            .collect();
-        assert!(
-            dorm_producers.contains("爱丽丝") && dorm_producers.contains("车尔尼"),
-            "爱丽丝/车尔尼应作为感知 producer 进驻宿舍: {:?}",
-            dorm_producers
-        );
-        if operbox.owns("絮雨") {
-            let office: HashSet<_> = blueprint
-                .rooms
-                .iter()
-                .filter(|b| b.kind == FacilityKind::Office)
-                .flat_map(|b| assignment.operators_in(&b.id))
-                .map(|o| o.name.clone())
-                .collect();
-            assert!(office.contains("絮雨"), "絮雨应作为办公室感知 producer 进驻: {:?}", office);
-        }
         let control_ops = assignment.control_operators();
         let control: HashSet<_> = control_ops.iter().map(|o| o.name.as_str()).collect();
-        assert!(control.contains("夕"), "control: {:?}", control);
         assert!(control.contains("八幡海铃"), "control: {:?}", control);
         assert!(control.contains("斩业星熊") && control.contains("诗怀雅"), "control: {:?}", control);
         assert!(
@@ -1856,20 +1541,6 @@ mod tests {
                     .iter()
                     .any(|b| b.id == r.room_id && b.kind == FacilityKind::Factory)
             }).collect::<Vec<_>>()
-        );
-
-        let rosemary_ops: HashSet<_> = ROSEMARY_MANU_TEAM.iter().map(|s| *s).collect();
-        let rosemary_room = peak.rooms.iter().find(|r| {
-            r.operators.iter().any(|o| o.name == ROSEMARY_NAME)
-                && rosemary_ops.iter().all(|n| r.operators.iter().any(|o| o.name == *n))
-        });
-        assert!(
-            rosemary_room.is_some(),
-            "迷迭香站应为阿罗玛+食铁兽+迷迭香，got {:?}",
-            peak
-                .rooms
-                .iter()
-                .find(|r| r.operators.iter().any(|o| o.name == ROSEMARY_NAME))
         );
 
         let br_winter = room_ops("manu_2");

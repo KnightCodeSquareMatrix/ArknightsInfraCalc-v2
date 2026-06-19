@@ -135,6 +135,11 @@ fn shortcut_hit_filter(shortcut_id: &str) -> Option<fn(&TradeSearchHit) -> bool>
     match shortcut_id {
         "gsl_docus_solo" => Some(hit_docus_solo_shortcut),
         "gsl_docus_syracusa" => Some(hit_docus_syracusa_shortcut),
+        "gsl_vina_lungmen" => Some(|hit| hit_shortcut_id(hit, "gsl_vina_lungmen")),
+        "gsl_penguin_texlap_e0" => Some(|hit| hit_shortcut_id(hit, "gsl_penguin_texlap_e0")),
+        "gsl_penguin_texangel_e2" => Some(|hit| hit_shortcut_id(hit, "gsl_penguin_texangel_e2")),
+        "gsl_penguin_exusiai_lemuen" => Some(|hit| hit_shortcut_id(hit, "gsl_penguin_exusiai_lemuen")),
+        "gsl_blackkey_closure" => Some(|hit| hit_shortcut_id(hit, "gsl_blackkey_closure")),
         _ => None,
     }
 }

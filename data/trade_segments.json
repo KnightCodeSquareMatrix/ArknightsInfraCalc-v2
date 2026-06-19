@@ -19,6 +19,43 @@
         "karlan_precision": true
       },
       "consumer": "ling_jie"
+    },
+    {
+      "id": "blackkey_closure",
+      "shortcut_id": "gsl_blackkey_closure",
+      "priority": 19,
+      "producer": {},
+      "consumer": "blackkey_closure"
+    },
+    {
+      "id": "penguin_exusiai_lemuen",
+      "shortcut_id": "gsl_penguin_exusiai_lemuen",
+      "priority": 17,
+      "producer": {},
+      "consumer": "penguin_exusiai_lemuen"
+    },
+    {
+      "id": "vina_lungmen",
+      "shortcut_id": "gsl_vina_lungmen",
+      "priority": 16,
+      "producer": {
+        "daifeen_e2_in_control": true
+      },
+      "consumer": "vina_lungmen"
+    },
+    {
+      "id": "penguin_texangel_e2",
+      "shortcut_id": "gsl_penguin_texangel_e2",
+      "priority": 14,
+      "producer": {},
+      "consumer": "penguin_texangel_e2"
+    },
+    {
+      "id": "penguin_texlap_e0",
+      "shortcut_id": "gsl_penguin_texlap_e0",
+      "priority": 13,
+      "producer": {},
+      "consumer": "penguin_texlap_e0"
     }
   ],
   "roles": [
@@ -33,6 +70,19 @@
         {
           "kind": "shortcut",
           "shortcut_id": "gsl_docus_solo"
+        },
+        {
+          "kind": "unfiltered"
+        }
+      ]
+    },
+    {
+      "id": "meta_vina",
+      "pick_steps": [
+        {
+          "kind": "segment",
+          "segment_id": "vina_lungmen",
+          "only_if_producer": true
         },
         {
           "kind": "unfiltered"

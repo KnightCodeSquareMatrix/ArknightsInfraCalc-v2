@@ -33,62 +33,6 @@
   ],
   "systems": [
     {
-      "id": "rosemary_perception",
-      "label": "迷迭香感知链·全链(档1-2)：黑键定贸+迷迭香定制(队友贪心)+夕中枢+絮雨办公室+爱丽丝车尔尼宿舍；高于但书组",
-      "priority": 21,
-      "shift_modes": ["peak"],
-      "slots": [
-        {
-          "facility": "trade_post",
-          "operators": [{ "name": "黑键", "elite": 2 }]
-        },
-        {
-          "facility": "factory",
-          "operators": [{ "name": "迷迭香", "elite": 2 }]
-        },
-        {
-          "facility": "control",
-          "operators": [{ "name": "夕", "elite": 0 }]
-        },
-        {
-          "facility": "office",
-          "optional": true,
-          "operators": [{ "name": "絮雨", "elite": 2 }]
-        },
-        {
-          "facility": "dormitory",
-          "optional": true,
-          "operators": [{ "name": "爱丽丝", "elite": 2 }]
-        },
-        {
-          "facility": "dormitory",
-          "optional": true,
-          "operators": [{ "name": "车尔尼", "elite": 2 }]
-        }
-      ]
-    },
-    {
-      "id": "rosemary_perception_core",
-      "label": "迷迭香感知链·三核心(档3)：仅黑键+迷迭香+絮雨，无夕；降级至但书组之下",
-      "priority": 15,
-      "shift_modes": ["peak"],
-      "slots": [
-        {
-          "facility": "trade_post",
-          "operators": [{ "name": "黑键", "elite": 2 }]
-        },
-        {
-          "facility": "factory",
-          "operators": [{ "name": "迷迭香", "elite": 2 }]
-        },
-        {
-          "facility": "office",
-          "optional": true,
-          "operators": [{ "name": "絮雨", "elite": 2 }]
-        }
-      ]
-    },
-    {
       "id": "docus_syracusa",
       "label": "叙拉古组：但书+伺夜+贝洛内（中枢八幡海铃E2，工具45+45）",
       "priority": 20,
@@ -139,14 +83,13 @@
     },
     {
       "id": "witch_long_beta",
-      "label": "巫恋组：巫恋Ⅱ+龙舌兰Ⅱ+裁缝β（138%贸+46%金）",
+      "label": "巫恋组（定稿）：巫恋Ⅱ+龙舌兰Ⅱ+裁缝β第三人；不进 meta_chain，与但书链双贸共存",
       "priority": 16,
       "shortcut_id": "gsl_witch_long_beta",
       "shift_modes": ["peak"],
       "slots": [
         {
           "facility": "trade_post",
-          "trade_role": "meta_witch",
           "operators": [
             { "name": "巫恋", "elite": 2 },
             { "name": "龙舌兰", "elite": 2 },
@@ -199,9 +142,94 @@
       ]
     },
     {
+      "id": "pinus_sylvestris",
+      "label": "红松林（公孙）：焰尾+薇薇安娜中枢；manu_1 经验三线；manu_4 砾赤金",
+      "priority": 19,
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "control",
+          "operators": [
+            { "name": "焰尾", "elite": 2 },
+            { "name": "薇薇安娜", "elite": 2 }
+          ]
+        },
+        {
+          "facility": "factory",
+          "room_id": "manu_1",
+          "operators": [
+            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
+            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
+            { "pick_one": ["灰毫", "远牙", "野鬃", "食铁兽", "断罪者"], "elite": 2 }
+          ]
+        },
+        {
+          "facility": "factory",
+          "room_id": "manu_4",
+          "operators": [
+            { "name": "砾", "elite": 2 },
+            { "pick_one": ["迷迭香", "阿罗玛"], "elite": 2 },
+            { "pick_one": ["阿罗玛", "断罪者", "槐琥"], "elite": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "penguin_exusiai_lemuen",
+      "label": "企鹅物流：能天使+蕾缪安E2相伴+第三人",
+      "priority": 15,
+      "exclusive_group": "penguin_meta",
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "trade_post",
+          "operators": [
+            { "name": "能天使", "elite": 0 },
+            { "name": "蕾缪安", "elite": 2 },
+            { "pick_one": ["空", "流星", "芬"], "elite": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "penguin_texangel_e2",
+      "label": "企鹅物流：德E2默契+能天使+第三人",
+      "priority": 14,
+      "exclusive_group": "penguin_meta",
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "trade_post",
+          "operators": [
+            { "name": "德克萨斯", "elite": 2 },
+            { "name": "能天使", "elite": 0 },
+            { "pick_one": ["空", "流星", "芬"], "elite": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "penguin_texlap_e0",
+      "label": "企鹅物流：德E0恩怨+拉普兰德+第三人",
+      "priority": 13,
+      "exclusive_group": "penguin_meta",
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "trade_post",
+          "operators": [
+            { "name": "德克萨斯", "elite": 0, "max_elite": 1 },
+            { "name": "拉普兰德", "elite": 0 },
+            { "pick_one": ["空", "流星", "芬"], "elite": 0 }
+          ]
+        }
+      ]
+    },
+    {
       "id": "vina_lungmen",
       "label": "推王组：戴菲恩+推进之王+摩根+维娜·维多利亚（95%贸，但书替补）",
       "priority": 12,
+      "segment_id": "vina_lungmen",
       "exclusive_group": "meta_chain",
       "shift_modes": ["peak"],
       "slots": [

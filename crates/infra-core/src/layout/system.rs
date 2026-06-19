@@ -17,6 +17,22 @@ use crate::skill_table::{data_path, SkillTable};
 
 use crate::layout::shift::AssignShiftMode;
 
+/// 单个 registry slot 的已解析落位（`select_registry_systems` 产出）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RegistrySlotClaim {
+    pub room_id: RoomId,
+    pub facility: FacilityKind,
+    pub operators: Vec<AssignedOperator>,
+}
+
+/// `base_systems.json` 中已选体系的完整落位计划。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RegistrySystemClaim {
+    pub system_id: String,
+    pub priority: i32,
+    pub slots: Vec<RegistrySlotClaim>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct BaseSystemsFile {
     #[serde(default)]
@@ -79,6 +95,9 @@ pub struct SystemOperatorFixed {
     pub name: String,
     #[serde(default)]
     pub elite: u8,
+    /// 德克萨斯 E0/E2 企鹅物流分叉：精英上限（含）。
+    #[serde(default)]
+    pub max_elite: Option<u8>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,7 +179,9 @@ fn resolve_pick_one(
         if used.contains(name) {
             continue;
         }
-        let elite = operbox.elite_of(name)?;
+        let Some(elite) = operbox.elite_of(name) else {
+            continue;
+        };
         if elite >= pick.elite {
             return Some(ResolvedOperator {
                 name: name.clone(),
@@ -177,20 +198,27 @@ fn resolve_slot_operators(
     used: &HashSet<String>,
 ) -> Option<Vec<ResolvedOperator>> {
     let mut resolved = Vec::with_capacity(slot.operators.len());
+    let mut slot_used: HashSet<String> = used.clone();
     for spec in &slot.operators {
         match spec {
             SystemOperatorSpec::Fixed(fixed) => {
                 let elite = operbox.elite_of(&fixed.name)?;
-                if elite < fixed.elite || used.contains(&fixed.name) {
+                if elite < fixed.elite || slot_used.contains(&fixed.name) {
                     return None;
                 }
+                if fixed.max_elite.is_some_and(|max| elite > max) {
+                    return None;
+                }
+                slot_used.insert(fixed.name.clone());
                 resolved.push(ResolvedOperator {
                     name: fixed.name.clone(),
                     elite,
                 });
             }
             SystemOperatorSpec::PickOne(pick) => {
-                resolved.push(resolve_pick_one(operbox, pick, used)?);
+                let op = resolve_pick_one(operbox, pick, &slot_used)?;
+                slot_used.insert(op.name.clone());
+                resolved.push(op);
             }
         }
     }
@@ -222,22 +250,28 @@ fn resolve_slot_room<'a>(
     })
 }
 
-/// 按 `priority` 认领可行成套方案；写入 `assignment` 与 `used`。
-pub fn claim_base_systems(
+/// 按 `priority` 贪心选型：返回将认领的 registry 体系（不调 solve）。
+pub fn select_registry_systems(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
-    _table: &SkillTable,
     mode: AssignShiftMode,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    skip_system_ids: &HashSet<String>,
+) -> Vec<RegistrySystemClaim> {
     let Some(cache) = base_systems_cache() else {
-        return Ok(());
+        return Vec::new();
     };
 
+    let mut scratch = assignment.clone();
+    let mut scratch_used = used.clone();
     let mut claimed_groups: HashSet<String> = HashSet::new();
+    let mut selected = Vec::new();
 
     for system in systems_by_priority(cache) {
+        if skip_system_ids.contains(&system.id) {
+            continue;
+        }
         if !mode_allowed(system, mode) {
             continue;
         }
@@ -246,15 +280,148 @@ pub fn claim_base_systems(
                 continue;
             }
         }
-        if !system_feasible(blueprint, operbox, assignment, used, system) {
+        let Some(claim) = plan_registry_system(blueprint, operbox, &scratch, &scratch_used, system)
+        else {
             continue;
-        }
-        claim_system(blueprint, operbox, assignment, used, system)?;
+        };
+        apply_registry_claim_to_assignment(&claim, &mut scratch, &mut scratch_used);
+        selected.push(claim);
         if let Some(group) = system.exclusive_group.clone() {
             claimed_groups.insert(group);
         }
     }
+    selected
+}
+
+/// 将 `RegistrySystemClaim` 写入编制。
+pub fn apply_registry_system_claim(
+    claim: &RegistrySystemClaim,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    for slot in &claim.slots {
+        let ops: Vec<AssignedOperator> = slot
+            .operators
+            .iter()
+            .map(|op| {
+                if !used.insert(op.name.clone()) {
+                    return Err(Error::msg(format!(
+                        "system {} duplicate {}",
+                        claim.system_id, op.name
+                    )));
+                }
+                Ok(AssignedOperator::new(&op.name, op.elite))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        if slot.facility == FacilityKind::ControlCenter {
+            let mut existing = assignment.control_operators();
+            existing.extend(ops);
+            assignment.set_room(RoomId::from("control"), existing);
+        } else {
+            assignment.set_room(slot.room_id.clone(), ops);
+        }
+    }
     Ok(())
+}
+
+/// 按 `priority` 认领可行成套方案；写入 `assignment` 与 `used`。
+/// `skip_system_ids`：已由 `system_integrity` 等路径处理的体系 id（如迷迭香链）。
+pub fn claim_base_systems(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    _table: &SkillTable,
+    mode: AssignShiftMode,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+    skip_system_ids: &HashSet<String>,
+) -> Result<()> {
+    let selected = select_registry_systems(
+        blueprint,
+        operbox,
+        mode,
+        assignment,
+        used,
+        skip_system_ids,
+    );
+    for claim in selected {
+        apply_registry_system_claim(&claim, assignment, used)?;
+    }
+    Ok(())
+}
+
+fn plan_registry_system(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    system: &BaseSystemDef,
+) -> Option<RegistrySystemClaim> {
+    if !system_feasible(blueprint, operbox, assignment, used, system) {
+        return None;
+    }
+    let mut scratch = assignment.clone();
+    let mut scratch_used = used.clone();
+    let mut slots = Vec::new();
+    for slot_def in &system.slots {
+        if slot_def.optional
+            && !slot_resolvable(blueprint, operbox, &scratch, &scratch_used, slot_def)
+        {
+            continue;
+        }
+        let room = resolve_slot_room(blueprint, &scratch, slot_def)?;
+        let resolved = resolve_slot_operators(operbox, slot_def, &scratch_used)?;
+        let facility = facility_kind(&slot_def.facility)?;
+        let room_id = if slot_def.facility == "control" {
+            RoomId::from("control")
+        } else {
+            room.id.clone()
+        };
+        let operators: Vec<AssignedOperator> = resolved
+            .iter()
+            .map(|op| AssignedOperator::new(&op.name, op.elite))
+            .collect();
+        slots.push(RegistrySlotClaim {
+            room_id: room_id.clone(),
+            facility,
+            operators: operators.clone(),
+        });
+        // 同房多 slot（如三间发电站）须顺序占用房间，与 `claim_system` 一致。
+        for op in &operators {
+            scratch_used.insert(op.name.clone());
+        }
+        if facility == FacilityKind::ControlCenter {
+            let mut existing = scratch.control_operators();
+            existing.extend(operators);
+            scratch.set_room(RoomId::from("control"), existing);
+        } else {
+            scratch.set_room(room_id, operators);
+        }
+    }
+    Some(RegistrySystemClaim {
+        system_id: system.id.clone(),
+        priority: system.priority,
+        slots,
+    })
+}
+
+fn apply_registry_claim_to_assignment(
+    claim: &RegistrySystemClaim,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) {
+    for slot in &claim.slots {
+        for op in &slot.operators {
+            used.insert(op.name.clone());
+        }
+        if slot.facility == FacilityKind::ControlCenter {
+            let mut existing = assignment.control_operators();
+            existing.extend(slot.operators.clone());
+            assignment.set_room(RoomId::from("control"), existing);
+        } else {
+            assignment.set_room(slot.room_id.clone(), slot.operators.clone());
+        }
+    }
 }
 
 /// slot 能否在当前蓝图 / operbox / used 下落位（房 + 干员均可解）。
@@ -299,46 +466,6 @@ fn system_feasible(
         .all(|slot| slot_resolvable(blueprint, operbox, assignment, used, slot))
 }
 
-fn claim_system(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-    system: &BaseSystemDef,
-) -> Result<()> {
-    for slot in &system.slots {
-        // 可选 slot 无法落位（缺设施 / 缺干员 / 中枢满员）时静默裁剪，不影响核心链。
-        if slot.optional && !slot_resolvable(blueprint, operbox, assignment, used, slot) {
-            continue;
-        }
-        let room = resolve_slot_room(blueprint, assignment, slot)
-            .ok_or_else(|| Error::msg(format!("system {} slot room vanished", system.id)))?;
-        let resolved = resolve_slot_operators(operbox, slot, used)
-            .ok_or_else(|| Error::msg(format!("system {} slot operators vanished", system.id)))?;
-        let ops: Vec<AssignedOperator> = resolved
-            .iter()
-            .map(|op| {
-                if !used.insert(op.name.clone()) {
-                    return Err(Error::msg(format!(
-                        "system {} duplicate {}",
-                        system.id, op.name
-                    )));
-                }
-                Ok(AssignedOperator::new(&op.name, op.elite))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        if slot.facility == "control" {
-            let mut existing: Vec<AssignedOperator> = assignment.control_operators();
-            existing.extend(ops);
-            assignment.set_room(RoomId::from("control"), existing);
-        } else {
-            assignment.set_room(room.id.clone(), ops);
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,13 +479,36 @@ mod tests {
         OperBox::load(&path).unwrap()
     }
 
+    fn operbox_without_names(base: &OperBox, exclude: &[&str]) -> OperBox {
+        let exclude: HashSet<_> = exclude.iter().copied().collect();
+        let entries: Vec<_> = base
+            .entries
+            .iter()
+            .filter(|e| !exclude.contains(e.name.as_str()))
+            .cloned()
+            .collect();
+        OperBox::from_entries(entries)
+    }
+
+    fn pinus_claimed(assignment: &BaseAssignment) -> bool {
+        assignment
+            .control_operators()
+            .iter()
+            .any(|o| o.name == "焰尾")
+            && assignment
+                .control_operators()
+                .iter()
+                .any(|o| o.name == "薇薇安娜")
+    }
+
     #[test]
     fn base_systems_registry_loads_curated_groups() {
         let cache = base_systems_cache().expect("base_systems loaded");
         let ids: HashSet<_> = cache.systems.iter().map(|s| s.id.as_str()).collect();
         assert!(ids.contains("docus_syracusa"));
-        assert!(ids.contains("rosemary_perception"));
+        assert!(!ids.contains("rosemary_perception"));
         assert!(ids.contains("witch_long_beta"));
+        assert!(ids.contains("pinus_sylvestris"));
         assert!(ids.contains("lungmen_manu_pair"));
         assert!(ids.contains("gongsun_greyy2_power_line"));
     }
@@ -380,6 +530,7 @@ mod tests {
             AssignShiftMode::Peak,
             &mut assignment,
             &mut used,
+            &HashSet::new(),
         )
         .unwrap();
 
@@ -389,32 +540,11 @@ mod tests {
             .map(|o| o.name)
             .collect();
         assert!(control.contains("八幡海铃"));
-        assert!(control.contains("夕"));
         assert!(
             control.contains("斩业星熊") && control.contains("诗怀雅"),
             "龙门制造中枢应与叙拉古中枢同室认领: {:?}",
             control
         );
-
-        // 迷迭香链改为「定位不定队友」：claim 只钉单人锚点（黑键贸易 / 迷迭香制造），
-        // 队友由 assign 阶段贪心补满，这里只校验锚点定站。
-        let trade_anchored = assignment.rooms.iter().any(|r| {
-            blueprint
-                .rooms
-                .iter()
-                .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
-                && r.operators.iter().any(|o| o.name == "黑键")
-        });
-        assert!(trade_anchored, "黑键应定位到某贸易站");
-
-        let manu_anchored = assignment.rooms.iter().any(|r| {
-            blueprint
-                .rooms
-                .iter()
-                .any(|b| b.id == r.room_id && b.kind == FacilityKind::Factory)
-                && r.operators.iter().any(|o| o.name == "迷迭香")
-        });
-        assert!(manu_anchored, "迷迭香应定位到某制造站");
 
         let docus_room = assignment.rooms.iter().any(|r| {
             r.operators.iter().any(|o| o.name == "但书")
@@ -439,16 +569,186 @@ mod tests {
             AssignShiftMode::Peak,
             &mut assignment,
             &mut used,
+            &HashSet::new(),
         )
         .unwrap();
 
         assert!(!used.contains("灵知"));
-        let trade_2: HashSet<_> = assignment
-            .operators_in(&RoomId::from("trade_2"))
+        let has_docus_trade = assignment.rooms.iter().any(|r| {
+            blueprint
+                .rooms
+                .iter()
+                .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
+                && r.operators.iter().any(|o| o.name == "但书")
+        });
+        assert!(has_docus_trade, "但书链应认领某一贸易站");
+    }
+
+    #[test]
+    fn claim_witch_long_beta_coexists_with_docus_on_dual_trade() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = ideal_e2_operbox();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        let trade_posts: Vec<_> = blueprint
+            .rooms
             .iter()
-            .map(|o| o.name.clone())
+            .filter(|r| r.kind == FacilityKind::TradePost)
             .collect();
-        assert!(trade_2.contains("但书"));
+        assert_eq!(trade_posts.len(), 2, "243 夹具应为双贸");
+
+        let witch_room = assignment.rooms.iter().find(|r| {
+            blueprint
+                .rooms
+                .iter()
+                .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
+                && r.operators.iter().any(|o| o.name == "巫恋")
+                && r.operators.iter().any(|o| o.name == "龙舌兰")
+        });
+        assert!(witch_room.is_some(), "巫恋+龙舌兰应认领另一贸易站");
+        let docus_room = assignment.rooms.iter().find(|r| {
+            r.operators.iter().any(|o| o.name == "但书")
+        });
+        assert!(docus_room.is_some(), "但书链应认领贸易站");
+        assert_ne!(
+            witch_room.map(|r| &r.room_id),
+            docus_room.map(|r| &r.room_id),
+            "巫恋组与但书链应分占不同贸站"
+        );
+    }
+
+    #[test]
+    fn claim_pinus_sylvestris_on_ideal_e2_peak() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = ideal_e2_operbox();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        let control_ops = assignment.control_operators();
+        let control: HashSet<_> = control_ops.iter().map(|o| o.name.as_str()).collect();
+        assert!(control.contains("焰尾"), "control: {:?}", control);
+        assert!(control.contains("薇薇安娜"), "control: {:?}", control);
+
+        let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
+        assert_eq!(manu_1.len(), 3);
+        assert!(manu_1.iter().any(|o| o.name == "灰毫"));
+        assert!(manu_1.iter().any(|o| o.name == "远牙"));
+        assert!(manu_1.iter().any(|o| o.name == "野鬃"));
+
+        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
+        assert!(
+            manu_4.iter().any(|o| o.name == "砾"),
+            "manu_4: {:?}",
+            manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn claim_pinus_sylvestris_substitutes_shisibao_when_one_pinus_missing() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = operbox_without_names(&ideal_e2_operbox(), &["灰毫"]);
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        assert!(pinus_claimed(&assignment));
+        let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
+        assert_eq!(manu_1.len(), 3);
+        assert!(manu_1.iter().any(|o| o.name == "远牙"));
+        assert!(manu_1.iter().any(|o| o.name == "野鬃"));
+        assert!(
+            manu_1.iter().any(|o| o.name == "食铁兽"),
+            "缺 1 红松应食铁兽替补: {:?}",
+            manu_1.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+        assert!(!manu_1.iter().any(|o| o.name == "灰毫"));
+    }
+
+    #[test]
+    fn claim_pinus_sylvestris_skipped_without_viviana_or_yanwei() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        for exclude in ["薇薇安娜", "焰尾"] {
+            let operbox = operbox_without_names(&ideal_e2_operbox(), &[exclude]);
+            let mut assignment = BaseAssignment::default();
+            let mut used = HashSet::new();
+            claim_base_systems(
+                &blueprint,
+                &operbox,
+                &table,
+                AssignShiftMode::Peak,
+                &mut assignment,
+                &mut used,
+                &HashSet::new(),
+            )
+            .unwrap();
+            assert!(
+                !pinus_claimed(&assignment),
+                "缺 {exclude} 时不应认领红松林"
+            );
+        }
+    }
+
+    #[test]
+    fn claim_pinus_sylvestris_skipped_with_only_one_pinus_member() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = operbox_without_names(&ideal_e2_operbox(), &["远牙", "野鬃"]);
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        assert!(
+            !pinus_claimed(&assignment),
+            "仅 1 名红松制造核时不应开启"
+        );
     }
 
     #[test]
@@ -466,6 +766,7 @@ mod tests {
             AssignShiftMode::Peak,
             &mut assignment,
             &mut used,
+            &HashSet::new(),
         )
         .unwrap();
 

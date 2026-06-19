@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::layout::blueprint::RoomId;
 use crate::tier::PromotionTier;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssignedOperator {
     pub name: String,
     pub elite: u8,
@@ -107,5 +107,15 @@ impl BaseAssignment {
 
     pub fn has_room_staffing(&self) -> bool {
         self.rooms.iter().any(|r| !r.operators.is_empty())
+    }
+
+    pub fn operator_names(&self) -> HashSet<String> {
+        let mut names = HashSet::new();
+        for room in &self.rooms {
+            for op in &room.operators {
+                names.insert(op.name.clone());
+            }
+        }
+        names
     }
 }
