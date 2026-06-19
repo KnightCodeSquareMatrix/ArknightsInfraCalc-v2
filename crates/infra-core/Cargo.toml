@@ -9,3 +9,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 csv.workspace = true
 rayon.workspace = true
+calamine.workspace = true
