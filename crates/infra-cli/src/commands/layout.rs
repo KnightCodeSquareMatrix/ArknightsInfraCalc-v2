@@ -323,8 +323,6 @@ fn layout_analyze_cmd(args: &[String]) -> Result<(), Error> {
     }
 
     if json_only {
-        print_box_profile_report(&profile);
-        println!();
         print!("{}", serde_json::to_string_pretty(&profile)?);
     } else {
         print_box_profile_report(&profile);

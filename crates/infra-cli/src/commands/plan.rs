@@ -94,8 +94,6 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
     // ── 3. 输出：分析 + 排班 → stdout；路径提示 → stderr ─────────────────
     let json_only = args.iter().any(|a| a == "--json");
     if json_only {
-        print_box_profile_report(&profile);
-        println!();
         print!("{profile_json}");
     } else {
         eprintln!("layout={layout_label}");
