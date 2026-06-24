@@ -126,10 +126,22 @@ crates/infra-core/src/layout/orchestrate/
 |-----------|-----------|----------------------|-------------|------|
 | `docus_syracusa` | fixed | 贝洛内↔伺夜（未偿还的债务） | `gsl_docus_syracusa` | ✅ registry + shortcut；`execute_plan` 落位 |
 | `ling_jie_karlan` | control-only | 灵知 E2 中枢激活 `karlan_precision`；精1孑由贸易搜索注入 | L1 自然计算；`gsl_ling_jie_yaxin` 仅参考锚点 | ✅ registry control slot；无 active segment |
-| `witch_long_beta` | **fixed（定稿）** | 巫恋+龙舌兰固定核；第三人裁缝β `pick_one` | `gsl_witch_long_beta` | ✅ **最终版**：registry fixed；**无** `meta_chain`；243 与但书链双贸共存 |
+| `witch_long_beta` | **fixed（定稿）** | 巫恋+龙舌兰固定核；第三人裁缝β `pick_one` | `gsl_witch_long_beta` | ✅ registry fixed；无 `meta_chain`；普通场景可与但书链共存，full E2 但书长班上下文让位给 `blackkey_closure` |
 | `vina_lungmen` | fixed | 摩根↔推王（帮派指南针，站内 GSG tag）+ 戴菲恩中枢 producer | `gsl_vina_lungmen`（vault 满配 135% 贸） | ✅ registry + producer-gated segment |
-| `blackkey_closure` | L3 锚 | 黑键+可露希尔+挂件（**不进编**；贪心 + `gsl_blackkey_closure` 打分） | `gsl_blackkey_closure` | ✅ shortcut + segment |
+| `blackkey_closure` | fixed | 黑键+可露希尔+吉星；默认低于龙巫，特定但书长班上下文覆盖 | `gsl_blackkey_closure` | ✅ registry + shortcut + segment |
 | `rosemary_perception*` | **global effect** | 感知 producer 落位 + `cross_facility` 算 layout → 贪心选型 | — | ✅ 已移出编排；`assign_perception_producers` + scope=global |
+
+#### 243 但书长班上下文策略
+
+`blackkey_closure` 的 `base_systems.json` 普通 priority 低于 `witch_long_beta`，因此普通场景仍是龙巫优先。
+
+当以下条件同时成立时，`layout/system.rs::docus_closure_long_shift_active` 会在 SameStation 选型阶段临时提升 `blackkey_closure`：
+
+- `docus_syracusa` 已在 CrossStation 阶段选中；
+- 迷迭香 / 黑键 / 可露希尔 / 吉星均 E2；
+- 存在 E2 感知源：絮雨 / 八幡海铃 / 焰狐龙梓兰之一。
+
+该策略对齐公孙 243 高配三队：α 队为但书 + 伺夜 + 贝洛内，上 S1+S3；β 队为可露希尔 + 黑键 + 吉星，上 S1+S2。它是命名上下文 policy，不是全局调高可露希尔站，也不是匿名综合评分。
 
 #### Phase 2 待建（贸易 bond）
 
@@ -201,16 +213,16 @@ Producer 前提（跨房，非 global pool）：
 ### Phase 3 — Executor（execute）
 
 - [x] registry `fixed` / `bond` 落位（`execute_plan`）；贸易余站 `assign_trade_remainder` 贪心
-- [x] **已移除 / 不再存在**：`apply_blackkey_colocate_rule`、`assign_trade_meta`、`complete_trade_anchor_rooms`（黑键贸锚）
-- [x] 黑键：感知链算 layout → 散件进 `C(n,3)`；`gsl_blackkey_closure` 仅 L3 打分
+- [x] **已移除 / 不再存在**：`apply_blackkey_colocate_rule`、`assign_trade_meta`、`complete_trade_anchor_rooms`（旧黑键贸锚）
+- [x] 黑键：`blackkey_closure` 作为 low-priority same-station registry；但书长班上下文中覆盖 `witch_long_beta`，普通场景仍低于龙巫
 - [x] **巫恋组定稿**：`witch_long_beta` registry fixed；不做 `trade_role` / 多 System 变体
 - [ ] `trade_role` / `role_pick`（仅余未进 registry 的散件；巫恋已排除）
-- [x] **验收**：243 双贸 = 但书链 + 巫恋链（或黑键可露贪心）分站，不靠并站 patch
+- [x] **验收**：243 full E2 但书长班 = 但书链 + 可露希尔黑键吉星；缺但书时龙巫仍优先于可露希尔站；不靠并站 patch
 
 #### 巫恋组（定稿）
 
 - **固定核**：精二巫恋 + 精二龙舌兰 + 裁缝β第三人（`pick_one` 卡夫卡/柏喙/明椒/折光）。
-- **编排**：仅 `witch_long_beta`；无 `exclusive_group`，与但书链双贸共存。
+- **编排**：仅 `witch_long_beta`；无 `exclusive_group`。普通双贸可与但书链共存；但在公孙 243 full E2 长班上下文中会让位给 `blackkey_closure`。
 - **L3**：进编锚 `gsl_witch_long_beta`；`gsl_witch_long_alpha` 等仅 verify / `classify_witch_room`，不进编。
 
 ### Phase 4 — global effect 收拢（与编排并行）

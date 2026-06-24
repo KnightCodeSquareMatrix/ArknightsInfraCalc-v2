@@ -522,7 +522,8 @@ fn control_rotation_candidate(
 /// - **设施每班全部满编，绝不空转**：每班由当班两队合力铺满所有贸易/制造/发电站。
 /// - 生产设施切成两半 H1/H2：α 跑 H1、β 跑 H2；γ 作为轮换替补，第 2 班接 H1、第 3 班接 H2。
 /// - 班次结构 12h + 6h + 6h；每队休息一个班次（α 休 S2、β 休 S3、γ 休 S1）。
-/// - 中枢 / 宿舍为共享脚手架，三班钉死（体系绑定干员随脚手架；轮休细化为后续）。
+/// - 宿舍 / 办公室为共享脚手架，三班钉死。
+/// - 中枢按 αβγ 队伍轮休重分配：每班只用活跃两队候选，体系中枢先 pin，再补满 5 人。
 pub fn schedule_team_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -535,7 +536,8 @@ pub fn schedule_team_rotation(
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
 
-    // 1) 参考高峰班 + 编排计划 → 取中枢/宿舍作为三班共享脚手架。
+    // 1) 参考高峰班 + 编排计划 → 取宿舍/办公室作为三班共享脚手架。
+    // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
     let peak_result = assign_shift_with_plan_skip(
@@ -1431,17 +1433,18 @@ mod tests {
             &BaseAssignment::default(),
         )
         .unwrap();
-        if !peak
-            .rooms
-            .iter()
-            .any(|r| r.operators.iter().any(|o| o.name == "迷迭香"))
-            || !peak
-                .rooms
+        assert!(
+            peak.rooms
                 .iter()
-                .any(|r| r.operators.iter().any(|o| o.name == "黑键"))
-        {
-            return;
-        }
+                .any(|r| r.operators.iter().any(|o| o.name == "迷迭香")),
+            "迷迭香链激活时 peak 应含迷迭香"
+        );
+        assert!(
+            peak.rooms
+                .iter()
+                .any(|r| r.operators.iter().any(|o| o.name == "黑键")),
+            "迷迭香链激活时 peak 应含黑键"
+        );
 
         let report = schedule_team_rotation(
             &blueprint,
@@ -1461,6 +1464,62 @@ mod tests {
             team_of_operator(&report, "黑键"),
             Some(team),
             "迷迭香与黑键应同队"
+        );
+    }
+
+    #[test]
+    fn team_rotation_docus_and_blackkey_closure_share_12h_shift() {
+        use crate::operbox::default_operbox_full_e2_path;
+
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        for name in ["但书", "伺夜", "贝洛内", "可露希尔", "黑键", "吉星"] {
+            if !operbox.owns(name) {
+                return;
+            }
+        }
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let shift1 = &report.shifts[0].assignment;
+        let trade_rooms: Vec<_> = shift1
+            .rooms
+            .iter()
+            .filter(|r| {
+                blueprint
+                    .rooms
+                    .iter()
+                    .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
+            })
+            .collect();
+        assert!(
+            trade_rooms.iter().any(|r| {
+                ["但书", "伺夜", "贝洛内"]
+                    .iter()
+                    .all(|name| r.operators.iter().any(|o| o.name == *name))
+            }),
+            "12h 班应包含但书站: {:?}",
+            trade_rooms
+        );
+        assert!(
+            trade_rooms.iter().any(|r| {
+                ["可露希尔", "黑键", "吉星"]
+                    .iter()
+                    .all(|name| r.operators.iter().any(|o| o.name == *name))
+            }),
+            "12h 班应包含可露希尔黑键吉星站: {:?}",
+            trade_rooms
         );
     }
 

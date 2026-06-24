@@ -351,7 +351,9 @@ pub fn rotating_workers(assignment: &BaseAssignment, blueprint: &BaseBlueprint) 
     names
 }
 
-/// 中枢 + 宿舍 + 办公室感知 producer（三班钉死，从高峰班拷贝）。
+/// 宿舍 + 办公室感知 producer（三班钉死，从高峰班拷贝）。
+///
+/// 中枢在 `schedule_team_rotation` 中按 αβγ 队伍轮休重分配，不在这里钉死。
 pub fn pinned_assignment(assignment: &BaseAssignment, blueprint: &BaseBlueprint) -> BaseAssignment {
     let mut pinned = BaseAssignment::default();
     for room in &assignment.rooms {

@@ -113,6 +113,24 @@
       ]
     },
     {
+      "id": "blackkey_closure",
+      "label": "可露希尔黑键站：可露希尔+黑键+吉星；默认低于龙巫，仅在但书长班+迷迭香绑定上下文覆盖",
+      "tier": "same_station",
+      "priority": 11,
+      "segment_id": "blackkey_closure",
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "trade_post",
+          "operators": [
+            { "name": "可露希尔", "elite": 2 },
+            { "name": "黑键", "elite": 2 },
+            { "name": "吉星", "elite": 2 }
+          ]
+        }
+      ]
+    },
+    {
       "id": "gongsun_greyy2_power_line",
       "label": "243 自动化发电组：承曦格雷伊晨曦+格雷伊+布丁（虚拟+1；金线清流/温蒂/森蚺 140%）",
       "tier": "same_station",

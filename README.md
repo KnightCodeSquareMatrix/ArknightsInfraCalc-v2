@@ -1,6 +1,6 @@
 # ArknightsInfraCalc v2
 
-明日方舟基建效率求解器（v2 绿场重写）。给定干员练度与布局假设，计算贸易站同房三人组的订单效率、机制等效效率、单位产出；支持穷举搜索、自定义蓝图探测、**编排层体系认领**（`base_systems.json`）与 **αβγ ABC 三队轮换**排班。旧版 A-B-A 已废弃，见 [docs/SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md)。
+明日方舟基建效率求解器（v2 绿场重写）。给定干员练度与布局假设，计算贸易站同房三人组的订单效率、机制等效效率、单位产出；支持穷举搜索、自定义蓝图探测、**编排层体系认领**（`base_systems.json`）与 **αβγ三队、 ABC 三轮换**排班。旧版 A-B-A 已废弃，见 [docs/SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md)。
 
 **当前主力域**：贸易站（L1 解释器 + L2 域引擎 + L3 组合短路 + 回归齐全）。制造站、控制中枢、全局资源、编排层（System → Plan → Execute）已有基础实现。文档入口见 [docs/INDEX.md](docs/INDEX.md)，项目地图见 [docs/PROJECT_MAP.md](docs/PROJECT_MAP.md)。
 

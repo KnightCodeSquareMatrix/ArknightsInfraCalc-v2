@@ -15,7 +15,7 @@
 - **发电站**：`search_power_assignment`（充能 + 虚拟发电折算）
 - **全基建宏观排班**：`assign_shift`（编排 `build_plan` → `execute_plan`）已落地（`layout test` / `plan` / `team-rotation` 默认调用）
 - **box_profile**：练度分析工具（`plan` / `layout analyze`）
-- **编排层**：`base_systems.json` 体系认领（但书链、巫恋、红松林等）；`cross_facility` global atom
+- **编排层**：`base_systems.json` 体系认领（但书链、巫恋、可露希尔黑键、红松林等）；`cross_facility` global atom
 
 ### 各域落地状态
 
@@ -211,7 +211,7 @@ ArknightsInfraCalc-v2/
 | **`operator_instances.json`** | `干员@tier_0` / `干员@tier_up` → `buff_ids`；干员归属唯一真相 | Cursor |
 | **`trade_shortcuts.json`** | L3 组合表化最优解 + verify / reference 锚点；`gsl_ling_jie_yaxin` 仅参考，不 active 匹配 | 双方 |
 | **`trade_segments.json`** | 链段注册表（docus_syracusa / blackkey_closure / vina_lungmen / penguin_* + roles fallback 链） | 双方 |
-| **`base_systems.json`** | 编排层体系认领（`select_registry_systems` / `execute_plan`）；字段含 `tier`（`cross_station` / `same_station`）、priority、`exclusive_group`、slots | 脚本 + 手工 |
+| **`base_systems.json`** | 编排层体系认领（`select_registry_systems` / `execute_plan`）；字段含 `tier`（`cross_station` / `same_station`）、priority、`exclusive_group`、slots；`blackkey_closure` 普通优先级低于龙巫，但在但书长班上下文中由命名 policy 覆盖 | 脚本 + 手工 |
 | **`REGRESSION_CASES.csv`** | CLI `verify` 用例：期望 trade%/gold%/shortcut_id | 双方 |
 | **`UNIT_OUTPUT_ANCHORS.csv`** | 单位产出 / GSL 赤金锚点 | 双方 |
 | **`prts_trade_skills.json`** / `.csv` / `_table.html` | PRTS 贸易站技能原文快照（核对用） | 脚本抓取 |

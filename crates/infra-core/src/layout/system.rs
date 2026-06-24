@@ -124,6 +124,14 @@ struct BaseSystemsCache {
 
 static BASE_SYSTEMS_CACHE: OnceLock<Option<BaseSystemsCache>> = OnceLock::new();
 
+const DOCUS_SYRACUSA_SYSTEM: &str = "docus_syracusa";
+const BLACKKEY_CLOSURE_SYSTEM: &str = "blackkey_closure";
+const ROSEMARY: &str = "迷迭香";
+const BLACKKEY: &str = "黑键";
+const CLOSURE: &str = "可露希尔";
+const JIXING: &str = "吉星";
+const MIN_PERCEPTION_SOURCES: &[&str] = &["絮雨", "八幡海铃", "焰狐龙梓兰"];
+
 pub fn load_base_systems(path: &Path) -> Result<BaseSystemsFile> {
     let raw = std::fs::read_to_string(path)?;
     serde_json::from_str(&raw)
@@ -144,12 +152,6 @@ fn base_systems_cache() -> Option<&'static BaseSystemsCache> {
             })
         })
         .as_ref()
-}
-
-fn systems_by_priority(cache: &BaseSystemsCache) -> Vec<&BaseSystemDef> {
-    let mut list: Vec<_> = cache.systems.iter().collect();
-    list.sort_by(|a, b| b.priority.cmp(&a.priority));
-    list
 }
 
 fn mode_allowed(system: &BaseSystemDef, mode: AssignShiftMode) -> bool {
@@ -318,7 +320,7 @@ fn select_tier(
     skip_system_ids: &HashSet<String>,
     out: &mut Vec<RegistrySystemClaim>,
 ) {
-    for system in systems_by_tier_and_priority(cache, tier) {
+    for system in systems_for_tier(cache, tier, operbox, out) {
         if skip_system_ids.contains(&system.id) {
             continue;
         }
@@ -353,6 +355,49 @@ fn systems_by_tier_and_priority(
         .collect();
     list.sort_by(|a, b| b.priority.cmp(&a.priority));
     list
+}
+
+fn systems_for_tier<'a>(
+    cache: &'a BaseSystemsCache,
+    tier: OperatorTier,
+    operbox: &OperBox,
+    selected: &[RegistrySystemClaim],
+) -> Vec<&'a BaseSystemDef> {
+    let mut list = systems_by_tier_and_priority(cache, tier);
+    if tier == OperatorTier::SameStation && docus_closure_long_shift_active(operbox, selected) {
+        list.sort_by(|a, b| {
+            contextual_same_station_priority(b, true)
+                .cmp(&contextual_same_station_priority(a, true))
+        });
+    }
+    list
+}
+
+fn contextual_same_station_priority(system: &BaseSystemDef, docus_closure_long_shift: bool) -> i32 {
+    if docus_closure_long_shift && system.id == BLACKKEY_CLOSURE_SYSTEM {
+        return 17;
+    }
+    system.priority
+}
+
+/// 公孙 243 高配三队：但书链长班已认领且迷迭香/黑键绑定链可用时，
+/// 第二个 18h 贸易队改取可露希尔+黑键+吉星。普通场景仍由 base_systems priority
+/// 决定，`witch_long_beta` 高于 `blackkey_closure`。
+fn docus_closure_long_shift_active(operbox: &OperBox, selected: &[RegistrySystemClaim]) -> bool {
+    selected
+        .iter()
+        .any(|claim| claim.system_id == DOCUS_SYRACUSA_SYSTEM)
+        && owns_e2(operbox, ROSEMARY)
+        && owns_e2(operbox, BLACKKEY)
+        && owns_e2(operbox, CLOSURE)
+        && owns_e2(operbox, JIXING)
+        && MIN_PERCEPTION_SOURCES
+            .iter()
+            .any(|name| operbox.elite_of(name).is_some_and(|elite| elite >= 2))
+}
+
+fn owns_e2(operbox: &OperBox, name: &str) -> bool {
+    operbox.elite_of(name).is_some_and(|elite| elite >= 2)
 }
 
 /// 将 `RegistrySystemClaim` 写入编制。
@@ -565,6 +610,7 @@ mod tests {
         assert!(ids.contains("docus_syracusa"));
         assert!(!ids.contains("rosemary_perception"));
         assert!(ids.contains("witch_long_beta"));
+        assert!(ids.contains("blackkey_closure"));
         assert!(ids.contains("pinus_sylvestris"));
         assert!(ids.contains("lungmen_manu_pair"));
         assert!(ids.contains("gongsun_greyy2_power_line"));
@@ -647,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_witch_long_beta_coexists_with_docus_on_dual_trade() {
+    fn claim_docus_long_shift_prefers_blackkey_closure_over_witch() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = ideal_e2_operbox();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -672,24 +718,58 @@ mod tests {
             .collect();
         assert_eq!(trade_posts.len(), 2, "243 夹具应为双贸");
 
-        let witch_room = assignment.rooms.iter().find(|r| {
+        let closure_room = assignment.rooms.iter().find(|r| {
             blueprint
                 .rooms
                 .iter()
                 .any(|b| b.id == r.room_id && b.kind == FacilityKind::TradePost)
-                && r.operators.iter().any(|o| o.name == "巫恋")
-                && r.operators.iter().any(|o| o.name == "龙舌兰")
+                && r.operators.iter().any(|o| o.name == CLOSURE)
+                && r.operators.iter().any(|o| o.name == BLACKKEY)
+                && r.operators.iter().any(|o| o.name == JIXING)
         });
-        assert!(witch_room.is_some(), "巫恋+龙舌兰应认领另一贸易站");
+        assert!(
+            closure_room.is_some(),
+            "但书+迷迭香绑定上下文应认领可露希尔黑键站"
+        );
+        assert!(
+            !used.contains("巫恋") && !used.contains("龙舌兰"),
+            "该上下文下不应让龙巫挤掉黑键长班"
+        );
         let docus_room = assignment
             .rooms
             .iter()
             .find(|r| r.operators.iter().any(|o| o.name == "但书"));
         assert!(docus_room.is_some(), "但书链应认领贸易站");
         assert_ne!(
-            witch_room.map(|r| &r.room_id),
+            closure_room.map(|r| &r.room_id),
             docus_room.map(|r| &r.room_id),
-            "巫恋组与但书链应分占不同贸站"
+            "可露希尔黑键站与但书链应分占不同贸站"
+        );
+    }
+
+    #[test]
+    fn claim_witch_long_beta_still_beats_blackkey_closure_without_docus() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = operbox_without_names(&ideal_e2_operbox(), &["但书"]);
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        assert!(used.contains("巫恋") && used.contains("龙舌兰"));
+        assert!(
+            !used.contains(BLACKKEY) && !used.contains(CLOSURE),
+            "无但书上下文时龙巫仍应优先于可露希尔站"
         );
     }
 

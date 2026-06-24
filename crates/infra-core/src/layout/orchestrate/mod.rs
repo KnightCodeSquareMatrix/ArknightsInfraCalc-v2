@@ -65,13 +65,13 @@ mod tests {
     }
 
     #[test]
-    fn build_plan_peak_ideal_e2_claims_witch_with_docus() {
+    fn build_plan_peak_ideal_e2_claims_blackkey_closure_with_docus() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = OperBox::load(
             &crate::skill_table::data_path("schedule_243/operbox_ideal_e2.json").unwrap(),
         )
         .unwrap();
-        if !operbox.owns("巫恋") || !operbox.owns("龙舌兰") {
+        if !operbox.owns("可露希尔") || !operbox.owns("黑键") || !operbox.owns("吉星") {
             return;
         }
         let plan = build_plan(
@@ -85,8 +85,8 @@ mod tests {
         assert!(
             plan.registry_claims
                 .iter()
-                .any(|c| c.system_id == "witch_long_beta"),
-            "peak plan 应含巫恋组: {:?}",
+                .any(|c| c.system_id == "blackkey_closure"),
+            "但书+迷迭香绑定上下文应含可露希尔黑键站: {:?}",
             plan.registry_system_ids()
         );
         assert!(

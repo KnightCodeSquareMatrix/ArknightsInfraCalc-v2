@@ -79,6 +79,8 @@ operbox + blueprint
 
 同类型多房间：按蓝图 `rooms` 数组顺序或稳定 `room_id` 字典序。
 
+**同站 meta 特例**：普通 priority 下 `witch_long_beta` 高于 `blackkey_closure`。若 CrossStation 阶段已选中 `docus_syracusa`，且迷迭香 / 黑键 / 可露希尔 / 吉星均 E2 并存在 E2 感知源，则 SameStation 阶段启用 `docus_closure_long_shift_active`，临时让 `blackkey_closure` 覆盖龙巫；这是公孙 243 长班取舍，不是全局调权。
+
 ---
 
 ## 5. 冲突处理（默认）
