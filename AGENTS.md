@@ -101,7 +101,7 @@ rg -n "error\[|error:|failed|panicked" target/codex-logs
 
 ### 6.2 用户说“跑一遍模拟”
 
-默认理解为：全精2 练度盒 + 243 布局 + αβγ ABC 三队轮换 + 写出 MAA JSON。
+默认理解为：全精2 练度盒 + 243 布局 + 账号分析 + αβγ ABC 三队轮换 + 写出 MAA JSON。默认入口用带分析的 `plan`；只有用户明确说“仅排班 / 不要分析”时，才用 `layout team-rotation`。
 
 ```powershell
 cargo run -q -p infra-cli -- plan `

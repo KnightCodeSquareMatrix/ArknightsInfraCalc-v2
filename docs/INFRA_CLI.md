@@ -37,6 +37,7 @@ crates/infra-cli/src/
 │   ├── mod.rs           # 子命令模块聚合；对外 re-export
 │   ├── plan.rs          # `plan`：box profile + αβγ 排班 + MAA
 │   ├── layout.rs        # `layout test` / `rotation` / `team-rotation` / `analyze` / `eval` 全部子命令
+│   ├── profile.rs       # `profile`：性能画像 / 分析链路对比辅助
 │   └── verify.rs        # `verify` 子命令：跑回归、汇总失败
 ├── verify/
 │   ├── mod.rs           # 回归资产门面；re-export loaders 与 fixtures
@@ -63,6 +64,7 @@ crates/infra-cli/src/
 |------|------|--------|
 | `plan.rs` | **`plan`**：box profile JSON + `schedule_team_rotation` + MAA；`--operbox` 支持 JSON/xlsx；布局默认 243 | 画像算法（`box_profile/`）；排班逻辑（`schedule/`） |
 | `layout.rs` | `layout test` / `rotation` / `team-rotation` / `analyze` / `eval`：蓝图 JSON + operbox → `assign_shift` 宏观落位（或自定义 `--assignment`）→ `resolve_base` → 搜索/评分 | 蓝图格式定义（`infra-core::layout::blueprint`）；求解公式（在 `infra-core`） |
+| `profile.rs` | `profile layout-full` / `profile analyze-compare`：采集 CLI 热路径、搜索规模和分析链路耗时 | 业务求解公式；用户主流程输出契约 |
 | `verify.rs` | `verify_cmd`：遍历 `REGRESSION_CASES.csv`；按 `expect_shortcut` 选夹具；对比 trade%/gold%/shortcut；再跑 `UNIT_OUTPUT_ANCHORS.csv` | 夹具定义（在 `verify/fixtures.rs`）；CSV 列定义（在 `verify/cases.rs`） |
 
 项目结构已定型：`pool` / `search` 等编排暂留 `main.rs`，**不再计划拆文件**。新增子命令仍应优先新建 `commands/foo.rs`，避免继续膨胀 `main.rs`。
@@ -125,6 +127,8 @@ crates/infra-cli/src/
 | **`layout rotation`** | `commands/layout.rs` | `output::emit_base_rotation` | **已废弃**（A-B-A）；启动时 stderr 警告，请改用 `team-rotation` |
 | **`layout analyze`** | `commands/layout.rs` | `print_box_profile_report` | 必选 `--layout` + `--operbox`；练度概况分析 |
 | **`layout eval`** | `commands/layout.rs` | stderr 文本 / JSON | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
+| `profile layout-full` | `commands/profile.rs` | stderr 性能报告 | 开发辅助；默认路径为历史性能夹具，用户模拟不要用 |
+| `profile analyze-compare` | `commands/profile.rs` | stderr 对比报告 | 开发辅助；对比 hybrid profile 与旧 probe 链路耗时 |
 | `schedule rotation` | `main.rs` | `output::emit_schedule` | 贸易站 A-B-A（旧入口，已废弃） |
 | `trade yield` | `main.rs` | `output::emit_trade_yield` | `verify::unit_fixture` |
 
@@ -171,7 +175,7 @@ cargo run -p infra-cli -- plan \
 
 ## 跑一遍模拟（Agent 默认）
 
-> **给 Cursor / 协作者**：用户说「跑一遍模拟」「跑模拟」「三班模拟」等，且未指定其他命令时，**默认**跑 **`plan`** 或 **`layout team-rotation`** 并**写出 MAA JSON**。不要用 `layout rotation`（A-B-A）或 `layout test`（单班搜索）代替。
+> **给 Cursor / 协作者**：用户说「跑一遍模拟」「跑模拟」「三班模拟」等，且未指定其他命令时，**默认**跑 **`plan`** 并**写出 MAA JSON**，因为它同时包含账号分析与 αβγ 排班。只有用户明确说“仅排班 / 不要分析”时，才用 `layout team-rotation`。不要用 `layout rotation`（A-B-A）或 `layout test`（单班搜索）代替。
 
 **无用户指定路径时，Agent 固定用：**
 
@@ -184,12 +188,12 @@ cargo run -p infra-cli -- plan \
 ### 命令（Agent 默认）
 
 ```bash
-# 推荐
+# Agent 默认
 cargo run -p infra-cli -- plan \
   --operbox data/fixtures/243/operbox_full_e2.json \
   --maa-out out/243_maa.json
 
-# 或仅排班
+# 仅排班
 cargo run -p infra-cli -- layout team-rotation \
   --layout data/fixtures/243/layout.json \
   --operbox data/fixtures/243/operbox_full_e2.json \
@@ -198,7 +202,7 @@ cargo run -p infra-cli -- layout team-rotation \
 
 | 参数 | 说明 |
 |------|------|
-| `--layout` | **必填**。`BaseBlueprint` JSON；**Agent 默认** `data/fixtures/243/layout.json` |
+| `--layout` | `plan` 可选，默认 `data/fixtures/243/layout.json`；`layout team-rotation` 必填 |
 | `--operbox` | **必填**。`OperBox` JSON；**Agent 默认** `data/fixtures/243/operbox_full_e2.json` |
 | `--maa-out` | **Agent 默认必带**。写出 MAA 基建排班 JSON；默认 `out/243_maa.json` |
 | `--maa-title` | 可选。覆盖 JSON 顶层 `title` |
@@ -218,7 +222,7 @@ cargo run -p infra-cli -- layout team-rotation \
 
 ## 自定义布局 + 练度盒测试（改机制 smoke test）
 
-> **给 Cursor / 协作者**：用户给出「某布局 JSON + operbox / 练度表」要跑**单班贸易/制造搜索探测**时，**优先用 `layout test`**，不要用 `bench`（`bench` 布局锁死 243c 基准）、也不要在 CLI 里临时拼 `LayoutContext` / 搜索上下文。若用户只说「跑一遍模拟」，见上节 **`layout team-rotation`**。
+> **给 Cursor / 协作者**：用户给出「某布局 JSON + operbox / 练度表」要跑**单班贸易/制造搜索探测**时，**优先用 `layout test`**，不要用 `bench`（`bench` 布局锁死 243c 基准）、也不要在 CLI 里临时拼 `LayoutContext` / 搜索上下文。若用户只说「跑一遍模拟」，见上节 **`plan`**。
 >
 > **无用户指定文件时，Agent 默认固定用：**
 > - 布局：`data/fixtures/243/layout.json`
@@ -228,7 +232,7 @@ cargo run -p infra-cli -- layout team-rotation \
 
 | 场景 | 用哪个 |
 |------|--------|
-| **用户说「跑一遍模拟」（无用户路径）** | **`layout team-rotation`** + 标准夹具 + **`--maa-out out/243_maa.json`**（见上节） |
+| **用户说「跑一遍模拟」（无用户路径）** | **`plan`** + 标准夹具 + **`--maa-out out/243_maa.json`**（见上节） |
 | **改机制后 smoke test（无用户路径）** | **`layout test`** + **`data/fixtures/243/layout.json`** + **`data/fixtures/243/operbox_full_e2.json`** |
 | 用户提供了 `BaseBlueprint` JSON（如 `243测试用布局.json`、排班工具导出的布局） | **`layout test`** + 用户 `--layout` + 用户或标准 `--operbox` |
 | 对比固定 243c 基准 + operbox（无自定义房间结构） | `bench --operbox data/fixtures/243/operbox_full_e2.json` |

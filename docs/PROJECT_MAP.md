@@ -154,22 +154,23 @@ ArknightsInfraCalc-v2/
 
 | 命令 | 用途 |
 |------|------|
-| **`plan`** | **用户主入口**：账号画像 JSON + αβγ 三队排班 + MAA；`--operbox` 支持 JSON/xlsx；布局默认 243 |
+| **`plan`** | **用户主入口 / Agent 默认模拟入口**：账号画像 JSON + αβγ 三队排班 + MAA；`--operbox` 支持 JSON/xlsx；布局默认 243 |
 | `verify --case <id>` / `--all` | 跑 `REGRESSION_CASES.csv` + `UNIT_OUTPUT_ANCHORS.csv` |
 | `pool --trade` | 打印贸易站池统计与跳过原因 |
 | `search trade [--roster] [--top N]` | 全池 C(n,3) 搜索 Top-K |
 | `bench --operbox <path>` | 243c 基准布局 + operbox 贸易/制造搜索（**无**怪猎木天蓼；怪猎号见下） |
 | **`layout test`** | **自定义 `BaseBlueprint` + operbox（默认 `assign_base_greedy` 宏观排班）** |
-| **`layout team-rotation`** | **αβγ ABC 三队轮换（含 MAA 导出）— 现行默认** |
+| **`layout team-rotation`** | **αβγ ABC 三队轮换（含 MAA 导出）— 仅排班入口** |
 | **`layout rotation`** | ~~三班 A-B-A~~ **已废弃**（启动警告）；请用 `team-rotation` |
 | **`layout analyze`** | **练度 box profile 分析（对比基线）** |
 | **`layout eval`** | **评估指定编制各房间效率** |
+| `profile layout-full` / `profile analyze-compare` | CLI 性能画像 / 分析链路对比辅助 |
 | `schedule rotation --operbox <path> [--layout-baseline] [--json]` | 贸易站 A-B-A（旧入口，已废弃） |
 | `trade yield <fixture> [--level] [--shift]` | 单站产量探测（fixture 名见 `verify/fixtures.rs` 的 `unit_fixture`） |
 
 **Agent 默认夹具**（无用户路径时）：`data/fixtures/243/layout.json` + `data/fixtures/243/operbox_full_e2.json` — 见 [AGENTS.md](../AGENTS.md) §6。
 
-**用户说「跑一遍模拟」**：`plan`（推荐）或 `layout team-rotation` + `--maa-out out/243_maa.json` — 见 [AGENTS.md](../AGENTS.md) §6.2、[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)、[INFRA_CLI.md](INFRA_CLI.md)「跑一遍模拟」。
+**用户说「跑一遍模拟」**：默认跑 `plan --maa-out out/243_maa.json`（账号分析 + αβγ 排班）；仅排班时才用 `layout team-rotation` — 见 [AGENTS.md](../AGENTS.md) §6.2、[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)、[INFRA_CLI.md](INFRA_CLI.md)「跑一遍模拟」。
 
 **模块职责（必读）**：[INFRA_CLI.md](INFRA_CLI.md) — 约定 `commands` / `verify` / `output` 分工，避免把机制或夹具塞回 `main.rs`。
 
@@ -180,6 +181,7 @@ ArknightsInfraCalc-v2/
 | `src/main.rs` | 进程入口、子命令路由；`pool` / `search` / `schedule` / `trade` / `bench` 编排（部分暂留 `main.rs`） |
 | `src/commands/plan.rs` | **`plan`**：box profile + `schedule_team_rotation` + MAA |
 | `src/commands/layout.rs` | `layout test` / `rotation` / `team-rotation` / `analyze` / `eval` 全部子命令 |
+| `src/commands/profile.rs` | `profile layout-full` / `profile analyze-compare`：CLI 性能画像与分析链路对比 |
 | `src/commands/verify.rs` | `verify` 子命令：遍历 CSV、断言、PASS/FAIL |
 | `src/verify/cases.rs` | 加载 `REGRESSION_CASES.csv`、`UNIT_OUTPUT_ANCHORS.csv` |
 | `src/verify/fixtures.rs` | 硬编码 `TradeRoomInput`（回归 + `trade yield`） |
