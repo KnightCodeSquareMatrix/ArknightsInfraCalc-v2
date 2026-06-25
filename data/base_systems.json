@@ -261,6 +261,24 @@
       ]
     },
     {
+      "id": "standardization_mizuki",
+      "label": "标准化组：水月E2意识协议 + 两名标准化β工具人",
+      "tier": "same_station",
+      "priority": 12,
+      "shift_modes": ["peak"],
+      "slots": [
+        {
+          "facility": "factory",
+          "room_id": "manu_4",
+          "operators": [
+            { "name": "水月", "elite": 2 },
+            { "pick_one": ["史都华德", "杰西卡", { "name": "海沫", "elite": 2 }, "罗比菈塔", "调香师", "香草"], "elite": 1 },
+            { "pick_one": ["史都华德", "杰西卡", { "name": "海沫", "elite": 2 }, "罗比菈塔", "调香师", "香草"], "elite": 1 }
+          ]
+        }
+      ]
+    },
+    {
       "id": "vina_lungmen",
       "label": "推王组：戴菲恩+推进之王+摩根+维娜·维多利亚（135%贸，但书替补）",
       "tier": "cross_station",

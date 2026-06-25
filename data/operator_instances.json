@@ -6558,6 +6558,19 @@
         }
       }
     },
+    "食铁兽@tier_0": {
+      "name": "食铁兽",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "食铁兽@tier_up": {
       "name": "食铁兽",
       "tier": "tier_up",
@@ -6565,7 +6578,6 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_formula_spd[010]",
             "manu_formula_spd[020]"
           ],
           "stepwise": true

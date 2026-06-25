@@ -107,9 +107,48 @@ pub struct SystemOperatorFixed {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SystemOperatorPickOne {
-    pub pick_one: Vec<String>,
+    pub pick_one: Vec<PickOneCandidate>,
     #[serde(default)]
     pub elite: u8,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum PickOneCandidate {
+    Name(String),
+    Spec(PickOneCandidateSpec),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PickOneCandidateSpec {
+    pub name: String,
+    #[serde(default)]
+    pub elite: Option<u8>,
+    #[serde(default)]
+    pub max_elite: Option<u8>,
+}
+
+impl PickOneCandidate {
+    fn name(&self) -> &str {
+        match self {
+            PickOneCandidate::Name(name) => name,
+            PickOneCandidate::Spec(spec) => &spec.name,
+        }
+    }
+
+    fn elite_requirement(&self, default: u8) -> u8 {
+        match self {
+            PickOneCandidate::Name(_) => default,
+            PickOneCandidate::Spec(spec) => spec.elite.unwrap_or(default),
+        }
+    }
+
+    fn max_elite(&self) -> Option<u8> {
+        match self {
+            PickOneCandidate::Name(_) => None,
+            PickOneCandidate::Spec(spec) => spec.max_elite,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -182,16 +221,19 @@ fn resolve_pick_one(
     pick: &SystemOperatorPickOne,
     used: &HashSet<String>,
 ) -> Option<ResolvedOperator> {
-    for name in &pick.pick_one {
+    for candidate in &pick.pick_one {
+        let name = candidate.name();
         if used.contains(name) {
             continue;
         }
         let Some(elite) = operbox.elite_of(name) else {
             continue;
         };
-        if elite >= pick.elite {
+        if elite >= candidate.elite_requirement(pick.elite)
+            && !candidate.max_elite().is_some_and(|max| elite > max)
+        {
             return Some(ResolvedOperator {
-                name: name.clone(),
+                name: name.to_string(),
                 elite,
             });
         }
@@ -617,10 +659,67 @@ mod tests {
         assert!(ids.contains("lungmen_manu_pair"));
         assert!(ids.contains("gongsun_greyy2_power_line"));
         assert!(ids.contains("automation_group"), "自动化组应已注册");
+        assert!(ids.contains("standardization_mizuki"), "标准化组应已注册");
         assert!(
             !ids.contains("abyssal_hunters"),
             "深海链只在三班轮换 S2 短班入口尝试，不进入普通 base_systems registry"
         );
+    }
+
+    #[test]
+    fn claim_standardization_mizuki_same_station() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::from_entries(vec![
+            crate::operbox::OperBoxEntry {
+                id: "mizuki".into(),
+                name: "水月".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            crate::operbox::OperBoxEntry {
+                id: "steward".into(),
+                name: "史都华德".into(),
+                elite: 1,
+                level: 55,
+                own: true,
+                potential: 1,
+                rarity: 3,
+            },
+            crate::operbox::OperBoxEntry {
+                id: "jessica".into(),
+                name: "杰西卡".into(),
+                elite: 2,
+                level: 70,
+                own: true,
+                potential: 1,
+                rarity: 4,
+            },
+        ]);
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
+        let names: HashSet<_> = manu_4.iter().map(|op| op.name.as_str()).collect();
+        assert_eq!(manu_4.len(), 3, "manu_4: {manu_4:?}");
+        assert!(names.contains("水月"), "manu_4: {manu_4:?}");
+        assert!(names.contains("史都华德"), "manu_4: {manu_4:?}");
+        assert!(names.contains("杰西卡"), "manu_4: {manu_4:?}");
+        assert!(used.contains("水月"));
     }
 
     #[test]

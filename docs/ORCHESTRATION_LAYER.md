@@ -106,6 +106,8 @@ crates/infra-core/src/layout/orchestrate/
 | `pick_one` | 列表选一 | 第一个可用干员 |
 | `greedy` | Plain | `C(n,3)` 或发电 O(n)（制造仍全池穷举） |
 
+`pick_one` 候选默认继承 slot 级 `"elite"` 要求；需要按候选区分精英化门槛时可写对象，例如 `{ "name": "海沫", "elite": 2 }`。对象候选还支持 `"max_elite"`，用于保留少量 E0-only / E1-only 历史锚点。
+
 ### 4.3 与现有文件的关系
 
 | 文件 | 角色 |
@@ -173,6 +175,7 @@ Producer 前提（跨房，非 global pool）：
 
 | 组合 | CSV 技能 | 编排建议 | 状态 |
 |------|----------|----------|------|
+| 水月 E2 + 两名标准化 β | 意识协议 / 标准化 β | `same_station` 固定制造站，同站 meta；β 工具人用 `pick_one`，海沫单独要求 E2 | ✅ `standardization_mizuki` |
 | 阿兰娜 E2 + 温米 | 「搭把手！」 | 自动化金线固定 slot 或 `bond` + 第三人贪心 | ⚠️ shortcut 待补；registry 延至 Phase 3（避免抢公孙金线制造位） |
 | Miss.Christine E2 + 酒神 | 盛餐的回报 |  niche；低优先 | ❌ |
 | 怒潮凛冬 E2 + 乌萨斯学生自治团 | 情同手足 | tag 同房加成；可并进乌萨斯制造 meta | ❌ |
