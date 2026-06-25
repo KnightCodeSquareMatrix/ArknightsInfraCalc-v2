@@ -1,7 +1,7 @@
 # infra-cli + Layout 生成器 — 前端对接说明
 
 > 面向前端 / 排班 UI。**Layout 蓝图**用静态页 `layout-gen` 编辑；**排班求解 + MAA JSON** 用 `infra-cli`（子进程或后续 WASM）。  
-> **Release 构建**：2026-06-18 · commit `482cf71` · 见 `release/VERSION.txt`
+> **Beta Release 构建**：2026-06-25 · backend commit `9e52de9` · frontend beta source `3259eaa` · 见 `release/VERSION.txt`
 
 ---
 
@@ -17,6 +17,8 @@ release/
 │   └── operbox_full_e2.json   243 样例练度（全精2）
 ├── docs/
 │   └── FRONTEND_CLI.md        本文件副本
+├── plans/
+│   └── cli-format-reference.md
 ├── README.md                  快速上手
 └── VERSION.txt
 ```

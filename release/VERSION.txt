@@ -1,20 +1,28 @@
-ArknightsInfraCalc frontend release bundle
-Build date: 2026-06-18
-Git commit: 80d881f
-Platform: windows-x86_64 (infra-cli.exe, ~3.0 MB)
+ArknightsInfraCalc beta release bundle
+Build date: 2026-06-25
+Backend commit: 9e52de9
+Frontend beta source commit: 3259eaa
+Platform: windows-x86_64
 
-Contents:
-  infra-cli.exe           — plan / layout team-rotation + MAA export
-  layout-gen/index.html   — BaseBlueprint layout editor (static, any browser)
-  fixtures/               — sample layout + operbox for 243
-  docs/FRONTEND_CLI.md    — full API for frontend integration
+Recommended CLI entry:
+  infra-cli.exe plan
 
-Requires separately (from repo root):
-  data/                   — operator_instances.json, skill_table.json, base_systems.json, …
+Use plan for the full user flow:
+  profile JSON + alpha/beta/gamma team rotation + MAA JSON
 
-Quick start:
-  .\release\infra-cli.exe plan --operbox release\fixtures\operbox_full_e2.json --maa-out out\maa.json
+Recommended command:
+  .\release\infra-cli.exe plan --layout release\fixtures\layout.json --operbox release\fixtures\operbox_full_e2.json --profile-out out\243_profile.json --maa-out out\243_maa.json
 
-Docs:
-  release/README.md
-  release/docs/FRONTEND_CLI.md
+Use only when no profile JSON is needed:
+  .\release\infra-cli.exe layout team-rotation --layout release\fixtures\layout.json --operbox release\fixtures\operbox_full_e2.json --maa-out out\243_maa.json
+
+Bundle contents:
+  infra-cli.exe
+  layout-gen/index.html
+  fixtures/layout.json
+  fixtures/operbox_full_e2.json
+  docs/FRONTEND_CLI.md
+  plans/cli-format-reference.md
+
+Runtime requirement:
+  Run from a directory containing data/, or place data/ beside release/.
