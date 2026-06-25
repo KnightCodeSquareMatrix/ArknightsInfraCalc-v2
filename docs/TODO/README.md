@@ -6,7 +6,7 @@
 
 | 优先级 | 文件 | 状态 | 说明 |
 |--------|------|------|------|
-| — | — | — | 当前无 ready TODO；评分主线已改为分量化口径，后续按需补 CLI 字段命名与公孙等效效率锚点 |
+| P0 | [SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](SYSTEM_REGISTRY_NORMALIZATION_REPORT.md) | ready | 按 `MECHANICS_REGISTRY.csv` 真源重分层：中间产物 / 跨站 meta / 同站组合 / core priority / 散件 |
 
 ## 新 TODO 文件模板
 
