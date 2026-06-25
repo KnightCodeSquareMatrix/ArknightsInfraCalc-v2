@@ -2,6 +2,8 @@
 
 > **新会话请先读 [AGENTS.md](../AGENTS.md)**，再读 [INDEX.md](INDEX.md) 和本文。机制细节见 [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)，评分口径见 [SCORING_MODEL.md](SCORING_MODEL.md)，评分收敛计划见 [SCORING_REFACTOR_PLAN.md](SCORING_REFACTOR_PLAN.md)。准备实现事项见 [TODO/](TODO/)，归档材料见 [ARCHIVE/](ARCHIVE/)。大文件内部边界见 [INTERNAL/](INTERNAL/)。
 
+如果读者懂基建体系但不关心代码入口，先看 [GONGSUN_RUNTIME_OVERVIEW.md](GONGSUN_RUNTIME_OVERVIEW.md)。
+
 **结构已定稿**：不再做大范围源码拆分；靠文档路由到正确函数段即可。
 
 ## 项目是什么
@@ -67,6 +69,7 @@ ArknightsInfraCalc-v2/
 ├── docs/
 │   ├── INDEX.md            文档总入口：首读、TODO、归档、任务路由
 │   ├── PROJECT_MAP.md      ← 本文：当前架构地图
+│   ├── GONGSUN_RUNTIME_OVERVIEW.md 给基建策略作者看的运行流程说明
 │   ├── EFFECT_ATOM_DESIGN.md   机制词汇、已建模干员、分层求解定稿
 │   ├── MANUFACTURE_STATUS.md   制造站域状态（勿按贸易站假设改）
 │   ├── BASE_ASSIGNMENT.md      全基建进驻编制（宏观排班）设计

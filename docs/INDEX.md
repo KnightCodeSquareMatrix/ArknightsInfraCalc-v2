@@ -8,6 +8,7 @@
 |------|------|
 | [../AGENTS.md](../AGENTS.md) | Agent 操作规则、当前主线、验证命令 |
 | [PROJECT_MAP.md](PROJECT_MAP.md) | 项目结构、模块索引、数据真源 |
+| [GONGSUN_RUNTIME_OVERVIEW.md](GONGSUN_RUNTIME_OVERVIEW.md) | 给懂基建但不懂代码的公孙长乐解释项目运行流程 |
 | [TODO/README.md](TODO/README.md) | 准备实现的功能与当前工作队列 |
 | [ARCHIVE/README.md](ARCHIVE/README.md) | 已完成、废弃或历史设计材料 |
 
@@ -17,6 +18,7 @@
 |------|--------|
 | 改评分 / 排序 / 分量口径 | [SCORING_REFACTOR_PLAN.md](SCORING_REFACTOR_PLAN.md)、[SCORING_MODEL.md](SCORING_MODEL.md) |
 | 改编排 / 体系 / meta 组合 | [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md) |
+| 给基建策略作者解释程序运行过程 | [GONGSUN_RUNTIME_OVERVIEW.md](GONGSUN_RUNTIME_OVERVIEW.md) |
 | 改排班轮换 / MAA 导出 | [SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)、[INFRA_CLI.md](INFRA_CLI.md) |
 | 改 CLI / 前端集成 | [INFRA_CLI.md](INFRA_CLI.md)、[FRONTEND_CLI.md](FRONTEND_CLI.md) |
 | 改贸易 L1/L2/L3 | [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)、[INTERNAL/TRADE_INTERPRETER.md](INTERNAL/TRADE_INTERPRETER.md)、[INTERNAL/SHORTCUT_MATCHING.md](INTERNAL/SHORTCUT_MATCHING.md) |
