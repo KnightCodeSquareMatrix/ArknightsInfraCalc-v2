@@ -55,15 +55,15 @@
 | 组件 | 状态 |
 |------|------|
 | 感知 producer / consumer（`global_resource/`） | ✅ 已实现 |
-| `base_systems.json` 条目 | ✅ `blackkey_closure` 低优先级 same-station registry；完整 `rosemary_perception` 不进编 |
-| 但书站 + 黑键搭配 | ✅ 但书长班上下文 policy：但书站 + 可露希尔/黑键/吉星 分站 |
+| `base_systems.json` 条目 | ✅ 完整 `rosemary_perception` 不进编；黑键可露只保留为 L3/segment 锚点 |
+| 但书站 + 黑键搭配 | ✅ role policy：但书站优先，黑键通过 `closure` role 优先服务可露希尔站 |
 | 夕 elite 层级（应为 0） | ⚠️ 需确认 |
 
 ### 约束
 
 - 黑键**不与巫恋同站**
 - 迷迭香+黑键**上 2 班休息 1 班**
-- 243 full E2 且但书链已启用时，黑键跟可露希尔、吉星进 β 长班；此时龙巫让位。无但书上下文时龙巫仍优先于可露希尔站。
+- 贸易站按但书 → 可露希尔 → 巫恋 core priority。243 full E2 时黑键常作为可露希尔站高效工具人；缺黑键时可露仍上站，龙巫作为第三优先级走裁缝 β / α / 空白 fallback。
 - 恢复班不启用成套
 
 ---

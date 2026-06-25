@@ -569,6 +569,7 @@ mod tests {
                         order: TradeOrderKind::Gold,
                     }),
                     dorm_beds: None,
+                    dorm_ambience_level: None,
                 },
                 RoomBlueprint {
                     id: RoomId::new("power_1"),
@@ -576,6 +577,7 @@ mod tests {
                     level: 3,
                     product: None,
                     dorm_beds: None,
+                    dorm_ambience_level: None,
                 },
                 RoomBlueprint {
                     id: RoomId::new("dorm_1"),
@@ -583,6 +585,7 @@ mod tests {
                     level: 3,
                     product: None,
                     dorm_beds: Some(5),
+                    dorm_ambience_level: Some(5),
                 },
             ],
         }

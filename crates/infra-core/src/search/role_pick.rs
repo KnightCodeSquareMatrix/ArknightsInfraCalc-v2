@@ -9,8 +9,9 @@ use crate::skill_table::SkillTable;
 use crate::trade::segment::{segment_producer_active, trade_segment_cache};
 
 use super::trade::{
-    hit_docus_solo_shortcut, search_trade_triples, search_trade_triples_filtered,
-    SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
+    hit_blackkey_closure_shortcut, hit_closure_shortcut, hit_docus_solo_shortcut,
+    hit_witch_shortcut, search_trade_triples, search_trade_triples_filtered, SearchTripleFilter,
+    TradeSearchHit, TradeSearchOptions,
 };
 
 pub fn hit_docus_syracusa_shortcut(hit: &TradeSearchHit) -> bool {
@@ -21,7 +22,11 @@ pub fn hit_shortcut_id(hit: &TradeSearchHit, shortcut_id: &str) -> bool {
     hit.shortcut.as_deref() == Some(shortcut_id)
 }
 
-/// Meta 站落位：按 `roles[].pick_steps` 顺序尝试，末步 `unfiltered` 与旧 Plain fallback 一致。
+/// Meta 站落位：按 `roles[].pick_steps` 顺序尝试。
+///
+/// `trade_segments.json` 的 role 只表达一个核心策略，例如“必须包含但书/可露/巫恋，
+/// 优先命中某个 L3 shortcut”。普通散件兜底由调用方显式处理，避免 role 自己退化成
+/// 无核心干员的 plain 站。
 pub fn pick_trade_role_hit(
     role_id: &str,
     pool: &TradePool,
@@ -61,9 +66,17 @@ pub fn pick_trade_role_hit(
                 {
                     continue;
                 }
-                if let Ok(hit) =
-                    pick_with_shortcut_filter(&sub, table, &opts, &seg.shortcut_id, used)
-                {
+                let Some(hit_filter) = shortcut_hit_filter(&seg.shortcut_id) else {
+                    continue;
+                };
+                if let Ok(hit) = pick_with_step_filter(
+                    &sub,
+                    table,
+                    &opts,
+                    Some(hit_filter),
+                    step.must_include_name.as_deref(),
+                    used,
+                ) {
                     return Ok(hit);
                 }
             }
@@ -71,13 +84,47 @@ pub fn pick_trade_role_hit(
                 let Some(sid) = step.shortcut_id.as_deref() else {
                     continue;
                 };
-                if let Ok(hit) = pick_with_shortcut_filter(&sub, table, &opts, sid, used) {
+                let Some(hit_filter) = shortcut_hit_filter(sid) else {
+                    continue;
+                };
+                if let Ok(hit) = pick_with_step_filter(
+                    &sub,
+                    table,
+                    &opts,
+                    Some(hit_filter),
+                    step.must_include_name.as_deref(),
+                    used,
+                ) {
+                    return Ok(hit);
+                }
+            }
+            "filtered" => {
+                let Some(filter_id) = step.hit_filter.as_deref() else {
+                    continue;
+                };
+                let Some(hit_filter) = named_hit_filter(filter_id) else {
+                    continue;
+                };
+                if let Ok(hit) = pick_with_step_filter(
+                    &sub,
+                    table,
+                    &opts,
+                    Some(hit_filter),
+                    step.must_include_name.as_deref(),
+                    used,
+                ) {
                     return Ok(hit);
                 }
             }
             "unfiltered" => {
-                let report = search_trade_triples(&sub, table, &opts)?;
-                if let Ok(hit) = pick_disjoint_trade_hit(report.best, report.top, used) {
+                if let Ok(hit) = pick_with_step_filter(
+                    &sub,
+                    table,
+                    &opts,
+                    None,
+                    step.must_include_name.as_deref(),
+                    used,
+                ) {
                     return Ok(hit);
                 }
             }
@@ -102,24 +149,25 @@ pub fn pick_docus_trade_hit(
     pick_trade_role_hit("docus", pool, table, search_opts, layout, used, top_k)
 }
 
-fn pick_with_shortcut_filter(
+fn pick_with_step_filter(
     pool: &TradePool,
     table: &SkillTable,
     search_opts: &TradeSearchOptions,
-    shortcut_id: &str,
+    hit_filter: Option<fn(&TradeSearchHit) -> bool>,
+    must_include_name: Option<&str>,
     used: &HashSet<String>,
 ) -> Result<TradeSearchHit> {
-    let Some(hit_filter) = shortcut_hit_filter(shortcut_id) else {
-        return Err(crate::error::Error::msg(format!(
-            "no search hit_filter for shortcut {shortcut_id}"
-        )));
-    };
+    if hit_filter.is_none() && must_include_name.is_none() {
+        let report = search_trade_triples(pool, table, search_opts)?;
+        return pick_disjoint_trade_hit(report.best, report.top, used);
+    }
     let report = search_trade_triples_filtered(
         pool,
         table,
         search_opts,
         SearchTripleFilter {
-            hit_filter: Some(hit_filter),
+            must_include_name: must_include_name.map(str::to_string),
+            hit_filter,
             ..SearchTripleFilter::default()
         },
     )?;
@@ -130,6 +178,8 @@ fn shortcut_hit_filter(shortcut_id: &str) -> Option<fn(&TradeSearchHit) -> bool>
     match shortcut_id {
         "gsl_docus_solo" => Some(hit_docus_solo_shortcut),
         "gsl_docus_syracusa" => Some(hit_docus_syracusa_shortcut),
+        id if id.starts_with("gsl_closure") => Some(hit_closure_shortcut),
+        id if id.starts_with("gsl_witch") => Some(hit_witch_shortcut),
         "gsl_vina_lungmen" => Some(|hit| hit_shortcut_id(hit, "gsl_vina_lungmen")),
         "gsl_penguin_texlap_e0" => Some(|hit| hit_shortcut_id(hit, "gsl_penguin_texlap_e0")),
         "gsl_penguin_texangel_e2" => Some(|hit| hit_shortcut_id(hit, "gsl_penguin_texangel_e2")),
@@ -141,18 +191,39 @@ fn shortcut_hit_filter(shortcut_id: &str) -> Option<fn(&TradeSearchHit) -> bool>
     }
 }
 
+fn named_hit_filter(filter_id: &str) -> Option<fn(&TradeSearchHit) -> bool> {
+    match filter_id {
+        "docus_solo" => Some(hit_docus_solo_shortcut),
+        "docus_syracusa" => Some(hit_docus_syracusa_shortcut),
+        "closure" => Some(hit_closure_shortcut),
+        "blackkey_closure" => Some(hit_blackkey_closure_shortcut),
+        "witch" => Some(hit_witch_shortcut),
+        _ => None,
+    }
+}
+
 fn pick_disjoint_trade_hit(
     best: TradeSearchHit,
     top: Vec<TradeSearchHit>,
     used: &HashSet<String>,
 ) -> Result<TradeSearchHit> {
-    for hit in top.into_iter().chain(std::iter::once(best)) {
-        let names = trade_hit_names(&hit);
-        if names.iter().all(|n| !used.contains(n)) {
-            return Ok(hit);
-        }
+    top.into_iter()
+        .chain(std::iter::once(best))
+        .filter(|hit| trade_hit_names(hit).iter().all(|n| !used.contains(n)))
+        .max_by(|a, b| {
+            role_pick_sort_key(a)
+                .partial_cmp(&role_pick_sort_key(b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .ok_or_else(|| crate::error::Error::msg("no disjoint trade triple"))
+}
+
+fn role_pick_sort_key(hit: &TradeSearchHit) -> f64 {
+    if hit.unit_trade_per_day > 0.0 {
+        hit.unit_trade_per_day
+    } else {
+        hit.trade_pct
     }
-    Err(crate::error::Error::msg("no disjoint trade triple"))
 }
 
 fn trade_hit_names(hit: &TradeSearchHit) -> &[String] {
@@ -162,5 +233,129 @@ fn trade_hit_names(hit: &TradeSearchHit) -> &[String] {
         &hit.gold_names
     } else {
         &hit.originium_names
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instances::{default_instances_path, OperatorInstances};
+    use crate::layout::LayoutContext;
+    use crate::pool::build_trade_pool;
+    use crate::roster::Roster;
+    use crate::skill_table::{default_skill_table_path, SkillTable};
+    use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
+
+    fn fixtures(names: &[(&str, u8)]) -> (TradePool, SkillTable, LayoutContext) {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            names
+                .iter()
+                .map(|(name, elite)| ((*name).to_string(), *elite))
+                .collect::<HashMap<_, _>>(),
+        );
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        (pool, table, LayoutContext::search_baseline())
+    }
+
+    fn gold_opts(layout: &LayoutContext) -> TradeSearchOptions {
+        TradeSearchOptions {
+            top_k: 20,
+            layout: Arc::new(layout.clone()),
+            order_mode: TradeSearchOrderMode::Single(TradeOrderKind::Gold),
+            ..TradeSearchOptions::default()
+        }
+    }
+
+    #[test]
+    fn docus_role_requires_docus_and_never_degrades_to_plain() {
+        let (pool, table, layout) =
+            fixtures(&[("可露希尔", 2), ("古米", 2), ("夜刀", 2), ("斑点", 1)]);
+        let err = pick_trade_role_hit(
+            "docus",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("docus"),
+            "docus role should fail without docus instead of returning plain: {err}"
+        );
+    }
+
+    #[test]
+    fn closure_role_keeps_closure_without_blackkey() {
+        let (pool, table, layout) =
+            fixtures(&[("可露希尔", 2), ("古米", 2), ("夜刀", 2), ("斑点", 1)]);
+        let hit = pick_trade_role_hit(
+            "closure",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+        assert!(hit.names.iter().any(|n| n == "可露希尔"), "{hit:?}");
+        assert!(
+            hit.shortcut
+                .as_deref()
+                .is_none_or(|id| id.starts_with("gsl_closure")),
+            "{hit:?}"
+        );
+    }
+
+    #[test]
+    fn witch_role_uses_alpha_or_blank_when_beta_missing() {
+        let (pool, table, layout) =
+            fixtures(&[("巫恋", 2), ("龙舌兰", 2), ("古米", 2), ("夜刀", 2)]);
+        let hit = pick_trade_role_hit(
+            "witch",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+        assert!(hit.names.iter().any(|n| n == "巫恋"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "龙舌兰"), "{hit:?}");
+        assert_eq!(hit.shortcut.as_deref(), Some("gsl_witch_long_blank"));
+    }
+
+    #[test]
+    fn docus_role_can_use_high_eff_tools_when_they_outscore_penguin_pair() {
+        let (pool, table, layout) = fixtures(&[
+            ("但书", 2),
+            ("德克萨斯", 2),
+            ("拉普兰德", 2),
+            ("空弦", 2),
+            ("石英", 2),
+        ]);
+        let hit = pick_trade_role_hit(
+            "docus",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+
+        assert!(hit.names.iter().any(|n| n == "但书"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "石英"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "空弦"), "{hit:?}");
+        assert_eq!(hit.shortcut.as_deref(), Some("gsl_docus_solo"));
+        assert!(hit.unit_trade_per_day >= 16_000.0, "{hit:?}");
     }
 }

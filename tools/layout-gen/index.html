@@ -207,6 +207,9 @@
         <div id="dormBedsField" hidden>
           <label>床位数 dorm_beds</label><input type="number" id="dormBeds" min="1" max="8" value="5" />
         </div>
+        <div id="dormAmbienceField" hidden>
+          <label>有效等级 dorm_ambience_level</label><input type="number" id="dormAmbience" min="1" max="5" value="5" />
+        </div>
       </div>
     </div>
 
@@ -294,6 +297,7 @@
             room.factoryRecipe = defaultFactoryProduct(i, count);
           } else if (kind === "dormitory") {
             room.dormBeds = 5;
+            room.dormAmbienceLevel = 5;
           }
           next[key] = room;
         }
@@ -400,6 +404,7 @@
 
       const productField = document.getElementById("productField");
       const dormField = document.getElementById("dormBedsField");
+      const dormAmbienceField = document.getElementById("dormAmbienceField");
       const productSelect = document.getElementById("roomProduct");
 
       if (room.kind === "trading" || room.kind === "manufacture") {
@@ -416,8 +421,10 @@
       }
 
       dormField.hidden = room.kind !== "dormitory";
+      dormAmbienceField.hidden = room.kind !== "dormitory";
       if (room.kind === "dormitory") {
         document.getElementById("dormBeds").value = room.dormBeds ?? 5;
+        document.getElementById("dormAmbience").value = room.dormAmbienceLevel ?? room.dormBeds ?? 5;
       }
     }
 
@@ -480,6 +487,7 @@
             entry.product = { factory: { recipe: room.factoryRecipe || "gold" } };
           } else if (kind === "dormitory") {
             entry.dorm_beds = Number(room.dormBeds) || 5;
+            entry.dorm_ambience_level = Number(room.dormAmbienceLevel) || entry.dorm_beds;
           }
           rooms.push(entry);
         }
@@ -569,8 +577,9 @@
         if (kind === "manufacture" && r.product?.factory?.recipe) {
           room.factoryRecipe = r.product.factory.recipe;
         }
-        if (kind === "dormitory" && r.dorm_beds) {
-          room.dormBeds = r.dorm_beds;
+        if (kind === "dormitory") {
+          room.dormBeds = r.dorm_beds || 5;
+          room.dormAmbienceLevel = r.dorm_ambience_level || r.dorm_beds || 5;
         }
         rooms[key] = room;
       }
@@ -614,6 +623,13 @@
       if (!state.selected) return;
       const key = roomKey(state.selected.kind, state.selected.index);
       state.rooms[key].dormBeds = Number(e.target.value);
+      renderPreview();
+    });
+
+    document.getElementById("dormAmbience").addEventListener("input", (e) => {
+      if (!state.selected) return;
+      const key = roomKey(state.selected.kind, state.selected.index);
+      state.rooms[key].dormAmbienceLevel = Number(e.target.value);
       renderPreview();
     });
 

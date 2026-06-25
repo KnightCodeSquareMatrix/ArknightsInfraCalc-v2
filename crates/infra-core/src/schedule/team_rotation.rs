@@ -69,7 +69,7 @@ pub struct DailyTotals {
 /// αβγ 三队轮换报告。
 #[derive(Debug, Clone, Serialize)]
 pub struct TeamRotationReport {
-    /// peak 班编排计划（只读；α/β 切半与 γ plain 贸易均据此对齐）。
+    /// peak 班编排计划（只读；α/β 切半与 γ 贸易 role 填充均据此对齐）。
     pub peak_plan: AssignmentPlan,
     pub teams: Vec<TeamAssignment>,
     pub shifts: Vec<TeamShiftResult>,
@@ -109,7 +109,7 @@ fn split_production_facilities(blueprint: &BaseBlueprint) -> [FacilityHalf; 2] {
     halves
 }
 
-/// γ 替补半区：贸易 plain 贪心（不重搜 meta），制造/发电站绑定搜索。
+/// γ 替补半区：贸易沿用 core role 顺序，制造/发电站绑定搜索。
 #[allow(clippy::too_many_arguments)]
 fn assign_gamma_half(
     blueprint: &BaseBlueprint,
@@ -577,7 +577,7 @@ pub fn schedule_team_rotation(
     let [mut h1, mut h2] = split_production_facilities(blueprint);
     align_shift_binds_in_halves(&peak, operbox, &mut h1, &mut h2);
 
-    // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ plain 贸易替补。
+    // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ 走贸易 role 替补。
     let alpha = production_half_from_peak(&peak, &h1);
     let beta = production_half_from_peak(&peak, &h2);
     peak_plan

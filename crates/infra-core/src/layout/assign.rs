@@ -20,11 +20,11 @@ use crate::pool::{
     JIE_TRADE_NAME,
 };
 use crate::search::{
-    control_entry_plugin_fill, hit_blackkey_closure_shortcut, hit_closure_shortcut,
-    hit_witch_shortcut, pick_docus_trade_hit, search_control_combos, search_manufacture_triples,
-    search_power_assignment, search_trade_triples, search_trade_triples_filtered,
-    ControlFillPolicy, ControlSearchOptions, ManuSearchHit, ManuSearchOptions, PowerSearchOptions,
-    SearchTripleFilter, TradeSearchHit, TradeSearchOptions, MATATABI_CONSUMER_NAME,
+    control_entry_plugin_fill, hit_witch_shortcut, pick_docus_trade_hit, pick_trade_role_hit,
+    search_control_combos, search_manufacture_triples, search_power_assignment,
+    search_trade_triples, search_trade_triples_filtered, ControlFillPolicy, ControlSearchOptions,
+    ManuSearchHit, ManuSearchOptions, PowerSearchOptions, SearchTripleFilter, TradeSearchHit,
+    TradeSearchOptions, MATATABI_CONSUMER_NAME,
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
@@ -647,7 +647,9 @@ const BLACKKEY_NAME: &str = "黑键";
 const WITCH_TRADE_NAME: &str = "巫恋";
 const DOCUS_TRADE_NAME: &str = "但书";
 const CLOSURE_TRADE_NAME: &str = "可露希尔";
-const TRADE_CORE_REGISTRY_SYSTEMS: [&str; 6] = [
+/// 这些旧 `base_systems` 条目是 L3/兼容锚点，不再由 registry fixed 早占贸易站。
+/// 主路径改由 `trade_segments.roles` 的核心优先策略落位：但书 -> 可露希尔 -> 巫恋。
+const TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS: [&str; 6] = [
     "blackkey_closure",
     "witch_long_beta",
     "penguin_exusiai_lemuen",
@@ -1179,7 +1181,7 @@ fn trade_order_from_room(room: &crate::layout::blueprint::RoomBlueprint) -> Resu
 }
 
 fn skip_trade_core_registry_systems(skip: &mut HashSet<String>) {
-    for id in TRADE_CORE_REGISTRY_SYSTEMS {
+    for id in TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS {
         skip.insert(id.to_string());
     }
 }
@@ -1211,10 +1213,12 @@ fn pick_trade_meta_then_plain(
         }
     }
     if order == TradeOrderKind::Gold && !used.contains(CLOSURE_TRADE_NAME) {
-        if let Ok(hit) = pick_closure_trade_hit(
+        if let Ok(hit) = pick_trade_role_hit(
+            "closure",
             pool,
             table,
             trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            layout,
             used,
             options.top_k,
         ) {
@@ -1224,10 +1228,12 @@ fn pick_trade_meta_then_plain(
         }
     }
     if order == TradeOrderKind::Gold && !used.contains(WITCH_TRADE_NAME) {
-        if let Ok(hit) = pick_witch_trade_hit(
+        if let Ok(hit) = pick_trade_role_hit(
+            "witch",
             pool,
             table,
             trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            layout,
             used,
             options.top_k,
         ) {
@@ -1246,106 +1252,6 @@ fn pick_trade_meta_then_plain(
         },
         used,
         options.top_k,
-    )
-}
-
-fn pick_closure_trade_hit(
-    pool: &TradePool,
-    table: &SkillTable,
-    search_opts: TradeSearchOptions,
-    used: &HashSet<String>,
-    top_k: usize,
-) -> Result<TradeSearchHit> {
-    pick_core_trade_hit(
-        pool,
-        table,
-        search_opts,
-        CLOSURE_TRADE_NAME,
-        Some(hit_blackkey_closure_shortcut),
-        Some(hit_closure_shortcut),
-        used,
-        top_k,
-    )
-}
-
-fn pick_witch_trade_hit(
-    pool: &TradePool,
-    table: &SkillTable,
-    search_opts: TradeSearchOptions,
-    used: &HashSet<String>,
-    top_k: usize,
-) -> Result<TradeSearchHit> {
-    pick_core_trade_hit(
-        pool,
-        table,
-        search_opts,
-        WITCH_TRADE_NAME,
-        Some(hit_witch_shortcut),
-        None,
-        used,
-        top_k,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn pick_core_trade_hit(
-    pool: &TradePool,
-    table: &SkillTable,
-    search_opts: TradeSearchOptions,
-    core_name: &str,
-    preferred_filter: Option<fn(&TradeSearchHit) -> bool>,
-    fallback_filter: Option<fn(&TradeSearchHit) -> bool>,
-    used: &HashSet<String>,
-    top_k: usize,
-) -> Result<TradeSearchHit> {
-    let sub = filter_trade_pool(pool, used);
-    if sub.entries.len() < 3 {
-        return Err(Error::msg(format!(
-            "trade pool has {} ready operators (need 3)",
-            sub.entries.len()
-        )));
-    }
-    let mut opts = search_opts;
-    opts.top_k = top_k;
-
-    if let Some(hit_filter) = preferred_filter {
-        if let Ok(hit) = search_core_trade_hit(&sub, table, &opts, core_name, hit_filter, used) {
-            return Ok(hit);
-        }
-    }
-    if let Some(hit_filter) = fallback_filter {
-        if let Ok(hit) = search_core_trade_hit(&sub, table, &opts, core_name, hit_filter, used) {
-            return Ok(hit);
-        }
-    }
-
-    Err(Error::msg(format!("no meta trade triple for {core_name}")))
-}
-
-fn search_core_trade_hit(
-    pool: &TradePool,
-    table: &SkillTable,
-    search_opts: &TradeSearchOptions,
-    core_name: &str,
-    hit_filter: fn(&TradeSearchHit) -> bool,
-    used: &HashSet<String>,
-) -> Result<TradeSearchHit> {
-    let report = search_trade_triples_filtered(
-        pool,
-        table,
-        search_opts,
-        SearchTripleFilter {
-            must_include_name: Some(core_name.to_string()),
-            hit_filter: Some(hit_filter),
-            ..SearchTripleFilter::default()
-        },
-    )?;
-    pick_disjoint_from_report(
-        report.best,
-        report.top,
-        trade_hit_names,
-        used,
-        "no disjoint meta trade triple",
     )
 }
 

@@ -55,10 +55,10 @@ infra-cli.exe
     { "id": "power_3",   "kind": "power_plant",     "level": 3 },
     { "id": "meeting",   "kind": "meeting_room",    "level": 3 },
     { "id": "office_1",  "kind": "office",          "level": 3 },
-    { "id": "dorm_1",    "kind": "dormitory",       "level": 3, "dorm_beds": 5 },
-    { "id": "dorm_2",    "kind": "dormitory",       "level": 3, "dorm_beds": 5 },
-    { "id": "dorm_3",    "kind": "dormitory",       "level": 3, "dorm_beds": 5 },
-    { "id": "dorm_4",    "kind": "dormitory",       "level": 3, "dorm_beds": 5 }
+    { "id": "dorm_1",    "kind": "dormitory",       "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 },
+    { "id": "dorm_2",    "kind": "dormitory",       "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 },
+    { "id": "dorm_3",    "kind": "dormitory",       "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 },
+    { "id": "dorm_4",    "kind": "dormitory",       "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 }
   ]
 }
 ```

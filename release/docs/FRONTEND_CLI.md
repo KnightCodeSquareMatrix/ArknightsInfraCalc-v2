@@ -50,7 +50,7 @@ start release/layout-gen/index.html
 | 功能 | 说明 |
 |------|------|
 | 基建预设 | 243 / 153 / 333 / 252 / 342（贸/制/电数量） |
-| 房间编辑 | 等级、贸易订单（LMD/合成玉）、制造配方、宿舍床位 |
+| 房间编辑 | 等级、贸易订单（LMD/合成玉）、制造配方、宿舍床位、宿舍有效等级 |
 | 场景假设 | `drone_cap`、`sui_facility_count`、`dorm_occupant_count`、`monster_cuisine` 等 |
 | 导出 | 下载 `BaseBlueprint` JSON → 作为 CLI `--layout` |
 | 导入 | 加载已有 layout JSON 继续编辑 |
@@ -290,7 +290,8 @@ MAA 排班 JSON 已写入: out/243_maa.json
       "kind": "factory",
       "level": 3,
       "product": { "factory": { "recipe": "gold" } }
-    }
+    },
+    { "id": "dorm_1", "kind": "dormitory", "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 }
   ]
 }
 ```
@@ -299,6 +300,11 @@ MAA 排班 JSON 已写入: out/243_maa.json
 
 贸易 `order`：`gold` | `originium` → MAA 导出为 `LMD` | `Orundum`。  
 制造 `recipe`：`gold` | `battle_record` | `originium` → `Pure Gold` | `Battle Record` | `Originium Shard`。
+
+宿舍字段：
+
+- `dorm_beds`：宿舍容量，用于 MAA 宿舍补人。
+- `dorm_ambience_level`：技能原文“每间宿舍每级”的有效等级，满宿舍一般为 5；旧布局未提供时 CLI 会兼容使用 `dorm_beds`，再退回 `level`。
 
 参考样例：`release/fixtures/layout.json` 或 `data/fixtures/243/layout.json`。**推荐用 layout-gen 导出，字段与此一致。**
 

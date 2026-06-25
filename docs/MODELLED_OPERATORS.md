@@ -68,7 +68,7 @@ L1 自然回归：`reg_ling_jie_yaxin_natural` 锁定中枢灵知 E2 + 贸易站
 
 与佩佩共用 `PeerEffAbsorb` 原语；巫恋 `rate_per_peer=45`，佩佩 `rate=0`（只清零、不吸收）。
 
-**编排（定稿）**：`base_systems.json` → `witch_long_beta`（巫恋+龙舌兰固定，第三人裁缝β `pick_one`）→ L3 `gsl_witch_long_beta`（138%贸+46%金）。不进 `meta_chain`；243 与但书链各占一贸站。其余 `gsl_witch_*` 档位仅 L3 分类/回归，不扩 registry。
+**编排**：巫恋是贸易 core priority，不是固定裁缝β三人组。`trade_segments.roles.witch` 强制包含精二巫恋，并通过 `gsl_witch_*` 匹配龙舌兰精二 + 裁缝 β / α / 空白第三人等 fallback；`witch_long_beta` 只保留为历史锚点 / L3 分档，不再作为主路径 fixed registry 早占站。
 
 ## 4.6 佩佩
 

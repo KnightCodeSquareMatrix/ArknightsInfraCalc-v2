@@ -41,7 +41,7 @@ operbox + blueprint
 │ 阶段 A：编排 + producer 落位 + 分设施搜索           │
 │  · System → Plan → Execute 先认领 registry 体系     │
 │  · 中枢  C(n,k)  k∈[1,5]（search_control_combos）   │
-│  · 贸易  registry 站由编排认领；余站 C(n,3)         │
+│  · 贸易  余站按 docus/closure/witch role 后 C(n,3) │
 │  · 制造  每产线类型 C(n,3)（同 243c split-line）   │
 │  · 发电  每站 1 人贪心（已有 search_power_*）      │
 │  · 宿舍   producer 房（森西等）按 assignment 定人   │
@@ -74,12 +74,12 @@ operbox + blueprint
 2. **控制中枢补位** `control`（木天蓼 / 全局贸易·制造 % 等；不足 5 人时用 `search_control_combos` 补满）
 3. **宿舍 / 感知 producer**（如森西、迷迭香感知源；先落位再 `resolve_base`）
 4. **发电各站**（每站 1 人，`search_power_assignment` 同款 `used`）
-5. **制造各产线**（按蓝图 `manu_line_scenario`：赤金线、经验线等同组三人）
-6. **贸易余站**（未被 registry 占用的普通贸易站）
+5. **贸易余站**（未被 registry 占用的金单贸易站先走 `docus → closure → witch → plain` role；源石单走 plain）
+6. **制造各产线**（按蓝图 `manu_line_scenario`：赤金线、经验线等同组三人）
 
 同类型多房间：按蓝图 `rooms` 数组顺序或稳定 `room_id` 字典序。
 
-**同站 meta 特例**：普通 priority 下 `witch_long_beta` 高于 `blackkey_closure`。若 CrossStation 阶段已选中 `docus_syracusa`，且迷迭香 / 黑键 / 可露希尔 / 吉星均 E2 并存在 E2 感知源，则 SameStation 阶段启用 `docus_closure_long_shift_active`，临时让 `blackkey_closure` 覆盖龙巫；这是公孙 243 长班取舍，不是全局调权。
+**贸易 core priority**：但书、可露希尔、巫恋不是固定三人组。`assign_shift` 会跳过 `witch_long_beta`、`blackkey_closure`、企鹅、推王等旧 registry 早占站条目，改在贸易余站调用 `trade_segments.roles`。完整叙拉古链仍优先；缺链时但书仍配最高可用工具人。可露缺黑键仍上可露；巫恋缺裁缝 β 时走 α / 空白第三人 fallback。
 
 ---
 
@@ -200,6 +200,7 @@ operbox + blueprint
 | `schedule/base_rotation.rs` | `schedule_base_rotation_a_b_a`（A-B-A legacy）+ `score_base_assignment` |
 | `schedule/team_rotation.rs` | `schedule_team_rotation`：αβγ 三队轮换 |
 | `search/control.rs` | `search_control_combos`：中枢 C(n,k) + `ControlFillPolicy` |
+| `search/role_pick.rs` | 贸易 core role：`docus` / `closure` / `witch` fallback 链 |
 | `search/trade.rs` / `manufacture.rs` / `power.rs` | 分设施搜索 |
 | `pool/trade.rs` | `filter_trade_pool` |
 | `pool/base.rs` | 泛型 `PoolCore<T>`、`filter_pool` |

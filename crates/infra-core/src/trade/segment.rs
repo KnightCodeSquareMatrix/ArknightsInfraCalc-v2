@@ -59,6 +59,10 @@ pub struct RolePickStep {
     #[serde(default)]
     pub shortcut_id: Option<String>,
     #[serde(default)]
+    pub hit_filter: Option<String>,
+    #[serde(default)]
+    pub must_include_name: Option<String>,
+    #[serde(default)]
     pub only_if_producer: bool,
 }
 
@@ -205,6 +209,8 @@ mod tests {
         assert!(cache.segment("vina_lungmen").is_some());
         assert!(cache.segment("penguin_exusiai_lemuen").is_some());
         assert!(cache.role("docus").is_some());
+        assert!(cache.role("closure").is_some());
+        assert!(cache.role("witch").is_some());
         assert!(cache.role("meta_vina").is_some());
     }
 

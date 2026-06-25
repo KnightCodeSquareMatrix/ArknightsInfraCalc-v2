@@ -13,8 +13,8 @@
 
 | 职责 | 应在哪 | 当前边界 |
 |------|--------|------|
-| 选体系 / 固定组合进编 | **编排** | `layout/orchestrate::{build_plan, execute_plan}`；`claim_base_systems` 仅兼容 / 测试辅助 |
-| 填散件第三人 | **搜索（子集）** | `assign_trade_remainder` / 制造 / 发电贪心填空房 |
+| 选跨站体系 / 固定 bond 进编 | **编排** | `layout/orchestrate::{build_plan, execute_plan}`；`claim_base_systems` 仅兼容 / 测试辅助 |
+| 贸易核心优先 / 填散件第三人 | **role policy + 搜索（子集）** | `trade_segments.roles` + `search/role_pick.rs`；`assign_trade_remainder` / 制造 / 发电贪心填空房 |
 | 算全局池 / 中枢注入 | **resolve** | `resolve_base` + `cross_facility` / `global_resource` |
 | 算同房效率 / 产量 | **L1–L3 solve** | 只消费编制结果，不负责发现 meta 组合 |
 
@@ -75,7 +75,7 @@ crates/infra-core/src/layout/orchestrate/
   execute.rs   # 落位：fixed / bond / core+segment / pick_one
 ```
 
-`assign_shift` 当前主线为：seed → `build_plan` → `execute_plan` → producer/resolve → 发电/制造/贸易余站贪心填充。
+`assign_shift` 当前主线为：seed → `build_plan` → `execute_plan` → producer/resolve → 发电 → 贸易 core role / plain → 制造贪心填充。贸易早于制造填充，避免但书、可露希尔、巫恋等核心和其工具人被制造站提前占用。
 
 ---
 
@@ -111,37 +111,36 @@ crates/infra-core/src/layout/orchestrate/
 | 文件 | 角色 |
 |------|------|
 | `data/base_systems.json` | System 目录：`tier`（`cross_station` / `same_station`）、priority、`exclusive_group`、slots |
-| `data/trade_segments.json` | producer 条件 + consumer → `shortcut_id` |
+| `data/trade_segments.json` | producer 条件 + consumer → `shortcut_id`；`roles` 声明贸易核心优先 fallback 链 |
 | `data/trade_shortcuts.json` | L3 组合级 trade%/gold% 锚点 |
 | `layout/system_integrity/` | **已迁出编排主路径**；迷迭香感知链待 Phase 4 `cross_facility` + 计算效率后进编 |
 
-### 4.3 贸易 meta：优先注册的组合（工具人表）
+### 4.3 贸易 meta：跨站体系、同站锚点与核心优先
 
 来源：`MECHANICS_REGISTRY.csv` 中「当与 X 在同一个贸易站」+ 公孙工具人表。  
-`meta_chain` 互斥组内四选一：叙拉古 / 喀兰 / 推王 / 怪猎（见 `base_systems.json` `exclusive_group`）。
+`base_systems.json` 保留跨站体系和历史同站锚点；当前 `assign_shift` 主路径会跳过 `witch_long_beta`、`blackkey_closure`、企鹅、推王等低优先 registry 抢站条目，贸易余站改由 `data/trade_segments.json` 的 `roles` 执行核心优先。
 
-#### 已落地或数据齐套
+#### 已落地的数据与运行时归属
 
-| System id | fill_mode | 同房 bond（CSV 技能） | L3 shortcut | 状态 |
-|-----------|-----------|----------------------|-------------|------|
-| `docus_syracusa` | fixed | 贝洛内↔伺夜（未偿还的债务） | `gsl_docus_syracusa` | ✅ registry + shortcut；`execute_plan` 落位 |
-| `ling_jie_karlan` | control-only | 灵知 E2 中枢激活 `karlan_precision`；精1孑由贸易搜索注入 | L1 自然计算；`gsl_ling_jie_yaxin` 仅参考锚点 | ✅ registry control slot；无 active segment |
-| `witch_long_beta` | **fixed（定稿）** | 巫恋+龙舌兰固定核；第三人裁缝β `pick_one` | `gsl_witch_long_beta` | ✅ registry fixed；无 `meta_chain`；普通场景可与但书链共存，full E2 但书长班上下文让位给 `blackkey_closure` |
-| `vina_lungmen` | fixed | 摩根↔推王（帮派指南针，站内 GSG tag）+ 戴菲恩中枢 producer | `gsl_vina_lungmen`（vault 满配 135% 贸） | ✅ registry + producer-gated segment |
-| `blackkey_closure` | fixed | 黑键+可露希尔+吉星；默认低于龙巫，特定但书长班上下文覆盖 | `gsl_blackkey_closure` | ✅ registry + shortcut + segment |
-| `rosemary_perception*` | **global effect** | 感知 producer 落位 + `cross_facility` 算 layout → 贪心选型 | — | ✅ 已移出编排；`assign_perception_producers` + scope=global |
+| id / role | 类型 | L3 shortcut | 当前运行时 |
+|-----------|------|-------------|------------|
+| `docus_syracusa` / role `docus` | 跨站 meta + 但书核心优先 | `gsl_docus_syracusa` / `gsl_docus_solo` | 完整叙拉古链优先；缺伺夜/贝洛内时仍强制包含但书配最高可用工具人 |
+| `closure` | 可露希尔核心优先 | `gsl_blackkey_closure` / `gsl_closure_*` | 强制包含可露希尔；优先黑键可露锚点，缺黑键仍保留可露 |
+| `witch` | 巫恋核心优先 | `gsl_witch_*` | 强制包含精二巫恋；龙舌兰优先，裁缝 β / α / 空白第三人 fallback |
+| `ling_jie_karlan` | control producer + L1 自然搜索 | `gsl_ling_jie_yaxin` 仅参考 | 只认领灵知 E2 中枢；精1孑由贸易搜索注入 |
+| `vina_lungmen` / `penguin_*` | 低优先 bond / segment 锚点 | `gsl_vina_lungmen` / `gsl_penguin_*` | 保留 L3 锚点和旧测试；普通排班不早于但书/可露/巫恋核心抢站 |
+| `rosemary_perception*` | **global effect** | — | 已移出编排；`assign_perception_producers` + scope=global |
 
-#### 243 但书长班上下文策略
+#### 贸易核心 role 顺序
 
-`blackkey_closure` 的 `base_systems.json` 普通 priority 低于 `witch_long_beta`，因此普通场景仍是龙巫优先。
+贸易金单余站按 `pick_trade_meta_then_plain` 尝试：
 
-当以下条件同时成立时，`layout/system.rs::docus_closure_long_shift_active` 会在 SameStation 选型阶段临时提升 `blackkey_closure`：
+1. `docus`：完整叙拉古链优先；否则 `gsl_docus_solo`；否则仍只搜索包含但书的三人组；无但书则失败，不退化成“无但书 plain”。
+2. `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用三人组。
+3. `witch`：`gsl_witch_*`；支持龙舌兰精二 + 裁缝 β / α / 空白第三人等 fallback。
+4. plain：散件工具人三人组，且排除黑键与巫恋同房冲突。
 
-- `docus_syracusa` 已在 CrossStation 阶段选中；
-- 迷迭香 / 黑键 / 可露希尔 / 吉星均 E2；
-- 存在 E2 感知源：絮雨 / 八幡海铃 / 焰狐龙梓兰之一。
-
-该策略对齐公孙 243 高配三队：α 队为但书 + 伺夜 + 贝洛内，上 S1+S3；β 队为可露希尔 + 黑键 + 吉星，上 S1+S2。它是命名上下文 policy，不是全局调高可露希尔站，也不是匿名综合评分。
+这条顺序是核心优先策略，不是固定三人组优先级。完整叙拉古链仍是跨站 meta；八幡海铃、伺夜、贝洛内不是普通贸易散件。
 
 #### Phase 2 待建（贸易 bond）
 
@@ -214,16 +213,15 @@ Producer 前提（跨房，非 global pool）：
 
 - [x] registry `fixed` / `bond` 落位（`execute_plan`）；贸易余站 `assign_trade_remainder` 贪心
 - [x] **已移除 / 不再存在**：`apply_blackkey_colocate_rule`、`assign_trade_meta`、`complete_trade_anchor_rooms`（旧黑键贸锚）
-- [x] 黑键：`blackkey_closure` 作为 low-priority same-station registry；但书长班上下文中覆盖 `witch_long_beta`，普通场景仍低于龙巫
-- [x] **巫恋组定稿**：`witch_long_beta` registry fixed；不做 `trade_role` / 多 System 变体
-- [ ] `trade_role` / `role_pick`（仅余未进 registry 的散件；巫恋已排除）
-- [x] **验收**：243 full E2 但书长班 = 但书链 + 可露希尔黑键吉星；缺但书时龙巫仍优先于可露希尔站；不靠并站 patch
+- [x] 贸易核心 role：`docus` / `closure` / `witch` 写入 `trade_segments.json`，由 `search/role_pick.rs` 统一执行
+- [x] `assign_shift` 主路径跳过 `witch_long_beta`、`blackkey_closure`、企鹅、推王等旧 registry 早占站条目，改由 role policy 选择
+- [x] **验收**：缺伺夜/贝洛内时但书仍进站；缺黑键时可露仍进站；缺裁缝 β 时巫恋走 α / blank fallback；小饼类账号保留但书、可露、龙巫
 
-#### 巫恋组（定稿）
+#### 巫恋 role
 
-- **固定核**：精二巫恋 + 精二龙舌兰 + 裁缝β第三人（`pick_one` 卡夫卡/柏喙/明椒/折光）。
-- **编排**：仅 `witch_long_beta`；无 `exclusive_group`。普通双贸可与但书链共存；但在公孙 243 full E2 长班上下文中会让位给 `blackkey_closure`。
-- **L3**：进编锚 `gsl_witch_long_beta`；`gsl_witch_long_alpha` 等仅 verify / `classify_witch_room`，不进编。
+- **核心**：精二巫恋；龙舌兰精二优先。
+- **fallback**：裁缝 β → 裁缝 α → 空白第三人；对应 `gsl_witch_long_beta` / `gsl_witch_long_alpha` / `gsl_witch_long_blank` 等。
+- **编排**：不再把 `witch_long_beta` 当固定三人组早占站；由 role policy 在贸易余站搜索里强制包含巫恋。
 
 ### Phase 4 — global effect 收拢（与编排并行）
 
@@ -239,7 +237,7 @@ Producer 前提（跨房，非 global pool）：
 
 ### Phase 5 — team-rotation 对齐
 
-- [x] α/β 从 peak 切半保留编排已认领贸易 meta；γ 走 `assign_team_gamma_half`（plain 贸易，不重搜 meta/但书置顶）
+- [x] α/β 从 peak 切半保留编排已认领贸易 meta；γ 走 `assign_team_gamma_half`（同样使用 docus → closure → witch → plain 的贸易 role 顺序）
 - [x] `assign_shift_with_plan` + `TeamRotationReport.peak_plan` 供轮换层只读编排计划
 
 ---

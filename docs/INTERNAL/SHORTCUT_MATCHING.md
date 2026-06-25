@@ -22,17 +22,17 @@
 | 字段 | 含义 |
 |------|------|
 | `segments[]` | producer 条件 + `consumer` 种类 + `shortcut_id` + `priority` |
-| `roles[].pick_steps` | meta 站落位顺序：`segment` → `shortcut` → `unfiltered` |
+| `roles[].pick_steps` | meta 站落位顺序：`segment` / `shortcut` / `filtered` / `unfiltered`；可带 `must_include_name` |
 
 **Producer**（`GlobalInjectManifest`）：`haru_e2_in_control`、`daifeen_e2_in_control` 等；`karlan_precision` 仍是全局注入，但喀兰市井孑已改走 L1 自然计算，不再注册 active L3 segment。
 
 **Consumer**（Rust 匹配器）：`docus_syracusa`、`blackkey_closure`、`vina_lungmen`、`penguin_*`。
 
-**`roles.docus` fallback 链**：
+**贸易 core role fallback 链**：
 
-1. `segment/docus_syracusa`（仅 `haru_e2_in_control` 时尝试）→ `gsl_docus_syracusa` trade=200 / gold=55（含阿米娅7%、贸易站人头3%、中枢八幡海铃E2）
-2. `shortcut/gsl_docus_solo` → L1 动态 `order_eff_pre`
-3. `unfiltered` → 无 filter 全池（公孙盒无但书时 Plain）
+- `docus`：`segment/docus_syracusa`（仅 `haru_e2_in_control` 时尝试）→ `gsl_docus_syracusa`，再 `gsl_docus_solo`，最后 `unfiltered + must_include_name=但书`。无但书时 role 失败，由调用方进入下一个 role 或 plain；不会把无但书 plain 误报为 docus。
+- `closure`：`gsl_blackkey_closure` 优先，再 `closure` 分档，最后 `unfiltered + must_include_name=可露希尔`。黑键缺失不影响可露希尔核心上站。
+- `witch`：`filtered hit_filter=witch + must_include_name=巫恋`，由 `classify_witch_room` 覆盖龙舌兰精二 + 裁缝 β / α / 空白第三人等 fallback。
 
 `resolve_trade_shortcut` 在巫恋/可露之前调用 `match_registered_trade_segment`（按 `priority`）。
 
@@ -40,9 +40,9 @@
 
 数据：`data/base_systems.json`（每 System 含 `"tier"` 字段：`cross_station` / `same_station`）；主路径代码：`layout/orchestrate::{build_plan, execute_plan}`，其中 `build_plan` 调用 `select_registry_systems`。`layout/system.rs::claim_base_systems` 仅作兼容 / 测试辅助入口。
 
-在 `assign_shift` **开头**（高峰班）由 `build_plan` 按 **tier 两阶段**贪心认领固定组合：先 `CrossStation`（跨站体系）、后 `SameStation`（同站组合），各阶段内按 `priority` 排序，`exclusive_group` 互斥态跨阶段共享。随后 `execute_plan` 先占 `control` / `trade_post` 等空房并写入 `used`；后续设施贪心跳过已占房间。中枢若只钉了体系内 1 人（如海铃），`assign_control` 会**补满剩余席位**而非整房重搜。
+在 `assign_shift` **开头**（高峰班）由 `build_plan` 按 **tier 两阶段**贪心认领真正的跨站体系 / fixed bond：先 `CrossStation`（跨站体系）、后 `SameStation`（同站组合），各阶段内按 `priority` 排序，`exclusive_group` 互斥态跨阶段共享。随后 `execute_plan` 先占 `control` / `trade_post` 等空房并写入 `used`；后续设施贪心跳过已占房间。中枢若只钉了体系内 1 人（如海铃），`assign_control` 会**补满剩余席位**而非整房重搜。
 
-来源：公孙长乐工具人表（`scripts/build_base_systems_from_gongsun_xlsx.py` 维护小目录）。`exclusive_group` 互斥（如 `meta_chain`：叙拉古/喀兰/推王/怪猎四选一）；`pick_one` 在认领时按顺序取盒内第一个可用干员（如裁缝β四选一）。贸易 L3 锚点仍在 `trade_shortcuts.json`，但 `gsl_ling_jie_yaxin` 仅作参考锚点，不参与 active 匹配。
+来源：公孙长乐工具人表（`scripts/build_base_systems_from_gongsun_xlsx.py` 维护小目录）。`exclusive_group` 互斥（如 `meta_chain`：叙拉古/喀兰/推王/怪猎四选一）；`pick_one` 在认领时按顺序取盒内第一个可用干员。贸易核心优先（但书、可露希尔、巫恋）不再依赖 `base_systems` fixed 认领；`assign_shift` 会跳过 `witch_long_beta`、`blackkey_closure`、企鹅、推王等旧抢站条目，改由 `roles` 搜索。贸易 L3 锚点仍在 `trade_shortcuts.json`，但 `gsl_ling_jie_yaxin` 仅作参考锚点，不参与 active 匹配。
 
 ## 匹配优先级（`resolve_trade_shortcut`）
 

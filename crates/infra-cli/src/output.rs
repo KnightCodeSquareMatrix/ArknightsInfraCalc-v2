@@ -1097,7 +1097,10 @@ fn format_shift_station_line(
         .find(|r| r.room_id == room_id)
         .map(|r| {
             if r.trade_score != 0.0 {
-                format!(" [贸易效率{:.0}%]", r.trade_skill_pct)
+                format!(
+                    " [贸易倍率{:.2}x / 订单{:.0}% / 技能{:.0}%]",
+                    r.trade_score, r.trade_pct, r.trade_skill_pct
+                )
             } else if r.manu_score != 0.0 {
                 format!(" [产出{:.0}%]", r.manu_score)
             } else if r.power_score != 0.0 {
@@ -1341,7 +1344,10 @@ fn write_base_rotation_text(
                 .find(|r| r.room_id == *room_id)
                 .map(|r| {
                     if r.trade_score != 0.0 {
-                        format!(" [贸易效率{:.0}%]", r.trade_skill_pct)
+                        format!(
+                            " [贸易倍率{:.2}x / 订单{:.0}% / 技能{:.0}%]",
+                            r.trade_score, r.trade_pct, r.trade_skill_pct
+                        )
                     } else if r.manu_score != 0.0 {
                         format!(" [产出{:.0}%]", r.manu_score)
                     } else if r.power_score != 0.0 {

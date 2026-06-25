@@ -293,6 +293,7 @@ emit_bench（meta.layout = 蓝图路径）
 
 - 结构与 `data/layout/243c.json` 一致：`rooms[]`（`kind` / `level` / `product`）、`scenario`（`dorm_occupant_count`、`sui_facility_count`、`initial_global` 等）、可选 `template` 元数据。
 - 贸易订单分布、制造产线数**从 `rooms` 自动推导**，不必与 243c 相同（例如 2 贸易站 = 1 赤金 + 1 源石）。
+- 宿舍推荐同时填写 `dorm_beds`（MAA 宿舍容量）和 `dorm_ambience_level`（“每间宿舍每级”技能读取值；满宿舍通常为 5）；旧布局未填写 `dorm_ambience_level` 时兼容读取 `dorm_beds`。
 - `scenario` 在无进驻编制时作为布局聚合量回退（精英设施数、宿舍人数等）。
 - 进驻编制（`BaseAssignment`）**可通过 `--assignment` 传入**（`layout test --assignment <path>` 或 `layout eval --assignment <path>`）；不传时**默认调用 `assign_base_greedy`** 自动生成全基建宏观落位。
 - 怪猎木天蓼 / 精2 全局注入在 `infra-core` 用 `snhunt_default_assignment()`、`resolve_snhunt_*_layout()` 测；完整模拟需在蓝图 JSON 的 assignment 中编 `control`（**火龙S黑角** + **麒麟R夜刀**，≠ 三星黑角/夜刀）。

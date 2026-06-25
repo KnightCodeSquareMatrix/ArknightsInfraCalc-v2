@@ -56,14 +56,46 @@
         {
           "kind": "segment",
           "segment_id": "docus_syracusa",
-          "only_if_producer": true
+          "only_if_producer": true,
+          "must_include_name": "但书"
         },
         {
           "kind": "shortcut",
-          "shortcut_id": "gsl_docus_solo"
+          "shortcut_id": "gsl_docus_solo",
+          "must_include_name": "但书"
         },
         {
-          "kind": "unfiltered"
+          "kind": "unfiltered",
+          "must_include_name": "但书"
+        }
+      ]
+    },
+    {
+      "id": "closure",
+      "pick_steps": [
+        {
+          "kind": "shortcut",
+          "shortcut_id": "gsl_blackkey_closure",
+          "must_include_name": "可露希尔"
+        },
+        {
+          "kind": "filtered",
+          "hit_filter": "closure",
+          "must_include_name": "可露希尔"
+        },
+        {
+          "kind": "unfiltered",
+          "must_include_name": "可露希尔"
+        }
+      ]
+    },
+    {
+      "id": "witch",
+      "pick_steps": [
+        {
+          "kind": "filtered",
+          "hit_filter": "witch",
+          "must_include_name": "巫恋"
         }
       ]
     },

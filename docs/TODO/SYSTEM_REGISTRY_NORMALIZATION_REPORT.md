@@ -1,8 +1,9 @@
 # 组合体系规范化审计报告
 
-> 状态：ready  
-> 来源：用户要求；`data/MECHANICS_REGISTRY.csv` 是全干员基建技能原文真源  
+> 状态：doing
+> 来源：用户要求；`data/MECHANICS_REGISTRY.csv` 是全干员基建技能原文真源
 > 目标：把“中间产物 / 跨站 meta / 同站组合 / 核心优先 / 散件工具人”重新分层，避免继续把不同语义塞进同一张组合表。
+> 进度：Phase 0/1 已落地；Phase 2 起的跨站 / 全局资源拆清仍待做。
 
 ## 1. 审计结论
 
@@ -186,6 +187,8 @@
 
 ### Phase 0：冻结真源和命名
 
+状态：已落地。
+
 - 明确 `MECHANICS_REGISTRY.csv` 是全干员技能原文真源。
 - 每个组合/体系文档必须写 `source_refs`。
 - 文档中停止使用“固定组合”描述 core priority。
@@ -195,6 +198,8 @@
 - `docs/ORCHESTRATION_LAYER.md`、`docs/BASE_ASSIGNMENT.md`、`docs/SCHEDULE_ROTATION.md` 中 `witch_long_beta fixed`、`blackkey_closure fixed` 的描述被替换。
 
 ### Phase 1：贸易 meta 角色化
+
+状态：已落地。`trade_segments.json` 已补 `roles.docus` / `roles.closure` / `roles.witch`，`assign_shift` 主路径跳过旧 fixed 抢站条目，由 `search/role_pick.rs` 执行核心优先。
 
 目标排序：
 

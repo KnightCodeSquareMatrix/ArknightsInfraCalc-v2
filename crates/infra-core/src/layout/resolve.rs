@@ -788,7 +788,7 @@ mod tests {
         assert_eq!(layout.manufacture_station_count, 4);
         assert_eq!(layout.manu_recipe_kinds, 2);
         assert_eq!(layout.meeting_max_level, 3);
-        assert_eq!(layout.dorm_level_sum, 12);
+        assert_eq!(layout.dorm_level_sum, 20);
         assert_eq!(layout.dorm_occupant_count, 20);
         assert_eq!(layout.elite_facility_count, 0);
         assert_eq!(layout.sui_facility_count, 2);

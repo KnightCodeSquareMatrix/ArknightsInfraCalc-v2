@@ -193,7 +193,7 @@ impl LayoutContext {
     pub fn search_baseline_legacy() -> Self {
         Self {
             meeting_max_level: 3,
-            dorm_level_sum: 12,
+            dorm_level_sum: 20,
             manu_recipe_kinds: 2,
             sui_facility_count: 2,
             dorm_occupant_count: DEFAULT_DORM_OCCUPANT_COUNT,

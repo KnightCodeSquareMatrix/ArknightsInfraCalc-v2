@@ -12,8 +12,8 @@ use crate::pool::{
 };
 use crate::roster::Roster;
 use crate::search::{
-    hit_closure_shortcut, hit_witch_shortcut, pick_docus_trade_hit, search_trade_triples,
-    search_trade_triples_filtered, SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
+    pick_docus_trade_hit, pick_trade_role_hit, search_trade_triples, search_trade_triples_filtered,
+    SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
@@ -108,7 +108,7 @@ fn commit_station(
     })
 }
 
-/// Shift A：龙巫 → 可露 → 但书，再按 score 贪心填满（通常正好三站）。
+/// Shift A：但书 → 可露 → 龙巫，再按 score 贪心填满（通常正好三站）。
 pub fn schedule_meta_shift_from_pool(
     pool: &TradePool,
     table: &SkillTable,
@@ -124,7 +124,7 @@ pub fn schedule_meta_shift_from_pool(
         )));
     }
 
-    // Meta 站（但书 → 龙巫 → 可露）按单站金条订单搜；Stations 模式会同时过滤源石线，
+    // Meta 站（但书 → 可露 → 龙巫）按单站金条订单搜；Stations 模式会同时过滤源石线，
     // 而 gsl_witch 等 shortcut 仅出现在金条订单，导致过滤失败并 fallback 为 Plain。
     let mut search_opts = per_station_search_options(options);
     search_opts.top_k = 1;
@@ -133,13 +133,14 @@ pub fn schedule_meta_shift_from_pool(
     let mut stations = Vec::with_capacity(TRADE_STATIONS_PER_SHIFT);
     let mut total_score = 0.0;
 
-    let meta_slots: [(TradeStationRole, bool); 3] = [
-        (TradeStationRole::Docus, true),
-        (TradeStationRole::Witch, false),
-        (TradeStationRole::Closure, false),
+    let meta_slots: [(TradeStationRole, &str); 3] = [
+        (TradeStationRole::Docus, "docus"),
+        (TradeStationRole::Closure, "closure"),
+        (TradeStationRole::Witch, "witch"),
     ];
 
-    for (station_index, (role, is_docus)) in meta_slots.into_iter().enumerate() {
+    for (role, role_id) in meta_slots {
+        let station_index = stations.len();
         let sub = filter_trade_pool(pool, &used);
         if sub.entries.len() < WORKERS_PER_STATION {
             return Err(Error::msg(format!(
@@ -150,33 +151,53 @@ pub fn schedule_meta_shift_from_pool(
                 used.len()
             )));
         }
-        let pick = if is_docus {
-            let hit = pick_docus_trade_hit(
+        let hit = if role == TradeStationRole::Docus {
+            pick_docus_trade_hit(
                 &sub,
                 table,
                 search_opts.clone(),
                 search_opts.layout.as_ref(),
                 &used,
                 search_opts.top_k,
-            )?;
-            StationPick { hit, role }
+            )
         } else {
-            let hit_filter = match role {
-                TradeStationRole::Witch => hit_witch_shortcut,
-                TradeStationRole::Closure => hit_closure_shortcut,
-                _ => unreachable!(),
-            };
-            pick_station(
+            pick_trade_role_hit(
+                role_id,
                 &sub,
                 table,
-                &search_opts,
-                SearchTripleFilter {
-                    hit_filter: Some(hit_filter),
-                    ..SearchTripleFilter::default()
-                },
-                role,
-            )?
+                search_opts.clone(),
+                search_opts.layout.as_ref(),
+                &used,
+                search_opts.top_k,
+            )
         };
+        let Ok(hit) = hit else {
+            continue;
+        };
+        let pick = StationPick { hit, role };
+        total_score += pick.hit.score;
+        stations.push(commit_station(pick, station_index, &mut used)?);
+    }
+
+    while stations.len() < TRADE_STATIONS_PER_SHIFT {
+        let station_index = stations.len();
+        let sub = filter_trade_pool(pool, &used);
+        if sub.entries.len() < WORKERS_PER_STATION {
+            return Err(Error::msg(format!(
+                "第 {} 班贸易站 {} 可用干员不足 {} 人（已用 {} 人）",
+                shift_index + 1,
+                station_index + 1,
+                WORKERS_PER_STATION,
+                used.len()
+            )));
+        }
+        let pick = pick_station(
+            &sub,
+            table,
+            &search_opts,
+            SearchTripleFilter::default(),
+            TradeStationRole::Plain,
+        )?;
         total_score += pick.hit.score;
         stations.push(commit_station(pick, station_index, &mut used)?);
     }
@@ -366,7 +387,7 @@ fn assert_disjoint(a: &HashSet<String>, b: &HashSet<String>, label: &str) -> Res
     }
 }
 
-/// Three-shift A-B-A: shift1 龙巫/可露/但书；shift2 精0孑带队 + 余量；shift3 复用 shift1。
+/// Three-shift A-B-A: shift1 但书/可露/龙巫；shift2 精0孑带队 + 余量；shift3 复用 shift1。
 pub fn schedule_trade_rotation_a_b_a(
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -445,15 +466,14 @@ mod tests {
         assert_eq!(report.shifts[0].stations.len(), 3);
         assert_eq!(report.shifts[2].workers, report.shifts[0].workers);
 
-        // meta 顺序：但书 → 龙巫 → 可露。公孙盒未拥有但书，首站 docus 过滤失败后 Plain 落位。
+        // meta 顺序：但书 → 可露 → 龙巫；缺高优先核心时跳过，最后 plain 补满。
         assert_eq!(report.shifts[0].stations.len(), TRADE_STATIONS_PER_SHIFT);
         assert!(
-            report.shifts[0].stations[0].role == TradeStationRole::Plain
-                || report.shifts[0]
-                    .stations
-                    .iter()
-                    .any(|s| s.role == TradeStationRole::Docus),
-            "shift1 meta order starts with docus attempt: {:?}",
+            report.shifts[0].stations.iter().any(|s| matches!(
+                s.role,
+                TradeStationRole::Docus | TradeStationRole::Closure | TradeStationRole::Witch
+            )),
+            "shift1 should keep the highest available meta role before plain fallback: {:?}",
             report.shifts[0]
                 .stations
                 .iter()

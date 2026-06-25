@@ -6,7 +6,7 @@
 
 | 优先级 | 文件 | 状态 | 说明 |
 |--------|------|------|------|
-| P0 | [SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](SYSTEM_REGISTRY_NORMALIZATION_REPORT.md) | ready | 按 `MECHANICS_REGISTRY.csv` 真源重分层：中间产物 / 跨站 meta / 同站组合 / core priority / 散件 |
+| P0 | [SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](SYSTEM_REGISTRY_NORMALIZATION_REPORT.md) | doing | Phase 0/1 已完成；下一步拆清跨站 / 全局资源与旧 registry 语义 |
 
 ## 新 TODO 文件模板
 

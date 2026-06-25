@@ -60,7 +60,7 @@ EffectAtom {
 | `PowerStationCount` | 电站数量（含虚拟） | 温蒂（制造站读） |
 | `EliteFacilityCount` | 精英化设施数量 | 深律 |
 | `SuiFacilityCount` | 岁/令同行设施数 | 黍 |
-| `DormLevelSum` | 宿舍等级之和 | 深律 |
+| `DormLevelSum` | 宿舍有效等级之和（`dorm_ambience_level`；旧布局兼容 `dorm_beds`） | 深律 |
 | `MeetingMaxLevel` | 会客室最高等级 | 深律 |
 | `LimitExcess` | 订单上限超出当前订单数 | 诗怀雅 |
 | `TaggedCountInRoom(tag)` | 同房带某 tag 的人数 | 银灰 |
@@ -226,7 +226,7 @@ resolve_base 执行顺序（新增阶段 5）:
 | `FacilityLevel` | 设施等级（爱丽丝/车尔尼/森西产量因子） |
 | `TradeStationCount` | 贸易站数量 |
 | `PowerStationCount` | 发电站数量 |
-| `DormLevelSum` | 宿舍等级之和 |
+| `DormLevelSum` | 宿舍有效等级之和（用于“每间宿舍每级”） |
 | `MeetingMaxLevel` | 会客室最高等级 |
 | `EliteFacilityCount` | 精英干员设施数 |
 | `SuiFacilityCount` | 岁设施数 |

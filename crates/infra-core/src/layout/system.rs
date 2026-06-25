@@ -380,9 +380,11 @@ fn contextual_same_station_priority(system: &BaseSystemDef, docus_closure_long_s
     system.priority
 }
 
-/// 公孙 243 高配三队：但书链长班已认领且迷迭香/黑键绑定链可用时，
-/// 第二个 18h 贸易队改取可露希尔+黑键+吉星。普通场景仍由 base_systems priority
-/// 决定，`witch_long_beta` 高于 `blackkey_closure`。
+/// Legacy registry 兼容路径：若直接调用 `claim_base_systems`，且但书链长班已认领、
+/// 迷迭香/黑键绑定链可用，则旧 fixed registry 会优先认领可露希尔+黑键+吉星。
+///
+/// 主路径 `assign_shift` 已跳过这些 role-managed 贸易 registry，由 `trade_segments.roles`
+/// 执行但书 -> 可露希尔 -> 巫恋的核心优先策略。
 fn docus_closure_long_shift_active(operbox: &OperBox, selected: &[RegistrySystemClaim]) -> bool {
     selected
         .iter()
@@ -693,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_docus_long_shift_prefers_blackkey_closure_over_witch() {
+    fn legacy_claim_docus_long_shift_prefers_blackkey_closure_over_witch() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = ideal_e2_operbox();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -729,11 +731,11 @@ mod tests {
         });
         assert!(
             closure_room.is_some(),
-            "但书+迷迭香绑定上下文应认领可露希尔黑键站"
+            "legacy registry 兼容路径应认领可露希尔黑键站"
         );
         assert!(
             !used.contains("巫恋") && !used.contains("龙舌兰"),
-            "该上下文下不应让龙巫挤掉黑键长班"
+            "legacy registry 兼容路径下不应让龙巫挤掉黑键长班"
         );
         let docus_room = assignment
             .rooms
@@ -748,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_witch_long_beta_still_beats_blackkey_closure_without_docus() {
+    fn legacy_claim_witch_long_beta_priority_without_docus() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = operbox_without_names(&ideal_e2_operbox(), &["但书"]);
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();

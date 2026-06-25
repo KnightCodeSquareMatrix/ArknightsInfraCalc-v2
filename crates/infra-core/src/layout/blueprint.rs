@@ -58,6 +58,18 @@ pub struct RoomBlueprint {
     /// 宿舍床位数；缺省时按等级查表。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dorm_beds: Option<u8>,
+    /// “每间宿舍每级”技能读取的有效宿舍等级；缺省时兼容旧布局的 dorm_beds，再退回建筑等级。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dorm_ambience_level: Option<u8>,
+}
+
+impl RoomBlueprint {
+    pub fn dorm_skill_level(&self) -> u8 {
+        self.dorm_ambience_level
+            .or(self.dorm_beds)
+            .unwrap_or(self.level)
+            .min(5)
+    }
 }
 
 /// 场景假设：无法从物理蓝图单独推出的聚合量（宿管精二设施数等）。
@@ -210,7 +222,7 @@ impl BaseBlueprint {
         self.rooms
             .iter()
             .filter(|r| r.kind == FacilityKind::Dormitory)
-            .map(|r| u16::from(r.level))
+            .map(|r| u16::from(r.dorm_skill_level()))
             .sum()
     }
 
@@ -259,6 +271,20 @@ impl BaseBlueprint {
             }
             if room.level == 0 {
                 return Err(Error::msg(format!("room {} level must be >= 1", room.id.0)));
+            }
+            if matches!(room.kind, FacilityKind::Dormitory) {
+                if matches!(room.dorm_beds, Some(0)) {
+                    return Err(Error::msg(format!(
+                        "dorm room {} dorm_beds must be >= 1",
+                        room.id.0
+                    )));
+                }
+                if matches!(room.dorm_ambience_level, Some(0)) {
+                    return Err(Error::msg(format!(
+                        "dorm room {} dorm_ambience_level must be >= 1",
+                        room.id.0
+                    )));
+                }
             }
             match room.kind {
                 FacilityKind::TradePost => {
@@ -323,6 +349,7 @@ mod tests {
         assert_eq!(bp.count_facility(FacilityKind::TradePost), 2);
         assert_eq!(bp.count_facility(FacilityKind::Factory), 4);
         assert_eq!(bp.manu_recipe_kinds(), 2);
+        assert_eq!(bp.dorm_level_sum(), 20);
         let trade = bp.trade_station_scenario();
         assert_eq!(trade.gold_order_stations, 2);
         assert_eq!(trade.originium_order_stations, 0);
@@ -348,5 +375,34 @@ mod tests {
         assert_eq!(manu.gold_lines, 2);
         assert_eq!(manu.battle_record_lines, 2);
         assert_eq!(bp.gold_manu_line_count(), 2);
+    }
+
+    #[test]
+    fn dorm_level_sum_uses_skill_level_not_building_level() {
+        let bp = BaseBlueprint {
+            template: None,
+            drone_cap: 135,
+            scenario: Default::default(),
+            rooms: vec![
+                RoomBlueprint {
+                    id: RoomId::new("dorm_1"),
+                    kind: FacilityKind::Dormitory,
+                    level: 3,
+                    product: None,
+                    dorm_beds: Some(5),
+                    dorm_ambience_level: None,
+                },
+                RoomBlueprint {
+                    id: RoomId::new("dorm_2"),
+                    kind: FacilityKind::Dormitory,
+                    level: 3,
+                    product: None,
+                    dorm_beds: Some(5),
+                    dorm_ambience_level: Some(4),
+                },
+            ],
+        };
+
+        assert_eq!(bp.dorm_level_sum(), 9);
     }
 }
