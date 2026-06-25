@@ -122,7 +122,7 @@ infra-cli plan \
 
 | 文件 | 用途 |
 |------|------|
-| `--profile-out` | 账户画像 JSON：`summary`、`domains`、`rotation`、`baseline_rotation`、`actions`、`flags` |
+| `--profile-out` | 账户画像 JSON，见 §4.1 |
 | `--maa-out` | MAA 排班 JSON：`title`、`description`、`plans[]`、`rooms` |
 
 **示例：**
@@ -134,7 +134,74 @@ infra-cli plan \
   --maa-out out/243_maa.json
 ```
 
-### 4.1 `layout team-rotation`（仅排班 + MAA）
+### 4.1 用户画像 JSON（`--profile-out`）
+
+`--profile-out` 当前稳定契约为 `schema_version: 2`。前端应把它作为结构化用户画像读取；stdout / stderr 只用于日志和人类可读报告。
+
+```json
+{
+  "schema_version": 2,
+  "layout_label": "data/fixtures/243/layout.json",
+  "operbox_label": "data/fixtures/243/operbox_full_e2.json",
+  "baseline_label": "data/fixtures/243/schedule_export.json (full_e2)",
+  "summary": {
+    "owned": 418,
+    "tier_up_owned": 418,
+    "trade_pool_ready": 75,
+    "manu_pool_ready": 90
+  },
+  "domains": [
+    {
+      "id": "trade_gold",
+      "label": "贸易·赤金线",
+      "current": {
+        "operators": ["巫恋", "龙舌兰", "卡夫卡"],
+        "score": 3.4748,
+        "trade_pct": 138.0,
+        "gold_pct": 46.0
+      },
+      "baseline": {
+        "operators": ["巫恋", "龙舌兰", "卡夫卡"],
+        "score": 3.4748,
+        "trade_pct": 138.0,
+        "gold_pct": 46.0
+      },
+      "gap_ratio": 0.0,
+      "severity": "ok"
+    }
+  ],
+  "rotation": {
+    "daily_trade": 6.48335,
+    "daily_manu": 482.625,
+    "daily_power": 51.375
+  },
+  "baseline_rotation": {
+    "daily_trade": 5.84553,
+    "daily_manu": 465.75,
+    "daily_power": 55.125
+  },
+  "actions": [],
+  "flags": ["trade_gold_ok"],
+  "narration_hints": ["赤金贸易 meta 组合与公孙参考一致，差距主要在练度"]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `schema_version` | `2` | 用户画像契约版本；不兼容变更必须升版本 |
+| `layout_label` / `operbox_label` / `baseline_label` | `string` | 展示用来源标签，不作为路径依赖 |
+| `summary` | object | 账号概览：`owned`、`tier_up_owned`、`trade_pool_ready`、`manu_pool_ready` |
+| `domains[]` | array | 分域对比，UI 主表使用 |
+| `domains[].id` | string | 稳定域 ID；已知值：`trade_gold`、`trade_originium`、`manu_composite`、`manu_gold`、`manu_exp`、`rotation_trade`、`rotation_manu` |
+| `domains[].current` / `baseline` | object | 当前 / 参考快照：`operators[]`、`score`，贸易域可带 `trade_pct` / `gold_pct` |
+| `domains[].gap_ratio` | number | `(current.score - baseline.score) / baseline.score` |
+| `domains[].severity` | `"ok" | "warn" | "critical"` | 缺口等级 |
+| `rotation` / `baseline_rotation` | object | 24h 三队轮休加权：`daily_trade`、`daily_manu`、`daily_power` |
+| `actions[]` | array | 提升建议，元素含 `priority`、`kind`、`operator`、`domain_id`、`message` |
+| `flags[]` | string[] | 机器可读状态标记 |
+| `narration_hints[]` | string[] | 面向用户的补充说明 |
+
+### 4.2 `layout team-rotation`（仅排班 + MAA）
 
 ```bash
 infra-cli layout team-rotation \
@@ -152,12 +219,12 @@ infra-cli layout team-rotation \
   --maa-out out/243_maa.json
 ```
 
-### 4.2 参数一览（team-rotation）
+### 4.3 参数一览（team-rotation）
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
-| `--layout <path>` | 是 | `BaseBlueprint` JSON（见 §4.1） |
-| `--operbox <path>` | 是 | `OperBox` JSON 数组（见 §4.2） |
+| `--layout <path>` | 是 | `BaseBlueprint` JSON（见 §5.1） |
+| `--operbox <path>` | 是 | `OperBox` JSON 数组（见 §5.2） |
 | `--maa-out <path>` | 否* | 写出 MAA 自定义基建 JSON；**前端集成建议始终带上** |
 | `--maa-title <text>` | 否 | 覆盖 JSON 顶层 `title` |
 | `--top <n>` | 否 | 编制搜索候选深度，默认 `20` |
@@ -168,7 +235,7 @@ infra-cli layout team-rotation \
 
 \* 带 `--maa-out` 时：`team-rotation` 的 **stderr = 人类可读排班表**；`plan` 的排班表在 **stdout**。
 
-### 4.3 标准输出 / 标准错误
+### 4.4 标准输出 / 标准错误
 
 | 流 | `plan`（默认） | `team-rotation` + `--maa-out` |
 |----|----------------|-------------------------------|
@@ -178,12 +245,12 @@ infra-cli layout team-rotation \
 
 **前端解析建议：**
 
-- 一体化 UI：优先 **`plan`**，传入 `--profile-out` + `--maa-out`，读取两个 JSON 文件。
+- 一体化 UI：优先 **`plan`**，传入 `--profile-out` + `--maa-out`，读取 `profileJson` / `maaJson`。
 - stdout / stderr 作为日志或人类可读报告展示，不作为结构化数据源。
 - 下载 / 导入 MAA：使用 **`--maa-out` 已知路径** 读文件。
 - 成功：`exit code == 0`；失败：stderr 含 `error:`，非零退出码。
 
-### 4.4 stderr 提示示例
+### 4.5 stderr 提示示例
 
 ```
 MAA 排班 JSON 已写入: out/243_maa.json
