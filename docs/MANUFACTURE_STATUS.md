@@ -1,7 +1,7 @@
 # 制造站域状态
 
 > **勿按贸易站 L2/L3 假设改制造站。** 制造站无 `gold_flow` / `order_mechanic` / `trade_shortcuts`；求解为 L1 直通 `solve_manufacture`。  
-> **搜索刻意全池 `C(n,3)`**：制造站无贸易式「金标组合」L3，穷举 + `composite` 评分是定稿设计，不是待补缺口。
+> **搜索刻意对候选池做 `C(n,3)` 穷举**：制造站无贸易式「金标组合」L3，穷举 + `composite` 评分是定稿设计，不是待补缺口；排班层会先用工具人表与机制扩展缩小候选池。
 
 ## 域对比
 
@@ -33,7 +33,7 @@
 - 无 `PeerAbsorb` 后的 `gold_flow` 挂钩。
 - 共享同一 `skill_table.json`（制造 buff 与贸易 buff 同表不同 id）。
 - **时间爬升**（芬/克洛丝/稀音/阿罗玛等）：`Action::AddEffRamp` → 纸面取 **20h 逐时效率算术平均**（见 `eff_ramp.rs`）；发电空构仍用 `shift_hours` 单点。
-- 排班层 `assign_shift` 先用 `standalone_roster.json` 制造白名单作为主池；若全制造池搜索结果明显高于主池结果（例如急性子/慢性子等未列入白名单的散件自然更优），则回退采用全池结果。低星爬升技能不必为了可选中而加入工具人表。
+- 排班层 `assign_shift` 先用 `standalone_roster.json` 制造白名单作为主池，再通过 `expand_manufacture_candidate_pool` 补入不适合写进人工工具人表、但机制上应参与散件竞争的候选（当前包括标准化·β、急性子/慢性子同构的 25% 爬升技能）。制造站只搜索扩展后的候选池，不在每个房间无条件二次搜索全池。低星爬升技能不必为了可选中而加入工具人表。
 
 ## CLI 入口
 

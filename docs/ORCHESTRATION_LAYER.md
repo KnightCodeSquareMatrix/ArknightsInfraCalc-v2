@@ -104,7 +104,7 @@ crates/infra-core/src/layout/orchestrate/
 | `bond` | 二人锁死 + 第三人 | 固定 A+B，`pick_one` 填第三（例：德 E0+拉普兰德 **或** 能天使+蕾缪安；同干员不同 tier 须分叉 System） |
 | `core` | 单人锚 + segment 池补满 | 仅用于未来非感知散件锚点；**黑键不走此路径** |
 | `pick_one` | 列表选一 | 第一个可用干员 |
-| `greedy` | Plain | `C(n,3)` 或发电 O(n)（制造仍全池穷举） |
+| `greedy` | Plain | 候选池内 `C(n,3)` 或发电 O(n)（制造候选池 = 工具人表主池 + 机制扩展候选） |
 
 `pick_one` 候选默认继承 slot 级 `"elite"` 要求；需要按候选区分精英化门槛时可写对象，例如 `{ "name": "海沫", "elite": 2 }`。对象候选还支持 `"max_elite"`，用于保留少量 E0-only / E1-only 历史锚点。
 

@@ -15,9 +15,9 @@ use crate::manufacture::input::ManuSearchRecipeMode;
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
-    build_trade_pool, filter_manufacture_pool, filter_trade_pool, jie_e0_trade_operator,
-    karlan_precision_active, try_filter_standalone, ControlPool, ManuPool, PowerPool, TradePool,
-    JIE_TRADE_NAME,
+    build_trade_pool, expand_manufacture_candidate_pool, filter_manufacture_pool,
+    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, try_filter_standalone,
+    ControlPool, ManuPool, PowerPool, TradePool, JIE_TRADE_NAME,
 };
 use crate::search::{
     control_entry_plugin_fill, hit_witch_shortcut, pick_docus_trade_hit, pick_trade_role_hit,
@@ -31,8 +31,6 @@ use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
 use crate::types::RecipeKind;
 
 const SENXI_DORM_CUISINE_BUFF: &str = "dorm_rec_bd_dungeon[000]";
-const MANU_FALLBACK_SCORE_EPSILON: f64 = 0.01;
-
 fn ms(a: Instant, b: Instant) -> f64 {
     a.duration_since(b).as_secs_f64() * 1000.0
 }
@@ -1330,35 +1328,15 @@ fn pick_manu_hit(
 ) -> Result<ManuSearchHit> {
     let full_sub = filter_manufacture_pool(pool, used);
     let primary_sub = try_filter_standalone(&full_sub, FacilityKind::Factory, 3);
-    let primary_hit = search_manu_hit_in_pool(
-        &primary_sub,
+    let candidate_sub = expand_manufacture_candidate_pool(&primary_sub, &full_sub);
+    search_manu_hit_in_pool(
+        &candidate_sub,
         table,
-        search_opts.clone(),
+        search_opts,
         used,
         top_k,
         "manufacture pool",
-    )?;
-    if primary_sub.entries.len() < full_sub.entries.len() {
-        let fallback_hit = search_manu_hit_in_pool(
-            &full_sub,
-            table,
-            search_opts,
-            used,
-            top_k,
-            "manufacture full pool",
-        )?;
-        if fallback_hit.composite_score > primary_hit.composite_score + MANU_FALLBACK_SCORE_EPSILON
-        {
-            eprintln!(
-                "[工具人表] 制造站: 主池技能{:.1}%低于全池{:.1}%，回退全池选中 {}",
-                primary_hit.breakdown.prod_skill,
-                fallback_hit.breakdown.prod_skill,
-                manu_hit_names(&fallback_hit).join(", "),
-            );
-            return Ok(fallback_hit);
-        }
-    }
-    Ok(primary_hit)
+    )
 }
 
 fn search_manu_hit_in_pool(
@@ -1618,7 +1596,7 @@ mod tests {
     }
 
     #[test]
-    fn manufacture_low_standalone_pool_falls_back_to_full_pool_ramp_skills() {
+    fn manufacture_candidate_extension_picks_ramp_skills_over_low_standalone_pool() {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let pool = ManuPool {
             entries: vec![
@@ -1631,6 +1609,15 @@ mod tests {
             ],
             skipped: vec![],
         };
+        let filtered = try_filter_standalone(&pool, FacilityKind::Factory, 3);
+        let expanded = expand_manufacture_candidate_pool(&filtered, &pool);
+        assert!(
+            expanded.entries.len() < pool.entries.len(),
+            "manufacture candidate extension should not fall back to the full pool"
+        );
+        assert!(expanded.entry("芬").is_some());
+        assert!(expanded.entry("克洛丝").is_some());
+
         let hit = pick_manu_hit(
             &pool,
             &table,
@@ -1648,7 +1635,7 @@ mod tests {
         assert!(names.contains("克洛丝"), "hit={hit:?}");
         assert!(
             !names.contains("褐果") && !names.contains("卡达"),
-            "低效白名单组合不应压过全池爬升技能: {hit:?}"
+            "低效白名单组合不应压过扩展候选池中的爬升技能: {hit:?}"
         );
         assert!(hit.breakdown.prod_skill > 50.0, "hit={hit:?}");
     }

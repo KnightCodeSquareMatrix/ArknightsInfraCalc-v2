@@ -68,6 +68,48 @@ pub fn filter_manufacture_pool(pool: &ManuPool, exclude: &HashSet<String>) -> Ma
     filter_pool(pool, exclude)
 }
 
+/// Expand the standalone manufacture candidate pool with low-cost mechanically
+/// important fillers that should not live in the hand-maintained whitelist.
+pub fn expand_manufacture_candidate_pool(primary: &ManuPool, full: &ManuPool) -> ManuPool {
+    let mut seen: HashSet<String> = primary.entries.iter().map(|e| e.name.clone()).collect();
+    let mut entries = primary.entries.clone();
+
+    for entry in &full.entries {
+        if seen.contains(&entry.name) {
+            continue;
+        }
+        if is_manufacture_candidate_extension(entry) {
+            entries.push(entry.clone());
+            seen.insert(entry.name.clone());
+        }
+    }
+
+    entries.sort_by(|a, b| {
+        b.flat_eff_hint
+            .partial_cmp(&a.flat_eff_hint)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    ManuPool {
+        entries,
+        skipped: full.skipped.clone(),
+    }
+}
+
+fn is_manufacture_candidate_extension(entry: &ManuPoolEntry) -> bool {
+    entry.buff_ids.iter().any(|buff_id| {
+        matches!(
+            buff_id.as_str(),
+            "manu_prod_spd[010]"
+                | "manu_prod_spd_addition[030]"
+                | "manu_prod_spd_addition[031]"
+                | "manu_prod_spd_addition[040]"
+                | "manu_prod_spd_addition[041]"
+        )
+    })
+}
+
 fn try_entry(
     name: &str,
     progress: crate::roster::OperatorProgress,
@@ -151,5 +193,48 @@ mod tests {
         let pool = build_manufacture_pool(&roster, &instances, &table).unwrap();
         assert!(pool.stats(3).ready > 20);
         assert!(pool.entry("蛇屠箱").is_some());
+    }
+
+    fn test_entry(name: &str, buff_ids: &[&str], flat_eff_hint: f64) -> ManuPoolEntry {
+        ManuPoolEntry {
+            name: name.to_string(),
+            elite: 0,
+            progress: crate::roster::OperatorProgress::elite_only(0),
+            buff_ids: buff_ids.iter().map(|id| (*id).to_string()).collect(),
+            tags: vec![],
+            flat_eff_hint,
+            has_l2_delegate: false,
+            tier: OperatorTier::Standalone,
+        }
+    }
+
+    #[test]
+    fn manufacture_candidate_extension_adds_standard_beta_and_ramps() {
+        let primary = ManuPool {
+            entries: vec![
+                test_entry("褐果", &["manu_prod_spd[000]"], 20.0),
+                test_entry("雪猎", &["manu_prod_spd&limit&cost[101]"], 20.0),
+                test_entry("卡达", &["manu_formula_cost[000]"], 0.0),
+            ],
+            skipped: vec![],
+        };
+        let full = ManuPool {
+            entries: vec![
+                primary.entries[0].clone(),
+                primary.entries[1].clone(),
+                primary.entries[2].clone(),
+                test_entry("史都华德", &["manu_prod_spd[010]"], 25.0),
+                test_entry("芬", &["manu_prod_spd_addition[030]"], 0.0),
+                test_entry("克洛丝", &["manu_prod_spd_addition[040]"], 0.0),
+                test_entry("低效非候选", &["manu_prod_spd[999]"], 5.0),
+            ],
+            skipped: vec![],
+        };
+
+        let expanded = expand_manufacture_candidate_pool(&primary, &full);
+        assert!(expanded.entry("史都华德").is_some());
+        assert!(expanded.entry("芬").is_some());
+        assert!(expanded.entry("克洛丝").is_some());
+        assert!(expanded.entry("低效非候选").is_none());
     }
 }
