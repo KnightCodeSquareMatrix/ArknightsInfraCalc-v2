@@ -154,7 +154,7 @@ impl PickOneCandidate {
 #[derive(Debug, Clone)]
 struct ResolvedOperator {
     name: String,
-    elite: u8,
+    progress: crate::roster::OperatorProgress,
 }
 
 struct BaseSystemsCache {
@@ -226,15 +226,17 @@ fn resolve_pick_one(
         if used.contains(name) {
             continue;
         }
-        let Some(elite) = operbox.elite_of(name) else {
+        let Some(progress) = operbox.progress_of(name) else {
             continue;
         };
-        if elite >= candidate.elite_requirement(pick.elite)
-            && !candidate.max_elite().is_some_and(|max| elite > max)
+        if progress.elite >= candidate.elite_requirement(pick.elite)
+            && !candidate
+                .max_elite()
+                .is_some_and(|max| progress.elite > max)
         {
             return Some(ResolvedOperator {
                 name: name.to_string(),
-                elite,
+                progress,
             });
         }
     }
@@ -251,17 +253,17 @@ fn resolve_slot_operators(
     for spec in &slot.operators {
         match spec {
             SystemOperatorSpec::Fixed(fixed) => {
-                let elite = operbox.elite_of(&fixed.name)?;
-                if elite < fixed.elite || slot_used.contains(&fixed.name) {
+                let progress = operbox.progress_of(&fixed.name)?;
+                if progress.elite < fixed.elite || slot_used.contains(&fixed.name) {
                     return None;
                 }
-                if fixed.max_elite.is_some_and(|max| elite > max) {
+                if fixed.max_elite.is_some_and(|max| progress.elite > max) {
                     return None;
                 }
                 slot_used.insert(fixed.name.clone());
                 resolved.push(ResolvedOperator {
                     name: fixed.name.clone(),
-                    elite,
+                    progress,
                 });
             }
             SystemOperatorSpec::PickOne(pick) => {
@@ -461,7 +463,7 @@ pub fn apply_registry_system_claim(
                         claim.system_id, op.name
                     )));
                 }
-                Ok(AssignedOperator::new(&op.name, op.elite))
+                Ok(op.clone())
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -524,7 +526,7 @@ fn plan_registry_system(
         };
         let operators: Vec<AssignedOperator> = resolved
             .iter()
-            .map(|op| AssignedOperator::new(&op.name, op.elite))
+            .map(|op| AssignedOperator::from_progress(&op.name, op.progress))
             .collect();
         slots.push(RegistrySlotClaim {
             room_id: room_id.clone(),

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::manufacture::ManuOperator;
-use crate::roster::Roster;
+use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::types::{Action, Phase, RecipeKind, SkillDef};
@@ -17,6 +17,7 @@ pub use super::trade::PoolSkip;
 pub struct ManuPoolEntry {
     pub name: String,
     pub elite: u8,
+    pub progress: OperatorProgress,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
     /// Sum of general `AddFlatEff` in `constant` phase — sort hint only.
@@ -103,6 +104,7 @@ fn try_entry(
     Ok(ManuPoolEntry {
         name: name.to_string(),
         elite: progress.elite,
+        progress,
         buff_ids,
         tags,
         flat_eff_hint,

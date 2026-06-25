@@ -17,7 +17,7 @@ pub use assign::{
     assign_team_producer_rooms, assignment_operator_names, blackkey_witch_same_trade_room,
     pinned_assignment, rotating_workers, AssignBaseOptions, AssignShiftResult,
 };
-pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment};
+pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment, RoomEfficiencySnapshot};
 pub use blueprint::{
     BaseBlueprint, BlueprintScenario, FacilityKind, RoomBlueprint, RoomId, RoomProduct,
 };

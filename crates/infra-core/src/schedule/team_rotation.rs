@@ -145,9 +145,10 @@ fn production_half_from_peak(peak: &BaseAssignment, half: &FacilityHalf) -> Base
         .chain(half.manu.iter())
         .chain(half.power.iter())
     {
-        let ops = peak.operators_in(room_id);
-        if !ops.is_empty() {
-            half_assignment.set_room(room_id.clone(), ops.to_vec());
+        if let Some(room) = peak.room_assignment(room_id) {
+            if !room.operators.is_empty() {
+                half_assignment.set_room_assignment(room.clone());
+            }
         }
     }
     half_assignment
@@ -172,7 +173,7 @@ fn operators_of(assignment: &BaseAssignment) -> Vec<String> {
 
 fn merge_rooms(target: &mut BaseAssignment, source: &BaseAssignment) {
     for room in &source.rooms {
-        target.set_room(room.room_id.clone(), room.operators.clone());
+        target.set_room_assignment(room.clone());
     }
 }
 
@@ -281,7 +282,7 @@ fn build_abyssal_s2_candidate(ctx: &AbyssalBuildCtx<'_>) -> Option<AbyssalCandid
 
     for room in &ctx.gamma_h1.rooms {
         if !manu_rooms.contains(&room.room_id) {
-            candidate.set_room(room.room_id.clone(), room.operators.clone());
+            candidate.set_room_assignment(room.clone());
             gamma_ops.extend(room.operators.iter().map(|op| op.name.clone()));
         }
     }
@@ -789,12 +790,15 @@ pub fn schedule_team_rotation(
             .iter()
             .filter(|n| system_ctrl_names.contains(*n) && !present_entries.contains(*n))
         {
-            let elite = operbox.elite_of(name).unwrap_or(0);
+            let progress = operbox.progress_of(name).unwrap_or_default();
             team_entries.push(crate::pool::ControlPoolEntry {
                 name: name.clone(),
-                elite,
-                buff_ids: instances
-                    .resolve_control_buff_ids(name, crate::tier::PromotionTier::from_elite(elite)),
+                elite: progress.elite,
+                progress,
+                buff_ids: instances.resolve_control_buff_ids(
+                    name,
+                    crate::tier::PromotionTier::from_progress(progress),
+                ),
                 tags: vec![],
                 tier: crate::layout::tier::OperatorTier::CrossStation,
             });
@@ -820,10 +824,11 @@ pub fn schedule_team_rotation(
                 if room_names.contains(name) || assigned_names.contains(name) {
                     continue;
                 }
-                ops.push(AssignedOperator::new(
-                    name,
-                    operbox.elite_of(name).unwrap_or(0),
-                ));
+                let op = operbox
+                    .progress_of(name)
+                    .map(|progress| AssignedOperator::from_progress(name, progress))
+                    .unwrap_or_else(|| AssignedOperator::new(name, 0));
+                ops.push(op);
                 room_names.insert(name.clone());
             }
             if !ops.is_empty() {
@@ -845,10 +850,8 @@ pub fn schedule_team_rotation(
                 final_pool.entries.push(crate::pool::ControlPoolEntry {
                     name: op.name.clone(),
                     elite: op.elite,
-                    buff_ids: instances.resolve_control_buff_ids(
-                        &op.name,
-                        crate::tier::PromotionTier::from_elite(op.elite),
-                    ),
+                    progress: crate::roster::OperatorProgress::new(op.elite, op.level, op.rarity),
+                    buff_ids: instances.resolve_control_buff_ids(&op.name, op.tier()),
                     tags: vec![],
                     tier: crate::layout::tier::OperatorTier::CrossStation,
                 });
@@ -866,7 +869,7 @@ pub fn schedule_team_rotation(
                     if names.contains(&entry.name) || assigned.contains(&entry.name) {
                         continue;
                     }
-                    ops.push(AssignedOperator::new(&entry.name, entry.elite));
+                    ops.push(AssignedOperator::from_progress(&entry.name, entry.progress));
                     names.insert(entry.name.clone());
                 }
                 a.set_room(RoomId::from("control"), ops);

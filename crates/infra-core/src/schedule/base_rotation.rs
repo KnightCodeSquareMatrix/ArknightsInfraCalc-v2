@@ -135,7 +135,12 @@ pub fn score_base_assignment(
             room_id: room.id.0.clone(),
             ..RoomScoreLine::default()
         };
-        if !room.operators.is_empty() {
+        if let Some(snapshot) = assignment.efficiency_in(&room.id).filter(|s| s.is_trade()) {
+            trade_score += snapshot.trade_score;
+            line.trade_score = snapshot.trade_score;
+            line.trade_pct = snapshot.trade_pct;
+            line.trade_skill_pct = snapshot.trade_skill_pct;
+        } else if !room.operators.is_empty() {
             let input = TradeRoomInput {
                 level: room.level,
                 operators: room.operators.clone(),
@@ -162,7 +167,13 @@ pub fn score_base_assignment(
             room_id: room.id.0.clone(),
             ..RoomScoreLine::default()
         };
-        if !room.operators.is_empty() {
+        if let Some(snapshot) = assignment
+            .efficiency_in(&room.id)
+            .filter(|s| s.is_manufacture())
+        {
+            manu_prod_sum += snapshot.manu_prod_total;
+            line.manu_score = snapshot.manu_prod_skill;
+        } else if !room.operators.is_empty() {
             let input = ManuRoomInput {
                 level: room.level,
                 operators: room.operators.clone(),
@@ -184,13 +195,18 @@ pub fn score_base_assignment(
             room_id: room.id.0.clone(),
             ..RoomScoreLine::default()
         };
-        let input = PowerRoomInput {
-            operator: room.operator.clone(),
-            mood: 24.0,
-            shift_hours,
-            layout: room.layout.clone(),
-        };
-        let score = solve_power(&input, table)?.charge_speed_pct;
+        let score =
+            if let Some(snapshot) = assignment.efficiency_in(&room.id).filter(|s| s.is_power()) {
+                snapshot.power_charge_speed_pct
+            } else {
+                let input = PowerRoomInput {
+                    operator: room.operator.clone(),
+                    mood: 24.0,
+                    shift_hours,
+                    layout: room.layout.clone(),
+                };
+                solve_power(&input, table)?.charge_speed_pct
+            };
         power_charge_sum += score;
         line.power_score = score;
         room_lines.push(line);
@@ -302,6 +318,7 @@ pub fn schedule_base_rotation_a_b_a(
 mod tests {
     use super::*;
     use crate::layout::assignment_operator_names;
+    use crate::layout::RoomEfficiencySnapshot;
     use crate::operbox::{default_operbox_gongsun_path, OperBox};
     use crate::skill_table::{data_path, default_skill_table_path, SkillTable};
 
@@ -374,5 +391,34 @@ mod tests {
             report.shifts[0].scores.trade_score,
             report.shifts[1].scores.trade_score
         );
+    }
+
+    #[test]
+    fn score_base_assignment_uses_room_efficiency_snapshot() {
+        let (blueprint, _operbox, instances, table) = fixtures_243_2gold();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room_with_efficiency(
+            "manu_1",
+            vec![
+                crate::layout::AssignedOperator::new("芬", 1),
+                crate::layout::AssignedOperator::new("克洛丝", 1),
+                crate::layout::AssignedOperator::new("泡普卡", 1),
+            ],
+            Some(RoomEfficiencySnapshot {
+                manu_prod_total: 333.0,
+                manu_prod_skill: 30.0,
+                ..RoomEfficiencySnapshot::default()
+            }),
+        );
+
+        let scores =
+            score_base_assignment(&blueprint, &assignment, &instances, &table, 24.0, None).unwrap();
+        let line = scores
+            .room_lines
+            .iter()
+            .find(|line| line.room_id == "manu_1")
+            .expect("manu_1 line");
+        assert_eq!(scores.manu_prod_sum, 333.0);
+        assert_eq!(line.manu_score, 30.0);
     }
 }

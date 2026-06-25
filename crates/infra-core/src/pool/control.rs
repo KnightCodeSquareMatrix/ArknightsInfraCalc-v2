@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::control::ControlOperator;
 use crate::error::Result;
 use crate::instances::OperatorInstances;
-use crate::roster::Roster;
+use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
@@ -16,6 +16,7 @@ pub use super::trade::PoolSkip;
 pub struct ControlPoolEntry {
     pub name: String,
     pub elite: u8,
+    pub progress: OperatorProgress,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
     pub tier: OperatorTier,
@@ -95,6 +96,7 @@ fn try_entry(
     Ok(ControlPoolEntry {
         name: name.to_string(),
         elite: progress.elite,
+        progress,
         buff_ids,
         tags,
         tier: OperatorTier::Standalone,

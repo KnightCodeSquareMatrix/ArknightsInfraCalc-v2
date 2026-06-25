@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
-use crate::roster::Roster;
+use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::trade::TradeOperator;
@@ -83,6 +83,7 @@ pub fn jie_market_trade_pool_entry(
     Some(TradePoolEntry {
         name: op.name,
         elite: op.elite,
+        progress: OperatorProgress::new(op.elite, 1, 4),
         buff_ids: op.buff_ids,
         tags: op.tags,
         compiled_atoms: op.compiled_atoms,
@@ -116,6 +117,7 @@ pub fn add_jie_market_to_trade_pool(
 pub struct TradePoolEntry {
     pub name: String,
     pub elite: u8,
+    pub progress: OperatorProgress,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
     pub compiled_atoms: Arc<[CompiledAtom]>,
@@ -239,6 +241,7 @@ fn try_entry(
     Ok(TradePoolEntry {
         name: name.to_string(),
         elite: progress.elite,
+        progress,
         buff_ids: buff_ids.clone(),
         tags,
         compiled_atoms: compile_operator_atoms(&buff_ids, table),

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
-use crate::layout::assignment::{AssignedOperator, BaseAssignment};
+use crate::layout::assignment::{AssignedOperator, BaseAssignment, RoomEfficiencySnapshot};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId, RoomProduct};
 use crate::layout::orchestrate::{build_plan, execute_plan, AssignmentPlan};
 use crate::layout::resolve::resolve_base;
@@ -369,7 +369,7 @@ pub fn pinned_assignment(assignment: &BaseAssignment, blueprint: &BaseBlueprint)
         if room.operators.is_empty() {
             continue;
         }
-        pinned.set_room(room.room_id.clone(), room.operators.clone());
+        pinned.set_room_assignment(room.clone());
     }
     pinned
 }
@@ -441,7 +441,11 @@ pub(crate) fn assign_control(
         assignment,
         &control_id,
         &hit.names,
-        |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
+        |name| {
+            pool.entry(name)
+                .map(|e| AssignedOperator::from_progress(name, e.progress))
+                .unwrap_or_else(|| AssignedOperator::new(name, 0))
+        },
         used,
         &pinned,
     )
@@ -508,7 +512,7 @@ fn commit_control_combo(
     assignment: &mut BaseAssignment,
     room_id: &RoomId,
     names: &[String],
-    elite_of: impl Fn(&str) -> u8,
+    operator_of: impl Fn(&str) -> AssignedOperator,
     used: &mut HashSet<String>,
     pinned: &HashSet<String>,
 ) -> Result<()> {
@@ -518,7 +522,7 @@ fn commit_control_combo(
             if !pinned.contains(name) && !used.insert(name.clone()) {
                 return Err(Error::msg(format!("control duplicate {name}")));
             }
-            Ok(AssignedOperator::new(name, elite_of(name)))
+            Ok(operator_of(name))
         })
         .collect::<Result<Vec<_>>>()?;
     assignment.set_room(room_id.clone(), ops);
@@ -538,9 +542,9 @@ fn assign_perception_producers(
     if operbox.owns("夕") && !used.contains("夕") {
         let control = assignment.control_operators();
         if control.len() < 5 {
-            let elite = operbox.elite_of("夕").unwrap_or(0);
+            let progress = operbox.progress_of("夕").unwrap_or_default();
             let mut ops = control;
-            ops.push(AssignedOperator::new("夕", elite));
+            ops.push(AssignedOperator::from_progress("夕", progress));
             used.insert("夕".into());
             assignment.set_room(RoomId::from("control"), ops);
         }
@@ -551,7 +555,11 @@ fn assign_perception_producers(
                 continue;
             }
             used.insert("絮雨".into());
-            assignment.set_room(room.id.clone(), vec![AssignedOperator::new("絮雨", 2)]);
+            let op = operbox
+                .progress_of("絮雨")
+                .map(|progress| AssignedOperator::from_progress("絮雨", progress))
+                .unwrap_or_else(|| AssignedOperator::new("絮雨", 2));
+            assignment.set_room(room.id.clone(), vec![op]);
             break;
         }
     }
@@ -567,7 +575,11 @@ fn assign_perception_producers(
             continue;
         };
         used.insert(name.into());
-        assignment.set_room(room.id.clone(), vec![AssignedOperator::new(name, 2)]);
+        let op = operbox
+            .progress_of(name)
+            .map(|progress| AssignedOperator::from_progress(name, progress))
+            .unwrap_or_else(|| AssignedOperator::new(name, 2));
+        assignment.set_room(room.id.clone(), vec![op]);
     }
     Ok(())
 }
@@ -583,11 +595,14 @@ fn assign_dorm_producers(
         if !assignment.operators_in(&room.id).is_empty() {
             continue;
         }
-        let Some((name, elite)) = best_dorm_producer(operbox, instances, used) else {
+        let Some((name, progress)) = best_dorm_producer(operbox, instances, used) else {
             continue;
         };
         used.insert(name.clone());
-        assignment.set_room(room.id.clone(), vec![AssignedOperator::new(name, elite)]);
+        assignment.set_room(
+            room.id.clone(),
+            vec![AssignedOperator::from_progress(name, progress)],
+        );
     }
     Ok(())
 }
@@ -596,8 +611,8 @@ fn best_dorm_producer(
     operbox: &OperBox,
     instances: &OperatorInstances,
     used: &HashSet<String>,
-) -> Option<(String, u8)> {
-    let mut best: Option<(String, u8, u8)> = None;
+) -> Option<(String, crate::roster::OperatorProgress)> {
+    let mut best: Option<(String, crate::roster::OperatorProgress)> = None;
     for (name, progress) in &operbox.owned {
         if used.contains(name) || progress.elite < 2 {
             continue;
@@ -607,14 +622,15 @@ fn best_dorm_producer(
         if !buffs.iter().any(|b| b == SENXI_DORM_CUISINE_BUFF) {
             continue;
         }
-        let replace = best
-            .as_ref()
-            .is_none_or(|(_, _, level)| progress.elite > *level);
+        let replace = best.as_ref().is_none_or(|(_, best)| {
+            progress.elite > best.elite
+                || (progress.elite == best.elite && progress.level > best.level)
+        });
         if replace {
-            best = Some((name.clone(), progress.elite, progress.elite));
+            best = Some((name.clone(), *progress));
         }
     }
-    best.map(|(name, elite, _)| (name, elite))
+    best
 }
 
 fn trade_hit_excludes_blackkey_witch_collide(hit: &TradeSearchHit) -> bool {
@@ -696,7 +712,11 @@ fn try_commit_fixed_manu_team(
         assignment,
         room_id,
         &names,
-        |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
+        |name| {
+            pool.entry(name)
+                .map(|e| AssignedOperator::from_progress(name, e.progress))
+                .unwrap_or_else(|| AssignedOperator::new(name, 0))
+        },
         used,
         anchors,
         "manufacture fixed team",
@@ -727,7 +747,10 @@ fn try_assign_gongsun_gold_manu_team(
             let senxi_entry = pool.entry("森蚺");
             if senxi_entry.is_some() && !used.contains("森蚺") {
                 let mut ops: Vec<AssignedOperator> = existing.to_vec();
-                ops.push(AssignedOperator::new("森蚺", senxi_entry.unwrap().elite));
+                ops.push(AssignedOperator::from_progress(
+                    "森蚺",
+                    senxi_entry.unwrap().progress,
+                ));
                 assignment.set_room(room.id.clone(), ops);
                 used.insert("森蚺".to_string());
                 return Ok(());
@@ -776,7 +799,7 @@ fn commit_anchor_room(
     assignment: &mut BaseAssignment,
     room_id: &RoomId,
     names: &[String],
-    elite_of: impl Fn(&str) -> u8,
+    operator_of: impl Fn(&str) -> AssignedOperator,
     used: &mut HashSet<String>,
     anchors: &[String],
     facility: &str,
@@ -787,7 +810,7 @@ fn commit_anchor_room(
             if !anchors.contains(name) && !used.insert(name.clone()) {
                 return Err(Error::msg(format!("{facility} duplicate {name}")));
             }
-            Ok(AssignedOperator::new(name, elite_of(name)))
+            Ok(operator_of(name))
         })
         .collect::<Result<Vec<_>>>()?;
     assignment.set_room(room_id.clone(), ops);
@@ -1152,16 +1175,20 @@ pub fn assign_power_rooms(
     }
 
     for (room_id, station) in empty_rooms.iter().zip(report.assignments.iter()) {
-        let elite = pool.entry(&station.hit.name).map(|e| e.elite).unwrap_or(0);
+        let op = pool
+            .entry(&station.hit.name)
+            .map(|e| AssignedOperator::from_progress(&station.hit.name, e.progress))
+            .unwrap_or_else(|| AssignedOperator::new(&station.hit.name, 0));
         if !used.insert(station.hit.name.clone()) {
             return Err(Error::msg(format!(
                 "power {}: duplicate {}",
                 room_id.0, station.hit.name
             )));
         }
-        assignment.set_power_operator(
+        assignment.set_room_with_efficiency(
             room_id.clone(),
-            AssignedOperator::new(&station.hit.name, elite),
+            vec![op],
+            Some(power_efficiency_snapshot(&station.hit)),
         );
     }
     Ok(())
@@ -1371,9 +1398,14 @@ fn commit_trade_room(
         assignment,
         room_id,
         trade_hit_names(hit),
-        |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
+        |name| {
+            pool.entry(name)
+                .map(|e| AssignedOperator::from_progress(name, e.progress))
+                .unwrap_or_else(|| AssignedOperator::new(name, 0))
+        },
         used,
         "trade",
+        Some(trade_efficiency_snapshot(hit)),
     )
 }
 
@@ -1388,9 +1420,14 @@ fn commit_manu_room(
         assignment,
         room_id,
         manu_hit_names(hit),
-        |name| pool.entry(name).map(|e| e.elite).unwrap_or(0),
+        |name| {
+            pool.entry(name)
+                .map(|e| AssignedOperator::from_progress(name, e.progress))
+                .unwrap_or_else(|| AssignedOperator::new(name, 0))
+        },
         used,
         "manufacture",
+        Some(manu_efficiency_snapshot(hit)),
     )
 }
 
@@ -1459,6 +1496,32 @@ fn manu_hit_names(hit: &ManuSearchHit) -> &[String] {
     first_nonempty_names(&hit.names, &hit.gold_names, &hit.battle_record_names)
 }
 
+fn trade_efficiency_snapshot(hit: &TradeSearchHit) -> RoomEfficiencySnapshot {
+    RoomEfficiencySnapshot {
+        trade_score: hit.breakdown.effective_eff_multiplier,
+        trade_pct: hit.trade_pct,
+        trade_skill_pct: hit.breakdown.order_eff_skill,
+        trade_gold_pct: hit.gold_pct,
+        ..RoomEfficiencySnapshot::default()
+    }
+}
+
+fn manu_efficiency_snapshot(hit: &ManuSearchHit) -> RoomEfficiencySnapshot {
+    RoomEfficiencySnapshot {
+        manu_prod_total: hit.breakdown.prod_total,
+        manu_prod_skill: hit.breakdown.prod_skill,
+        manu_storage_limit: hit.breakdown.storage_limit,
+        ..RoomEfficiencySnapshot::default()
+    }
+}
+
+fn power_efficiency_snapshot(hit: &crate::search::PowerSearchHit) -> RoomEfficiencySnapshot {
+    RoomEfficiencySnapshot {
+        power_charge_speed_pct: hit.charge_speed_pct,
+        ..RoomEfficiencySnapshot::default()
+    }
+}
+
 fn pick_first_disjoint<T: Clone>(
     hits: impl IntoIterator<Item = T>,
     names_of: &impl Fn(&T) -> &[String],
@@ -1486,9 +1549,10 @@ fn commit_operators_to_room(
     assignment: &mut BaseAssignment,
     room_id: &RoomId,
     names: &[String],
-    elite_of: impl Fn(&str) -> u8,
+    operator_of: impl Fn(&str) -> AssignedOperator,
     used: &mut HashSet<String>,
     facility: &str,
+    efficiency: Option<RoomEfficiencySnapshot>,
 ) -> Result<()> {
     let ops = names
         .iter()
@@ -1496,10 +1560,10 @@ fn commit_operators_to_room(
             if !used.insert(name.clone()) {
                 return Err(Error::msg(format!("{facility} duplicate {name}")));
             }
-            Ok(AssignedOperator::new(name, elite_of(name)))
+            Ok(operator_of(name))
         })
         .collect::<Result<Vec<_>>>()?;
-    assignment.set_room(room_id.clone(), ops);
+    assignment.set_room_with_efficiency(room_id.clone(), ops, efficiency);
     Ok(())
 }
 
@@ -1544,6 +1608,7 @@ mod tests {
         crate::pool::ManuPoolEntry {
             name: name.to_string(),
             elite: 0,
+            progress: crate::roster::OperatorProgress::elite_only(0),
             buff_ids: buff_ids.iter().map(|id| (*id).to_string()).collect(),
             tags: vec![],
             flat_eff_hint: 0.0,
@@ -1586,6 +1651,67 @@ mod tests {
             "低效白名单组合不应压过全池爬升技能: {hit:?}"
         );
         assert!(hit.breakdown.prod_skill > 50.0, "hit={hit:?}");
+    }
+
+    #[test]
+    fn commit_manu_room_stores_efficiency_snapshot_and_progress() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let progress = crate::roster::OperatorProgress::new(1, 55, 3);
+        let pool = ManuPool {
+            entries: vec![
+                crate::pool::ManuPoolEntry {
+                    name: "芬".to_string(),
+                    elite: progress.elite,
+                    progress,
+                    buff_ids: vec!["manu_prod_spd_addition[030]".to_string()],
+                    tags: vec![],
+                    flat_eff_hint: 0.0,
+                    has_l2_delegate: false,
+                    tier: crate::layout::tier::OperatorTier::Standalone,
+                },
+                manu_pool_entry("克洛丝", &["manu_prod_spd_addition[040]"]),
+                manu_pool_entry("泡普卡", &["manu_prod_spd&limit&cost[010]"]),
+            ],
+            skipped: vec![],
+        };
+        let hit = pick_manu_hit(
+            &pool,
+            &table,
+            ManuSearchOptions {
+                recipe_mode: ManuSearchRecipeMode::Single(RecipeKind::Gold),
+                top_k: 20,
+                ..Default::default()
+            },
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        commit_manu_room(
+            &mut assignment,
+            &RoomId::from("manu_1"),
+            &hit,
+            &pool,
+            &mut used,
+        )
+        .unwrap();
+
+        let room = assignment
+            .room_assignment(&RoomId::from("manu_1"))
+            .expect("room committed");
+        let snapshot = room.efficiency.as_ref().expect("manufacture snapshot");
+        assert_eq!(snapshot.manu_prod_total, hit.breakdown.prod_total);
+        assert_eq!(snapshot.manu_prod_skill, hit.breakdown.prod_skill);
+        let fen = room
+            .operators
+            .iter()
+            .find(|op| op.name == "芬")
+            .expect("fen committed");
+        assert_eq!(fen.level, 55);
+        assert_eq!(fen.rarity, 3);
+        assert_eq!(fen.tier(), crate::tier::PromotionTier::TierUp);
     }
 
     #[test]

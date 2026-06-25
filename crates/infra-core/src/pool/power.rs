@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::power::PowerOperator;
-use crate::roster::Roster;
+use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::types::{Action, Phase, SkillDef};
@@ -15,6 +15,7 @@ pub use super::trade::PoolSkip;
 pub struct PowerPoolEntry {
     pub name: String,
     pub elite: u8,
+    pub progress: OperatorProgress,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
     /// Sum of constant `AddFlatEff` — sort hint only.
@@ -97,6 +98,7 @@ fn try_entry(
     Ok(PowerPoolEntry {
         name: name.to_string(),
         elite: progress.elite,
+        progress,
         buff_ids,
         tags,
         flat_charge_hint,

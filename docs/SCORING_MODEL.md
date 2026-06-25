@@ -156,6 +156,14 @@ pub fn power_station_score(charge_speed_pct: f64, _virtual_power_produced: f64) 
 - 制造：`manu_prod_sum += result.prod_total`
 - 发电：`power_charge_sum += charge_speed_pct`
 
+自动排班生成的生产房间会在 `RoomAssignment.efficiency` 中保存求解阶段命中的效率快照：
+
+- 贸易房保存 `trade_score` / `trade_pct` / `trade_skill_pct` / `trade_gold_pct`；
+- 制造房保存 `manu_prod_total` / `manu_prod_skill` / `manu_storage_limit`；
+- 发电房保存 `power_charge_speed_pct`。
+
+`score_base_assignment` 优先读取该快照；只有手写或旧版 assignment 没有快照时才回退到 `resolve_base + solve_*` 重算。这样 CLI / 轮换展示不再成为第二套求解入口，也不会因为 assignment 只保存干员名导致 tier/progress 丢失。
+
 `ShiftScores::weighted_*` 只做时长折算：
 
 ```rust
