@@ -20,11 +20,11 @@ use crate::pool::{
     JIE_TRADE_NAME,
 };
 use crate::search::{
-    control_entry_plugin_fill, hit_witch_shortcut, pick_docus_trade_hit, search_control_combos,
-    search_manufacture_triples, search_power_assignment, search_trade_triples,
-    search_trade_triples_filtered, ControlFillPolicy, ControlSearchOptions, ManuSearchHit,
-    ManuSearchOptions, PowerSearchOptions, SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
-    MATATABI_CONSUMER_NAME,
+    control_entry_plugin_fill, hit_blackkey_closure_shortcut, hit_closure_shortcut,
+    hit_witch_shortcut, pick_docus_trade_hit, search_control_combos, search_manufacture_triples,
+    search_power_assignment, search_trade_triples, search_trade_triples_filtered,
+    ControlFillPolicy, ControlSearchOptions, ManuSearchHit, ManuSearchOptions, PowerSearchOptions,
+    SearchTripleFilter, TradeSearchHit, TradeSearchOptions, MATATABI_CONSUMER_NAME,
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
@@ -150,7 +150,9 @@ pub fn assign_shift_with_plan_skip(
     let t0 = Instant::now();
     blueprint.validate()?;
 
-    let plan = build_plan(blueprint, operbox, mode, seed, skip_system_ids)?;
+    let mut skip_system_ids = skip_system_ids.clone();
+    skip_trade_core_registry_systems(&mut skip_system_ids);
+    let plan = build_plan(blueprint, operbox, mode, seed, &skip_system_ids)?;
     let t1 = Instant::now();
 
     let executed = execute_plan(blueprint, operbox, table, &plan, seed)?;
@@ -227,26 +229,6 @@ pub fn assign_shift_with_plan_skip(
                 &mut used,
             )?;
             let t8 = Instant::now();
-            let manu_layout = resolve_base(
-                blueprint,
-                &assignment,
-                Some(instances),
-                Some(table),
-                options.mood,
-                Some(durin_plan),
-            )?
-            .layout_snapshot();
-            let t9 = Instant::now();
-            assign_manufacture_lines(
-                blueprint,
-                &manu_pool,
-                table,
-                &manu_layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t10 = Instant::now();
             let trade_layout = resolve_base(
                 blueprint,
                 &assignment,
@@ -256,7 +238,7 @@ pub fn assign_shift_with_plan_skip(
                 Some(durin_plan),
             )?
             .layout_snapshot();
-            let t11 = Instant::now();
+            let t9 = Instant::now();
             assign_trade_remainder(
                 blueprint,
                 &trade_pool,
@@ -267,11 +249,31 @@ pub fn assign_shift_with_plan_skip(
                 &mut assignment,
                 &mut used,
             )?;
+            let t10 = Instant::now();
+            let manu_layout = resolve_base(
+                blueprint,
+                &assignment,
+                Some(instances),
+                Some(table),
+                options.mood,
+                Some(durin_plan),
+            )?
+            .layout_snapshot();
+            let t11 = Instant::now();
+            assign_manufacture_lines(
+                blueprint,
+                &manu_pool,
+                table,
+                &manu_layout,
+                options,
+                &mut assignment,
+                &mut used,
+            )?;
             let t12 = Instant::now();
 
             eprintln!(
                 "[计时] 编排选型={:.2}ms  编排落位={:.2}ms  resolve(1st)={:.2}ms  中枢={:.2}ms  perception+dorm={:.2}ms  resolve(2nd)={:.2}ms  建池={:.2}ms  \
-                 发电={:.2}ms  resolve(3rd)={:.2}ms  制造={:.2}ms  resolve(4th)={:.2}ms  贸易余站={:.2}ms  单班总计={:.2}ms",
+                 发电={:.2}ms  resolve(3rd)={:.2}ms  贸易余站={:.2}ms  resolve(4th)={:.2}ms  制造={:.2}ms  单班总计={:.2}ms",
                 ms(t1, t0), ms(t2, t1), ms(t3, t2), ms(t4, t3), ms(t5, t4),
                 ms(t6, t5), ms(t7, t6), ms(t8, t7), ms(t9, t8), ms(t10, t9),
                 ms(t11, t10), ms(t12, t11), ms(t12, t0),
@@ -410,7 +412,7 @@ pub(crate) fn assign_control(
         fill_policy: ControlFillPolicy::HrAndMood,
     };
 
-    let base_pool = if options.skip_standalone_control {
+    let base_pool = if options.skip_standalone_control || !pinned.is_empty() {
         pool.clone()
     } else {
         try_filter_standalone(pool, FacilityKind::ControlCenter, 1)
@@ -643,6 +645,16 @@ pub fn blackkey_witch_same_trade_room(
 
 const BLACKKEY_NAME: &str = "黑键";
 const WITCH_TRADE_NAME: &str = "巫恋";
+const DOCUS_TRADE_NAME: &str = "但书";
+const CLOSURE_TRADE_NAME: &str = "可露希尔";
+const TRADE_CORE_REGISTRY_SYSTEMS: [&str; 6] = [
+    "blackkey_closure",
+    "witch_long_beta",
+    "penguin_exusiai_lemuen",
+    "penguin_texangel_e2",
+    "penguin_texlap_e0",
+    "vina_lungmen",
+];
 /// 公孙 243 金线固定 trio（`ideal_e2_saria_qingliu_weedy_gold_140`）。
 const GONGSUN_GOLD_MANU_TEAM: [&str; 3] = ["清流", "温蒂", "森蚺"];
 
@@ -868,18 +880,8 @@ fn assign_trade_remainder(
             continue;
         }
         let order = trade_order_from_room(room)?;
-        let hit = pick_trade_hit(
-            pool,
-            table,
-            trade_room_options(layout, gold_lines, options, order),
-            SearchTripleFilter {
-                hit_filter: Some(trade_hit_ok_for_greedy),
-                ..SearchTripleFilter::default()
-            },
-            used,
-            options.top_k,
-        )
-        .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
+        let hit = pick_trade_meta_then_plain(pool, table, layout, gold_lines, options, order, used)
+            .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
         commit_trade_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())
@@ -957,7 +959,7 @@ pub fn assign_team_producer_rooms(
     )
 }
 
-/// γ 替补半区：贸易 plain 贪心（与 peak `assign_trade_remainder` 同路径），制造/发电仍站绑定搜索。
+/// γ 替补半区：贸易沿用 meta 核心优先级，制造/发电仍站绑定搜索。
 #[allow(clippy::too_many_arguments)]
 pub fn assign_team_gamma_half(
     blueprint: &BaseBlueprint,
@@ -973,7 +975,7 @@ pub fn assign_team_gamma_half(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    assign_team_trade_plain_rooms(
+    assign_team_trade_meta_rooms(
         blueprint,
         trade_pool,
         table,
@@ -1021,44 +1023,6 @@ fn assign_team_trade_meta_rooms(
         let hit =
             pick_trade_meta_then_plain(trade_pool, table, layout, gold_lines, options, order, used)
                 .map_err(|e| Error::msg(format!("team trade {}: {e}", room_id.0)))?;
-        commit_trade_room(assignment, room_id, &hit, trade_pool, used)?;
-    }
-    Ok(())
-}
-
-/// peak / γ 余站贸易：plain C(n,3)，不走 meta/但书置顶（编排已认领的 meta 由 α/β 切半保留）。
-#[allow(clippy::too_many_arguments)]
-fn assign_team_trade_plain_rooms(
-    blueprint: &BaseBlueprint,
-    trade_pool: &TradePool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    options: &AssignBaseOptions,
-    trade_rooms: &[RoomId],
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    let gold_lines = blueprint.gold_manu_line_count();
-    for room_id in trade_rooms {
-        if !assignment.operators_in(room_id).is_empty() {
-            continue;
-        }
-        let room = blueprint
-            .room(room_id)
-            .ok_or_else(|| Error::msg(format!("team trade room {} not in blueprint", room_id.0)))?;
-        let order = trade_order_from_room(room)?;
-        let hit = pick_trade_hit(
-            trade_pool,
-            table,
-            trade_room_options(layout, gold_lines, options, order),
-            SearchTripleFilter {
-                hit_filter: Some(trade_hit_ok_for_greedy),
-                ..SearchTripleFilter::default()
-            },
-            used,
-            options.top_k,
-        )
-        .map_err(|e| Error::msg(format!("team trade plain {}: {e}", room_id.0)))?;
         commit_trade_room(assignment, room_id, &hit, trade_pool, used)?;
     }
     Ok(())
@@ -1214,14 +1178,15 @@ fn trade_order_from_room(room: &crate::layout::blueprint::RoomBlueprint) -> Resu
     }
 }
 
-/// 但书干员名（合同法/违约 docus 机制核心，效率 ≈ 纸面工具效率 × 1.55）。
-const DOCUS_TRADE_NAME: &str = "但书";
+fn skip_trade_core_registry_systems(skip: &mut HashSet<String>) {
+    for id in TRADE_CORE_REGISTRY_SYSTEMS {
+        skip.insert(id.to_string());
+    }
+}
 
-/// 团队贸易站取人：但书（docus）最高优先 → 否则纸面贪心。
+/// 团队贸易站取人：但书 → 可露希尔 → 龙巫 → 普通散件。
 ///
-/// 但书房间效率 = (1 + 队友订单效率/100) × 1.55，是全基建最高产贸易位；纯按
-/// `effective_eff_multiplier` 排序的搜索不一定把它顶到最前，故在此显式置顶，保证它落到
-/// 最先填充的峰值队（最长班 + 最佳队友）。
+/// 这些 meta 是核心优先级，不是固定三人组；每个核心站内部仍由贸易搜索选择最优队友。
 fn pick_trade_meta_then_plain(
     pool: &TradePool,
     table: &SkillTable,
@@ -1245,13 +1210,142 @@ fn pick_trade_meta_then_plain(
             }
         }
     }
+    if order == TradeOrderKind::Gold && !used.contains(CLOSURE_TRADE_NAME) {
+        if let Ok(hit) = pick_closure_trade_hit(
+            pool,
+            table,
+            trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            used,
+            options.top_k,
+        ) {
+            if hit.names.iter().any(|n| n == CLOSURE_TRADE_NAME) {
+                return Ok(hit);
+            }
+        }
+    }
+    if order == TradeOrderKind::Gold && !used.contains(WITCH_TRADE_NAME) {
+        if let Ok(hit) = pick_witch_trade_hit(
+            pool,
+            table,
+            trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            used,
+            options.top_k,
+        ) {
+            if hit.names.iter().any(|n| n == WITCH_TRADE_NAME) {
+                return Ok(hit);
+            }
+        }
+    }
     pick_trade_hit(
         pool,
         table,
         trade_room_options(layout, gold_lines, options, order),
-        SearchTripleFilter::default(),
+        SearchTripleFilter {
+            hit_filter: Some(trade_hit_ok_for_greedy),
+            ..SearchTripleFilter::default()
+        },
         used,
         options.top_k,
+    )
+}
+
+fn pick_closure_trade_hit(
+    pool: &TradePool,
+    table: &SkillTable,
+    search_opts: TradeSearchOptions,
+    used: &HashSet<String>,
+    top_k: usize,
+) -> Result<TradeSearchHit> {
+    pick_core_trade_hit(
+        pool,
+        table,
+        search_opts,
+        CLOSURE_TRADE_NAME,
+        Some(hit_blackkey_closure_shortcut),
+        Some(hit_closure_shortcut),
+        used,
+        top_k,
+    )
+}
+
+fn pick_witch_trade_hit(
+    pool: &TradePool,
+    table: &SkillTable,
+    search_opts: TradeSearchOptions,
+    used: &HashSet<String>,
+    top_k: usize,
+) -> Result<TradeSearchHit> {
+    pick_core_trade_hit(
+        pool,
+        table,
+        search_opts,
+        WITCH_TRADE_NAME,
+        Some(hit_witch_shortcut),
+        None,
+        used,
+        top_k,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn pick_core_trade_hit(
+    pool: &TradePool,
+    table: &SkillTable,
+    search_opts: TradeSearchOptions,
+    core_name: &str,
+    preferred_filter: Option<fn(&TradeSearchHit) -> bool>,
+    fallback_filter: Option<fn(&TradeSearchHit) -> bool>,
+    used: &HashSet<String>,
+    top_k: usize,
+) -> Result<TradeSearchHit> {
+    let sub = filter_trade_pool(pool, used);
+    if sub.entries.len() < 3 {
+        return Err(Error::msg(format!(
+            "trade pool has {} ready operators (need 3)",
+            sub.entries.len()
+        )));
+    }
+    let mut opts = search_opts;
+    opts.top_k = top_k;
+
+    if let Some(hit_filter) = preferred_filter {
+        if let Ok(hit) = search_core_trade_hit(&sub, table, &opts, core_name, hit_filter, used) {
+            return Ok(hit);
+        }
+    }
+    if let Some(hit_filter) = fallback_filter {
+        if let Ok(hit) = search_core_trade_hit(&sub, table, &opts, core_name, hit_filter, used) {
+            return Ok(hit);
+        }
+    }
+
+    Err(Error::msg(format!("no meta trade triple for {core_name}")))
+}
+
+fn search_core_trade_hit(
+    pool: &TradePool,
+    table: &SkillTable,
+    search_opts: &TradeSearchOptions,
+    core_name: &str,
+    hit_filter: fn(&TradeSearchHit) -> bool,
+    used: &HashSet<String>,
+) -> Result<TradeSearchHit> {
+    let report = search_trade_triples_filtered(
+        pool,
+        table,
+        search_opts,
+        SearchTripleFilter {
+            must_include_name: Some(core_name.to_string()),
+            hit_filter: Some(hit_filter),
+            ..SearchTripleFilter::default()
+        },
+    )?;
+    pick_disjoint_from_report(
+        report.best,
+        report.top,
+        trade_hit_names,
+        used,
+        "no disjoint meta trade triple",
     )
 }
 
@@ -1471,7 +1565,7 @@ mod tests {
     use crate::instances::default_instances_path;
     use crate::layout::shift::AssignShiftMode;
     use crate::layout::BaseBlueprint;
-    use crate::operbox::{default_operbox_gongsun_path, OperBox};
+    use crate::operbox::{default_operbox_gongsun_path, OperBox, OperBoxEntry};
     use crate::skill_table::{default_skill_table_path, SkillTable};
 
     fn fixtures() -> (BaseBlueprint, OperBox, OperatorInstances, SkillTable) {
@@ -1480,6 +1574,24 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         (blueprint, operbox, instances, table)
+    }
+
+    fn operbox_from_names(entries: &[(&str, u8, u8)]) -> OperBox {
+        OperBox::from_entries(
+            entries
+                .iter()
+                .enumerate()
+                .map(|(i, (name, elite, rarity))| OperBoxEntry {
+                    id: format!("test_{i:03}"),
+                    name: (*name).to_string(),
+                    elite: *elite,
+                    level: 1,
+                    own: true,
+                    potential: 1,
+                    rarity: *rarity,
+                })
+                .collect(),
+        )
     }
 
     #[test]
@@ -1614,6 +1726,114 @@ mod tests {
                 shift.index + 1
             );
         }
+    }
+
+    #[test]
+    fn team_rotation_partial_trade_meta_keeps_docus_closure_and_witch() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = operbox_from_names(&[
+            ("但书", 2, 5),
+            ("可露希尔", 2, 6),
+            ("巫恋", 2, 5),
+            ("龙舌兰", 2, 5),
+            ("卡夫卡", 1, 5),
+            ("德克萨斯", 2, 5),
+            ("拉普兰德", 2, 5),
+            ("古米", 2, 4),
+            ("夜刀", 0, 2),
+            ("石英", 2, 4),
+            ("慕斯", 2, 4),
+            ("空弦", 2, 6),
+            ("能天使", 2, 6),
+            ("空", 2, 5),
+            ("八幡海铃", 2, 5),
+            ("灵知", 2, 6),
+            ("斩业星熊", 2, 6),
+            ("诗怀雅", 2, 5),
+            ("Mon3tr", 2, 6),
+            ("凯尔希", 2, 6),
+            ("明椒", 0, 5),
+            ("望", 2, 5),
+            ("薇薇安娜", 2, 6),
+            ("阿米娅", 2, 5),
+            ("格雷伊", 2, 4),
+            ("烛煌", 2, 6),
+            ("澄闪", 2, 6),
+            ("雷蛇", 2, 5),
+            ("海霓", 2, 5),
+            ("清流", 2, 4),
+            ("砾", 2, 4),
+            ("苍苔", 2, 5),
+            ("白雪", 2, 4),
+            ("红豆", 2, 4),
+            ("酒神", 2, 6),
+            ("褐果", 2, 4),
+            ("卡达", 2, 4),
+            ("槐琥", 2, 5),
+            ("铅踝", 2, 5),
+            ("雪猎", 2, 5),
+            ("斑点", 2, 3),
+            ("乌尔比安", 2, 6),
+            ("斯卡蒂", 1, 6),
+            ("冬时", 2, 5),
+            ("幽灵鲨", 2, 5),
+            ("安哲拉", 0, 5),
+            ("水月", 2, 6),
+            ("炎熔", 2, 3),
+            ("艾雅法拉", 2, 6),
+            ("阿罗玛", 0, 5),
+        ]);
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let report = crate::schedule::schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 20,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(
+            report.shifts.iter().any(|shift| trade_room_contains(
+                &shift.assignment,
+                &blueprint,
+                &["但书"]
+            )),
+            "partial meta account should keep docus core in rotation"
+        );
+        assert!(
+            report.shifts.iter().any(|shift| {
+                trade_room_contains(&shift.assignment, &blueprint, &["可露希尔"])
+            }),
+            "partial meta account should keep closure core in rotation"
+        );
+        assert!(
+            report.shifts.iter().any(|shift| {
+                trade_room_contains(&shift.assignment, &blueprint, &["巫恋", "龙舌兰"])
+            }),
+            "partial meta account should keep witch + tequila fallback in rotation"
+        );
+    }
+
+    fn trade_room_contains(
+        assignment: &BaseAssignment,
+        blueprint: &BaseBlueprint,
+        names: &[&str],
+    ) -> bool {
+        assignment.rooms.iter().any(|room| {
+            blueprint
+                .rooms
+                .iter()
+                .any(|bp| bp.id == room.room_id && bp.kind == FacilityKind::TradePost)
+                && names
+                    .iter()
+                    .all(|name| room.operators.iter().any(|op| op.name == *name))
+        })
     }
 
     #[test]
