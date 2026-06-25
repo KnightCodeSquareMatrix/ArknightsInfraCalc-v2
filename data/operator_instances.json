@@ -5371,7 +5371,7 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_prod_spd&limit&cost[100]"
+            "manu_prod_spd&limit&cost[200]"
           ],
           "stepwise": false
         }
@@ -5384,8 +5384,7 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_prod_spd&limit&cost[100]",
-            "manu_prod_spd&limit&cost[200]"
+            "manu_prod_spd&limit&cost[100]"
           ],
           "stepwise": true
         }

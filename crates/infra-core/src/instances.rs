@@ -256,4 +256,19 @@ mod tests {
             "精2 应保留金属工艺并叠加原质塑金（勿用 manu_formula_spd[102] 替换金属）"
         );
     }
+
+    #[test]
+    fn resolve_cai_du_manu_tier0_and_tier_up_do_not_stack() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        assert_eq!(
+            instances.resolve_manufacture_buff_ids("裁度", PromotionTier::Tier0),
+            vec!["manu_prod_spd&limit&cost[200]".to_string()],
+            "裁度精0应为量体裁衣 20%，不是得心应手"
+        );
+        assert_eq!(
+            instances.resolve_manufacture_buff_ids("裁度", PromotionTier::TierUp),
+            vec!["manu_prod_spd&limit&cost[100]".to_string()],
+            "裁度精2应替换为得心应手 25%+仓库，不应与量体裁衣叠加"
+        );
+    }
 }
