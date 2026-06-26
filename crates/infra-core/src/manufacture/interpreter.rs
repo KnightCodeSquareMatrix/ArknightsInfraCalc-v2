@@ -236,11 +236,12 @@ fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
     const GLADIIA_BETA: &str = "control_mp_aegir2[010]";
     const TAG_ABYSSAL: &str = "cc.g.abyssal";
 
-    let has_abyssal_in_room = ctx
+    let room_abyssal_count = ctx
         .operators
         .iter()
-        .any(|op| op.tags.iter().any(|t| t == TAG_ABYSSAL));
-    if !has_abyssal_in_room {
+        .filter(|op| op.tags.iter().any(|t| t == TAG_ABYSSAL))
+        .count() as f64;
+    if room_abyssal_count == 0.0 {
         return;
     }
 
@@ -261,7 +262,7 @@ fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
             .get(TAG_ABYSSAL)
             .unwrap_or(&0),
     );
-    let bonus = (abyssal_count * rate).min(cap);
+    let bonus = (room_abyssal_count * abyssal_count * rate).min(cap);
     ctx.station_eff.add(None, bonus);
 }
 
@@ -1145,7 +1146,7 @@ mod tests {
     }
 
     #[test]
-    fn gladiia_control_boosts_abyssal_manu_rooms_by_global_hunter_count() {
+    fn gladiia_control_boosts_each_abyssal_by_global_hunter_count() {
         let table = table();
         let mut layout = LayoutContext::default();
         layout.control_workforce.push("歌蕾蒂娅".to_string());
@@ -1178,8 +1179,8 @@ mod tests {
         abyssal_room.layout = Arc::new(layout.clone());
         let abyssal = crate::manufacture::solver::solve_manufacture(&abyssal_room, &table).unwrap();
         assert!(
-            (abyssal.prod_skill - 55.0).abs() < 0.01,
-            "4 abyssal hunters in manufacture ×10 plus 芬15, got {}",
+            (abyssal.prod_skill - 95.0).abs() < 0.01,
+            "2 abyssal hunters in room × 4 abyssal hunters in manufacture ×10 plus 芬15, got {}",
             abyssal.prod_skill
         );
 
