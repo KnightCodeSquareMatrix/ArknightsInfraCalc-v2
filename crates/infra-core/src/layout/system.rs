@@ -1374,6 +1374,58 @@ mod tests {
     }
 
     #[test]
+    fn claim_pinus_robust_when_manu4_gold_teammates_unavailable() {
+        // 回归：manu_4 赤金槽只钉砾（队友由制造贪心补齐），不再 pick_one 迷迭香/阿罗玛/
+        // 断罪者/槐琥。即使这些干员全缺，红松林仍应认领——焰尾/薇薇安娜进中枢、
+        // manu_1 红松三线落位。修复前缺这些队友会使 manu_4 非 optional 槽失败，
+        // 整链 all-or-nothing 被拒，导致中枢无焰尾、水月等低 priority 体系反占。
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = operbox_without_names(
+            &ideal_e2_operbox(),
+            &["迷迭香", "阿罗玛", "断罪者", "槐琥"],
+        );
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        assert!(
+            pinus_claimed(&assignment),
+            "缺 manu_4 赤金队友时红松林仍应认领（焰尾+薇薇安娜进中枢）: control={:?}",
+            assignment
+                .control_operators()
+                .iter()
+                .map(|o| &o.name)
+                .collect::<Vec<_>>()
+        );
+        let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
+        assert!(
+            manu_1.iter().any(|o| o.name == "灰毫")
+                && manu_1.iter().any(|o| o.name == "远牙")
+                && manu_1.iter().any(|o| o.name == "野鬃"),
+            "manu_1 应为红松三线: {:?}",
+            manu_1.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+        // manu_4 只钉砾，队友交给制造贪心（不再硬编码）。
+        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
+        assert!(
+            manu_4.iter().any(|o| o.name == "砾"),
+            "manu_4 应含砾 anchor: {:?}",
+            manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn claim_pinus_sylvestris_skipped_without_viviana_or_yanwei() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();

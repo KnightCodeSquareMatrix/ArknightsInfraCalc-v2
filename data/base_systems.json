@@ -199,9 +199,7 @@
           "facility": "factory",
           "room_id": "manu_4",
           "operators": [
-            { "name": "砾", "elite": 2 },
-            { "pick_one": ["迷迭香", "阿罗玛"], "elite": 2 },
-            { "pick_one": ["阿罗玛", "断罪者", "槐琥"], "elite": 2 }
+            { "name": "砾", "elite": 2 }
           ]
         }
       ]
