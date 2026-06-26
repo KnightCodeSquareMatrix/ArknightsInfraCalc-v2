@@ -32,6 +32,8 @@ use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
 use crate::types::RecipeKind;
 
 const SENXI_DORM_CUISINE_BUFF: &str = "dorm_rec_bd_dungeon[000]";
+const SPHINX_NAME: &str = "深巡";
+const URRBIAN_NAME: &str = "乌尔比安";
 fn ms(a: Instant, b: Instant) -> f64 {
     a.duration_since(b).as_secs_f64() * 1000.0
 }
@@ -189,6 +191,7 @@ pub fn assign_shift_with_plan_skip(
 
     if mode == AssignShiftMode::Peak {
         assign_perception_producers(blueprint, operbox, &mut assignment, &mut used)?;
+        assign_sphinx_urrbian_dorm_anchor(blueprint, operbox, &mut assignment, &mut used);
         assign_dorm_producers(blueprint, operbox, instances, &mut assignment, &mut used)?;
     }
     let t5 = Instant::now();
@@ -604,6 +607,33 @@ fn assign_dorm_producers(
         );
     }
     Ok(())
+}
+
+pub(crate) fn assign_sphinx_urrbian_dorm_anchor(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) {
+    if !operbox.owns(SPHINX_NAME) || used.contains(URRBIAN_NAME) {
+        return;
+    }
+    let Some(progress) = operbox.progress_of(URRBIAN_NAME) else {
+        return;
+    };
+    let Some(room) = blueprint
+        .rooms_of(FacilityKind::Dormitory)
+        .into_iter()
+        .find(|room| assignment.operators_in(&room.id).is_empty())
+    else {
+        return;
+    };
+
+    used.insert(URRBIAN_NAME.into());
+    assignment.set_room(
+        room.id.clone(),
+        vec![AssignedOperator::from_progress(URRBIAN_NAME, progress)],
+    );
 }
 
 fn best_dorm_producer(
@@ -1666,6 +1696,40 @@ mod tests {
             buff_ids,
             crate::roster::OperatorProgress::elite_only(0),
         )
+    }
+
+    #[test]
+    fn sphinx_urrbian_anchor_places_urrbian_in_dorm_base_workforce() {
+        let (blueprint, _, instances, table) = fixtures();
+        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+
+        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
+
+        assert!(used.contains("乌尔比安"));
+        assert!(
+            assignment
+                .rooms
+                .iter()
+                .any(|room| room.room_id.0.starts_with("dorm_")
+                    && room.operators.iter().any(|op| op.name == "乌尔比安")),
+            "深巡存在时应把乌尔比安作为宿舍进驻锚点"
+        );
+        let layout = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap()
+        .layout;
+        assert!(
+            layout.base_workforce.iter().any(|name| name == "乌尔比安"),
+            "宿舍进驻的乌尔比安应进入 OperatorInBase 判定"
+        );
     }
 
     #[test]

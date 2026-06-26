@@ -144,6 +144,13 @@
           "gold",
           "originium"
         ]
+      },
+      {
+        "name": "深巡",
+        "order_types": [
+          "gold",
+          "originium"
+        ]
       }
     ],
     "factory": [

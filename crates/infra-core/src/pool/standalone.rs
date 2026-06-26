@@ -388,6 +388,7 @@ mod tests {
         assert!(roster.trade_post.contains_key("空弦"));
         assert!(roster.trade_post.contains_key("吉星"));
         assert!(roster.trade_post.contains_key("石英"));
+        assert!(roster.trade_post.contains_key("深巡"));
         assert!(
             !roster.trade_post.contains_key("但书"),
             "但书是体系核，不应在工具人表"

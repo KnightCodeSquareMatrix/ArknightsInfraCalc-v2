@@ -8,14 +8,10 @@ use crate::instances::OperatorInstances;
 use crate::layout::{
     assign_control, assign_shift_with_plan_skip, assign_team_gamma_half, pinned_assignment,
     resolve_base, ActivatedSystem, AssignBaseOptions, AssignShiftMode, AssignedOperator,
-    AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId, RoomProduct, SlotFill,
+    AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId, SlotFill,
 };
-use crate::manufacture::{solve_manufacture, ManuOperator, ManuRoomInput};
 use crate::operbox::OperBox;
-use crate::pool::{
-    build_control_pool, build_manufacture_pool, build_power_pool, build_trade_pool,
-    filter_general_manufacture_search_pool, ManuPool,
-};
+use crate::pool::{build_control_pool, build_manufacture_pool, build_power_pool, build_trade_pool};
 use crate::search::control_entry_plugin_fill;
 use crate::skill_table::SkillTable;
 
@@ -188,26 +184,23 @@ struct AbyssalCandidate {
     gamma_ops: Vec<String>,
 }
 
-/// 构造 S2 深海短班候选：2+2 深海猎手、歌蕾蒂娅进中枢、每房按求解器补最佳第三人。
+/// 构造 S2 深海短班候选：四名深海猎手视作等价生产锚，按房间人数计数枚举。
 /// 歌蕾蒂娅只能承受约 7h 短班；深海链不进入普通 base_systems registry。
 struct AbyssalBuildCtx<'a> {
     operbox: &'a OperBox,
     blueprint: &'a BaseBlueprint,
-    instances: &'a OperatorInstances,
-    table: &'a SkillTable,
-    pools: &'a ProductionPools,
     used_ab: &'a HashSet<String>,
     shared: &'a BaseAssignment,
     beta: &'a BaseAssignment,
     gamma_h1: &'a BaseAssignment,
-    mood: f64,
-    durin_plan: Option<u8>,
 }
 
-fn build_abyssal_s2_candidate(ctx: &AbyssalBuildCtx<'_>) -> Option<AbyssalCandidate> {
-    let gladiia_elite = ctx.operbox.elite_of(ABYSSAL_GLADIIA)?;
+fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidate> {
+    let Some(gladiia_elite) = ctx.operbox.elite_of(ABYSSAL_GLADIIA) else {
+        return Vec::new();
+    };
     if gladiia_elite < 2 || ctx.used_ab.contains(ABYSSAL_GLADIIA) {
-        return None;
+        return Vec::new();
     }
 
     let mut hunters = Vec::new();
@@ -217,79 +210,89 @@ fn build_abyssal_s2_candidate(ctx: &AbyssalBuildCtx<'_>) -> Option<AbyssalCandid
         }
     }
     if hunters.len() < 4 {
-        return None;
+        return Vec::new();
     }
 
     let manu_rooms: Vec<RoomId> = ctx
         .blueprint
         .rooms_of(FacilityKind::Factory)
         .iter()
-        .filter(|r| ctx.gamma_h1.operators_in(&r.id).len() == 3)
-        .take(2)
         .map(|r| r.id.clone())
         .collect();
-    if manu_rooms.len() < 2 {
-        return None;
+    if manu_rooms.is_empty() {
+        return Vec::new();
     }
 
-    let mut candidate = ctx.shared.clone();
-    candidate.set_room(
-        RoomId::from("control"),
-        abyssal_control_room(ctx.shared, gladiia_elite)?,
-    );
-    merge_rooms(&mut candidate, ctx.beta);
-    let mut gamma_ops = Vec::new();
+    let mut base = ctx.shared.clone();
+    let Some(control) = abyssal_control_room(ctx.shared, gladiia_elite) else {
+        return Vec::new();
+    };
+    base.set_room(RoomId::from("control"), control);
+    merge_rooms(&mut base, ctx.beta);
+    merge_rooms(&mut base, ctx.gamma_h1);
 
-    for i in 0..2 {
-        let first = ctx.operbox.progress_of(&hunters[i * 2])?;
-        let second = ctx.operbox.progress_of(&hunters[i * 2 + 1])?;
-        let mut ops = vec![
-            AssignedOperator::from_progress(&hunters[i * 2], first),
-            AssignedOperator::from_progress(&hunters[i * 2 + 1], second),
-        ];
-        candidate.set_room(manu_rooms[i].clone(), ops.clone());
-
-        let layout = resolve_base(
-            ctx.blueprint,
-            &candidate,
-            Some(ctx.instances),
-            Some(ctx.table),
-            ctx.mood,
-            ctx.durin_plan,
-        )
-        .ok()?
-        .layout_snapshot();
-        let used = candidate.operator_names();
-        let filler = best_abyssal_room_filler(
-            ctx.blueprint,
-            &manu_rooms[i],
-            &ops,
-            ctx.instances,
-            &ctx.pools.manu,
-            ctx.table,
-            &layout,
-            ctx.mood,
-            &used,
-            ctx.used_ab,
-        )?;
-        ops.push(filler);
-        gamma_ops.extend(ops.iter().map(|op| op.name.clone()));
-        candidate.set_room(manu_rooms[i].clone(), ops);
+    let original_rooms: Vec<Vec<AssignedOperator>> = manu_rooms
+        .iter()
+        .map(|room_id| base.operators_in(room_id).to_vec())
+        .collect();
+    let gamma_original: HashSet<String> = operators_of(ctx.gamma_h1).into_iter().collect();
+    let hunter_names: HashSet<&str> = hunters.iter().map(String::as_str).collect();
+    let hunter_ops: Vec<AssignedOperator> = hunters
+        .iter()
+        .filter_map(|name| {
+            ctx.operbox
+                .progress_of(name)
+                .map(|progress| AssignedOperator::from_progress(name, progress))
+        })
+        .collect();
+    if hunter_ops.len() != hunters.len() {
+        return Vec::new();
     }
 
-    for room in &ctx.gamma_h1.rooms {
-        if !manu_rooms.contains(&room.room_id) {
-            candidate.set_room_assignment(room.clone());
-            gamma_ops.extend(room.operators.iter().map(|op| op.name.clone()));
+    let mut count_vectors = Vec::new();
+    enumerate_abyssal_counts(4, manu_rooms.len(), &mut Vec::new(), &mut count_vectors);
+
+    let mut out = Vec::new();
+    for counts in count_vectors {
+        let mut candidate = base.clone();
+        let mut next_hunter = 0;
+        for (room_idx, count) in counts.iter().copied().enumerate() {
+            let mut ops = Vec::new();
+            for _ in 0..count {
+                ops.push(hunter_ops[next_hunter].clone());
+                next_hunter += 1;
+            }
+            for op in &original_rooms[room_idx] {
+                if ops.len() >= 3 {
+                    break;
+                }
+                if hunter_names.contains(op.name.as_str()) {
+                    continue;
+                }
+                ops.push(op.clone());
+            }
+            candidate.set_room(manu_rooms[room_idx].clone(), ops);
         }
-    }
-    gamma_ops.sort();
-    gamma_ops.dedup();
 
-    Some(AbyssalCandidate {
-        assignment: candidate,
-        gamma_ops,
-    })
+        let mut gamma_ops: Vec<String> = candidate
+            .rooms
+            .iter()
+            .filter(|room| manu_rooms.contains(&room.room_id))
+            .flat_map(|room| room.operators.iter())
+            .filter(|op| {
+                gamma_original.contains(&op.name) || hunter_names.contains(op.name.as_str())
+            })
+            .map(|op| op.name.clone())
+            .collect();
+        gamma_ops.sort();
+        gamma_ops.dedup();
+        out.push(AbyssalCandidate {
+            assignment: candidate,
+            gamma_ops,
+        });
+    }
+
+    out
 }
 
 fn abyssal_control_room(
@@ -309,71 +312,23 @@ fn abyssal_control_room(
     Some(control)
 }
 
-fn best_abyssal_room_filler(
-    blueprint: &BaseBlueprint,
-    room_id: &RoomId,
-    pinned: &[AssignedOperator],
-    instances: &OperatorInstances,
-    pool: &ManuPool,
-    table: &SkillTable,
-    layout: &crate::layout::LayoutContext,
-    mood: f64,
-    used: &HashSet<String>,
-    used_ab: &HashSet<String>,
-) -> Option<AssignedOperator> {
-    let room = blueprint.room(room_id)?;
-    let Some(RoomProduct::Factory { recipe }) = room.product.as_ref() else {
-        return None;
-    };
-    let pinned_names: HashSet<&str> = pinned.iter().map(|op| op.name.as_str()).collect();
-
-    let pool = filter_general_manufacture_search_pool(pool);
-    pool.entries
-        .iter()
-        .filter(|entry| {
-            !used.contains(&entry.name)
-                && !used_ab.contains(&entry.name)
-                && !pinned_names.contains(entry.name.as_str())
-        })
-        .filter_map(|entry| {
-            let mut operators = pinned
-                .iter()
-                .filter_map(|op| assigned_to_manu_operator(op, instances))
-                .collect::<Vec<_>>();
-            if operators.len() != pinned.len() {
-                return None;
-            }
-            operators.push(entry.to_manu_operator());
-            let input = ManuRoomInput {
-                level: room.level,
-                operators,
-                active_recipe: *recipe,
-                mood,
-                layout: std::sync::Arc::new(layout.clone()),
-            };
-            let score = solve_manufacture(&input, table).ok()?.prod_total;
-            Some((score, entry.name.clone(), entry.progress))
-        })
-        .max_by(|a, b| {
-            a.0.partial_cmp(&b.0)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| b.1.cmp(&a.1))
-        })
-        .map(|(_, name, progress)| AssignedOperator::from_progress(name, progress))
-}
-
-fn assigned_to_manu_operator(
-    op: &AssignedOperator,
-    instances: &OperatorInstances,
-) -> Option<ManuOperator> {
-    let tier = op.tier();
-    let tags = instances.tags_for(&op.name, tier);
-    Some(ManuOperator {
-        name: op.name.clone(),
-        elite: op.elite,
-        buff_ids: instances.resolve_manufacture_buff_ids(&op.name, tier),
-        tags,
-    })
+fn enumerate_abyssal_counts(
+    remaining: usize,
+    room_count: usize,
+    current: &mut Vec<usize>,
+    out: &mut Vec<Vec<usize>>,
+) {
+    if current.len() == room_count {
+        if remaining == 0 {
+            out.push(current.clone());
+        }
+        return;
+    }
+    for count in 0..=remaining.min(3) {
+        current.push(count);
+        enumerate_abyssal_counts(remaining - count, room_count, current, out);
+        current.pop();
+    }
 }
 
 // ── 深海链短班入口结束 ──
@@ -882,20 +837,16 @@ pub fn schedule_team_rotation(
                 score_base_assignment(blueprint, &base, instances, table, hours, Some(durin_plan))?;
 
             // 路径 B: 有深海（S2 短班候选）
-            let abyssal = build_abyssal_s2_candidate(&AbyssalBuildCtx {
+            let abyssal_candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
                 operbox,
                 blueprint,
-                instances,
-                table,
-                pools: &pools,
                 used_ab: &used_ab,
                 shared: &shared,
                 beta: &beta,
                 gamma_h1: &gamma_h1,
-                mood: options.mood,
-                durin_plan: Some(durin_plan),
             });
-            let (best_assignment, best_scores) = if let Some(mut candidate) = abyssal {
+            let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores)> = None;
+            for mut candidate in abyssal_candidates {
                 let mut aby_used = candidate.assignment.operator_names();
                 assign_ctrl(&mut candidate.assignment, &mut aby_used)?;
                 if !candidate
@@ -914,6 +865,15 @@ pub fn schedule_team_rotation(
                     hours,
                     Some(durin_plan),
                 )?;
+                let replace = best_abyssal
+                    .as_ref()
+                    .is_none_or(|(_, best)| score_aby.manu_prod_sum > best.manu_prod_sum);
+                if replace {
+                    best_abyssal = Some((candidate, score_aby));
+                }
+            }
+            let (best_assignment, best_scores) = if let Some((candidate, score_aby)) = best_abyssal
+            {
                 if score_aby.manu_prod_sum > score_base.manu_prod_sum {
                     if let Some(team) = teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
                     {
