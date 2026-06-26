@@ -30,6 +30,7 @@ use crate::layout::blueprint::{BaseBlueprint, FacilityKind};
 use crate::layout::orchestrate::{build_plan, execute_plan, AssignmentPlan};
 use crate::layout::resolve::resolve_base;
 use crate::layout::shift::AssignShiftMode;
+use crate::layout::system::{explain_registry_systems, SystemExplainReport};
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
@@ -101,6 +102,21 @@ pub fn assign_shift(
         assign_shift_with_plan(blueprint, operbox, instances, table, options, mode, seed)?
             .assignment,
     )
+}
+
+/// 解释主路径 `assign_shift` 会如何认领 registry systems。
+///
+/// 这会套用与实际排班一致的 trade role registry skip 规则，但不执行设施搜索或效率结算。
+pub fn explain_assignment_systems(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    mode: AssignShiftMode,
+    seed: &BaseAssignment,
+) -> SystemExplainReport {
+    let mut skip_system_ids = HashSet::new();
+    skip_trade_core_registry_systems(&mut skip_system_ids);
+    let used = seed.operator_names();
+    explain_registry_systems(blueprint, operbox, mode, seed, &used, &skip_system_ids)
 }
 
 /// 从编排计划提取 claimed 干员名并按 tier 标注池条目。

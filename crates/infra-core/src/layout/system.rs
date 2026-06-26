@@ -35,6 +35,54 @@ pub struct RegistrySystemClaim {
     pub slots: Vec<RegistrySlotClaim>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemExplainStatus {
+    Selected,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SystemExplainReason {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SystemSlotExplain {
+    pub facility: String,
+    pub room_id: Option<String>,
+    pub optional: bool,
+    pub status: SystemExplainStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<SystemExplainReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_room_id: Option<RoomId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub operators: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SystemExplainEntry {
+    pub system_id: String,
+    pub label: String,
+    pub priority: i32,
+    pub tier: OperatorTier,
+    pub status: SystemExplainStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<SystemExplainReason>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slots: Vec<SystemSlotExplain>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SystemExplainReport {
+    pub mode: AssignShiftMode,
+    pub systems: Vec<SystemExplainEntry>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct BaseSystemsFile {
     #[serde(default)]
@@ -155,10 +203,34 @@ impl PickOneCandidate {
     }
 }
 
+impl SystemExplainReason {
+    fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ResolvedOperator {
     name: String,
     progress: crate::roster::OperatorProgress,
+}
+
+struct SlotPlan {
+    claim: RegistrySlotClaim,
+    explain: SystemSlotExplain,
+}
+
+struct SystemPlan {
+    claim: RegistrySystemClaim,
+    slots: Vec<SystemSlotExplain>,
+}
+
+struct SystemPlanError {
+    reason: SystemExplainReason,
+    slots: Vec<SystemSlotExplain>,
 }
 
 struct BaseSystemsCache {
@@ -247,22 +319,47 @@ fn resolve_pick_one(
     None
 }
 
-fn resolve_slot_operators(
+fn explain_slot_operators(
     operbox: &OperBox,
     slot: &SystemSlotDef,
     used: &HashSet<String>,
-) -> Option<Vec<ResolvedOperator>> {
+) -> std::result::Result<Vec<ResolvedOperator>, SystemExplainReason> {
     let mut resolved = Vec::with_capacity(slot.operators.len());
     let mut slot_used: HashSet<String> = used.clone();
     for spec in &slot.operators {
         match spec {
             SystemOperatorSpec::Fixed(fixed) => {
-                let progress = operbox.progress_of(&fixed.name)?;
-                if progress.elite < fixed.elite || slot_used.contains(&fixed.name) {
-                    return None;
+                if slot_used.contains(&fixed.name) {
+                    return Err(SystemExplainReason::new(
+                        "operator_already_used",
+                        format!("{} is already assigned", fixed.name),
+                    ));
+                }
+                let Some(progress) = operbox.progress_of(&fixed.name) else {
+                    return Err(SystemExplainReason::new(
+                        "missing_operator",
+                        format!("{} is not owned", fixed.name),
+                    ));
+                };
+                if progress.elite < fixed.elite {
+                    return Err(SystemExplainReason::new(
+                        "elite_requirement",
+                        format!(
+                            "{} elite {} < required {}",
+                            fixed.name, progress.elite, fixed.elite
+                        ),
+                    ));
                 }
                 if fixed.max_elite.is_some_and(|max| progress.elite > max) {
-                    return None;
+                    return Err(SystemExplainReason::new(
+                        "elite_requirement",
+                        format!(
+                            "{} elite {} > max {}",
+                            fixed.name,
+                            progress.elite,
+                            fixed.max_elite.unwrap_or_default()
+                        ),
+                    ));
                 }
                 slot_used.insert(fixed.name.clone());
                 resolved.push(ResolvedOperator {
@@ -271,44 +368,104 @@ fn resolve_slot_operators(
                 });
             }
             SystemOperatorSpec::PickOne(pick) => {
-                let op = resolve_pick_one(operbox, pick, &slot_used)?;
+                let Some(op) = resolve_pick_one(operbox, pick, &slot_used) else {
+                    let names: Vec<_> = pick.pick_one.iter().map(|c| c.name()).collect();
+                    return Err(SystemExplainReason::new(
+                        "missing_operator",
+                        format!("no pick_one candidate is available: {}", names.join(", ")),
+                    ));
+                };
                 slot_used.insert(op.name.clone());
                 resolved.push(op);
             }
         }
     }
-    Some(resolved)
+    Ok(resolved)
 }
 
-fn resolve_slot_room<'a>(
+fn explain_slot_room<'a>(
     blueprint: &'a BaseBlueprint,
     assignment: &BaseAssignment,
     slot: &SystemSlotDef,
-) -> Option<&'a crate::layout::blueprint::RoomBlueprint> {
+) -> std::result::Result<&'a crate::layout::blueprint::RoomBlueprint, SystemExplainReason> {
+    let Some(kind) = facility_kind(&slot.facility) else {
+        return Err(SystemExplainReason::new(
+            "unknown_facility",
+            format!("unknown facility {}", slot.facility),
+        ));
+    };
     if let Some(id) = slot.room_id.as_deref() {
-        let room = blueprint.rooms.iter().find(|r| r.id.0 == id)?;
+        let Some(room) = blueprint.rooms.iter().find(|r| r.id.0 == id) else {
+            return Err(SystemExplainReason::new(
+                "room_unavailable",
+                format!("room {id} does not exist"),
+            ));
+        };
+        if room.kind != kind {
+            return Err(SystemExplainReason::new(
+                "room_unavailable",
+                format!("room {id} is {:?}, not {:?}", room.kind, kind),
+            ));
+        }
         if !slot_matches_room_product(slot, room) {
-            return None;
+            return Err(SystemExplainReason::new(
+                "product_mismatch",
+                format!("room {id} does not match requested recipe/product"),
+            ));
         }
         if !assignment.operators_in(&room.id).is_empty() {
-            return None;
+            return Err(SystemExplainReason::new(
+                "room_occupied",
+                format!("room {id} is already occupied"),
+            ));
         }
-        return Some(room);
+        return Ok(room);
     }
-    let kind = facility_kind(&slot.facility)?;
-    blueprint.rooms.iter().find(|r| {
-        if r.kind != kind {
-            return false;
+
+    let mut has_facility = false;
+    let mut has_product = false;
+    let mut blocked_by_capacity = false;
+    for room in &blueprint.rooms {
+        if room.kind != kind {
+            continue;
         }
-        if !slot_matches_room_product(slot, r) {
-            return false;
+        has_facility = true;
+        if !slot_matches_room_product(slot, room) {
+            continue;
         }
+        has_product = true;
         if kind == FacilityKind::ControlCenter {
-            assignment.operators_in(&r.id).len() < 5
-        } else {
-            assignment.operators_in(&r.id).is_empty()
+            if assignment.operators_in(&room.id).len() < 5 {
+                return Ok(room);
+            }
+        } else if assignment.operators_in(&room.id).is_empty() {
+            return Ok(room);
         }
-    })
+        blocked_by_capacity = true;
+    }
+
+    if !has_facility {
+        return Err(SystemExplainReason::new(
+            "room_unavailable",
+            format!("no {:?} room exists", kind),
+        ));
+    }
+    if !has_product {
+        return Err(SystemExplainReason::new(
+            "product_mismatch",
+            format!("no {:?} room matches requested recipe/product", kind),
+        ));
+    }
+    if blocked_by_capacity {
+        return Err(SystemExplainReason::new(
+            "room_occupied",
+            format!("all matching {:?} rooms are occupied or full", kind),
+        ));
+    }
+    Err(SystemExplainReason::new(
+        "room_unavailable",
+        format!("no available {:?} room", kind),
+    ))
 }
 
 fn slot_matches_room_product(
@@ -376,6 +533,59 @@ pub fn select_registry_systems(
     selected
 }
 
+/// 解释每条 registry system 在当前蓝图 / 练度 / 已占用状态下的选型结果。
+/// 该函数只做旁路观测，不调用 trade/manu/power solve，也不修改传入编制。
+pub fn explain_registry_systems(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    mode: AssignShiftMode,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    skip_system_ids: &HashSet<String>,
+) -> SystemExplainReport {
+    let Some(cache) = base_systems_cache() else {
+        return SystemExplainReport {
+            mode,
+            systems: Vec::new(),
+        };
+    };
+
+    let mut scratch = assignment.clone();
+    let mut scratch_used = used.clone();
+    let mut claimed_groups: HashSet<String> = HashSet::new();
+    let mut selected = Vec::new();
+    let mut systems = Vec::new();
+
+    explain_tier(
+        OperatorTier::CrossStation,
+        cache,
+        blueprint,
+        operbox,
+        mode,
+        &mut scratch,
+        &mut scratch_used,
+        &mut claimed_groups,
+        skip_system_ids,
+        &mut selected,
+        &mut systems,
+    );
+    explain_tier(
+        OperatorTier::SameStation,
+        cache,
+        blueprint,
+        operbox,
+        mode,
+        &mut scratch,
+        &mut scratch_used,
+        &mut claimed_groups,
+        skip_system_ids,
+        &mut selected,
+        &mut systems,
+    );
+
+    SystemExplainReport { mode, systems }
+}
+
 /// 在单个 tier 内按 priority 贪心。
 fn select_tier(
     tier: OperatorTier,
@@ -401,15 +611,113 @@ fn select_tier(
                 continue;
             }
         }
-        let Some(claim) = plan_registry_system(blueprint, operbox, scratch, scratch_used, system)
+        let Ok(plan) =
+            plan_registry_system_detailed(blueprint, operbox, scratch, scratch_used, system)
         else {
             continue;
         };
-        apply_registry_claim_to_assignment(&claim, scratch, scratch_used);
+        apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
         if let Some(group) = system.exclusive_group.clone() {
             claimed_groups.insert(group);
         }
-        out.push(claim);
+        out.push(plan.claim);
+    }
+}
+
+fn explain_tier(
+    tier: OperatorTier,
+    cache: &BaseSystemsCache,
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    mode: AssignShiftMode,
+    scratch: &mut BaseAssignment,
+    scratch_used: &mut HashSet<String>,
+    claimed_groups: &mut HashSet<String>,
+    skip_system_ids: &HashSet<String>,
+    selected: &mut Vec<RegistrySystemClaim>,
+    out: &mut Vec<SystemExplainEntry>,
+) {
+    for system in systems_for_tier(cache, tier, operbox, selected) {
+        if skip_system_ids.contains(&system.id) {
+            out.push(system_explain_entry(
+                system,
+                SystemExplainStatus::Skipped,
+                Some(SystemExplainReason::new(
+                    "skipped_by_policy",
+                    "system is skipped by assignment policy",
+                )),
+                Vec::new(),
+            ));
+            continue;
+        }
+        if !mode_allowed(system, mode) {
+            out.push(system_explain_entry(
+                system,
+                SystemExplainStatus::Skipped,
+                Some(SystemExplainReason::new(
+                    "shift_mode_not_allowed",
+                    format!("{mode:?} shift is not allowed for this system"),
+                )),
+                Vec::new(),
+            ));
+            continue;
+        }
+        if let Some(group) = system.exclusive_group.as_deref() {
+            if claimed_groups.contains(group) {
+                out.push(system_explain_entry(
+                    system,
+                    SystemExplainStatus::Skipped,
+                    Some(SystemExplainReason::new(
+                        "exclusive_group_claimed",
+                        format!("exclusive group {group} is already claimed"),
+                    )),
+                    Vec::new(),
+                ));
+                continue;
+            }
+        }
+
+        match plan_registry_system_detailed(blueprint, operbox, scratch, scratch_used, system) {
+            Ok(plan) => {
+                apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
+                if let Some(group) = system.exclusive_group.clone() {
+                    claimed_groups.insert(group);
+                }
+                selected.push(plan.claim);
+                out.push(system_explain_entry(
+                    system,
+                    SystemExplainStatus::Selected,
+                    None,
+                    plan.slots,
+                ));
+            }
+            Err(err) => {
+                out.push(system_explain_entry(
+                    system,
+                    SystemExplainStatus::Skipped,
+                    Some(err.reason),
+                    err.slots,
+                ));
+            }
+        }
+    }
+}
+
+fn system_explain_entry(
+    system: &BaseSystemDef,
+    status: SystemExplainStatus,
+    reason: Option<SystemExplainReason>,
+    slots: Vec<SystemSlotExplain>,
+) -> SystemExplainEntry {
+    SystemExplainEntry {
+        system_id: system.id.clone(),
+        label: system.label.clone(),
+        priority: system.priority,
+        tier: system.tier.unwrap_or(OperatorTier::Standalone),
+        status,
+        exclusive_group: system.exclusive_group.clone(),
+        reason,
+        slots,
     }
 }
 
@@ -522,42 +830,54 @@ pub fn claim_base_systems(
     Ok(())
 }
 
-fn plan_registry_system(
+fn plan_registry_system_detailed(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     assignment: &BaseAssignment,
     used: &HashSet<String>,
     system: &BaseSystemDef,
-) -> Option<RegistrySystemClaim> {
-    if !system_feasible(blueprint, operbox, assignment, used, system) {
-        return None;
-    }
+) -> std::result::Result<SystemPlan, SystemPlanError> {
     let mut scratch = assignment.clone();
     let mut scratch_used = used.clone();
     let mut slots = Vec::new();
+    let mut slot_explains = Vec::new();
     for slot_def in &system.slots {
-        if slot_def.optional
-            && !slot_resolvable(blueprint, operbox, &scratch, &scratch_used, slot_def)
-        {
-            continue;
-        }
-        let room = resolve_slot_room(blueprint, &scratch, slot_def)?;
-        let resolved = resolve_slot_operators(operbox, slot_def, &scratch_used)?;
-        let facility = facility_kind(&slot_def.facility)?;
-        let room_id = if slot_def.facility == "control" {
-            RoomId::from("control")
-        } else {
-            room.id.clone()
+        let slot = match plan_registry_slot(blueprint, operbox, &scratch, &scratch_used, slot_def) {
+            Ok(slot) => slot,
+            Err(reason) if slot_def.optional => {
+                slot_explains.push(SystemSlotExplain {
+                    facility: slot_def.facility.clone(),
+                    room_id: slot_def.room_id.clone(),
+                    optional: true,
+                    status: SystemExplainStatus::Skipped,
+                    reason: Some(reason),
+                    resolved_room_id: None,
+                    operators: Vec::new(),
+                });
+                continue;
+            }
+            Err(reason) => {
+                slot_explains.push(SystemSlotExplain {
+                    facility: slot_def.facility.clone(),
+                    room_id: slot_def.room_id.clone(),
+                    optional: false,
+                    status: SystemExplainStatus::Skipped,
+                    reason: Some(reason.clone()),
+                    resolved_room_id: None,
+                    operators: Vec::new(),
+                });
+                return Err(SystemPlanError {
+                    reason,
+                    slots: slot_explains,
+                });
+            }
         };
-        let operators: Vec<AssignedOperator> = resolved
-            .iter()
-            .map(|op| AssignedOperator::from_progress(&op.name, op.progress))
-            .collect();
-        slots.push(RegistrySlotClaim {
-            room_id: room_id.clone(),
-            facility,
-            operators: operators.clone(),
-        });
+        let facility = slot.claim.facility;
+        let room_id = slot.claim.room_id.clone();
+        let operators = slot.claim.operators.clone();
+        slot_explains.push(slot.explain);
+        slots.push(slot.claim);
+
         // 同房多 slot（如三间发电站）须顺序占用房间，与 `claim_system` 一致。
         for op in &operators {
             scratch_used.insert(op.name.clone());
@@ -570,11 +890,70 @@ fn plan_registry_system(
             scratch.set_room(room_id, operators);
         }
     }
-    Some(RegistrySystemClaim {
-        system_id: system.id.clone(),
-        priority: system.priority,
-        tier: system.tier.unwrap_or(OperatorTier::Standalone),
-        slots,
+    Ok(SystemPlan {
+        claim: RegistrySystemClaim {
+            system_id: system.id.clone(),
+            priority: system.priority,
+            tier: system.tier.unwrap_or(OperatorTier::Standalone),
+            slots,
+        },
+        slots: slot_explains,
+    })
+}
+
+fn plan_registry_slot(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    slot_def: &SystemSlotDef,
+) -> std::result::Result<SlotPlan, SystemExplainReason> {
+    let room = explain_slot_room(blueprint, assignment, slot_def)?;
+    let resolved = explain_slot_operators(operbox, slot_def, used)?;
+    let facility = facility_kind(&slot_def.facility).ok_or_else(|| {
+        SystemExplainReason::new(
+            "unknown_facility",
+            format!("unknown facility {}", slot_def.facility),
+        )
+    })?;
+    if slot_def.facility == "control" {
+        let current = assignment.control_operators().len();
+        if current + resolved.len() > 5 {
+            return Err(SystemExplainReason::new(
+                "control_capacity",
+                format!(
+                    "control capacity exceeded: current {} + slot {} > 5",
+                    current,
+                    resolved.len()
+                ),
+            ));
+        }
+    }
+    let room_id = if slot_def.facility == "control" {
+        RoomId::from("control")
+    } else {
+        room.id.clone()
+    };
+    let operators: Vec<AssignedOperator> = resolved
+        .iter()
+        .map(|op| AssignedOperator::from_progress(&op.name, op.progress))
+        .collect();
+    let operator_names = operators.iter().map(|op| op.name.clone()).collect();
+    Ok(SlotPlan {
+        claim: RegistrySlotClaim {
+            room_id: room_id.clone(),
+            facility,
+            operators,
+        },
+        explain: SystemSlotExplain {
+            facility: slot_def.facility.clone(),
+            room_id: slot_def.room_id.clone(),
+            optional: slot_def.optional,
+            status: SystemExplainStatus::Selected,
+            reason: None,
+            resolved_room_id: Some(room_id),
+            operators: operator_names,
+        },
     })
 }
 
@@ -595,48 +974,6 @@ fn apply_registry_claim_to_assignment(
             assignment.set_room(slot.room_id.clone(), slot.operators.clone());
         }
     }
-}
-
-/// slot 能否在当前蓝图 / operbox / used 下落位（房 + 干员均可解）。
-fn slot_resolvable(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    assignment: &BaseAssignment,
-    used: &HashSet<String>,
-    slot: &SystemSlotDef,
-) -> bool {
-    if facility_kind(&slot.facility).is_none() {
-        return false;
-    }
-    if resolve_slot_room(blueprint, assignment, slot).is_none() {
-        return false;
-    }
-    let resolved = match resolve_slot_operators(operbox, slot, used) {
-        Some(ops) => ops,
-        None => return false,
-    };
-    if slot.facility == "control" {
-        let current = assignment.control_operators().len();
-        if current + resolved.len() > 5 {
-            return false;
-        }
-    }
-    true
-}
-
-/// 系统是否可认领：所有**非可选** slot 都能落位即可（可选 slot 缺失只会被裁剪）。
-fn system_feasible(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    assignment: &BaseAssignment,
-    used: &HashSet<String>,
-    system: &BaseSystemDef,
-) -> bool {
-    system
-        .slots
-        .iter()
-        .filter(|slot| !slot.optional)
-        .all(|slot| slot_resolvable(blueprint, operbox, assignment, used, slot))
 }
 
 #[cfg(test)]
@@ -936,6 +1273,49 @@ mod tests {
             manu_4.iter().any(|o| o.name == "砾"),
             "manu_4: {:?}",
             manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn explain_registry_systems_reports_selected_and_skipped_reasons() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = ideal_e2_operbox();
+        let mut skip = HashSet::new();
+        skip.insert("blackkey_closure".to_string());
+
+        let report = explain_registry_systems(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &HashSet::new(),
+            &skip,
+        );
+
+        let pinus = report
+            .systems
+            .iter()
+            .find(|entry| entry.system_id == "pinus_sylvestris")
+            .expect("pinus_sylvestris should be explained");
+        assert_eq!(pinus.status, SystemExplainStatus::Selected);
+        assert!(
+            pinus
+                .slots
+                .iter()
+                .any(|slot| slot.operators.iter().any(|name| name == "焰尾")),
+            "selected pinus slots should include resolved operators: {:?}",
+            pinus.slots
+        );
+
+        let blackkey = report
+            .systems
+            .iter()
+            .find(|entry| entry.system_id == "blackkey_closure")
+            .expect("blackkey_closure should be explained");
+        assert_eq!(blackkey.status, SystemExplainStatus::Skipped);
+        assert_eq!(
+            blackkey.reason.as_ref().map(|r| r.code.as_str()),
+            Some("skipped_by_policy")
         );
     }
 

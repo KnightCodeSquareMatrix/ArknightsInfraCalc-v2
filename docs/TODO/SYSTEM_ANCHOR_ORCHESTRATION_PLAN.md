@@ -90,21 +90,27 @@ pub struct AnchorSlot {
 
 ## 分阶段实施
 
-### Phase 0：System Explain
+### Phase 0：System Explain（已完成）
 
 先加可观测性，不改变排班结果。
 
+落地状态：
+
+- `layout/system.rs` 提供 `explain_registry_systems` 与结构化 `SystemExplainReport`。
+- `assign.rs` 提供 `explain_assignment_systems`，复用主路径 trade role registry skip 规则。
+- CLI 增加 `layout test --explain-systems`；配合 `--json` 时只输出 explain JSON。
+
 动作：
 
-- 在 `layout/system.rs` 或 `layout/orchestrate/explain.rs` 增加 `explain_registry_systems`。
-- 输出每条 system 的 selected / skipped 状态和原因。
-- 原因至少包含：缺干员、精英化不足、干员已占用、房间不可用、产物不匹配、中枢容量不足、互斥组已被占、班次模式不允许。
-- CLI 增加调试入口，例如 `layout test --explain-systems` 或先用环境变量输出。
+- [x] 在 `layout/system.rs` 增加 `explain_registry_systems`。
+- [x] 输出每条 system 的 selected / skipped 状态和原因。
+- [x] 原因至少包含：缺干员、精英化不足、干员已占用、房间不可用、产物不匹配、中枢容量不足、互斥组已被占、班次模式不允许。
+- [x] CLI 增加调试入口：`layout test --explain-systems` / `layout test --explain-systems --json`。
 
 验收：
 
-- 不改变 `plan` / `layout team-rotation` 的编制结果。
-- 能解释 `pinus_sylvestris`、`automation_group`、`docus_syracusa`、`blackkey_closure` 等 selected / skipped 原因。
+- [x] 不改变 `plan` / `layout team-rotation` 的编制结果。
+- [x] 能解释 `pinus_sylvestris`、`automation_group`、`docus_syracusa`、`blackkey_closure` 等 selected / skipped 原因。
 
 ### Phase 1：Anchor 数据模型
 

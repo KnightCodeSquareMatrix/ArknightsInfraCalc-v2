@@ -13,7 +13,8 @@ use infra_core::export::{
 };
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::{
-    assign_base_greedy, resolve_base, AssignBaseOptions, BaseAssignment, BaseBlueprint,
+    assign_base_greedy, explain_assignment_systems, resolve_base, AssignBaseOptions,
+    AssignShiftMode, BaseAssignment, BaseBlueprint,
 };
 use infra_core::manufacture::input::ManuRoomInput;
 use infra_core::manufacture::solve_manufacture;
@@ -38,7 +39,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
         Some("team-rotation") => layout_team_rotation_cmd(&args[1..]),
         _ => {
             eprintln!(
-                "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]"
+                "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text] [--explain-systems]"
             );
             eprintln!(
                 "       infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]"
@@ -335,6 +336,7 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
     let out = OutputOptions::from_args(args);
     let layout_path = layout_path_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
+    let explain_systems = args.iter().any(|a| a == "--explain-systems");
     let top_k = args
         .windows(2)
         .find(|w| w[0] == "--top")
@@ -346,8 +348,28 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
     let instances = OperatorInstances::load(&default_instances_path()?)?;
     let table = SkillTable::load(&default_skill_table_path()?)?;
 
+    let seed_assignment = if let Some(path) = assignment_path_from_args(args) {
+        Some(BaseAssignment::load(&path)?)
+    } else {
+        None
+    };
+
+    if explain_systems {
+        let empty_seed = BaseAssignment::default();
+        let seed = seed_assignment.as_ref().unwrap_or(&empty_seed);
+        let report = explain_assignment_systems(&blueprint, &operbox, AssignShiftMode::Peak, seed);
+        if out.format == OutputFormat::Json {
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            return Ok(());
+        }
+        print_system_explain_report(&report);
+    }
+
     let assignment = if let Some(path) = assignment_path_from_args(args) {
-        BaseAssignment::load(&path)?
+        match seed_assignment {
+            Some(assignment) => assignment,
+            None => BaseAssignment::load(&path)?,
+        }
     } else {
         assign_base_greedy(
             &blueprint,
@@ -459,6 +481,51 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
         },
         &manu_report,
     )
+}
+
+fn print_system_explain_report(report: &infra_core::layout::SystemExplainReport) {
+    eprintln!("system explain mode={:?}", report.mode);
+    for entry in &report.systems {
+        let status = match entry.status {
+            infra_core::layout::SystemExplainStatus::Selected => "selected",
+            infra_core::layout::SystemExplainStatus::Skipped => "skipped",
+        };
+        let reason = entry
+            .reason
+            .as_ref()
+            .map(|r| format!(" reason={} {}", r.code, r.message))
+            .unwrap_or_default();
+        eprintln!(
+            "  [{status}] {} tier={:?} priority={}{}",
+            entry.system_id, entry.tier, entry.priority, reason
+        );
+        for slot in &entry.slots {
+            let slot_status = match slot.status {
+                infra_core::layout::SystemExplainStatus::Selected => "selected",
+                infra_core::layout::SystemExplainStatus::Skipped => "skipped",
+            };
+            let room = slot
+                .resolved_room_id
+                .as_ref()
+                .map(|id| id.0.as_str())
+                .or(slot.room_id.as_deref())
+                .unwrap_or("-");
+            let ops = if slot.operators.is_empty() {
+                "-".to_string()
+            } else {
+                slot.operators.join("+")
+            };
+            let reason = slot
+                .reason
+                .as_ref()
+                .map(|r| format!(" reason={} {}", r.code, r.message))
+                .unwrap_or_default();
+            eprintln!(
+                "      [{slot_status}] {} room={} optional={} ops={}{}",
+                slot.facility, room, slot.optional, ops, reason
+            );
+        }
+    }
 }
 
 fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
