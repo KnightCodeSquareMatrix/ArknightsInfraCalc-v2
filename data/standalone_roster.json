@@ -225,6 +225,13 @@
         ]
       },
       {
+        "name": "Miss.Christine",
+        "min_tier": "tier_up",
+        "recipes": [
+          "battle_record"
+        ]
+      },
+      {
         "name": "食铁兽",
         "recipes": [
           "battle_record"
