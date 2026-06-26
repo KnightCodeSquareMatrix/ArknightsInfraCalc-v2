@@ -3692,9 +3692,38 @@
     },
     {
       "id": "manu_prod_spd&manu[000]",
-      "skill_name": "流程优化",
+      "skill_name": "科学改造",
       "facility": "manufacture",
       "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "peer_eff_absorb",
+            "params": {
+              "rate_per_peer": 0.0
+            }
+          },
+          "phase": "peer_absorb",
+          "phase_order": 10
+        },
+        {
+          "selector": "room_operator_count",
+          "action": {
+            "kind": "add_limit_from_selector",
+            "params": {
+              "multiplier": 5.0
+            }
+          },
+          "phase": "limit",
+          "phase_order": 25
+        }
+      ]
+    },
+    {
+      "id": "manu_prod_spd&manu[100]",
+      "skill_name": "流程优化",
+      "facility": "manufacture",
+      "tier": "tier_up",
       "atoms": [
         {
           "action": {
@@ -3717,39 +3746,6 @@
           "phase": "eff_var",
           "phase_order": 20,
           "tag": "station"
-        },
-        {
-          "action": {
-            "kind": "add_limit_delta",
-            "params": {
-              "delta": 5
-            }
-          },
-          "phase": "limit",
-          "phase_order": 21,
-          "condition": {
-            "owner_lacks_buff": {
-              "buff_id": "manu_prod_spd&manu[100]"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": "manu_prod_spd&manu[100]",
-      "skill_name": "科学改造",
-      "facility": "manufacture",
-      "tier": "tier_up",
-      "atoms": [
-        {
-          "action": {
-            "kind": "peer_eff_absorb",
-            "params": {
-              "rate_per_peer": 0.0
-            }
-          },
-          "phase": "peer_absorb",
-          "phase_order": 10
         },
         {
           "selector": "room_operator_count",
@@ -5544,48 +5540,14 @@
       "skill_name": "集群狩猎·α",
       "facility": "control",
       "tier": "tier_0",
-      "atoms": [
-        {
-          "selector": {
-            "tagged_count_in_manu_sum": {
-              "tag": "cc.g.abyssal"
-            }
-          },
-          "action": {
-            "kind": "global_inject_manu_eff",
-            "params": {
-              "value": 10.0
-            }
-          },
-          "phase": "global_inject",
-          "phase_order": 10,
-          "tag": "aegir_hunt_alpha"
-        }
-      ]
+      "atoms": []
     },
     {
       "id": "control_mp_aegir2[010]",
       "skill_name": "集群狩猎·β",
       "facility": "control",
       "tier": "tier_up",
-      "atoms": [
-        {
-          "selector": {
-            "tagged_count_in_manu_sum": {
-              "tag": "cc.g.abyssal"
-            }
-          },
-          "action": {
-            "kind": "global_inject_manu_eff",
-            "params": {
-              "value": 20.0
-            }
-          },
-          "phase": "global_inject",
-          "phase_order": 10,
-          "tag": "aegir_hunt_beta"
-        }
-      ]
+      "atoms": []
     },
     {
       "id": "control_mp_aegir1[000]",

@@ -207,6 +207,7 @@ pub fn apply_manu_phases(ctx: &mut ManuContext, table: &SkillTable) {
         apply_atom(ctx, atom, &owner, &names);
     }
     apply_pinus_sylvestris_control(ctx);
+    apply_abyssal_hunters_control(ctx);
 }
 
 fn apply_pinus_sylvestris_control(ctx: &mut ManuContext) {
@@ -225,6 +226,30 @@ fn apply_pinus_sylvestris_control(ctx: &mut ManuContext) {
         }
         if has_viviana && op.tags.iter().any(|t| t == TAG_KNIGHT) {
             op.skill_eff.add(None, 7.0);
+        }
+    }
+}
+
+fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
+    const GLADIIA: &str = "歌蕾蒂娅";
+    const GLADIIA_ALPHA: &str = "control_mp_aegir2[000]";
+    const GLADIIA_BETA: &str = "control_mp_aegir2[010]";
+    const TAG_ABYSSAL: &str = "cc.g.abyssal";
+
+    let rate = if ctx.layout.control_buff_active(GLADIIA, GLADIIA_BETA) {
+        20.0
+    } else if ctx.layout.control_buff_active(GLADIIA, GLADIIA_ALPHA) {
+        10.0
+    } else {
+        0.0
+    };
+    if rate == 0.0 {
+        return;
+    }
+
+    for op in &mut ctx.operators {
+        if op.tags.iter().any(|t| t == TAG_ABYSSAL) {
+            op.skill_eff.add(None, rate);
         }
     }
 }
@@ -746,7 +771,7 @@ mod tests {
     }
 
     #[test]
-    fn dongshi_zeros_peer_skill_eff_and_adds_room_prod() {
+    fn dongshi_tier0_zeros_peer_skill_eff_and_adds_storage() {
         let table = table();
         let input = ManuRoomInput::with_operators(
             3,
@@ -759,10 +784,10 @@ mod tests {
         );
         let mut ctx = ManuContext::from_room(&input);
         apply_manu_phases(&mut ctx, &table);
-        // 冬时 +30% (3 ops × 10%), peers' +15% zeroed
-        assert!((ctx.prod_skill(RecipeKind::Gold) - 30.0).abs() < 0.01);
-        assert!((ctx.prod_total(RecipeKind::Gold) - 33.0).abs() < 0.01);
-        assert_eq!(ctx.storage_limit(RecipeKind::Gold), 25);
+        // 科学改造：清零其他干员生产力；3 人 × 5 仓库。
+        assert!((ctx.prod_skill(RecipeKind::Gold) - 0.0).abs() < 0.01);
+        assert!((ctx.prod_total(RecipeKind::Gold) - 3.0).abs() < 0.01);
+        assert_eq!(ctx.storage_limit(RecipeKind::Gold), 35);
     }
 
     #[test]
@@ -791,11 +816,7 @@ mod tests {
             3,
             RecipeKind::Gold,
             vec![
-                op(
-                    "冬时",
-                    1,
-                    vec!["manu_prod_spd&manu[000]", "manu_prod_spd&manu[100]"],
-                ),
+                op("冬时", 1, vec!["manu_prod_spd&manu[100]"]),
                 op("芬", 0, vec!["manu_prod_spd[000]"]),
                 op("克洛丝", 0, vec!["manu_prod_spd[000]"]),
             ],
@@ -820,11 +841,7 @@ mod tests {
             3,
             RecipeKind::Gold,
             vec![
-                op(
-                    "冬时",
-                    1,
-                    vec!["manu_prod_spd&manu[000]", "manu_prod_spd&manu[100]"],
-                ),
+                op("冬时", 1, vec!["manu_prod_spd&manu[100]"]),
                 op("清流", 1, vec!["manu_prod_spd&trade[000]"]),
                 op("温蒂", 2, vec!["manu_prod_spd&power[020]"]),
             ],
@@ -901,8 +918,8 @@ mod tests {
         Arc::make_mut(&mut input.layout).trade_station_count = 3;
         let mut ctx = ManuContext::from_room(&input);
         apply_manu_phases(&mut ctx, &table);
-        // 冬时 +30%, 清流 trade layout +60% kept, 芬 skill zeroed
-        assert!((ctx.prod_skill(RecipeKind::Gold) - 90.0).abs() < 0.01);
+        // 科学改造无生产力；清流 trade layout +60% kept, 芬 skill zeroed
+        assert!((ctx.prod_skill(RecipeKind::Gold) - 60.0).abs() < 0.01);
     }
 
     #[test]
@@ -1024,11 +1041,7 @@ mod tests {
             3,
             RecipeKind::Gold,
             vec![
-                op(
-                    "冬时",
-                    1,
-                    vec!["manu_prod_spd&manu[000]", "manu_prod_spd&manu[100]"],
-                ),
+                op("冬时", 1, vec!["manu_prod_spd&manu[100]"]),
                 op(
                     "红云",
                     2,
@@ -1118,6 +1131,56 @@ mod tests {
         apply_manu_phases(&mut ctx, &table);
         let fen = ctx.operators.iter().find(|o| o.name == "芬").unwrap();
         assert!((fen.skill_eff.all - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn gladiia_control_boosts_only_abyssal_ops_in_current_manu_room() {
+        let table = table();
+        let mut layout = LayoutContext::default();
+        layout.control_workforce.push("歌蕾蒂娅".to_string());
+        layout
+            .control_buffs
+            .push(("歌蕾蒂娅".to_string(), "control_mp_aegir2[010]".to_string()));
+
+        let mut abyssal_room = ManuRoomInput::with_operators(
+            3,
+            RecipeKind::Gold,
+            vec![
+                ManuOperator {
+                    name: "乌尔比安".into(),
+                    elite: 2,
+                    buff_ids: vec![],
+                    tags: vec!["cc.g.abyssal".into()],
+                },
+                ManuOperator {
+                    name: "斯卡蒂".into(),
+                    elite: 2,
+                    buff_ids: vec![],
+                    tags: vec!["cc.g.abyssal".into()],
+                },
+                op("芬", 0, vec!["manu_prod_spd[000]"]),
+            ],
+        );
+        abyssal_room.layout = Arc::new(layout.clone());
+        let abyssal = crate::manufacture::solver::solve_manufacture(&abyssal_room, &table).unwrap();
+        assert!(
+            (abyssal.prod_skill - 55.0).abs() < 0.01,
+            "two abyssal hunters ×20 plus 芬15, got {}",
+            abyssal.prod_skill
+        );
+
+        let mut normal_room = ManuRoomInput::with_operators(
+            3,
+            RecipeKind::Gold,
+            vec![op("芬", 0, vec!["manu_prod_spd[000]"])],
+        );
+        normal_room.layout = Arc::new(layout);
+        let normal = crate::manufacture::solver::solve_manufacture(&normal_room, &table).unwrap();
+        assert!(
+            (normal.prod_skill - 15.0).abs() < 0.01,
+            "non-abyssal room must not inherit global abyssal boost, got {}",
+            normal.prod_skill
+        );
     }
 
     #[test]
@@ -1578,11 +1641,8 @@ mod tests {
     fn alanana_platform_bonus_survives_dongshi_peer_absorb() {
         let table = table();
         let mut room = alanana_room(2, 2, true);
-        room.operators.push(op(
-            "冬时",
-            1,
-            vec!["manu_prod_spd&manu[000]", "manu_prod_spd&manu[100]"],
-        ));
+        room.operators
+            .push(op("冬时", 1, vec!["manu_prod_spd&manu[100]"]));
         let mut ctx = ManuContext::from_room(&room);
         apply_manu_phases(&mut ctx, &table);
         let alanana = ctx.operators.iter().find(|o| o.name == "阿兰娜").unwrap();

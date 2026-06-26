@@ -34,6 +34,8 @@ pub struct LayoutContext {
     pub power_workforce: Vec<String>,
     /// 控制中枢进驻名单（红松林等体系专属房内结算读取）。
     pub control_workforce: Vec<String>,
+    /// 控制中枢运行时 buff，格式为 `(operator_name, buff_id)`。
+    pub control_buffs: Vec<(String, String)>,
     /// 无人机上限（承曦·巡线框架；默认 135）。
     pub drone_cap: u32,
     /// 基建内发电站作业平台数量（阿兰娜/布丁中枢·超频）。
@@ -88,6 +90,7 @@ impl Default for LayoutContext {
             global_inject: GlobalInjectManifest::default(),
             power_workforce: Vec::new(),
             control_workforce: Vec::new(),
+            control_buffs: Vec::new(),
             drone_cap: 135,
             platform_count_in_power: 0,
             rhine_life_in_base: 0,
@@ -140,6 +143,12 @@ impl LayoutContext {
     pub fn effective_power_station_count(&self) -> u8 {
         self.global
             .effective_power_station_count(self.power_station_count)
+    }
+
+    pub fn control_buff_active(&self, name: &str, buff_id: &str) -> bool {
+        self.control_buffs
+            .iter()
+            .any(|(op, buff)| op == name && buff == buff_id)
     }
 
     /// 公孙 243 事实基准：由 `data/layout/243_use_this_.json` 派生（2 金贸）。

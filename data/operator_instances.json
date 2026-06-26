@@ -650,7 +650,6 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
-            "manu_prod_spd&manu[000]",
             "manu_prod_spd&manu[100]"
           ],
           "stepwise": false

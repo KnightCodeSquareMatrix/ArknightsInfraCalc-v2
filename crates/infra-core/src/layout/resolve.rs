@@ -130,6 +130,14 @@ pub fn resolve_base(
             .collect::<Result<Vec<_>>>()?;
         if !control_ops.is_empty() {
             apply_control_to_layout(&mut layout, &control_ops, table, mood);
+            layout.control_buffs = control_ops
+                .iter()
+                .flat_map(|op| {
+                    op.buff_ids
+                        .iter()
+                        .map(move |buff_id| (op.name.clone(), buff_id.clone()))
+                })
+                .collect();
         }
 
         crate::office::apply_office_to_layout(
@@ -486,10 +494,7 @@ fn to_control_operator(
 ) -> Result<ControlOperator> {
     let tier = op.tier();
     let buff_ids = instances.resolve_control_buff_ids(&op.name, tier);
-    let tags = instances
-        .get(&op.name, tier)
-        .map(|i| i.tags.clone())
-        .unwrap_or_default();
+    let tags = instances.tags_for(&op.name, tier);
     Ok(ControlOperator {
         name: op.name.clone(),
         elite: op.elite,
@@ -504,8 +509,7 @@ fn instance_tags(
     tier: PromotionTier,
 ) -> Vec<String> {
     instances
-        .and_then(|inst| inst.get(name, tier))
-        .map(|i| i.tags.clone())
+        .map(|inst| inst.tags_for(name, tier))
         .unwrap_or_default()
 }
 

@@ -240,15 +240,11 @@ fn build_abyssal_s2_candidate(ctx: &AbyssalBuildCtx<'_>) -> Option<AbyssalCandid
     let mut gamma_ops = Vec::new();
 
     for i in 0..2 {
+        let first = ctx.operbox.progress_of(&hunters[i * 2])?;
+        let second = ctx.operbox.progress_of(&hunters[i * 2 + 1])?;
         let mut ops = vec![
-            AssignedOperator::new(
-                &hunters[i * 2],
-                ctx.operbox.elite_of(&hunters[i * 2]).unwrap_or(0),
-            ),
-            AssignedOperator::new(
-                &hunters[i * 2 + 1],
-                ctx.operbox.elite_of(&hunters[i * 2 + 1]).unwrap_or(0),
-            ),
+            AssignedOperator::from_progress(&hunters[i * 2], first),
+            AssignedOperator::from_progress(&hunters[i * 2 + 1], second),
         ];
         candidate.set_room(manu_rooms[i].clone(), ops.clone());
 
@@ -369,15 +365,7 @@ fn assigned_to_manu_operator(
     instances: &OperatorInstances,
 ) -> Option<ManuOperator> {
     let tier = op.tier();
-    let tags = instances
-        .get(&op.name, tier)
-        .map(|inst| inst.tags.clone())
-        .or_else(|| {
-            instances
-                .get(&op.name, crate::tier::PromotionTier::Tier0)
-                .map(|inst| inst.tags.clone())
-        })
-        .unwrap_or_default();
+    let tags = instances.tags_for(&op.name, tier);
     Some(ManuOperator {
         name: op.name.clone(),
         elite: op.elite,

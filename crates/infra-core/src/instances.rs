@@ -99,6 +99,14 @@ impl OperatorInstances {
         self.instances.get(&key)
     }
 
+    pub fn tags_for(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        self.get(name, tier)
+            .or_else(|| self.get(name, PromotionTier::TierUp))
+            .or_else(|| self.get(name, PromotionTier::Tier0))
+            .map(|i| i.tags.clone())
+            .unwrap_or_default()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&String, &OperatorInstance)> {
         self.instances.iter()
     }

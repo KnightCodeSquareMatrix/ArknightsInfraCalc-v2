@@ -194,7 +194,7 @@ pub enum Condition {
     ActiveRecipe {
         kind: RecipeKind,
     },
-    /// 持有者未绑定该 buff（冬时精0 仓库 +5 vs 精1 科学改造 per-op）。
+    /// 持有者未绑定该 buff（冬时精0 科学改造 vs 精1 流程优化）。
     OwnerLacksBuff {
         buff_id: String,
     },

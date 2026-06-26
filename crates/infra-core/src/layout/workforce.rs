@@ -343,9 +343,9 @@ fn operator_has_tag(
         return false;
     };
     instances
-        .get(&op.name, op.tier())
-        .map(|i| i.tags.iter().any(|t| t == tag))
-        .unwrap_or(false)
+        .tags_for(&op.name, op.tier())
+        .iter()
+        .any(|t| t == tag)
 }
 
 fn count_tagged_in_base(instances: Option<&OperatorInstances>, names: &[String], tag: &str) -> u8 {

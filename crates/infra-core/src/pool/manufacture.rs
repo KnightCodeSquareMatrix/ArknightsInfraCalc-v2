@@ -141,7 +141,7 @@ fn try_entry(
         has_l2_delegate |= delegated;
     }
 
-    let tags = inst.map(|i| i.tags.clone()).unwrap_or_default();
+    let tags = instances.tags_for(name, tier);
 
     Ok(ManuPoolEntry {
         name: name.to_string(),
