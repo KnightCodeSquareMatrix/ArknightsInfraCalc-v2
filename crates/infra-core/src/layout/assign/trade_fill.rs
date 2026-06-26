@@ -24,11 +24,14 @@ const BLACKKEY_NAME: &str = "黑键";
 const WITCH_TRADE_NAME: &str = "巫恋";
 const DOCUS_TRADE_NAME: &str = "但书";
 const CLOSURE_TRADE_NAME: &str = "可露希尔";
-/// 这些旧 `base_systems` 条目是 L3/兼容锚点，不再由 registry fixed 早占贸易站。
-/// 主路径改由 `trade_segments.roles` 的核心优先策略落位：但书 -> 可露希尔 -> 巫恋。
-const TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS: [&str; 6] = [
+const KARLAN_JIE_TRADE_NAME: &str = "孑";
+/// 这些 `base_systems` 条目是 L3/兼容锚点或贸易 role 目录，不再由 registry fixed 早占岗位。
+/// 主路径改由 `trade_segments.roles` 的核心优先策略落位：
+/// 但书 -> 可露希尔 -> 巫恋 -> 喀兰 -> 企鹅。
+const TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS: [&str; 7] = [
     "blackkey_closure",
     "witch_long_beta",
+    "ling_jie_karlan",
     "penguin_exusiai_lemuen",
     "penguin_texangel_e2",
     "penguin_texlap_e0",
@@ -207,7 +210,7 @@ pub(super) fn skip_trade_core_registry_systems(skip: &mut HashSet<String>) {
     }
 }
 
-/// 团队贸易站取人：但书 -> 可露希尔 -> 龙巫 -> 普通散件。
+/// 团队贸易站取人：但书 -> 可露希尔 -> 龙巫 -> 喀兰 -> 企鹅 -> 普通散件。
 ///
 /// 这些 meta 是核心优先级，不是固定三人组；每个核心站内部仍由贸易搜索选择最优队友。
 pub(super) fn pick_trade_meta_then_plain(
@@ -261,6 +264,37 @@ pub(super) fn pick_trade_meta_then_plain(
             if hit.names.iter().any(|n| n == WITCH_TRADE_NAME) {
                 return Ok(hit);
             }
+        }
+    }
+    if order == TradeOrderKind::Gold
+        && karlan_precision_active(&layout.global_inject)
+        && !used.contains(KARLAN_JIE_TRADE_NAME)
+    {
+        if let Ok(hit) = pick_trade_role_hit(
+            "karlan",
+            pool,
+            table,
+            trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            layout,
+            used,
+            options.top_k,
+        ) {
+            if hit.names.iter().any(|n| n == KARLAN_JIE_TRADE_NAME) {
+                return Ok(hit);
+            }
+        }
+    }
+    if order == TradeOrderKind::Gold {
+        if let Ok(hit) = pick_trade_role_hit(
+            "penguin",
+            pool,
+            table,
+            trade_room_options(layout, gold_lines, options, TradeOrderKind::Gold),
+            layout,
+            used,
+            options.top_k,
+        ) {
+            return Ok(hit);
         }
     }
     pick_trade_hit(

@@ -14,6 +14,8 @@ use super::trade::{
     TradeSearchHit, TradeSearchOptions,
 };
 
+const KARLAN_TRADE_NAMES: &[&str] = &["银灰", "崖心", "讯使", "角峰"];
+
 pub fn hit_docus_syracusa_shortcut(hit: &TradeSearchHit) -> bool {
     hit.shortcut.as_deref() == Some("gsl_docus_syracusa")
 }
@@ -198,8 +200,17 @@ fn named_hit_filter(filter_id: &str) -> Option<fn(&TradeSearchHit) -> bool> {
         "closure" => Some(hit_closure_shortcut),
         "blackkey_closure" => Some(hit_blackkey_closure_shortcut),
         "witch" => Some(hit_witch_shortcut),
+        "karlan" => Some(hit_karlan_jie),
         _ => None,
     }
+}
+
+fn hit_karlan_jie(hit: &TradeSearchHit) -> bool {
+    hit.names.iter().any(|n| n == "孑")
+        && hit
+            .names
+            .iter()
+            .any(|n| KARLAN_TRADE_NAMES.contains(&n.as_str()))
 }
 
 fn pick_disjoint_trade_hit(
@@ -330,6 +341,58 @@ mod tests {
         assert!(hit.names.iter().any(|n| n == "巫恋"), "{hit:?}");
         assert!(hit.names.iter().any(|n| n == "龙舌兰"), "{hit:?}");
         assert_eq!(hit.shortcut.as_deref(), Some("gsl_witch_long_blank"));
+    }
+
+    #[test]
+    fn karlan_role_requires_market_jie_and_karlan_peer() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("孑", 2), ("银灰", 2), ("琳琅诗怀雅", 2), ("崖心", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect::<HashMap<_, _>>(),
+        );
+        let mut pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        crate::pool::add_jie_market_to_trade_pool(&mut pool, &instances, &table);
+        let mut layout = LayoutContext::search_baseline();
+        layout.global_inject.record_karlan_precision(-15.0, 6);
+
+        let hit = pick_trade_role_hit(
+            "karlan",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+
+        assert!(hit.names.iter().any(|n| n == "孑"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "银灰"), "{hit:?}");
+        assert_eq!(hit.shortcut, None);
+        assert!(hit.trade_pct >= 120.0, "{hit:?}");
+    }
+
+    #[test]
+    fn penguin_role_can_pick_texas_lappland_bond() {
+        let (pool, table, layout) =
+            fixtures(&[("德克萨斯", 2), ("拉普兰德", 2), ("空", 2), ("古米", 2)]);
+        let hit = pick_trade_role_hit(
+            "penguin",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+
+        assert!(hit.names.iter().any(|n| n == "德克萨斯"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "拉普兰德"), "{hit:?}");
+        assert_eq!(hit.shortcut.as_deref(), Some("gsl_penguin_texlap_e0"));
     }
 
     #[test]

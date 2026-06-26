@@ -100,6 +100,33 @@
       ]
     },
     {
+      "id": "karlan",
+      "pick_steps": [
+        {
+          "kind": "filtered",
+          "hit_filter": "karlan",
+          "must_include_name": "孑"
+        }
+      ]
+    },
+    {
+      "id": "penguin",
+      "pick_steps": [
+        {
+          "kind": "segment",
+          "segment_id": "penguin_exusiai_lemuen"
+        },
+        {
+          "kind": "segment",
+          "segment_id": "penguin_texangel_e2"
+        },
+        {
+          "kind": "segment",
+          "segment_id": "penguin_texlap_e0"
+        }
+      ]
+    },
+    {
       "id": "meta_vina",
       "pick_steps": [
         {

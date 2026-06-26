@@ -11,7 +11,10 @@ use crate::layout::{
     AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId, SlotFill,
 };
 use crate::operbox::OperBox;
-use crate::pool::{build_control_pool, build_manufacture_pool, build_power_pool, build_trade_pool};
+use crate::pool::{
+    add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
+    build_trade_pool, karlan_precision_active,
+};
 use crate::search::control_entry_plugin_fill;
 use crate::skill_table::SkillTable;
 
@@ -467,6 +470,20 @@ fn control_rotation_candidate(
     control_entry_plugin_fill(entry)
 }
 
+fn move_control_operator_to_team(
+    team_ctrl: &mut HashMap<TeamLabel, Vec<String>>,
+    operator: &str,
+    team: TeamLabel,
+) {
+    for names in team_ctrl.values_mut() {
+        names.retain(|name| name != operator);
+    }
+    team_ctrl
+        .entry(team)
+        .or_default()
+        .push(operator.to_string());
+}
+
 // ── 中枢队伍归属结束 ──
 
 /// 全基建 αβγ 三队均衡轮休排班（公孙长乐替补池模型）。
@@ -508,7 +525,7 @@ pub fn schedule_team_rotation(
     let scaffold_used: HashSet<String> = operators_of(&shared).into_iter().collect();
     let t1 = Instant::now();
 
-    // 2) 以脚手架解算 layout（中枢 buff 生效），供生产搜索。
+    // 2) 以脚手架解算共享 layout；生产搜索另带 peak 中枢注入，供喀兰等贸易 role 使用。
     let layout = resolve_base(
         blueprint,
         &shared,
@@ -519,8 +536,32 @@ pub fn schedule_team_rotation(
     )?
     .layout_snapshot();
 
+    let mut production_seed = shared.clone();
+    let mut production_control = peak.control_operators();
+    if operbox.owns("灵知") && !production_control.iter().any(|op| op.name == "灵知") {
+        if let Some(progress) = operbox.progress_of("灵知") {
+            production_control.push(AssignedOperator::from_progress("灵知", progress));
+        }
+    }
+    if !production_control.is_empty() {
+        production_seed.set_room("control", production_control);
+    }
+    let production_layout = resolve_base(
+        blueprint,
+        &production_seed,
+        Some(instances),
+        Some(table),
+        options.mood,
+        Some(durin_plan),
+    )?
+    .layout_snapshot();
+
+    let mut trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
+    if karlan_precision_active(&production_layout.global_inject) {
+        add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
+    }
     let pools = ProductionPools {
-        trade: build_trade_pool(&operbox.trade_roster(instances), instances, table)?,
+        trade: trade_pool,
         manu: build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?,
         power: build_power_pool(&operbox.power_roster(instances), instances, table)?,
     };
@@ -552,7 +593,7 @@ pub fn schedule_team_rotation(
         blueprint,
         &pools,
         table,
-        &layout,
+        &production_layout,
         options,
         &h1,
         &mut gamma_h1,
@@ -565,7 +606,7 @@ pub fn schedule_team_rotation(
         blueprint,
         &pools,
         table,
-        &layout,
+        &production_layout,
         options,
         &h2,
         &mut gamma_h2,
@@ -625,6 +666,11 @@ pub fn schedule_team_rotation(
         production_team_by_name
             .entry(name)
             .or_insert(TeamLabel::Gamma);
+    }
+    if let Some(jie_team) = production_team_by_name.get("孑").copied() {
+        if operbox.owns("灵知") {
+            move_control_operator_to_team(&mut team_ctrl, "灵知", jie_team);
+        }
     }
     for entry in &control_pool.entries {
         if team_ctrl.values().any(|names| names.contains(&entry.name)) {
@@ -767,6 +813,15 @@ pub fn schedule_team_rotation(
             let mut ops = a.control_operators();
             let mut room_names: HashSet<String> = ops.iter().map(|o| o.name.clone()).collect();
             let assigned_names = a.operator_names();
+            let requires_karlan_control = assigned_names.contains("孑") && operbox.owns("灵知");
+            if requires_karlan_control && !room_names.contains("灵知") && ops.len() < 5 {
+                let op = operbox
+                    .progress_of("灵知")
+                    .map(|progress| AssignedOperator::from_progress("灵知", progress))
+                    .unwrap_or_else(|| AssignedOperator::new("灵知", 2));
+                ops.push(op);
+                room_names.insert("灵知".to_string());
+            }
             for name in active_names
                 .iter()
                 .filter(|n| system_ctrl_names.contains(*n))
@@ -1005,6 +1060,21 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         (blueprint, operbox, instances, table)
+    }
+
+    fn trade_room_contains(
+        assignment: &BaseAssignment,
+        blueprint: &BaseBlueprint,
+        names: &[&str],
+    ) -> bool {
+        assignment.rooms.iter().any(|room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|bp| bp.kind == FacilityKind::TradePost)
+                && names
+                    .iter()
+                    .all(|name| room.operators.iter().any(|op| op.name == *name))
+        })
     }
 
     #[test]
@@ -1558,6 +1628,46 @@ mod tests {
             }),
             "12h 班应包含可露希尔黑键吉星站: {:?}",
             trade_rooms
+        );
+    }
+
+    #[test]
+    fn team_rotation_three_trade_keeps_karlan_as_fourth_trade_meta() {
+        let mut blueprint = BaseBlueprint::template_snhunt().unwrap();
+        blueprint.scenario.initial_global.clear();
+        let base = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
+        let operbox = base.excluding(&HashSet::from(["八幡海铃".to_string(), "黑键".to_string()]));
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 20,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(
+            report.shifts.iter().any(|shift| {
+                shift
+                    .assignment
+                    .control_operators()
+                    .iter()
+                    .any(|op| op.name == "灵知")
+                    && trade_room_contains(&shift.assignment, &blueprint, &["孑", "银灰"])
+            }),
+            "3 贸易轮换应在前三 meta 之外保留喀兰市井孑站: {:?}",
+            report.shifts
+        );
+        assert_eq!(
+            operator_team_map(&report).get("灵知"),
+            operator_team_map(&report).get("孑"),
+            "灵知中枢应跟随喀兰贸易站同队"
         );
     }
 
