@@ -1,7 +1,7 @@
 # ADR 0001: layout 体系编排与 assignment 拆分
 
 > 决策状态：accepted
-> 实现状态：pending
+> 实现状态：Phase 1–3 完成；Phase 4 部分完成（迷迭香经 system_integrity 汇入统一 plan，execute 三态尚未泛化）；Phase 5–7 待办
 > 日期：2026-06-26（初稿）／2026-06-26（融合代码化体系编排层）
 > 关联文档：[../ORCHESTRATION_LAYER.md](../ORCHESTRATION_LAYER.md)、[../BASE_ASSIGNMENT.md](../BASE_ASSIGNMENT.md)、[../TODO/CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md](../TODO/CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md)、[../TODO/SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md](../TODO/SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md)、[../TODO/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../TODO/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、[../公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md](../公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md)
 
@@ -217,6 +217,14 @@ pub(crate) struct AssignmentRun<'a> {
 7. **轮换接入**：`team_rotation` 消费 plan 的 anchor / producer / degradation / shift_bind，不再从房间名反推（plan 语义稳定后做）。
 
 原 0001 的“不要在同一轮同时处理 `skip_trade_core_registry_systems` 删除 / `pick_trade_meta_then_plain` role 迁移 / 公孙金线语义化 / 感知 producer 迁移”不再是非完成条件，而是上列 Phase 3–6 分轮承载。机械拆分（Phase 1）期间仍不改变这些策略语义。
+
+### 实现进度（2026-06-26）
+
+- **Phase 1–2 完成**：`assign/{run,pipeline,commit,*_fill}` 子模块拆分行为等价；`orchestrate/plan.rs` 语义类型就位。
+- **Phase 3 完成**：迷迭香退出 registry（`base_systems.json` 删 `rosemary_perception`），改由 `system_integrity::evaluate_systems` 四档降级判定。
+- **Phase 4 部分完成 / 路线微调**：迷迭香不走 ADR 设想的「registry anchor + execute 三态」，而走 `system_integrity` 原型——只钉**迷迭香制造 anchor**，黑键不锚定（走贸易贪心 + `trade_hit_ok_for_greedy` 黑键≠巫恋过滤 + `shift_bind` 上2休1）。`build_plan` 调 `evaluate_systems` 把产出翻译为 `AssignmentPlan.anchors/producers/degradations/shift_binds`，`pipeline` 经 `place_system_anchors` 消费——**两路径已在统一 plan 汇合**（决策 B 落地）。
+  - 尚未泛化：`execute_plan` 的 reserved/required/committed 三态分支仍未抽象为通用机制（迷迭香用的是 anchor-then-search 的等效路径 + WIP 的 `must_include` 候选池修复）。后续若有 registry 体系需要 anchor-search 半固定，再泛化三态。
+- **Phase 5–7 待办**：制造 `forbid_with`（迷迭香≠清流/温蒂同房，见 `AUTOMATION_GROUP_CHAIN.md §2.4`）、`producer_fill` 统一 ProducerSlot、`team_rotation` 改为消费 `plan.shift_binds`（现仍用 `schedule/shift_bind.rs` 硬编码 `ROSEMARY_BLACKKEY_BIND`）。
 
 ## 非目标
 
