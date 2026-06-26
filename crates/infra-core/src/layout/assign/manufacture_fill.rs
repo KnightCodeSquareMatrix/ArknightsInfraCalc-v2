@@ -180,7 +180,7 @@ pub(super) fn assign_manufacture_lines(
     let candidate_pool = manufacture_candidate_pool_for_demand(pool, used, room_count);
 
     for room in rooms {
-        if !assignment.operators_in(&room.id).is_empty() {
+        if assignment.operators_in(&room.id).len() >= 3 {
             continue;
         }
         let recipe = match room.product.as_ref() {
@@ -188,10 +188,16 @@ pub(super) fn assign_manufacture_lines(
             _ => continue,
         };
         let opts = manu_options(layout, options, recipe);
-        let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
-            .or_else(|_| pick_manu_hit(pool, table, opts, used, options.top_k))
-            .or_else(|_| pick_capacity_manu_hit(pool, table, layout, options, recipe, used))
-            .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
+        let existing = assignment.operators_in(&room.id);
+        let hit = if existing.is_empty() {
+            pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
+                .or_else(|_| pick_manu_hit(pool, table, opts, used, options.top_k))
+                .or_else(|_| pick_capacity_manu_hit(pool, table, layout, options, recipe, used))
+        } else {
+            let anchor = existing[0].name.clone();
+            pick_manu_hit_with_anchor(pool, table, opts, used, options.top_k, &anchor)
+        }
+        .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
         commit_manu_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())
@@ -227,6 +233,22 @@ pub(super) fn pick_manu_hit(
 ) -> Result<ManuSearchHit> {
     let sub = filter_manufacture_pool(pool, used);
     search_manu_hit_in_pool(&sub, table, search_opts, used, top_k, "manufacture pool")
+}
+
+pub(super) fn pick_manu_hit_with_anchor(
+    pool: &ManuPool,
+    table: &SkillTable,
+    search_opts: ManuSearchOptions,
+    used: &HashSet<String>,
+    top_k: usize,
+    anchor: &str,
+) -> Result<ManuSearchHit> {
+    let mut used_for_filter = used.clone();
+    used_for_filter.remove(anchor);
+    let sub = filter_manufacture_pool(pool, &used_for_filter);
+    let mut search_opts = search_opts;
+    search_opts.must_include_name = Some(anchor.to_string());
+    search_manu_hit_in_pool(&sub, table, search_opts, &used_for_filter, top_k, "anchor pool")
 }
 
 pub(super) fn pick_capacity_manu_hit(

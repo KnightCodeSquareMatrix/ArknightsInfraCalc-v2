@@ -9,8 +9,8 @@ use crate::layout::{LayoutContext, SharedLayout};
 use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
 use crate::manufacture::solver::{solve_manufacture, ManuProdBreakdown, ManuStorageBreakdown};
 use crate::pool::{
-    combinations_triples, filter_general_manufacture_search_pool, filter_standalone_exact_with,
-    ManuPool, StandaloneFilter,
+    combinations_triples, combinations_triples_with_anchor, filter_general_manufacture_search_pool,
+    filter_standalone_exact_with, ManuPool, StandaloneFilter,
 };
 use crate::skill_table::SkillTable;
 use crate::types::{Action, Condition, EffectAtom, RecipeKind, SkillDef};
@@ -80,6 +80,7 @@ pub struct ManuSearchOptions {
     pub mood: f64,
     pub top_k: usize,
     pub layout: SharedLayout,
+    pub must_include_name: Option<String>,
 }
 
 impl Default for ManuSearchOptions {
@@ -90,6 +91,7 @@ impl Default for ManuSearchOptions {
             mood: 24.0,
             top_k: 5,
             layout: Arc::new(LayoutContext::search_baseline()),
+            must_include_name: None,
         }
     }
 }
@@ -172,24 +174,42 @@ fn search_manufacture_single_recipe(
             "search_manufacture_single_recipe requires Single recipe mode",
         ));
     };
-    let sub = filter_standalone_exact_with(
-        pool,
-        FacilityKind::Factory,
-        StandaloneFilter::for_recipe(recipe),
-    )
-    .unwrap_or_else(|| pool.clone());
-    let sub = if sub.entries.len() >= 3 {
-        sub
+    let sub = if options.must_include_name.is_some() {
+        pool.clone()
     } else {
-        let fallback = filter_recipe_productive_pool(pool, table, recipe);
-        if fallback.entries.len() >= 3 {
-            fallback
-        } else {
+        let sub = filter_standalone_exact_with(
+            pool,
+            FacilityKind::Factory,
+            StandaloneFilter::for_recipe(recipe),
+        )
+        .unwrap_or_else(|| pool.clone());
+        if sub.entries.len() >= 3 {
             sub
+        } else {
+            let fallback = filter_recipe_productive_pool(pool, table, recipe);
+            if fallback.entries.len() >= 3 {
+                fallback
+            } else {
+                sub
+            }
         }
     };
     let n = sub.entries.len();
-    let combos: Vec<[usize; 3]> = combinations_triples(n).collect();
+    let must_idx = options
+        .must_include_name
+        .as_ref()
+        .and_then(|name| sub.entries.iter().position(|e| e.name == *name));
+    if options.must_include_name.is_some() && must_idx.is_none() {
+        return Err(crate::error::Error::msg(format!(
+            "manufacture pool missing must-include operator {:?}",
+            options.must_include_name
+        )));
+    }
+    let combos: Vec<[usize; 3]> = if let Some(anchor) = must_idx {
+        combinations_triples_with_anchor(n, anchor).collect()
+    } else {
+        combinations_triples(n).collect()
+    };
     let combinations = combos.len() as u64;
     let start = Instant::now();
 

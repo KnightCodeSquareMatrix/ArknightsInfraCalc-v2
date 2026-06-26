@@ -219,6 +219,25 @@ mod tests {
         assert!(pool.entry("蛇屠箱").is_some());
     }
 
+    #[test]
+    fn full_e2_pool_contains_rosemary_anchor() {
+        let operbox =
+            OperBox::load(&crate::skill_table::data_path("fixtures/243/operbox_full_e2.json").unwrap())
+                .unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = operbox.manufacture_roster(&instances);
+        let pool = build_manufacture_pool(&roster, &instances, &table).unwrap();
+        assert!(
+            pool.entry("迷迭香").is_some(),
+            "skipped={:?}",
+            pool.skipped
+                .iter()
+                .filter(|(name, _, _)| name == "迷迭香")
+                .collect::<Vec<_>>()
+        );
+    }
+
     fn test_entry(name: &str, buff_ids: &[&str], flat_eff_hint: f64) -> ManuPoolEntry {
         ManuPoolEntry {
             name: name.to_string(),

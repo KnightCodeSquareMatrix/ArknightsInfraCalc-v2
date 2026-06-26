@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::time::Instant;
 
 mod commit;
 mod control_fill;
@@ -12,35 +11,22 @@ mod team_fill;
 mod trade_fill;
 
 pub(crate) use control_fill::assign_control;
-use manufacture_fill::assign_manufacture_lines;
 pub use power_fill::{assign_power_rooms, assign_power_stations};
-use producer_fill::{
-    assign_dorm_producers, assign_perception_producers, assign_sphinx_urrbian_dorm_anchor,
-};
 pub use team_fill::{assign_team_gamma_half, assign_team_producer_rooms};
 pub use trade_fill::blackkey_witch_same_trade_room;
-use trade_fill::{
-    assign_trade_jie_remainder, assign_trade_remainder, skip_trade_core_registry_systems,
-};
+use trade_fill::skip_trade_core_registry_systems;
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind};
-use crate::layout::orchestrate::{build_plan, execute_plan, AssignmentPlan};
-use crate::layout::resolve::resolve_base;
+use crate::layout::orchestrate::{build_plan, AssignmentPlan};
 use crate::layout::shift::AssignShiftMode;
-use crate::layout::system::{explain_registry_systems, SystemExplainReport};
+use crate::layout::system::{explain_registry_systems, SlotFillMode, SystemExplainReport};
 use crate::operbox::OperBox;
-use crate::pool::{
-    add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
-    build_trade_pool, karlan_precision_active,
-};
+use crate::pool::{compile_operator_atoms, ManuPoolEntry, TradePoolEntry};
+use crate::tier::PromotionTier;
 use crate::skill_table::SkillTable;
-
-fn ms(a: Instant, b: Instant) -> f64 {
-    a.duration_since(b).as_secs_f64() * 1000.0
-}
 
 #[derive(Debug, Clone)]
 pub struct AssignBaseOptions {
@@ -120,7 +106,7 @@ pub fn explain_assignment_systems(
 }
 
 /// 从编排计划提取 claimed 干员名并按 tier 标注池条目。
-fn tag_pool_from_plan<T: crate::pool::HasName + crate::pool::TierTagged>(
+pub(super) fn tag_pool_from_plan<T: crate::pool::HasName + crate::pool::TierTagged>(
     plan: &AssignmentPlan,
     pool: &mut crate::pool::PoolCore<T>,
 ) {
@@ -133,6 +119,95 @@ fn tag_pool_from_plan<T: crate::pool::HasName + crate::pool::TierTagged>(
         }
         pool.tag_tier(&names, claim.tier);
     }
+}
+
+pub(super) fn inject_search_anchor_pool_entries(
+    plan: &AssignmentPlan,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    trade_pool: &mut crate::pool::TradePool,
+    manu_pool: &mut crate::pool::ManuPool,
+) {
+    for claim in &plan.registry_claims {
+        for slot in &claim.slots {
+            if slot.fill != SlotFillMode::Search {
+                continue;
+            }
+            for op in &slot.operators {
+                match slot.facility {
+                    FacilityKind::TradePost => {
+                        inject_trade_anchor(op.name.as_str(), operbox, instances, table, trade_pool)
+                    }
+                    FacilityKind::Factory => {
+                        inject_manu_anchor(op.name.as_str(), operbox, instances, table, manu_pool)
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+fn inject_trade_anchor(
+    name: &str,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    pool: &mut crate::pool::TradePool,
+) {
+    if pool.entry(name).is_some() {
+        return;
+    }
+    let Some(progress) = operbox.progress_of(name) else {
+        return;
+    };
+    let tier = PromotionTier::from_progress(progress);
+    let buff_ids = instances.resolve_trade_buff_ids(name, tier);
+    if buff_ids.is_empty() {
+        return;
+    }
+    pool.entries.push(TradePoolEntry {
+        name: name.to_string(),
+        elite: progress.elite,
+        progress,
+        buff_ids: buff_ids.clone(),
+        tags: instances.tags_for(name, tier),
+        compiled_atoms: compile_operator_atoms(&buff_ids, table),
+        flat_eff_hint: 0.0,
+        is_mechanic: true,
+        tier: crate::layout::tier::OperatorTier::CrossStation,
+    });
+}
+
+fn inject_manu_anchor(
+    name: &str,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    _table: &SkillTable,
+    pool: &mut crate::pool::ManuPool,
+) {
+    if pool.entry(name).is_some() {
+        return;
+    }
+    let Some(progress) = operbox.progress_of(name) else {
+        return;
+    };
+    let tier = PromotionTier::from_progress(progress);
+    let buff_ids = instances.resolve_manufacture_buff_ids(name, tier);
+    if buff_ids.is_empty() {
+        return;
+    }
+    pool.entries.push(ManuPoolEntry {
+        name: name.to_string(),
+        elite: progress.elite,
+        progress,
+        buff_ids,
+        tags: instances.tags_for(name, tier),
+        flat_eff_hint: 0.0,
+        has_l2_delegate: false,
+        tier: crate::layout::tier::OperatorTier::CrossStation,
+    });
 }
 
 /// 同 [`assign_shift`]，额外返回编排 `AssignmentPlan`（peak 班供 αβγ 轮换只读）。
@@ -168,182 +243,15 @@ pub fn assign_shift_with_plan_skip(
     seed: &BaseAssignment,
     skip_system_ids: &HashSet<String>,
 ) -> Result<AssignShiftResult> {
-    let t0 = Instant::now();
     blueprint.validate()?;
 
     let mut skip_system_ids = skip_system_ids.clone();
     skip_trade_core_registry_systems(&mut skip_system_ids);
     let plan = build_plan(blueprint, operbox, mode, seed, &skip_system_ids)?;
-    let t1 = Instant::now();
 
-    let executed = execute_plan(blueprint, operbox, table, &plan, seed)?;
-    let mut assignment = executed.assignment;
-    let mut used = executed.used;
-    let t2 = Instant::now();
-
-    let durin_plan = operbox.durin_dorm_planning_count(instances);
-    let producer_layout = resolve_base(
-        blueprint,
-        &assignment,
-        Some(instances),
-        None,
-        options.mood,
-        Some(durin_plan),
-    )?
-    .layout_snapshot();
-    let t3 = Instant::now();
-
-    if mode == AssignShiftMode::Peak && assignment.control_operators().len() < 5 {
-        let mut control_pool =
-            build_control_pool(&operbox.control_roster(instances), instances, table)?;
-        tag_pool_from_plan(&plan, &mut control_pool);
-        assign_control(
-            &mut assignment,
-            &control_pool,
-            table,
-            &producer_layout,
-            options,
-            &mut used,
-        )?;
-    }
-    let t4 = Instant::now();
-
-    if mode == AssignShiftMode::Peak {
-        assign_perception_producers(blueprint, operbox, &mut assignment, &mut used)?;
-        assign_sphinx_urrbian_dorm_anchor(blueprint, operbox, &mut assignment, &mut used);
-        assign_dorm_producers(blueprint, operbox, instances, &mut assignment, &mut used)?;
-    }
-    let t5 = Instant::now();
-
-    let layout = resolve_base(
-        blueprint,
-        &assignment,
-        Some(instances),
-        Some(table),
-        options.mood,
-        Some(durin_plan),
-    )?
-    .layout_snapshot();
-    let t6 = Instant::now();
-
-    let mut trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
-    if karlan_precision_active(&layout.global_inject) {
-        add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
-    }
-    let mut manu_pool =
-        build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
-    let mut power_pool = build_power_pool(&operbox.power_roster(instances), instances, table)?;
-    tag_pool_from_plan(&plan, &mut trade_pool);
-    tag_pool_from_plan(&plan, &mut manu_pool);
-    tag_pool_from_plan(&plan, &mut power_pool);
-    let gold_lines = blueprint.gold_manu_line_count();
-    let t7 = Instant::now();
-
-    match mode {
-        AssignShiftMode::Peak => {
-            assign_power_stations(
-                blueprint,
-                &power_pool,
-                table,
-                &layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t8 = Instant::now();
-            let trade_layout = resolve_base(
-                blueprint,
-                &assignment,
-                Some(instances),
-                Some(table),
-                options.mood,
-                Some(durin_plan),
-            )?
-            .layout_snapshot();
-            let t9 = Instant::now();
-            assign_trade_remainder(
-                blueprint,
-                &trade_pool,
-                table,
-                &trade_layout,
-                gold_lines,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t10 = Instant::now();
-            let manu_layout = resolve_base(
-                blueprint,
-                &assignment,
-                Some(instances),
-                Some(table),
-                options.mood,
-                Some(durin_plan),
-            )?
-            .layout_snapshot();
-            let t11 = Instant::now();
-            assign_manufacture_lines(
-                blueprint,
-                &manu_pool,
-                table,
-                &manu_layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t12 = Instant::now();
-
-            eprintln!(
-                "[计时] 编排选型={:.2}ms  编排落位={:.2}ms  resolve(1st)={:.2}ms  中枢={:.2}ms  perception+dorm={:.2}ms  resolve(2nd)={:.2}ms  建池={:.2}ms  \
-                 发电={:.2}ms  resolve(3rd)={:.2}ms  贸易余站={:.2}ms  resolve(4th)={:.2}ms  制造={:.2}ms  单班总计={:.2}ms",
-                ms(t1, t0), ms(t2, t1), ms(t3, t2), ms(t4, t3), ms(t5, t4),
-                ms(t6, t5), ms(t7, t6), ms(t8, t7), ms(t9, t8), ms(t10, t9),
-                ms(t11, t10), ms(t12, t11), ms(t12, t0),
-            );
-        }
-        AssignShiftMode::Recovery => {
-            assign_trade_jie_remainder(
-                blueprint,
-                &trade_pool,
-                table,
-                instances,
-                &layout,
-                gold_lines,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t8 = Instant::now();
-            assign_manufacture_lines(
-                blueprint,
-                &manu_pool,
-                table,
-                &layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t9 = Instant::now();
-            assign_power_stations(
-                blueprint,
-                &power_pool,
-                table,
-                &layout,
-                options,
-                &mut assignment,
-                &mut used,
-            )?;
-            let t10 = Instant::now();
-
-            eprintln!(
-                "[计时] 编排选型={:.2}ms  编排落位={:.2}ms  resolve(1st)={:.2}ms  中枢={:.2}ms  perception+dorm={:.2}ms  resolve(2nd)={:.2}ms  建池={:.2}ms  \
-                  trade孑余站={:.2}ms  制造={:.2}ms  发电={:.2}ms  单班总计={:.2}ms",
-                ms(t1, t0), ms(t2, t1), ms(t3, t2), ms(t4, t3), ms(t5, t4),
-                ms(t6, t5), ms(t7, t6), ms(t8, t7), ms(t9, t8), ms(t10, t9),
-                ms(t10, t0),
-            );
-        }
-    }
+    let assignment = pipeline::run_shift_pipeline(
+        blueprint, operbox, instances, table, options, mode, seed, &plan,
+    )?;
 
     Ok(AssignShiftResult { assignment, plan })
 }
@@ -402,7 +310,9 @@ mod tests {
         gongsun_gold_manu_anchors_ready, manufacture_candidate_pool_for_demand, pick_manu_hit,
         try_assign_gongsun_gold_manu_team, QINGLIU_RENEWABLE_ENERGY_BUFF,
     };
+    use super::producer_fill::assign_sphinx_urrbian_dorm_anchor;
     use super::*;
+    use crate::layout::resolve::resolve_base;
     use std::collections::HashSet;
 
     use crate::instances::default_instances_path;

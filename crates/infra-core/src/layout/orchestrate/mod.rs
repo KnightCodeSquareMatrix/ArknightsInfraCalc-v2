@@ -8,6 +8,9 @@ mod select;
 
 pub use execute::{execute_plan, ExecuteResult};
 pub use plan::{ActivatedSystem, AssignmentPlan, SlotFill};
+// Phase 2 体系语义类型（SystemAnchor / ProducerSlot / SystemConstraint /
+// DegradationLadder / ShiftBind / AnchorFillPolicy）已在 `plan.rs` 定义为 `pub`，
+// 待后续 Phase 出现消费方时再在此 re-export，避免当前 unused 警告。
 pub use select::build_plan;
 
 #[cfg(test)]
@@ -60,6 +63,34 @@ mod tests {
                 .iter()
                 .any(|c| c.system_id == "pinus_sylvestris"),
             "peak plan 应含红松林: {:?}",
+            plan.registry_system_ids()
+        );
+    }
+
+    #[test]
+    fn build_plan_peak_ideal_e2_does_not_registry_claim_rosemary() {
+        // 迷迭香感知链走代码化体系层（system_integrity），不再作为 registry 体系。
+        // build_plan 只产出 registry 选型；迷迭香 anchor 由 pipeline 的 evaluate_rosemary
+        // 落位，黑键走贸易贪心 + 上2休1 绑定，二者均不出现在 registry_claims 中。
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::load(
+            &crate::skill_table::data_path("schedule_243/operbox_ideal_e2.json").unwrap(),
+        )
+        .unwrap();
+        let plan = build_plan(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
+        assert!(
+            !plan
+                .registry_claims
+                .iter()
+                .any(|c| c.system_id == "rosemary_perception"),
+            "迷迭香不应作为 registry 体系认领: {:?}",
             plan.registry_system_ids()
         );
     }

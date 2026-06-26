@@ -159,12 +159,29 @@ pub(super) fn assign_trade_remainder(
         .iter()
         .filter(|r| r.kind == FacilityKind::TradePost)
     {
-        if !assignment.operators_in(&room.id).is_empty() {
+        if assignment.operators_in(&room.id).len() >= 3 {
             continue;
         }
         let order = trade_order_from_room(room)?;
-        let hit = pick_trade_meta_then_plain(pool, table, layout, gold_lines, options, order, used)
-            .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
+        let existing = assignment.operators_in(&room.id);
+        let hit = if existing.is_empty() {
+            pick_trade_meta_then_plain(pool, table, layout, gold_lines, options, order, used)
+        } else {
+            let anchor = existing[0].name.clone();
+            pick_trade_hit(
+                pool,
+                table,
+                trade_room_options(layout, gold_lines, options, order),
+                SearchTripleFilter {
+                    must_include_name: Some(anchor),
+                    hit_filter: Some(trade_hit_ok_for_greedy),
+                    ..SearchTripleFilter::default()
+                },
+                used,
+                options.top_k,
+            )
+        }
+        .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
         commit_trade_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())
@@ -267,8 +284,17 @@ pub(super) fn pick_trade_hit(
     used: &HashSet<String>,
     top_k: usize,
 ) -> Result<TradeSearchHit> {
-    let sub = filter_trade_pool(pool, used);
-    let sub = if karlan_precision_active(&search_opts.layout.global_inject) {
+    let mut used_for_filter = used.clone();
+    if let Some(anchor) = filter.must_include_name.as_deref() {
+        used_for_filter.remove(anchor);
+    }
+    let sub = filter_trade_pool(pool, &used_for_filter);
+    // anchor 搜索（must_include）下不做 standalone 收窄：anchor 干员（如黑键这类
+    // 机械/订单速度 buffer）通常不是 standalone，收窄会把 anchor 本身滤掉，
+    // 触发 "missing must-include"。standalone 收窄仅用于无 anchor 的常规余站搜索。
+    let sub = if filter.must_include_name.is_some() {
+        sub
+    } else if karlan_precision_active(&search_opts.layout.global_inject) {
         sub
     } else {
         try_filter_standalone(&sub, FacilityKind::TradePost, 3)
@@ -283,7 +309,7 @@ pub(super) fn pick_trade_hit(
     opts.top_k = top_k;
     let report = match search_trade_triples_filtered(&sub, table, &opts, filter.clone()) {
         Ok(r) => r,
-        Err(_) if filter.hit_filter.is_some() || filter.must_include_name.is_some() => {
+        Err(_) if filter.hit_filter.is_some() && filter.must_include_name.is_none() => {
             search_trade_triples(&sub, table, &opts)?
         }
         Err(e) => return Err(e),
@@ -292,7 +318,7 @@ pub(super) fn pick_trade_hit(
         report.best,
         report.top,
         trade_hit_names,
-        used,
+        &used_for_filter,
         "no disjoint trade triple",
     )
 }

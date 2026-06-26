@@ -32,5 +32,10 @@ pub fn build_plan(
         mode,
         activated,
         registry_claims,
+        anchors: Vec::new(),
+        producers: Vec::new(),
+        constraints: Vec::new(),
+        degradations: Vec::new(),
+        shift_binds: Vec::new(),
     })
 }

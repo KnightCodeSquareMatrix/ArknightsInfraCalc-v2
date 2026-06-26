@@ -24,6 +24,8 @@ pub struct RegistrySlotClaim {
     pub room_id: RoomId,
     pub facility: FacilityKind,
     pub operators: Vec<AssignedOperator>,
+    #[serde(default, skip_serializing_if = "SlotFillMode::is_default")]
+    pub fill: SlotFillMode,
 }
 
 /// `base_systems.json` 中已选体系的完整落位计划。
@@ -33,6 +35,20 @@ pub struct RegistrySystemClaim {
     pub priority: i32,
     pub tier: OperatorTier,
     pub slots: Vec<RegistrySlotClaim>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SlotFillMode {
+    #[default]
+    Fixed,
+    Search,
+}
+
+impl SlotFillMode {
+    fn is_default(value: &Self) -> bool {
+        *value == Self::Fixed
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -132,6 +148,8 @@ pub struct SystemSlotDef {
     pub recipe: Option<crate::types::RecipeKind>,
     #[serde(default)]
     pub trade_role: Option<String>,
+    #[serde(default)]
+    pub fill: SlotFillMode,
     pub operators: Vec<SystemOperatorSpec>,
     /// 可选 slot：缺房 / 缺干员时静默跳过，不导致整链不可行。
     /// 用于感知 producer（夕中枢、絮雨办公室、爱丽丝/车尔尼宿舍）等非核心位，
@@ -944,6 +962,7 @@ fn plan_registry_slot(
             room_id: room_id.clone(),
             facility,
             operators,
+            fill: slot_def.fill,
         },
         explain: SystemSlotExplain {
             facility: slot_def.facility.clone(),
@@ -1016,7 +1035,10 @@ mod tests {
         let cache = base_systems_cache().expect("base_systems loaded");
         let ids: HashSet<_> = cache.systems.iter().map(|s| s.id.as_str()).collect();
         assert!(ids.contains("docus_syracusa"));
-        assert!(!ids.contains("rosemary_perception"));
+        assert!(
+            !ids.contains("rosemary_perception"),
+            "迷迭香感知链走代码化体系层（system_integrity），不进 registry"
+        );
         assert!(ids.contains("witch_long_beta"));
         assert!(ids.contains("blackkey_closure"));
         assert!(ids.contains("pinus_sylvestris"));

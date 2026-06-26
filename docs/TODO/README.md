@@ -7,7 +7,8 @@
 | 优先级 | 文件 | 状态 | 说明 |
 |--------|------|------|------|
 | P0 | [SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](SYSTEM_REGISTRY_NORMALIZATION_REPORT.md) | doing | Phase 0/1 已完成；下一步拆清跨站 / 全局资源与旧 registry 语义 |
-| P0 | [SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md](SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md) | ready | 结合 ADR 0001：体系 anchor 先落位，L3 / 工具人后补齐，效率最后结算 |
+| P0 | [SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md](SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md) | ready | 结合 ADR 0001：体系 anchor 先落位，L3 / 工具人后补齐，效率最后结算。数据驱动 registry 子集 |
+| P0 | [CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md](CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md) | ready | ADR 0001 决策 B–D：代码化体系层接口、anchor 三态、阶段性候选池、两路径汇合。复杂降级体系（迷迭香等） |
 
 ## 新 TODO 文件模板
 

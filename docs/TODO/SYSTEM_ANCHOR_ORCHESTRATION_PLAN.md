@@ -2,6 +2,8 @@
 
 > 状态：ready  
 > 来源：[ADR 0001](../ADR/0001-layout-assignment-decomposition.md)、[ORCHESTRATION_LAYER.md](../ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](../BASE_ASSIGNMENT.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、`docs/公孙长乐的体系分析文档/`
+>
+> **范围划分**：本文聚焦**数据驱动 registry 子集**——`base_systems.json` schema 如何表达 anchor / min_pick / constraint，能用声明静态表达的体系走这条路。带运行期降级决策树的复杂体系（迷迭香 / 红松林 / 自动化 / 深巡乌尔比安）走**代码化体系层**，接口与 anchor 三态见 [CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md](CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md)。两条路径产出同一套中间语义，汇合到统一 `AssignmentPlan`。
 
 ## 目标
 

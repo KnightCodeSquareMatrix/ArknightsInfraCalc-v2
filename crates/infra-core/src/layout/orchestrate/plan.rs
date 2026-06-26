@@ -2,7 +2,7 @@
 
 use crate::layout::blueprint::{FacilityKind, RoomId};
 use crate::layout::shift::AssignShiftMode;
-use crate::layout::system::RegistrySystemClaim;
+use crate::layout::system::{RegistrySystemClaim, SlotFillMode};
 use crate::layout::tier::OperatorTier;
 use std::collections::HashSet;
 
@@ -39,6 +39,78 @@ pub struct ActivatedSystem {
     pub slots: Vec<SlotFill>,
 }
 
+// ── Phase 2 体系语义类型（ADR 0001 决策 C） ──────────────────────────────
+// 当前仅定义类型并挂在 `AssignmentPlan` 上（默认空），不改变排班结果。
+// 由后续 Phase（体系层接线 / execute 三态 / anchor fill）逐步产出与消费。
+// 设计依据：docs/TODO/CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md §2。
+
+/// anchor 填充策略：决定 fill 阶段如何补齐 anchor 房的队友。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AnchorFillPolicy {
+    /// 贸易 anchor：走 trade role / L3 shortcut 补齐。
+    TradeRole { role_id: Option<String> },
+    /// 制造 anchor：按 recipe 约束搜索补齐。
+    ManufactureRecipe,
+    /// 普通搜索补齐（must_include = 核心）。
+    Plain,
+}
+
+/// 体系锚点：钉核心干员与设施，队友由 fill 阶段补齐（蓝本 `system_integrity/plan.rs:30`）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SystemAnchor {
+    pub system_id: String,
+    pub operator: String,
+    pub elite: u8,
+    pub facility: FacilityKind,
+    /// `None` = 该设施类型首个空房，不绑定具体 `room_id`。
+    pub room_id: Option<RoomId>,
+    pub fill_policy: AnchorFillPolicy,
+}
+
+/// 只提供全局 / 跨设施资源的 producer slot（蓝本 `OptionalProducer`）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ProducerSlot {
+    pub system_id: String,
+    pub operator: String,
+    pub elite: u8,
+    pub facility: FacilityKind,
+    /// 缺人时裁剪，不拖死核心。
+    pub optional: bool,
+}
+
+/// 不占房但影响补齐搜索的约束（补 pairwise；现仅有系统级 `exclusive_group`）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SystemConstraint {
+    /// 两名干员禁止同房（迷迭香 ↔ 清流+温蒂）。
+    ForbidSameRoom { a: String, b: String },
+    /// 两名干员禁止同贸易站（黑键 ↔ 巫恋）。
+    ForbidSameStation { a: String, b: String },
+    /// 体系要求蓝图存在某设施。
+    RequireFacility { facility: FacilityKind },
+}
+
+/// 降级阶梯结果（蓝本 `RosemaryTier` + `producers_present/missing`）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct DegradationLadder {
+    pub system_id: String,
+    /// 满配 / 档1 / 档2 / 档3 / 替代感知源。
+    pub tier_label: String,
+    /// priority-by-tier：高档保持高优先，低档降至核心体系之下。
+    pub priority: i32,
+    pub producers_present: Vec<String>,
+    pub producers_missing: Vec<String>,
+}
+
+/// 同班绑定（已存在于 `system_integrity/plan.rs:21`，迁入 plan 供轮换消费）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ShiftBind {
+    pub operators: Vec<String>,
+    pub on_shifts: u8,
+    pub off_shifts: u8,
+}
+
 /// 单班进驻前的编排计划；`execute_plan` 将其落成 `BaseAssignment`。
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct AssignmentPlan {
@@ -47,6 +119,18 @@ pub struct AssignmentPlan {
     pub activated: Vec<ActivatedSystem>,
     /// `base_systems.json` 认领明细（`execute_plan` 落位用）。
     pub registry_claims: Vec<RegistrySystemClaim>,
+    /// Phase 2 体系语义：两路径（registry + 代码化体系层）汇合产出。
+    /// 当前默认空，由后续 Phase 产出与消费，不影响现有排班。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<SystemAnchor>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub producers: Vec<ProducerSlot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constraints: Vec<SystemConstraint>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub degradations: Vec<DegradationLadder>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shift_binds: Vec<ShiftBind>,
 }
 
 impl AssignmentPlan {
@@ -55,6 +139,11 @@ impl AssignmentPlan {
             mode,
             activated: Vec::new(),
             registry_claims: Vec::new(),
+            anchors: Vec::new(),
+            producers: Vec::new(),
+            constraints: Vec::new(),
+            degradations: Vec::new(),
+            shift_binds: Vec::new(),
         }
     }
 
@@ -93,6 +182,19 @@ impl AssignmentPlan {
         for claim in &self.registry_claims {
             for slot in &claim.slots {
                 if slot.facility != FacilityKind::TradePost {
+                    continue;
+                }
+                if slot.fill == SlotFillMode::Search {
+                    for op in &slot.operators {
+                        let in_ab = alpha.operator_names().contains(&op.name)
+                            || beta.operator_names().contains(&op.name);
+                        if !in_ab {
+                            return Err(format!(
+                                "registry anchor operator {} not in α/β slice",
+                                op.name
+                            ));
+                        }
+                    }
                     continue;
                 }
                 let room = &slot.room_id;

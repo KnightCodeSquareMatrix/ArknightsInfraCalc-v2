@@ -39,6 +39,11 @@ pub(super) fn commit_trade_room(
     pool: &TradePool,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    let anchors: HashSet<String> = assignment
+        .operators_in(room_id)
+        .iter()
+        .map(|op| op.name.clone())
+        .collect();
     commit_operators_to_room(
         assignment,
         room_id,
@@ -49,6 +54,7 @@ pub(super) fn commit_trade_room(
                 .unwrap_or_else(|| AssignedOperator::new(name, 0))
         },
         used,
+        &anchors,
         "trade",
         Some(trade_efficiency_snapshot(hit)),
     )
@@ -61,6 +67,11 @@ pub(super) fn commit_manu_room(
     pool: &ManuPool,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    let anchors: HashSet<String> = assignment
+        .operators_in(room_id)
+        .iter()
+        .map(|op| op.name.clone())
+        .collect();
     commit_operators_to_room(
         assignment,
         room_id,
@@ -71,6 +82,7 @@ pub(super) fn commit_manu_room(
                 .unwrap_or_else(|| AssignedOperator::new(name, 0))
         },
         used,
+        &anchors,
         "manufacture",
         Some(manu_efficiency_snapshot(hit)),
     )
@@ -159,13 +171,14 @@ fn commit_operators_to_room(
     names: &[String],
     operator_of: impl Fn(&str) -> AssignedOperator,
     used: &mut HashSet<String>,
+    anchors: &HashSet<String>,
     facility: &str,
     efficiency: Option<RoomEfficiencySnapshot>,
 ) -> Result<()> {
     let ops = names
         .iter()
         .map(|name| {
-            if !used.insert(name.clone()) {
+            if !anchors.contains(name) && !used.insert(name.clone()) {
                 return Err(Error::msg(format!("{facility} duplicate {name}")));
             }
             Ok(operator_of(name))
