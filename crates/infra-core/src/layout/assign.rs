@@ -1001,15 +1001,12 @@ fn assign_manufacture_lines(
             Some(RoomProduct::Factory { recipe }) => *recipe,
             _ => continue,
         };
-        let hit = pick_manu_hit(
-            &candidate_pool,
-            table,
-            manu_options(layout, options, recipe),
-            used,
-            options.top_k,
-        )
-        .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
-        commit_manu_room(assignment, &room.id, &hit, &candidate_pool, used)?;
+        let opts = manu_options(layout, options, recipe);
+        let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
+            .or_else(|_| pick_manu_hit(pool, table, opts, used, options.top_k))
+            .or_else(|_| pick_capacity_manu_hit(pool, table, layout, options, recipe, used))
+            .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
+        commit_manu_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())
 }
@@ -1146,15 +1143,12 @@ fn assign_team_manu_rooms(
                 )))
             }
         };
-        let hit = pick_manu_hit(
-            &candidate_pool,
-            table,
-            manu_options(layout, options, recipe),
-            used,
-            options.top_k,
-        )
-        .map_err(|e| Error::msg(format!("team manu {}: {e}", room_id.0)))?;
-        commit_manu_room(assignment, room_id, &hit, &candidate_pool, used)?;
+        let opts = manu_options(layout, options, recipe);
+        let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
+            .or_else(|_| pick_manu_hit(manu_pool, table, opts, used, options.top_k))
+            .or_else(|_| pick_capacity_manu_hit(manu_pool, table, layout, options, recipe, used))
+            .map_err(|e| Error::msg(format!("team manu {}: {e}", room_id.0)))?;
+        commit_manu_room(assignment, room_id, &hit, manu_pool, used)?;
     }
     Ok(())
 }
@@ -1418,6 +1412,79 @@ fn pick_manu_hit(
     search_manu_hit_in_pool(&sub, table, search_opts, used, top_k, "manufacture pool")
 }
 
+fn pick_capacity_manu_hit(
+    pool: &ManuPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    recipe: RecipeKind,
+    used: &HashSet<String>,
+) -> Result<ManuSearchHit> {
+    let entries: Vec<_> = pool
+        .entries
+        .iter()
+        .filter(|entry| !used.contains(&entry.name))
+        .take(3)
+        .cloned()
+        .collect();
+    if entries.len() < 3 {
+        return Err(Error::msg(format!(
+            "manufacture capacity fallback has {} ready operators (need 3)",
+            entries.len()
+        )));
+    }
+    let operators = entries
+        .iter()
+        .map(|entry| entry.to_manu_operator())
+        .collect();
+    let input = crate::manufacture::ManuRoomInput {
+        level: 3,
+        operators,
+        active_recipe: recipe,
+        mood: options.mood,
+        layout: Arc::new(layout.clone()),
+    };
+    let result = crate::manufacture::solve_manufacture(&input, table)?;
+    let names = entries.iter().map(|entry| entry.name.clone()).collect();
+    let mut per_station = crate::manufacture::ManuProdBreakdown::default();
+    let mut storage = crate::manufacture::ManuStorageBreakdown::default();
+    let recipe_label = match recipe {
+        RecipeKind::Gold => {
+            per_station.gold = result.prod_total;
+            storage.gold = result.storage_limit;
+            "gold"
+        }
+        RecipeKind::BattleRecord => {
+            per_station.battle_record = result.prod_total;
+            storage.battle_record = result.storage_limit;
+            "battle_record"
+        }
+        RecipeKind::Originium => {
+            per_station.originium = result.prod_total;
+            storage.originium = result.storage_limit;
+            "originium"
+        }
+        RecipeKind::All => "all",
+    };
+
+    Ok(ManuSearchHit {
+        names,
+        gold_names: vec![],
+        battle_record_names: vec![],
+        composite_score: result.prod_total,
+        per_station,
+        storage,
+        breakdown: crate::search::ManuScoreBreakdown {
+            prod_base: result.prod_base,
+            prod_skill: result.prod_skill,
+            prod_global: result.prod_total - result.prod_base - result.prod_skill,
+            prod_total: result.prod_total,
+            storage_limit: result.storage_limit,
+            recipe: recipe_label.to_string(),
+        },
+    })
+}
+
 fn search_manu_hit_in_pool(
     pool: &ManuPool,
     table: &SkillTable,
@@ -1435,6 +1502,13 @@ fn search_manu_hit_in_pool(
     let mut opts = search_opts;
     opts.top_k = top_k;
     let report = search_manufacture_triples(pool, table, &opts)?;
+    if manu_hit_names(&report.best).is_empty()
+        && report.top.iter().all(|hit| manu_hit_names(hit).is_empty())
+    {
+        return Err(Error::msg(format!(
+            "{label} produced no manufacture triple"
+        )));
+    }
     pick_disjoint_from_report(
         report.best,
         report.top,

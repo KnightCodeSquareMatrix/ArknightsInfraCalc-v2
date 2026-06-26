@@ -170,6 +170,9 @@ fn operators_of(assignment: &BaseAssignment) -> Vec<String> {
 
 fn merge_rooms(target: &mut BaseAssignment, source: &BaseAssignment) {
     for room in &source.rooms {
+        if room.operators.is_empty() {
+            continue;
+        }
         target.set_room_assignment(room.clone());
     }
 }
@@ -257,6 +260,9 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         let mut candidate = base.clone();
         let mut next_hunter = 0;
         for (room_idx, count) in counts.iter().copied().enumerate() {
+            if count == 0 {
+                continue;
+            }
             let mut ops = Vec::new();
             for _ in 0..count {
                 ops.push(hunter_ops[next_hunter].clone());
@@ -997,6 +1003,53 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         (blueprint, operbox, instances, table)
+    }
+
+    #[test]
+    fn abyssal_candidate_does_not_materialize_empty_factory_rooms() {
+        let (blueprint, operbox, _, _) = fixtures();
+        if !["歌蕾蒂娅", "乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"]
+            .iter()
+            .all(|name| operbox.owns(name))
+        {
+            return;
+        }
+
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let mut gamma_h1 = BaseAssignment::default();
+        gamma_h1.set_room(
+            "manu_1",
+            vec![
+                AssignedOperator::new("芬", 0),
+                AssignedOperator::new("克洛丝", 0),
+                AssignedOperator::new("泡普卡", 0),
+            ],
+        );
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            blueprint: &blueprint,
+            used_ab: &HashSet::new(),
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+        });
+
+        assert!(!candidates.is_empty());
+        for candidate in candidates {
+            for room in &candidate.assignment.rooms {
+                let is_empty_factory = blueprint
+                    .room(&room.room_id)
+                    .is_some_and(|bp| bp.kind == FacilityKind::Factory)
+                    && room.operators.is_empty();
+                assert!(
+                    !is_empty_factory,
+                    "深海候选不应把未改动制造站写成显式空房: {:?}",
+                    room
+                );
+            }
+        }
     }
 
     #[test]
