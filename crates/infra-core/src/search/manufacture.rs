@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
 use crate::manufacture::solver::{solve_manufacture, ManuProdBreakdown, ManuStorageBreakdown};
-use crate::pool::{combinations_triples, ManuPool};
+use crate::pool::{combinations_triples, filter_general_manufacture_search_pool, ManuPool};
 use crate::skill_table::SkillTable;
 use crate::types::RecipeKind;
 
@@ -95,11 +95,14 @@ pub fn search_manufacture_triples(
     table: &SkillTable,
     options: &ManuSearchOptions,
 ) -> Result<ManuSearchReport> {
+    let general_pool = filter_general_manufacture_search_pool(pool);
     match options.recipe_mode {
         ManuSearchRecipeMode::Lines(scenario) => {
-            search_manufacture_split_lines(pool, table, options, scenario)
+            search_manufacture_split_lines(&general_pool, table, options, scenario)
         }
-        ManuSearchRecipeMode::Single(_) => search_manufacture_single_recipe(pool, table, options),
+        ManuSearchRecipeMode::Single(_) => {
+            search_manufacture_single_recipe(&general_pool, table, options)
+        }
     }
 }
 
@@ -532,6 +535,11 @@ mod tests {
         opts.layout = Arc::new(LayoutContext::search_baseline());
         let report = search_manufacture_triples(&pool, &table, &opts).unwrap();
         let gold = report.gold_line.as_ref().expect("gold line");
+        assert!(
+            !gold.names.contains(&"冬时".to_string()),
+            "冬时为自动化组体系专用，不应进入普通制造搜索，got {:?}",
+            gold.names
+        );
         assert!(
             gold.names.contains(&"清流".to_string()),
             "赤金线最优组应含清流，got {:?}",

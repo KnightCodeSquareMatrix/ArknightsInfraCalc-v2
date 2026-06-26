@@ -13,7 +13,8 @@ use crate::layout::{
 use crate::manufacture::{solve_manufacture, ManuOperator, ManuRoomInput};
 use crate::operbox::OperBox;
 use crate::pool::{
-    build_control_pool, build_manufacture_pool, build_power_pool, build_trade_pool, ManuPool,
+    build_control_pool, build_manufacture_pool, build_power_pool, build_trade_pool,
+    filter_general_manufacture_search_pool, ManuPool,
 };
 use crate::search::control_entry_plugin_fill;
 use crate::skill_table::SkillTable;
@@ -326,6 +327,7 @@ fn best_abyssal_room_filler(
     };
     let pinned_names: HashSet<&str> = pinned.iter().map(|op| op.name.as_str()).collect();
 
+    let pool = filter_general_manufacture_search_pool(pool);
     pool.entries
         .iter()
         .filter(|entry| {
@@ -1284,6 +1286,21 @@ mod tests {
                     .find(|team| team.label == shift.resting_team)
                     .unwrap();
                 for room in &shift.assignment.rooms {
+                    let is_factory = blueprint
+                        .room(&room.room_id)
+                        .is_some_and(|bp| bp.kind == FacilityKind::Factory);
+                    if is_factory
+                        && room
+                            .operators
+                            .iter()
+                            .any(|op| abyssal_names.contains(op.name.as_str()))
+                    {
+                        assert!(
+                            room.operators.iter().all(|op| op.name != "冬时"),
+                            "冬时为自动化组体系专用，不应作为深海制造散件: {:?}",
+                            room.operators
+                        );
+                    }
                     for op in &room.operators {
                         assert!(
                             !resting.operators.contains(&op.name),

@@ -56,6 +56,8 @@ impl ManuPoolEntry {
 /// 向后兼容别名
 pub type ManuPool = PoolCore<ManuPoolEntry>;
 
+const SYSTEM_ONLY_MANUFACTURE_OPERATORS: [&str; 1] = ["冬时"];
+
 pub fn build_manufacture_pool(
     roster: &Roster,
     instances: &OperatorInstances,
@@ -66,6 +68,22 @@ pub fn build_manufacture_pool(
 
 pub fn filter_manufacture_pool(pool: &ManuPool, exclude: &HashSet<String>) -> ManuPool {
     filter_pool(pool, exclude)
+}
+
+pub fn filter_general_manufacture_search_pool(pool: &ManuPool) -> ManuPool {
+    ManuPool {
+        entries: pool
+            .entries
+            .iter()
+            .filter(|e| {
+                !SYSTEM_ONLY_MANUFACTURE_OPERATORS
+                    .iter()
+                    .any(|name| e.name == *name)
+            })
+            .cloned()
+            .collect(),
+        skipped: pool.skipped.clone(),
+    }
 }
 
 /// Expand the standalone manufacture candidate pool with low-cost mechanically
@@ -236,5 +254,23 @@ mod tests {
         assert!(expanded.entry("芬").is_some());
         assert!(expanded.entry("克洛丝").is_some());
         assert!(expanded.entry("低效非候选").is_none());
+    }
+
+    #[test]
+    fn general_manufacture_search_pool_excludes_system_only_dongshi() {
+        let pool = ManuPool {
+            entries: vec![
+                test_entry("冬时", &["manu_prod_spd&manu[100]"], 30.0),
+                test_entry("芬", &["manu_prod_spd_addition[030]"], 0.0),
+                test_entry("克洛丝", &["manu_prod_spd_addition[040]"], 0.0),
+            ],
+            skipped: vec![],
+        };
+
+        let filtered = filter_general_manufacture_search_pool(&pool);
+        assert!(pool.entry("冬时").is_some(), "体系路径仍可显式取冬时");
+        assert!(filtered.entry("冬时").is_none());
+        assert!(filtered.entry("芬").is_some());
+        assert!(filtered.entry("克洛丝").is_some());
     }
 }

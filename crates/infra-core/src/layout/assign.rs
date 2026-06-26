@@ -15,9 +15,10 @@ use crate::manufacture::input::ManuSearchRecipeMode;
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
-    build_trade_pool, expand_manufacture_candidate_pool, filter_manufacture_pool,
-    filter_standalone_exact, filter_trade_pool, jie_e0_trade_operator, karlan_precision_active,
-    try_filter_standalone, ControlPool, ManuPool, PowerPool, TradePool, JIE_TRADE_NAME,
+    build_trade_pool, expand_manufacture_candidate_pool, filter_general_manufacture_search_pool,
+    filter_manufacture_pool, filter_standalone_exact, filter_trade_pool, jie_e0_trade_operator,
+    karlan_precision_active, try_filter_standalone, ControlPool, ManuPool, PowerPool, TradePool,
+    JIE_TRADE_NAME,
 };
 use crate::search::{
     control_entry_plugin_fill, hit_witch_shortcut, pick_docus_trade_hit, pick_trade_role_hit,
@@ -1360,7 +1361,7 @@ fn manufacture_candidate_pool_for_demand(
     used: &HashSet<String>,
     room_count: usize,
 ) -> ManuPool {
-    let full_sub = filter_manufacture_pool(pool, used);
+    let full_sub = filter_general_manufacture_search_pool(&filter_manufacture_pool(pool, used));
     let Some(primary_sub) = filter_standalone_exact(&full_sub, FacilityKind::Factory) else {
         return full_sub;
     };
@@ -1756,6 +1757,30 @@ mod tests {
 
         let candidate_pool = manufacture_candidate_pool_for_demand(&pool, &HashSet::new(), 2);
         assert_eq!(candidate_pool.entries.len(), pool.entries.len());
+        assert!(candidate_pool.entry("低效非候选A").is_some());
+        assert!(candidate_pool.entry("低效非候选B").is_some());
+    }
+
+    #[test]
+    fn manufacture_candidate_pool_does_not_fallback_dongshi_as_general_piece() {
+        let pool = ManuPool {
+            entries: vec![
+                manu_pool_entry("褐果", &["manu_prod_spd[000]"]),
+                manu_pool_entry("雪猎", &["manu_prod_spd&limit&cost[101]"]),
+                manu_pool_entry("卡达", &["manu_formula_cost[000]"]),
+                manu_pool_entry("冬时", &["manu_prod_spd&manu[100]"]),
+                manu_pool_entry("低效非候选A", &["manu_prod_spd[999]"]),
+                manu_pool_entry("低效非候选B", &["manu_prod_spd[998]"]),
+            ],
+            skipped: vec![],
+        };
+
+        let candidate_pool = manufacture_candidate_pool_for_demand(&pool, &HashSet::new(), 2);
+        assert!(pool.entry("冬时").is_some(), "自动化组仍可从原池显式取冬时");
+        assert!(
+            candidate_pool.entry("冬时").is_none(),
+            "普通制造候选池容量兜底也不应带回冬时"
+        );
         assert!(candidate_pool.entry("低效非候选A").is_some());
         assert!(candidate_pool.entry("低效非候选B").is_some());
     }
