@@ -536,8 +536,10 @@ mod tests {
         let report = search_manufacture_triples(&pool, &table, &opts).unwrap();
         let gold = report.gold_line.as_ref().expect("gold line");
         assert!(
-            !gold.names.contains(&"冬时".to_string()),
-            "冬时为自动化组体系专用，不应进入普通制造搜索，got {:?}",
+            !["冬时", "温蒂"]
+                .iter()
+                .any(|name| gold.names.contains(&name.to_string())),
+            "自动化组体系专用干员不应进入普通制造搜索，got {:?}",
             gold.names
         );
         assert!(

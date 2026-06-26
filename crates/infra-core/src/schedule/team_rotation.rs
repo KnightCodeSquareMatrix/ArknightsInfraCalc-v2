@@ -1296,8 +1296,10 @@ mod tests {
                             .any(|op| abyssal_names.contains(op.name.as_str()))
                     {
                         assert!(
-                            room.operators.iter().all(|op| op.name != "冬时"),
-                            "冬时为自动化组体系专用，不应作为深海制造散件: {:?}",
+                            room.operators
+                                .iter()
+                                .all(|op| op.name != "冬时" && op.name != "温蒂"),
+                            "自动化组体系专用干员不应作为深海制造散件: {:?}",
                             room.operators
                         );
                     }
