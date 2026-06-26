@@ -1299,6 +1299,81 @@ mod tests {
     }
 
     #[test]
+    fn claim_pinus_sylvestris_when_battle_record_room_is_manu4() {
+        let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        for room in &mut blueprint.rooms {
+            if room.id.0 == "manu_1" {
+                room.product = Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Gold,
+                });
+            } else if room.id.0 == "manu_4" {
+                room.product = Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::BattleRecord,
+                });
+            }
+        }
+        let operbox = ideal_e2_operbox();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        claim_base_systems(
+            &blueprint,
+            &operbox,
+            &table,
+            AssignShiftMode::Peak,
+            &mut assignment,
+            &mut used,
+            &HashSet::new(),
+        )
+        .unwrap();
+
+        let system_ids: Vec<_> = select_registry_systems(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &HashSet::new(),
+            &HashSet::new(),
+        )
+        .into_iter()
+        .map(|claim| claim.system_id)
+        .collect();
+        assert!(
+            system_ids
+                .iter()
+                .any(|id| id == "pinus_sylvestris_battle_manu4"),
+            "manu_4 经验布局应选择红松林变体: {system_ids:?}"
+        );
+        assert!(
+            !system_ids.iter().any(|id| id == "standardization_mizuki"),
+            "红松林应先占用 manu_4，标准化组不应反占: {system_ids:?}"
+        );
+
+        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
+        assert!(
+            manu_4.iter().any(|o| o.name == "灰毫")
+                && manu_4.iter().any(|o| o.name == "远牙")
+                && manu_4.iter().any(|o| o.name == "野鬃"),
+            "manu_4 应为红松经验线: {:?}",
+            manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
+        );
+
+        let gold_room_has_gravel = blueprint.rooms.iter().any(|room| {
+            matches!(
+                room.product,
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Gold
+                })
+            ) && assignment
+                .operators_in(&room.id)
+                .iter()
+                .any(|op| op.name == "砾")
+        });
+        assert!(gold_room_has_gravel, "砾应落在赤金产线");
+    }
+
+    #[test]
     fn explain_registry_systems_reports_selected_and_skipped_reasons() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = ideal_e2_operbox();
