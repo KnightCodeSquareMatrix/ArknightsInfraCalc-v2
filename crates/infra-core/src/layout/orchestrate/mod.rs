@@ -116,8 +116,10 @@ mod tests {
         .unwrap();
         // 迷迭香制造 anchor 汇入 plan.anchors；黑键不锚定。
         assert!(
-            plan.anchors.iter().any(|a| a.operator == "迷迭香"
-                && a.facility == crate::layout::blueprint::FacilityKind::Factory),
+            plan.anchors
+                .iter()
+                .any(|a| a.operator == "迷迭香"
+                    && a.facility == crate::layout::blueprint::FacilityKind::Factory),
             "应含迷迭香制造 anchor: {:?}",
             plan.anchors
         );
@@ -137,7 +139,10 @@ mod tests {
             plan.shift_binds
         );
         // 降级阶梯档位汇入 plan.degradations。
-        assert!(!plan.degradations.is_empty(), "应含迷迭香降级阶梯档位");
+        assert!(
+            !plan.degradations.is_empty(),
+            "应含迷迭香降级阶梯档位"
+        );
         // forbid-same-room 约束汇入 plan.constraints（迷迭香 ≠ 清流/温蒂同房）。
         assert!(
             plan.constraints.iter().any(|c| matches!(

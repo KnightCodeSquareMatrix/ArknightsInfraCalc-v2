@@ -11,8 +11,8 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::BaseBlueprint;
-use crate::layout::context::LayoutContext;
 use crate::layout::resolve::resolve_base;
+use crate::layout::context::LayoutContext;
 use crate::operbox::OperBox;
 use crate::skill_table::SkillTable;
 
@@ -110,9 +110,6 @@ impl StageTimer {
             .map(|(s, ms)| format!("{s}={ms:.2}ms"))
             .collect::<Vec<_>>()
             .join("  ");
-        eprintln!(
-            "[计时] {} {body}  {}总计={total:.2}ms",
-            self.label, self.label
-        );
+        eprintln!("[计时] {} {body}  {}总计={total:.2}ms", self.label, self.label);
     }
 }

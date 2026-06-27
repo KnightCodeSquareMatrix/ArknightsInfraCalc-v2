@@ -221,10 +221,9 @@ mod tests {
 
     #[test]
     fn full_e2_pool_contains_rosemary_anchor() {
-        let operbox = OperBox::load(
-            &crate::skill_table::data_path("fixtures/243/operbox_full_e2.json").unwrap(),
-        )
-        .unwrap();
+        let operbox =
+            OperBox::load(&crate::skill_table::data_path("fixtures/243/operbox_full_e2.json").unwrap())
+                .unwrap();
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = operbox.manufacture_roster(&instances);

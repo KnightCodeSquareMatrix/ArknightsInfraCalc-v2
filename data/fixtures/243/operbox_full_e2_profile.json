@@ -16,8 +16,8 @@
       "current": {
         "operators": [
           "巫恋",
-          "卡夫卡",
-          "龙舌兰"
+          "龙舌兰",
+          "卡夫卡"
         ],
         "score": 138.0,
         "trade_pct": 138.0,
@@ -41,12 +41,12 @@
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "可露希尔",
           "吉星",
-          "黑键"
+          "海蒂",
+          "能天使"
         ],
-        "score": 114.0,
-        "trade_pct": 114.0
+        "score": 120.0,
+        "trade_pct": 120.0
       },
       "baseline": {
         "operators": [
@@ -57,7 +57,7 @@
         "score": 35.0,
         "trade_pct": 35.0
       },
-      "gap_ratio": 2.257142857142857,
+      "gap_ratio": 2.4285714285714284,
       "severity": "ok"
     },
     {
@@ -65,11 +65,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "夜烟",
-          "引星棘刺",
-          "苍苔"
+          "幽灵鲨",
+          "安哲拉",
+          "引星棘刺"
         ],
-        "score": 482.5
+        "score": 647.5
       },
       "baseline": {
         "operators": [
@@ -77,9 +77,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "score": 439.0
+        "score": 444.0
       },
-      "gap_ratio": 0.09908883826879271,
+      "gap_ratio": 0.4583333333333333,
       "severity": "ok"
     },
     {
@@ -87,11 +87,11 @@
       "label": "制造·赤金产线",
       "current": {
         "operators": [
-          "夜烟",
-          "引星棘刺",
-          "苍苔"
+          "幽灵鲨",
+          "安哲拉",
+          "引星棘刺"
         ],
-        "score": 131.25
+        "score": 151.25
       },
       "baseline": {
         "operators": [
@@ -99,9 +99,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "score": 123.75
+        "score": 111.25
       },
-      "gap_ratio": 0.06060606060606061,
+      "gap_ratio": 0.3595505617977528,
       "severity": "ok"
     },
     {
@@ -109,11 +109,11 @@
       "label": "制造·经验产线",
       "current": {
         "operators": [
-          "断罪者",
-          "槐琥",
-          "裂响"
+          "乌尔比安",
+          "斯卡蒂",
+          "断罪者"
         ],
-        "score": 110.0
+        "score": 172.5
       },
       "baseline": {
         "operators": [
@@ -121,9 +121,9 @@
           "稀音",
           "帕拉斯"
         ],
-        "score": 95.75
+        "score": 110.75
       },
-      "gap_ratio": 0.14882506527415143,
+      "gap_ratio": 0.5575620767494357,
       "severity": "ok"
     },
     {
@@ -131,13 +131,13 @@
       "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "score": 7.44622
+        "score": 7.1936
       },
       "baseline": {
         "operators": [],
         "score": 6.69803
       },
-      "gap_ratio": 0.11170299326816992,
+      "gap_ratio": 0.07398742615366008,
       "severity": "ok"
     },
     {
@@ -145,29 +145,31 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "score": 517.125
+        "score": 555.125
       },
       "baseline": {
         "operators": [],
-        "score": 495.0
+        "score": 491.25
       },
-      "gap_ratio": 0.0446969696969697,
+      "gap_ratio": 0.13002544529262086,
       "severity": "ok"
     }
   ],
   "rotation": {
-    "daily_trade": 7.44622,
-    "daily_manu": 517.125,
+    "daily_trade": 7.1936,
+    "daily_manu": 555.125,
     "daily_power": 55.125
   },
   "baseline_rotation": {
     "daily_trade": 6.69803,
-    "daily_manu": 495.0,
+    "daily_manu": 491.25,
     "daily_power": 55.125
   },
   "actions": [],
   "flags": [
     "trade_gold_ok"
   ],
-  "narration_hints": []
+  "narration_hints": [
+    "赤金贸易 meta 组合与公孙参考一致，差距主要在练度"
+  ]
 }

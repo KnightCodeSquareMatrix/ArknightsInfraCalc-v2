@@ -25,8 +25,8 @@ use crate::layout::shift::AssignShiftMode;
 use crate::layout::system::{explain_registry_systems, SlotFillMode, SystemExplainReport};
 use crate::operbox::OperBox;
 use crate::pool::{compile_operator_atoms, ManuPoolEntry, TradePoolEntry};
-use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
+use crate::skill_table::SkillTable;
 
 #[derive(Debug, Clone)]
 pub struct AssignBaseOptions {
