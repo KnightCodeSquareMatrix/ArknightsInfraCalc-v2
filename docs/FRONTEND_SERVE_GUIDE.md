@@ -40,13 +40,13 @@ All file paths are chosen by the frontend.
 Success:
 
 ```json
-{"id":1,"ok":true,"result":{"layout":"tmp/layout.json","operbox":"tmp/operbox.json","owned":418,"top":20,"profile_out":"tmp/profile.json","maa_out":"tmp/maa.json","output_dir":"tmp/shifts","daily_trade":7.44,"daily_manu":520.12,"daily_power":55.12}}
+{"id":1,"ok":true,"elapsed_ms":123,"result":{"layout":"tmp/layout.json","operbox":"tmp/operbox.json","owned":418,"top":20,"profile_out":"tmp/profile.json","maa_out":"tmp/maa.json","output_dir":"tmp/shifts","daily_trade":7.44,"daily_manu":520.12,"daily_power":55.12}}
 ```
 
 Error:
 
 ```json
-{"id":1,"ok":false,"error":{"message":"..."}}
+{"id":1,"ok":false,"elapsed_ms":3,"error":{"message":"..."}}
 ```
 
 ## Frontend Changes

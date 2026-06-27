@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use infra_core::box_profile::{baseline_path_or_default, build_box_profile, BoxProfileOptions};
 use infra_core::export::{build_from_team_rotation, MaaExportOptions};
@@ -69,6 +70,7 @@ struct ServeRequest {
 struct ServeResponse<T: Serialize> {
     id: serde_json::Value,
     ok: bool,
+    elapsed_ms: u128,
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,11 +119,13 @@ struct PlanResult {
 }
 
 fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::Value> {
+    let start = Instant::now();
     let request: ServeRequest = match serde_json::from_str(line) {
         Ok(request) => request,
         Err(err) => {
             return error_response(
                 serde_json::Value::Null,
+                start.elapsed().as_millis(),
                 format!("invalid request json: {err}"),
             );
         }
@@ -136,17 +140,23 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
         Ok(result) => ServeResponse {
             id,
             ok: true,
+            elapsed_ms: start.elapsed().as_millis(),
             result: Some(result),
             error: None,
         },
-        Err(err) => error_response(id, err.to_string()),
+        Err(err) => error_response(id, start.elapsed().as_millis(), err.to_string()),
     }
 }
 
-fn error_response(id: serde_json::Value, message: String) -> ServeResponse<serde_json::Value> {
+fn error_response(
+    id: serde_json::Value,
+    elapsed_ms: u128,
+    message: String,
+) -> ServeResponse<serde_json::Value> {
     ServeResponse {
         id,
         ok: false,
+        elapsed_ms,
         result: None,
         error: Some(ServeError { message }),
     }
