@@ -77,6 +77,7 @@ fn print_usage() {
     eprintln!("  infra-cli bench --operbox <path> [--recipe gold|battle_record|originium] [--top <n>] [-o <file.csv>] [--text]");
     eprintln!("      (default manufacture: 4 lines = 2 gold + 2 battle_record; --recipe = single-line debug)");
     eprintln!("  infra-cli bake [all|trade|manufacture] [--out <dir>] [--limit-per-signature <n>]");
+    eprintln!("  infra-cli bake validate [--out <dir>]");
     eprintln!("  infra-cli schedule rotation --operbox <path> [--layout-baseline] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]");
     eprintln!("  infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]");

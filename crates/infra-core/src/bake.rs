@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::instances::{default_instances_path, OperatorInstances};
@@ -28,6 +28,7 @@ pub struct BakeOptions {
     pub include_trade: bool,
     pub include_manufacture: bool,
     pub limit_per_signature: Option<usize>,
+    pub generator: Option<BakeGeneratorFingerprint>,
 }
 
 impl Default for BakeOptions {
@@ -37,8 +38,17 @@ impl Default for BakeOptions {
             include_trade: true,
             include_manufacture: true,
             limit_per_signature: None,
+            generator: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BakeGeneratorFingerprint {
+    pub kind: String,
+    pub path: String,
+    pub bytes: u64,
+    pub hash64: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -51,28 +61,32 @@ pub struct BakeReport {
     pub manufacture_signatures: usize,
     pub manufacture_hits: usize,
     pub combo_table_rows: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generator: Option<BakeGeneratorFingerprint>,
     pub elapsed_ms: u128,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BakeManifest {
     schema_version: u32,
-    generated_by: &'static str,
-    model: &'static str,
+    generated_by: String,
+    model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    generator: Option<BakeGeneratorFingerprint>,
     inputs: Vec<BakeInputFingerprint>,
     options: BakeManifestOptions,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BakeManifestOptions {
     include_trade: bool,
     include_manufacture: bool,
     limit_per_signature: Option<usize>,
-    roster_model: &'static str,
-    layout_model: &'static str,
+    roster_model: String,
+    layout_model: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BakeInputFingerprint {
     path: String,
     bytes: u64,
@@ -89,6 +103,8 @@ struct BakedOperator {
 #[derive(Debug, Serialize)]
 struct BakedComboTable {
     schema_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    generator: Option<BakeGeneratorFingerprint>,
     operator_count: usize,
     mask_words: usize,
     indexes: Vec<BakedComboIndex>,
@@ -220,21 +236,24 @@ pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
         &operators,
         trade_catalog.as_ref(),
         manufacture_catalog.as_ref(),
+        options.generator.clone(),
     );
     let combo_table_rows = combo_table.rows.len();
     write_json(options.out_dir.join("combo_table.json"), &combo_table)?;
 
     let manifest = BakeManifest {
         schema_version: BAKE_SCHEMA_VERSION,
-        generated_by: "infra-core::bake",
-        model: "baseline_tier_up_operator_catalog",
+        generated_by: "infra-core::bake".to_string(),
+        model: "baseline_tier_up_operator_catalog".to_string(),
+        generator: options.generator.clone(),
         inputs: bake_input_fingerprints()?,
         options: BakeManifestOptions {
             include_trade: options.include_trade,
             include_manufacture: options.include_manufacture,
             limit_per_signature: options.limit_per_signature,
-            roster_model: "all modelled trade/manufacture operators at elite2 level1 rarity6",
-            layout_model: "LayoutContext::search_baseline",
+            roster_model: "all modelled trade/manufacture operators at elite2 level1 rarity6"
+                .to_string(),
+            layout_model: "LayoutContext::search_baseline".to_string(),
         },
     };
     write_json(options.out_dir.join("manifest.json"), &manifest)?;
@@ -248,16 +267,52 @@ pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
         manufacture_signatures,
         manufacture_hits,
         combo_table_rows,
+        generator: options.generator.clone(),
         elapsed_ms: start.elapsed().as_millis(),
     };
     write_json(options.out_dir.join("summary.json"), &report)?;
     Ok(report)
 }
 
+pub fn validate_baked_catalog(out_dir: &Path, generator: &BakeGeneratorFingerprint) -> Result<()> {
+    let manifest_path = out_dir.join("manifest.json");
+    let raw = fs::read_to_string(&manifest_path)?;
+    let manifest: BakeManifest = serde_json::from_str(&raw)?;
+    if manifest.schema_version != BAKE_SCHEMA_VERSION {
+        return Err(Error::msg(format!(
+            "baked schema mismatch: found {}, expected {}; rerun `infra-cli bake --out {}`",
+            manifest.schema_version,
+            BAKE_SCHEMA_VERSION,
+            out_dir.display()
+        )));
+    }
+    let Some(baked_generator) = manifest.generator.as_ref() else {
+        return Err(Error::msg(format!(
+            "baked manifest has no generator fingerprint; rerun `infra-cli bake --out {}`",
+            out_dir.display()
+        )));
+    };
+    if baked_generator.hash64 != generator.hash64
+        || baked_generator.bytes != generator.bytes
+        || baked_generator.kind != generator.kind
+    {
+        return Err(Error::msg(format!(
+            "baked generator mismatch: baked hash={} bytes={}, current hash={} bytes={}; rerun `infra-cli bake --out {}`",
+            baked_generator.hash64,
+            baked_generator.bytes,
+            generator.hash64,
+            generator.bytes,
+            out_dir.display()
+        )));
+    }
+    Ok(())
+}
+
 fn build_combo_table(
     operators: &[BakedOperator],
     trade_catalog: Option<&BakedTradeCatalog>,
     manufacture_catalog: Option<&BakedManufactureCatalog>,
+    generator: Option<BakeGeneratorFingerprint>,
 ) -> BakedComboTable {
     let operator_index: HashMap<&str, usize> = operators
         .iter()
@@ -346,6 +401,7 @@ fn build_combo_table(
     let indexes = build_combo_indexes(&rows);
     BakedComboTable {
         schema_version: BAKE_SCHEMA_VERSION,
+        generator,
         operator_count: operators.len(),
         mask_words,
         indexes,

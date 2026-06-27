@@ -24,7 +24,10 @@ pub mod office;
 pub mod power;
 pub mod trade;
 
-pub use bake::{bake_catalogs, BakeOptions, BakeReport, BAKE_SCHEMA_VERSION};
+pub use bake::{
+    bake_catalogs, validate_baked_catalog, BakeGeneratorFingerprint, BakeOptions, BakeReport,
+    BAKE_SCHEMA_VERSION,
+};
 pub use box_profile::{
     baseline_path_or_default, build_box_profile, render_box_profile_narrative, ActionKind,
     BoxProfile, BoxProfileOptions, GapSeverity, ProfileAction,
