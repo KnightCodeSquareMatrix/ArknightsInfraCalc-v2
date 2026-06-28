@@ -546,6 +546,43 @@ mod tests {
     }
 
     #[test]
+    fn vina_beta_requires_peer_glasgow_for_extra_ten_pct() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("维娜·维多利亚", 2), ("但书", 2), ("空弦", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        let report = search_trade_triples_filtered(
+            &pool,
+            &table,
+            &TradeSearchOptions {
+                trade_level: 2,
+                operator_capacity: 2,
+                order_mode: TradeSearchOrderMode::Single(TradeOrderKind::Gold),
+                use_baked: false,
+                top_k: 10,
+                ..TradeSearchOptions::default()
+            },
+            SearchTripleFilter {
+                must_include_names: vec!["维娜·维多利亚".to_string(), "但书".to_string()],
+                ..SearchTripleFilter::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.best.names, vec!["维娜·维多利亚", "但书"]);
+        assert!(
+            (report.best.breakdown.order_eff_skill - 30.0).abs() < 0.01,
+            "维娜未与其他格拉斯哥同房时应为 30% 退化态: {:?}",
+            report.best
+        );
+    }
+
+    #[test]
     fn roster_search_finds_docus_station() {
         let roster =
             Roster::load_csv_for_facility(&crate::roster::default_roster_path().unwrap(), "trade")

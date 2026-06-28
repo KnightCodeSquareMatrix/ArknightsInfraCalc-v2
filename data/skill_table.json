@@ -1678,7 +1678,7 @@
         },
         {
           "condition": {
-            "tag_present_in_room": {
+            "peer_tag_in_room": {
               "tag": "cc.g.glasgow"
             }
           },

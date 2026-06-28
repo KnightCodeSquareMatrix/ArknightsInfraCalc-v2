@@ -1708,6 +1708,48 @@ mod tests {
     }
 
     #[test]
+    fn team_rotation_feedback_000142_docus_lv2_prefers_higher_tool_over_vina() {
+        use crate::operbox::default_operbox_full_e2_path;
+
+        let blueprint =
+            BaseBlueprint::load(&crate::skill_table::data_path("layout/252.json").unwrap())
+                .unwrap();
+        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 20,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        for shift in &report.shifts {
+            for room in &shift.assignment.rooms {
+                let Some(bp_room) = blueprint.room(&room.room_id) else {
+                    continue;
+                };
+                if bp_room.kind != FacilityKind::TradePost {
+                    continue;
+                }
+                let names: Vec<_> = room.operators.iter().map(|op| op.name.as_str()).collect();
+                assert!(
+                    !(names.contains(&"但书") && names.contains(&"维娜·维多利亚")),
+                    "shift {} 但书二级站不应选择退化态维娜: {:?}",
+                    shift.index + 1,
+                    names
+                );
+            }
+        }
+    }
+
+    #[test]
     fn team_rotation_three_trade_keeps_karlan_as_fourth_trade_meta() {
         let mut blueprint = BaseBlueprint::template_snhunt().unwrap();
         blueprint.scenario.initial_global.clear();
