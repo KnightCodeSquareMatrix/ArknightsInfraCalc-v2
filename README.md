@@ -201,9 +201,10 @@ cargo run -p infra-cli -- verify --all
 ```
 
 - 评分 / 排序口径：[docs/SCORING_MODEL.md](docs/SCORING_MODEL.md)、[docs/SCORING_REFACTOR_PLAN.md](docs/SCORING_REFACTOR_PLAN.md)
+- 收尾期 bug 修复：[docs/MAINTENANCE_MODE.md](docs/MAINTENANCE_MODE.md)
 - 编排 / 体系 / meta 组合：[docs/ADR/0001-layout-assignment-decomposition.md](docs/ADR/0001-layout-assignment-decomposition.md)
 - CLI / 前端集成：[docs/INFRA_CLI.md](docs/INFRA_CLI.md)、[docs/FRONTEND_CLI.md](docs/FRONTEND_CLI.md)
-- 准备实现事项：[docs/TODO/](docs/TODO/)
+- 历史建设期 TODO：[docs/TODO/](docs/TODO/)（收尾期默认冻结）
 - 归档材料：[docs/ARCHIVE/](docs/ARCHIVE/)
 - 待建模干员：[docs/需要完成的干员建模.md](docs/需要完成的干员建模.md)
 

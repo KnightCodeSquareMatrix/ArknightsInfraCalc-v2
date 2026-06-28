@@ -1,10 +1,10 @@
 # 项目地图（Agent / 开发者入门）
 
-> **新会话请先读 [AGENTS.md](../AGENTS.md)**，再读 [INDEX.md](INDEX.md) 和本文。机制细节见 [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)，评分口径见 [SCORING_MODEL.md](SCORING_MODEL.md)，评分收敛计划见 [SCORING_REFACTOR_PLAN.md](SCORING_REFACTOR_PLAN.md)。准备实现事项见 [TODO/](TODO/)，归档材料见 [ARCHIVE/](ARCHIVE/)。大文件内部边界见 [INTERNAL/](INTERNAL/)。
+> **新会话请先读 [AGENTS.md](../AGENTS.md)**，再读 [MAINTENANCE_MODE.md](MAINTENANCE_MODE.md)、[INDEX.md](INDEX.md) 和本文。机制细节见 [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)，评分口径见 [SCORING_MODEL.md](SCORING_MODEL.md)。历史 TODO 默认冻结；归档材料见 [ARCHIVE/](ARCHIVE/)。大文件内部边界见 [INTERNAL/](INTERNAL/)。
 
 如果读者懂基建体系但不关心代码入口，先看 [GONGSUN_RUNTIME_OVERVIEW.md](GONGSUN_RUNTIME_OVERVIEW.md)。
 
-**结构已定稿**：不再做大范围源码拆分；靠文档路由到正确函数段即可。
+**结构已定稿，项目进入收尾 / bug 修复期**：不再做大范围源码拆分；靠文档路由到正确函数段。默认工作流是复现、定位、最小修复、补回归，见 [MAINTENANCE_MODE.md](MAINTENANCE_MODE.md)。
 
 ## 项目是什么
 
@@ -33,7 +33,7 @@
 
 **非目标**（由上层规划器负责）：心情排班、宿管恢复、全基建连班优化。见设计文档 §8.12。
 
-**全基建单班进驻编制**（`assign_shift` → `build_plan` / `execute_plan`、并行搜 + `used` 顺序落位）：现行见 **[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)**；**编排层 Phase 0–3 / 5 已落地**（`layout/orchestrate/`、`base_systems.json`），Phase 4 global effect 收拢进行中 — 见 **[ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)**。
+**全基建单班进驻编制**（`assign_shift` → `build_plan` / `execute_plan`、并行搜 + `used` 顺序落位）：现行见 **[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)**；**编排层 Phase 0–3 / 5 已落地**（`layout/orchestrate/`、`base_systems.json`）。剩余 Phase 计划在收尾期默认冻结，除非用户明确要求继续功能建设。
 
 ---
 
@@ -78,7 +78,8 @@ ArknightsInfraCalc-v2/
 │   ├── SCHEDULE_ROTATION.md    αβγ ABC 轮换 vs 废弃 A-B-A
 │   ├── SYSTEM_CHAINS.md        谜迭香/自动化/红松林/莱茵 体系链参考
 │   ├── INFRA_CLI.md            infra-cli 模块职责与改动边界
-│   ├── TODO/                   准备实现 / 正在实现的事项
+│   ├── MAINTENANCE_MODE.md     收尾期 bug 修复流程、回归与验收矩阵
+│   ├── TODO/                   历史建设期计划；收尾期默认冻结
 │   ├── ARCHIVE/                已完成 / 废弃 / 历史材料
 │   └── INTERNAL/               大文件内部地图（interpreter / shortcut）
 ├── crates/
@@ -326,15 +327,16 @@ ArknightsInfraCalc-v2/
 | [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md) | EffectAtom 模型、词汇表、分层求解概要、全局资源注册表 |
 | [MODELLED_OPERATORS.md](MODELLED_OPERATORS.md) | 已建模干员索引（从 EFFECT_ATOM_DESIGN.md §4 抽出） |
 | [SYSTEM_CHAINS.md](SYSTEM_CHAINS.md) | 谜迭香/自动化/红松林/莱茵 四大体系链参考手册 |
-| [INDEX.md](INDEX.md) | 文档入口、TODO / ARCHIVE 分层、任务路由 |
-| [TODO/](TODO/) | 准备实现 / 正在实现的事项 |
+| [INDEX.md](INDEX.md) | 文档入口、维护期路由、TODO / ARCHIVE 分层 |
+| [MAINTENANCE_MODE.md](MAINTENANCE_MODE.md) | 收尾期 bug 修复流程、分层定位、回归与验收矩阵 |
+| [TODO/](TODO/) | 历史建设期计划；收尾期默认冻结 |
 | [ARCHIVE/](ARCHIVE/) | 已完成、废弃或历史文档 |
 | [INFRA_CLI.md](INFRA_CLI.md) | CLI 分层原则、`commands` / `verify` / `output` 职责 |
 | [MANUFACTURE_STATUS.md](MANUFACTURE_STATUS.md) | 制造站实现范围与缺口 |
 | [BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md) | 全基建单班进驻编制设计（已落地） |
-| [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md) | 编排层 System / Plan / Execute（Phase 0–3/5 已落地；Phase 4 进行中） |
+| [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md) | 编排层 System / Plan / Execute（Phase 0–3/5 已落地；剩余 Phase 默认冻结） |
 | [FRONTEND_CLI.md](FRONTEND_CLI.md) | 前端集成：`plan`、MAA JSON、layout-gen |
 | [SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md) | αβγ ABC 轮换与废弃 A-B-A |
 | [INTERNAL/](INTERNAL/) | `interpreter` / `shortcut` 大文件内部地图 |
-| [AGENTS.md](../AGENTS.md) | Cursor 新会话首读、不变式、验证命令 |
+| [AGENTS.md](../AGENTS.md) | Agent 新会话首读、维护期规则、不变式、验证命令 |
 | [README.md](../README.md) | 项目原则摘要与快速命令 |
