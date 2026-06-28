@@ -8,7 +8,8 @@ use crate::instances::OperatorInstances;
 use crate::layout::{
     assign_control, assign_shift_with_plan_skip, assign_team_gamma_half, pinned_assignment,
     resolve_base, ActivatedSystem, AssignBaseOptions, AssignShiftMode, AssignedOperator,
-    AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId, SlotFill,
+    AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomAssignment, RoomId,
+    RoomProduct, SlotFill,
 };
 use crate::operbox::OperBox;
 use crate::pool::{
@@ -186,6 +187,84 @@ const ABYSSAL_GLADIIA: &str = "歌蕾蒂娅";
 const ABYSSAL_HUNTERS: [&str; 4] = ["乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"];
 const DAIFEEN: &str = "戴菲恩";
 const VINA_TRADE_GROUP: [&str; 3] = ["推进之王", "摩根", "维娜·维多利亚"];
+const WARMUP_STICKY_TRADE_OPERATORS: [&str; 2] = ["巫恋", "龙舌兰"];
+
+fn room_has_all(room: &RoomAssignment, names: &[&str]) -> bool {
+    names
+        .iter()
+        .all(|name| room.operators.iter().any(|op| op.name == *name))
+}
+
+fn trade_rooms_compatible_for_swap(blueprint: &BaseBlueprint, a: &RoomId, b: &RoomId) -> bool {
+    if a == b {
+        return true;
+    }
+    let Some(room_a) = blueprint.room(a) else {
+        return false;
+    };
+    let Some(room_b) = blueprint.room(b) else {
+        return false;
+    };
+    room_a.kind == FacilityKind::TradePost
+        && room_b.kind == FacilityKind::TradePost
+        && room_a.level == room_b.level
+        && room_a.product == room_b.product
+        && matches!(room_a.product, Some(RoomProduct::Trade { .. }))
+}
+
+fn trade_room_containing_group(
+    assignment: &BaseAssignment,
+    blueprint: &BaseBlueprint,
+    names: &[&str],
+) -> Option<RoomId> {
+    assignment.rooms.iter().find_map(|room| {
+        let bp_room = blueprint.room(&room.room_id)?;
+        (bp_room.kind == FacilityKind::TradePost && room_has_all(room, names))
+            .then(|| room.room_id.clone())
+    })
+}
+
+fn swap_trade_room_assignments(assignment: &mut BaseAssignment, a: &RoomId, b: &RoomId) -> bool {
+    let Some(ai) = assignment.rooms.iter().position(|room| &room.room_id == a) else {
+        return false;
+    };
+    let Some(bi) = assignment.rooms.iter().position(|room| &room.room_id == b) else {
+        return false;
+    };
+    if ai == bi {
+        return true;
+    }
+    let ops_a = assignment.rooms[ai].operators.clone();
+    let eff_a = assignment.rooms[ai].efficiency.clone();
+    assignment.rooms[ai].operators = assignment.rooms[bi].operators.clone();
+    assignment.rooms[ai].efficiency = assignment.rooms[bi].efficiency.clone();
+    assignment.rooms[bi].operators = ops_a;
+    assignment.rooms[bi].efficiency = eff_a;
+    true
+}
+
+/// 巫恋/龙舌兰订单体系有暖机成本；跨短班连续上岗时保持同一贸易站。
+fn align_trade_warmup_room(
+    blueprint: &BaseBlueprint,
+    assignment: &mut BaseAssignment,
+    sticky_room: &mut Option<RoomId>,
+) {
+    let Some(current_room) =
+        trade_room_containing_group(assignment, blueprint, &WARMUP_STICKY_TRADE_OPERATORS)
+    else {
+        return;
+    };
+    let Some(anchor_room) = sticky_room.clone() else {
+        *sticky_room = Some(current_room);
+        return;
+    };
+    if current_room == anchor_room {
+        return;
+    }
+    if trade_rooms_compatible_for_swap(blueprint, &current_room, &anchor_room) {
+        swap_trade_room_assignments(assignment, &current_room, &anchor_room);
+    }
+}
 
 struct AbyssalCandidate {
     assignment: BaseAssignment,
@@ -778,6 +857,7 @@ pub fn schedule_team_rotation(
     let mut daily = DailyTotals::default();
     let mut control_options = options.clone();
     control_options.skip_standalone_control = true;
+    let mut warmup_sticky_trade_room: Option<RoomId> = None;
     for (index, (hours, active, resting, parts)) in shift_specs.into_iter().enumerate() {
         // 活跃两队的中枢干员名册
         let active_names: HashSet<String> = active
@@ -919,6 +999,8 @@ pub fn schedule_team_rotation(
             }
             let mut base_used = base.operator_names();
             assign_ctrl(&mut base, &mut base_used)?;
+            let mut base_warmup_room = warmup_sticky_trade_room.clone();
+            align_trade_warmup_room(blueprint, &mut base, &mut base_warmup_room);
             let score_base =
                 score_base_assignment(blueprint, &base, instances, table, hours, Some(durin_plan))?;
 
@@ -931,10 +1013,16 @@ pub fn schedule_team_rotation(
                 beta: &beta,
                 gamma_h1: &gamma_h1,
             });
-            let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores)> = None;
+            let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores, Option<RoomId>)> = None;
             for mut candidate in abyssal_candidates {
                 let mut aby_used = candidate.assignment.operator_names();
                 assign_ctrl(&mut candidate.assignment, &mut aby_used)?;
+                let mut candidate_warmup_room = warmup_sticky_trade_room.clone();
+                align_trade_warmup_room(
+                    blueprint,
+                    &mut candidate.assignment,
+                    &mut candidate_warmup_room,
+                );
                 if !candidate
                     .assignment
                     .control_operators()
@@ -953,37 +1041,39 @@ pub fn schedule_team_rotation(
                 )?;
                 let replace = best_abyssal
                     .as_ref()
-                    .is_none_or(|(_, best)| score_aby.manu_prod_sum > best.manu_prod_sum);
+                    .is_none_or(|(_, best, _)| score_aby.manu_prod_sum > best.manu_prod_sum);
                 if replace {
-                    best_abyssal = Some((candidate, score_aby));
+                    best_abyssal = Some((candidate, score_aby, candidate_warmup_room));
                 }
             }
-            let (best_assignment, best_scores) = if let Some((candidate, score_aby)) = best_abyssal
-            {
-                if score_aby.manu_prod_sum > score_base.manu_prod_sum {
-                    if let Some(team) = teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
-                    {
-                        let mut ops = candidate.gamma_ops.clone();
-                        ops.push(ABYSSAL_GLADIIA.to_string());
-                        ops.extend(
-                            team_ctrl
-                                .get(&TeamLabel::Gamma)
-                                .cloned()
-                                .unwrap_or_default(),
-                        );
-                        ops.sort();
-                        ops.dedup();
-                        team.operators = ops;
+            let (best_assignment, best_scores, best_warmup_room) =
+                if let Some((candidate, score_aby, candidate_warmup_room)) = best_abyssal {
+                    if score_aby.manu_prod_sum > score_base.manu_prod_sum {
+                        if let Some(team) =
+                            teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
+                        {
+                            let mut ops = candidate.gamma_ops.clone();
+                            ops.push(ABYSSAL_GLADIIA.to_string());
+                            ops.extend(
+                                team_ctrl
+                                    .get(&TeamLabel::Gamma)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            );
+                            ops.sort();
+                            ops.dedup();
+                            team.operators = ops;
+                        }
+                        (candidate.assignment, score_aby, candidate_warmup_room)
+                    } else {
+                        (base, score_base, base_warmup_room)
                     }
-                    (candidate.assignment, score_aby)
                 } else {
-                    (base, score_base)
-                }
-            } else {
-                (base, score_base)
-            };
+                    (base, score_base, base_warmup_room)
+                };
             assignment = best_assignment;
             let scores = best_scores;
+            warmup_sticky_trade_room = best_warmup_room;
             let weighted_trade = scores.weighted_trade(hours);
             let weighted_manu = scores.weighted_manu(hours);
             let weighted_power = scores.weighted_power(hours);
@@ -1009,6 +1099,7 @@ pub fn schedule_team_rotation(
             }
             let mut s13_used = assignment.operator_names();
             assign_ctrl(&mut assignment, &mut s13_used)?;
+            align_trade_warmup_room(blueprint, &mut assignment, &mut warmup_sticky_trade_room);
             let scores = score_base_assignment(
                 blueprint,
                 &assignment,
@@ -1786,6 +1877,51 @@ mod tests {
             operator_team_map(&report).get("灵知"),
             operator_team_map(&report).get("孑"),
             "灵知中枢应跟随喀兰贸易站同队"
+        );
+    }
+
+    #[test]
+    fn team_rotation_feedback_010457_witch_group_keeps_trade_room() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        for name in ["巫恋", "龙舌兰"] {
+            if !operbox.owns(name) {
+                return;
+            }
+        }
+
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 20,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let mut witch_rooms = Vec::new();
+        for shift in &report.shifts {
+            if let Some(room_id) = trade_room_containing_group(
+                &shift.assignment,
+                &blueprint,
+                &WARMUP_STICKY_TRADE_OPERATORS,
+            ) {
+                witch_rooms.push((shift.index, room_id));
+            }
+        }
+        assert!(
+            witch_rooms.len() >= 2,
+            "feedback operbox should schedule witch group in short shifts: {witch_rooms:?}"
+        );
+        let first_room = witch_rooms[0].1.clone();
+        assert!(
+            witch_rooms.iter().all(|(_, room)| *room == first_room),
+            "巫恋/龙舌兰组跨班不应变更贸易站: {witch_rooms:?}"
         );
     }
 
