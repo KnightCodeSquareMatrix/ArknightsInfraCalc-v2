@@ -25,8 +25,8 @@ pub mod power;
 pub mod trade;
 
 pub use bake::{
-    bake_catalogs, validate_baked_catalog, BakeGeneratorFingerprint, BakeOptions,
-    BakeProgressEvent, BakeReport, BAKE_SCHEMA_VERSION,
+    bake_catalogs, validate_baked_catalog, warm_runtime_baked_table, BakeGeneratorFingerprint,
+    BakeOptions, BakeProgressEvent, BakeReport, BAKE_SCHEMA_VERSION,
 };
 pub use box_profile::{
     baseline_path_or_default, build_box_profile, render_box_profile_narrative, ActionKind,

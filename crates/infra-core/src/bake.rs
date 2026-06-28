@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::io::BufWriter;
@@ -19,7 +19,8 @@ use crate::pool::{
     build_manufacture_pool, build_trade_combo_operators_vec, build_trade_pool,
     combinations_indices, n_choose_k_u64,
 };
-use crate::pool::{ManuPool, TradePool};
+use crate::pool::{standalone_names_for, StandaloneFilter};
+use crate::pool::{HasName, ManuPool, PoolCore, TradePool};
 use crate::roster::{OperatorProgress, Roster};
 use crate::search::{
     ManuScoreBreakdown, ManuSearchHit, ManuSearchOptions, ManuSearchReport, SearchTripleFilter,
@@ -30,8 +31,9 @@ use crate::trade::input::{TradeOrderKind, TradeRoomInput, TradeSearchOrderMode};
 use crate::trade::shortcut::trade_station_exclusive_violation;
 use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::RecipeKind;
+use crate::FacilityKind;
 
-pub const BAKE_SCHEMA_VERSION: u32 = 3;
+pub const BAKE_SCHEMA_VERSION: u32 = 5;
 
 pub type BakeProgressCallback = Arc<dyn Fn(BakeProgressEvent) + Send + Sync>;
 
@@ -170,13 +172,142 @@ struct BakedComboTable {
     rows: Vec<BakedComboRow>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct BakedComboTableDisk {
+    schema_version: u32,
+    generator: Option<BakeGeneratorFingerprint>,
+    operator_count: usize,
+    operator_names: Vec<String>,
+    mask_words: usize,
+    indexes: Vec<BakedComboIndex>,
+    rows: Vec<BakedComboRowDisk>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BakedComboRowDisk {
+    room_level: u8,
+    operator_capacity: usize,
+    operator_indices: Vec<usize>,
+    sort_score: f64,
+    order_kind: Option<TradeOrderKind>,
+    recipe: Option<RecipeKind>,
+    trade_pct: Option<f64>,
+    gold_pct: Option<f64>,
+    shortcut: Option<String>,
+    unit_trade_per_day: Option<f64>,
+    unit_gold_per_day: Option<f64>,
+    unit_originium_per_day: Option<f64>,
+    output_multiplier: Option<f64>,
+    trade_order_eff_base: Option<f64>,
+    trade_order_eff_skill: Option<f64>,
+    trade_order_eff_global: Option<f64>,
+    trade_effective_eff_multiplier: Option<f64>,
+    manu_prod_total: Option<f64>,
+    manu_prod_base: Option<f64>,
+    manu_prod_skill: Option<f64>,
+    manu_prod_global: Option<f64>,
+    manu_storage_limit: Option<i32>,
+}
+
+impl From<&BakedComboTable> for BakedComboTableDisk {
+    fn from(value: &BakedComboTable) -> Self {
+        Self {
+            schema_version: value.schema_version,
+            generator: value.generator.clone(),
+            operator_count: value.operator_count,
+            operator_names: value.operator_names.clone(),
+            mask_words: value.mask_words,
+            indexes: value.indexes.clone(),
+            rows: value.rows.iter().map(BakedComboRowDisk::from).collect(),
+        }
+    }
+}
+
+impl From<&BakedComboRow> for BakedComboRowDisk {
+    fn from(value: &BakedComboRow) -> Self {
+        Self {
+            room_level: value.room_level,
+            operator_capacity: value.operator_capacity,
+            operator_indices: value.operator_indices.clone(),
+            sort_score: value.sort_score,
+            order_kind: value.order_kind,
+            recipe: value.recipe,
+            trade_pct: value.trade_pct,
+            gold_pct: value.gold_pct,
+            shortcut: value.shortcut.clone(),
+            unit_trade_per_day: value.unit_trade_per_day,
+            unit_gold_per_day: value.unit_gold_per_day,
+            unit_originium_per_day: value.unit_originium_per_day,
+            output_multiplier: value.output_multiplier,
+            trade_order_eff_base: value.trade_order_eff_base,
+            trade_order_eff_skill: value.trade_order_eff_skill,
+            trade_order_eff_global: value.trade_order_eff_global,
+            trade_effective_eff_multiplier: value.trade_effective_eff_multiplier,
+            manu_prod_total: value.manu_prod_total,
+            manu_prod_base: value.manu_prod_base,
+            manu_prod_skill: value.manu_prod_skill,
+            manu_prod_global: value.manu_prod_global,
+            manu_storage_limit: value.manu_storage_limit,
+        }
+    }
+}
+
+impl From<BakedComboTableDisk> for BakedComboTable {
+    fn from(value: BakedComboTableDisk) -> Self {
+        Self {
+            schema_version: value.schema_version,
+            generator: value.generator,
+            operator_count: value.operator_count,
+            operator_names: value.operator_names,
+            mask_words: value.mask_words,
+            indexes: value.indexes,
+            rows: value.rows.into_iter().map(BakedComboRow::from).collect(),
+        }
+    }
+}
+
+impl From<BakedComboRowDisk> for BakedComboRow {
+    fn from(value: BakedComboRowDisk) -> Self {
+        Self {
+            row_id: 0,
+            facility: String::new(),
+            signature_key: String::new(),
+            room_level: value.room_level,
+            operator_capacity: value.operator_capacity,
+            names: Vec::new(),
+            operator_indices: value.operator_indices,
+            operator_mask: Vec::new(),
+            sort_score: value.sort_score,
+            order_kind: value.order_kind,
+            recipe: value.recipe,
+            trade_pct: value.trade_pct,
+            gold_pct: value.gold_pct,
+            shortcut: value.shortcut,
+            unit_trade_per_day: value.unit_trade_per_day,
+            unit_gold_per_day: value.unit_gold_per_day,
+            unit_originium_per_day: value.unit_originium_per_day,
+            output_multiplier: value.output_multiplier,
+            trade_order_eff_base: value.trade_order_eff_base,
+            trade_order_eff_skill: value.trade_order_eff_skill,
+            trade_order_eff_global: value.trade_order_eff_global,
+            trade_effective_eff_multiplier: value.trade_effective_eff_multiplier,
+            manu_prod_total: value.manu_prod_total,
+            manu_prod_base: value.manu_prod_base,
+            manu_prod_skill: value.manu_prod_skill,
+            manu_prod_global: value.manu_prod_global,
+            manu_storage_limit: value.manu_storage_limit,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct RuntimeBakedComboTable {
     table: BakedComboTable,
     index_by_key: HashMap<String, (usize, usize)>,
+    operator_index_by_name: HashMap<String, usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct BakedComboIndex {
     signature_key: String,
     start: usize,
@@ -337,25 +468,30 @@ pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
     emit_progress(
         options,
         BakeProgressEvent::Writing {
-            path: options.out_dir.join("combo_table.json"),
+            path: options.out_dir.join("combo_table.bin"),
             rows: Some(combo_table_rows),
         },
     );
-    write_json(options.out_dir.join("combo_table.json"), &combo_table)?;
+    write_binary(
+        options.out_dir.join("combo_table.bin"),
+        &BakedComboTableDisk::from(&combo_table),
+    )?;
 
     let manifest = BakeManifest {
         schema_version: BAKE_SCHEMA_VERSION,
         generated_by: "infra-core::bake".to_string(),
-        model: "baseline_tier_up_parallel_combo_table".to_string(),
+        model: "binary_single_room_combo_table".to_string(),
         generator: options.generator.clone(),
         inputs: bake_input_fingerprints()?,
         options: BakeManifestOptions {
             include_trade: options.include_trade,
             include_manufacture: options.include_manufacture,
             limit_per_signature: options.limit_per_signature,
-            roster_model: "all modelled trade/manufacture operators at elite2 level1 rarity6"
+            roster_model:
+                "standalone_roster.json trade/manufacture entries at elite2 level1 rarity6"
+                    .to_string(),
+            layout_model: "single room signatures; gold trade keeps gold line count in key"
                 .to_string(),
-            layout_model: "LayoutContext::search_baseline".to_string(),
         },
     };
     emit_progress(
@@ -414,7 +550,11 @@ fn expected_signature_count(options: &BakeOptions) -> usize {
 }
 
 fn remove_stale_catalogs(out_dir: &Path) -> Result<()> {
-    for name in ["trade_combos.json", "manufacture_combos.json"] {
+    for name in [
+        "trade_combos.json",
+        "manufacture_combos.json",
+        "combo_table.json",
+    ] {
         let path = out_dir.join(name);
         match fs::remove_file(&path) {
             Ok(()) => {}
@@ -428,6 +568,27 @@ fn remove_stale_catalogs(out_dir: &Path) -> Result<()> {
 struct BakedRows {
     signatures: usize,
     rows: Vec<BakedComboRow>,
+}
+
+fn filter_pool_to_names<T: HasName + Clone>(
+    pool: &PoolCore<T>,
+    names: Option<BTreeSet<String>>,
+) -> PoolCore<T> {
+    let Some(names) = names else {
+        return PoolCore {
+            entries: Vec::new(),
+            skipped: pool.skipped.clone(),
+        };
+    };
+    PoolCore {
+        entries: pool
+            .entries
+            .iter()
+            .filter(|entry| names.contains(entry.pool_name()))
+            .cloned()
+            .collect(),
+        skipped: pool.skipped.clone(),
+    }
 }
 
 fn bake_trade_rows(
@@ -581,7 +742,7 @@ fn bake_manufacture_rows(
     operator_index: &HashMap<&str, usize>,
     mask_words: usize,
 ) -> Result<BakedRows> {
-    let pool = build_manufacture_pool(roster, instances, table)?;
+    let full_pool = build_manufacture_pool(roster, instances, table)?;
     let layout = Arc::new(LayoutContext::search_baseline());
     let mut all_rows = Vec::new();
     let mut signatures = 0usize;
@@ -592,6 +753,10 @@ fn bake_manufacture_rows(
             RecipeKind::BattleRecord,
             RecipeKind::Originium,
         ] {
+            let pool = filter_pool_to_names(
+                &full_pool,
+                standalone_names_for(FacilityKind::Factory, StandaloneFilter::for_recipe(recipe)),
+            );
             let operator_capacity = station_operator_capacity(room_level);
             let signature_key = manufacture_lookup_key(room_level, operator_capacity, recipe);
             let combo_count = n_choose_k_u64(pool.entries.len(), operator_capacity);
@@ -751,6 +916,7 @@ pub fn validate_baked_catalog(out_dir: &Path, generator: &BakeGeneratorFingerpri
 
 pub fn try_baked_trade_search(
     pool: &TradePool,
+    _skill_table: &SkillTable,
     options: &TradeSearchOptions,
     order_kind: TradeOrderKind,
     filter: &SearchTripleFilter,
@@ -777,19 +943,15 @@ pub fn try_baked_trade_search(
     let Some((start_idx, len)) = table.index_by_key.get(&key).copied() else {
         return Ok(None);
     };
-    let available: HashSet<&str> = pool
-        .entries
-        .iter()
-        .map(|entry| entry.name.as_str())
-        .collect();
+    let available_mask = available_operator_mask(
+        &table.operator_index_by_name,
+        pool.entries.iter().map(|entry| entry.name.as_str()),
+        table.table.mask_words,
+    );
     let must_names = filter.must_include_names();
     let mut hits = Vec::new();
     for row in &table.table.rows[start_idx..start_idx + len] {
-        if row
-            .names
-            .iter()
-            .any(|name| !available.contains(name.as_str()))
-        {
+        if !mask_subset(&row.operator_mask, &available_mask) {
             continue;
         }
         if must_names
@@ -798,9 +960,8 @@ pub fn try_baked_trade_search(
         {
             continue;
         }
-        let Some(hit) = row_to_trade_hit(row) else {
-            continue;
-        };
+        let hit = row_to_trade_hit(row);
+        let Some(hit) = hit else { continue };
         if filter.hit_filter.is_some_and(|f| !f(&hit)) {
             continue;
         }
@@ -828,6 +989,7 @@ pub fn try_baked_trade_search(
 
 pub fn try_baked_manufacture_search(
     pool: &ManuPool,
+    _skill_table: &SkillTable,
     options: &ManuSearchOptions,
     recipe: RecipeKind,
     combinations: u64,
@@ -843,18 +1005,14 @@ pub fn try_baked_manufacture_search(
     let Some((start_idx, len)) = table.index_by_key.get(&key).copied() else {
         return Ok(None);
     };
-    let available: HashSet<&str> = pool
-        .entries
-        .iter()
-        .map(|entry| entry.name.as_str())
-        .collect();
+    let available_mask = available_operator_mask(
+        &table.operator_index_by_name,
+        pool.entries.iter().map(|entry| entry.name.as_str()),
+        table.table.mask_words,
+    );
     let mut hits = Vec::new();
     for row in &table.table.rows[start_idx..start_idx + len] {
-        if row
-            .names
-            .iter()
-            .any(|name| !available.contains(name.as_str()))
-        {
+        if !mask_subset(&row.operator_mask, &available_mask) {
             continue;
         }
         if options
@@ -864,9 +1022,8 @@ pub fn try_baked_manufacture_search(
         {
             continue;
         }
-        let Some(hit) = row_to_manu_hit(row) else {
-            continue;
-        };
+        let hit = row_to_manu_hit(row);
+        let Some(hit) = hit else { continue };
         hits.push(hit);
         if hits.len() >= options.top_k.max(1) {
             break;
@@ -889,18 +1046,39 @@ pub fn try_baked_manufacture_search(
     }))
 }
 
+pub fn warm_runtime_baked_table() -> Result<bool> {
+    Ok(load_runtime_baked_table()?.is_some())
+}
+
 fn load_runtime_baked_table() -> Result<Option<&'static RuntimeBakedComboTable>> {
-    static CACHE: OnceLock<Result<Option<RuntimeBakedComboTable>>> = OnceLock::new();
-    match CACHE.get_or_init(load_runtime_baked_table_inner) {
-        Ok(Some(table)) => Ok(Some(table)),
-        Ok(None) => Ok(None),
-        Err(e) => Err(Error::msg(e.to_string())),
+    static CACHE: OnceLock<Option<RuntimeBakedComboTable>> = OnceLock::new();
+    if let Some(table) = CACHE.get() {
+        return Ok(table.as_ref());
+    }
+    match load_runtime_baked_table_inner() {
+        Ok(table) => {
+            let _ = CACHE.set(Some(table));
+            Ok(CACHE.get().and_then(|t| t.as_ref()))
+        }
+        Err(err) => {
+            let msg = err.to_string();
+            if msg.contains("data/baked/manifest.json not found")
+                || msg.contains("file not found")
+                || msg.contains("No such file or directory")
+                || msg.contains("baked schema mismatch")
+                || msg.contains("baked generator mismatch")
+            {
+                Ok(None)
+            } else {
+                Err(err)
+            }
+        }
     }
 }
 
-fn load_runtime_baked_table_inner() -> Result<Option<RuntimeBakedComboTable>> {
+fn load_runtime_baked_table_inner() -> Result<RuntimeBakedComboTable> {
     let Ok(manifest_path) = data_path("baked/manifest.json") else {
-        return Ok(None);
+        return Err(Error::msg("data/baked/manifest.json not found"));
     };
     let out_dir = manifest_path
         .parent()
@@ -908,9 +1086,11 @@ fn load_runtime_baked_table_inner() -> Result<Option<RuntimeBakedComboTable>> {
         .unwrap_or_else(|| PathBuf::from("data/baked"));
     let generator = current_exe_generator_fingerprint()?;
     validate_baked_catalog(&out_dir, &generator)?;
-    let combo_path = out_dir.join("combo_table.json");
-    let raw = fs::read_to_string(&combo_path)?;
-    let mut table: BakedComboTable = serde_json::from_str(&raw)?;
+    let combo_path = out_dir.join("combo_table.bin");
+    let raw = fs::read(&combo_path)?;
+    let disk: BakedComboTableDisk = bincode::deserialize(&raw)
+        .map_err(|e| Error::msg(format!("read {}: {e}", combo_path.display())))?;
+    let mut table = BakedComboTable::from(disk);
     let mut index_by_key = HashMap::new();
     for index in &table.indexes {
         index_by_key.insert(index.signature_key.clone(), (index.start, index.len));
@@ -932,10 +1112,17 @@ fn load_runtime_baked_table_inner() -> Result<Option<RuntimeBakedComboTable>> {
             row.operator_mask = operator_mask_from_indices(&row.operator_indices, table.mask_words);
         }
     }
-    Ok(Some(RuntimeBakedComboTable {
+    let operator_index_by_name = table
+        .operator_names
+        .iter()
+        .enumerate()
+        .map(|(idx, name)| (name.clone(), idx))
+        .collect();
+    Ok(RuntimeBakedComboTable {
         table,
         index_by_key,
-    }))
+        operator_index_by_name,
+    })
 }
 
 fn trade_lookup_key(
@@ -944,10 +1131,16 @@ fn trade_lookup_key(
     order_kind: TradeOrderKind,
     gold_lines: u32,
 ) -> String {
-    format!(
-        "trade:level{}:cap{}:order_{:?}:gold_lines{}",
-        room_level, operator_capacity, order_kind, gold_lines
-    )
+    match order_kind {
+        TradeOrderKind::Gold => format!(
+            "trade:level{}:cap{}:order_{:?}:gold_lines{}",
+            room_level, operator_capacity, order_kind, gold_lines
+        ),
+        TradeOrderKind::Originium => format!(
+            "trade:level{}:cap{}:order_{:?}",
+            room_level, operator_capacity, order_kind
+        ),
+    }
     .to_ascii_lowercase()
 }
 
@@ -980,31 +1173,45 @@ fn baked_trade_compatible(
     filter.must_operator_override.is_none()
         && (options.mood - 24.0).abs() < f64::EPSILON
         && (options.shift_hours - 24.0).abs() < f64::EPSILON
-        && baked_layout_compatible(&options.layout)
+        && baked_layout_search_compatible(&options.layout)
         && pool.entries.iter().all(|entry| entry.progress.elite >= 2)
 }
 
 fn baked_manufacture_compatible(pool: &ManuPool, options: &ManuSearchOptions) -> bool {
     (options.mood - 24.0).abs() < f64::EPSILON
-        && baked_layout_compatible(&options.layout)
+        && baked_layout_search_compatible(&options.layout)
         && pool.entries.iter().all(|entry| entry.progress.elite >= 2)
 }
 
-fn baked_layout_compatible(layout: &LayoutContext) -> bool {
-    let baseline = LayoutContext::search_baseline();
-    layout.meeting_max_level == baseline.meeting_max_level
-        && layout.dorm_level_sum == baseline.dorm_level_sum
-        && layout.manu_recipe_kinds == baseline.manu_recipe_kinds
-        && layout.dorm_occupant_count == baseline.dorm_occupant_count
-        && layout.trade_station_count == baseline.trade_station_count
-        && layout.power_station_count == baseline.power_station_count
-        && layout.manufacture_station_count == baseline.manufacture_station_count
-        && layout.gold_manu_line_count == baseline.gold_manu_line_count
-        && layout.base_workforce.is_empty()
-        && layout.trade_workforce.is_empty()
-        && layout.manu_workforce.is_empty()
-        && layout.control_workforce.is_empty()
-        && layout.power_workforce.is_empty()
+fn baked_layout_search_compatible(layout: &LayoutContext) -> bool {
+    let _ = layout;
+    true
+}
+
+fn available_operator_mask<'a>(
+    operator_index_by_name: &HashMap<String, usize>,
+    names: impl Iterator<Item = &'a str>,
+    mask_words: usize,
+) -> Vec<u64> {
+    let mut mask = vec![0u64; mask_words];
+    for name in names {
+        let Some(idx) = operator_index_by_name.get(name).copied() else {
+            continue;
+        };
+        let word = idx / 64;
+        let bit = idx % 64;
+        if let Some(slot) = mask.get_mut(word) {
+            *slot |= 1u64 << bit;
+        }
+    }
+    mask
+}
+
+fn mask_subset(row_mask: &[u64], available_mask: &[u64]) -> bool {
+    row_mask.iter().enumerate().all(|(idx, word)| {
+        let available = available_mask.get(idx).copied().unwrap_or(0);
+        word & !available == 0
+    })
 }
 
 fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
@@ -1193,7 +1400,20 @@ fn row_facility_from_signature(signature_key: &str) -> &'static str {
 
 fn bake_roster(instances: &OperatorInstances) -> Roster {
     let mut roster = Roster::default();
-    for name in modelled_production_operator_names(instances) {
+    for name in bake_operator_names(instances) {
+        let has_production_binding = instances
+            .get(&name, crate::tier::PromotionTier::TierUp)
+            .is_some_and(|i| {
+                i.facilities.contains_key("trade") || i.facilities.contains_key("manufacture")
+            })
+            || instances
+                .get(&name, crate::tier::PromotionTier::Tier0)
+                .is_some_and(|i| {
+                    i.facilities.contains_key("trade") || i.facilities.contains_key("manufacture")
+                });
+        if !has_production_binding {
+            continue;
+        }
         roster.insert(name, OperatorProgress::new(2, 1, 6));
     }
     roster
@@ -1235,13 +1455,22 @@ fn baked_operators(instances: &OperatorInstances, roster: &Roster) -> Vec<BakedO
     operators
 }
 
-fn modelled_production_operator_names(instances: &OperatorInstances) -> BTreeSet<String> {
+fn bake_operator_names(instances: &OperatorInstances) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for (_, instance) in instances.iter() {
-        if instance.facilities.contains_key("trade")
-            || instance.facilities.contains_key("manufacture")
-        {
+        if instance.facilities.contains_key("trade") {
             names.insert(instance.name.clone());
+        }
+    }
+    for recipe in [
+        RecipeKind::Gold,
+        RecipeKind::BattleRecord,
+        RecipeKind::Originium,
+    ] {
+        if let Some(set) =
+            standalone_names_for(FacilityKind::Factory, StandaloneFilter::for_recipe(recipe))
+        {
+            names.extend(set);
         }
     }
     names
@@ -1279,13 +1508,12 @@ fn fingerprint_file(path: &Path) -> Result<BakeInputFingerprint> {
 fn write_json(path: PathBuf, value: &impl Serialize) -> Result<()> {
     let file = File::create(&path)?;
     let writer = BufWriter::new(file);
-    let result = if path
-        .file_name()
-        .is_some_and(|name| name == "combo_table.json")
-    {
-        serde_json::to_writer(writer, value)
-    } else {
-        serde_json::to_writer_pretty(writer, value)
-    };
-    result.map_err(|e| Error::msg(format!("write {}: {e}", path.display())))
+    serde_json::to_writer_pretty(writer, value)
+        .map_err(|e| Error::msg(format!("write {}: {e}", path.display())))
+}
+
+fn write_binary(path: PathBuf, value: &impl Serialize) -> Result<()> {
+    let bytes = bincode::serialize(value)
+        .map_err(|e| Error::msg(format!("encode {}: {e}", path.display())))?;
+    fs::write(&path, bytes).map_err(|e| Error::msg(format!("write {}: {e}", path.display())))
 }

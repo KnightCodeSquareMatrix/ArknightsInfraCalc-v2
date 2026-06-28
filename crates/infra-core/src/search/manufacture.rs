@@ -221,9 +221,14 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     if options.use_baked {
-        if let Some(report) =
-            crate::bake::try_baked_manufacture_search(&sub, options, recipe, combinations, start)?
-        {
+        if let Some(report) = crate::bake::try_baked_manufacture_search(
+            &sub,
+            table,
+            options,
+            recipe,
+            combinations,
+            start,
+        )? {
             return Ok(report);
         }
     }

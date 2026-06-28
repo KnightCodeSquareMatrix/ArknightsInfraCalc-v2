@@ -1,8 +1,13 @@
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::Instant;
 
+use infra_core::bake::{
+    bake_catalogs, validate_baked_catalog, warm_runtime_baked_table, BakeGeneratorFingerprint,
+    BakeOptions, BakeProgressEvent,
+};
 use infra_core::box_profile::{
     baseline_path_or_default, build_box_profile_from_current_probe, run_user_rotation_probe,
     BoxProfileOptions,
@@ -10,7 +15,7 @@ use infra_core::box_profile::{
 use infra_core::export::{build_from_team_rotation, MaaExportOptions};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::BaseBlueprint;
-use infra_core::operbox::{default_layout_243_path, OperBox};
+use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::Error;
 use serde::{Deserialize, Serialize};
@@ -25,6 +30,13 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         instances: OperatorInstances::load(&default_instances_path()?)?,
         table: SkillTable::load(&default_skill_table_path()?)?,
     };
+
+    let _bake_handle = spawn_background_bake();
+    match warm_runtime_baked_table() {
+        Ok(true) => eprintln!("infra-cli serve: baked combo table warmed"),
+        Ok(false) => {}
+        Err(err) => eprintln!("infra-cli serve: baked combo table warm failed: {err}"),
+    }
 
     eprintln!("infra-cli serve ready: line-delimited JSON on stdin/stdout");
     let stdin = io::stdin();
@@ -59,6 +71,80 @@ struct ServeState {
     table: SkillTable,
 }
 
+fn spawn_background_bake() -> Option<thread::JoinHandle<()>> {
+    let out_dir = PathBuf::from("data/baked");
+    let generator = current_generator_fingerprint().ok()?;
+    if validate_baked_catalog(&out_dir, &generator).is_ok() {
+        return None;
+    }
+    eprintln!(
+        "infra-cli serve: baked catalog missing or stale, baking in background -> {}",
+        out_dir.display()
+    );
+    Some(thread::spawn(move || {
+        let mut options = BakeOptions::default();
+        options.out_dir = out_dir;
+        options.generator = Some(generator);
+        options.progress = Some(std::sync::Arc::new(print_bake_progress_line));
+        if let Err(err) = bake_catalogs(&options) {
+            eprintln!("infra-cli serve background bake failed: {err}");
+        }
+    }))
+}
+
+fn current_generator_fingerprint() -> Result<BakeGeneratorFingerprint, Error> {
+    let path = std::env::current_exe()?;
+    let bytes = fs::read(&path)?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    use std::hash::{Hash, Hasher};
+    bytes.hash(&mut hasher);
+    Ok(BakeGeneratorFingerprint {
+        kind: "infra-cli-exe".to_string(),
+        path: path.to_string_lossy().to_string(),
+        bytes: bytes.len() as u64,
+        hash64: format!("{:016x}", hasher.finish()),
+    })
+}
+
+fn print_bake_progress_line(event: BakeProgressEvent) {
+    match event {
+        BakeProgressEvent::Started {
+            out_dir,
+            operator_count,
+            signature_count,
+            worker_count,
+        } => eprintln!(
+            "[bake] start operators={} signatures={} rayon_workers={} -> {}",
+            operator_count,
+            signature_count,
+            worker_count,
+            out_dir.display()
+        ),
+        BakeProgressEvent::SignatureStarted {
+            facility,
+            signature_key,
+            combo_count,
+        } => eprintln!("[bake] {facility} {signature_key}: enumerating {combo_count} combos"),
+        BakeProgressEvent::SignatureFinished {
+            facility,
+            signature_key,
+            rows,
+            elapsed_ms,
+        } => eprintln!("[bake] {facility} {signature_key}: rows={rows} elapsed={elapsed_ms}ms"),
+        BakeProgressEvent::Writing { path, rows } => {
+            if let Some(rows) = rows {
+                eprintln!("[bake] write {} rows={rows}", path.display());
+            } else {
+                eprintln!("[bake] write {}", path.display());
+            }
+        }
+        BakeProgressEvent::Finished {
+            combo_table_rows,
+            elapsed_ms,
+        } => eprintln!("[bake] done combo_table_rows={combo_table_rows} elapsed={elapsed_ms}ms"),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct ServeRequest {
     #[serde(default)]
@@ -86,7 +172,8 @@ struct ServeError {
 
 #[derive(Debug, Deserialize)]
 struct PlanParams {
-    operbox: PathBuf,
+    #[serde(default)]
+    operbox: Option<PathBuf>,
     #[serde(default)]
     layout: Option<PathBuf>,
     #[serde(default)]
@@ -172,11 +259,12 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
         None => default_layout_243_path()?,
     };
     let blueprint = BaseBlueprint::load(&layout_path)?;
-    let operbox = OperBox::load(&params.operbox)?;
+    let operbox_path = params.operbox.unwrap_or(default_operbox_full_e2_path()?);
+    let operbox = OperBox::load(&operbox_path)?;
     let baseline_path = baseline_path_or_default(params.baseline.as_deref())?;
 
     let layout_label = layout_path.to_string_lossy().into_owned();
-    let operbox_label = params.operbox.to_string_lossy().into_owned();
+    let operbox_label = operbox_path.to_string_lossy().into_owned();
     let current =
         run_user_rotation_probe(&blueprint, &operbox, &state.instances, &state.table, top)?;
 

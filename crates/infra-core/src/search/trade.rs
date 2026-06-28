@@ -314,6 +314,7 @@ fn search_trade_single_order(
     if options.use_baked {
         if let Some(report) = crate::bake::try_baked_trade_search(
             &sub,
+            table,
             options,
             order_kind,
             &filter,

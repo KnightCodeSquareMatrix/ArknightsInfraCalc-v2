@@ -10,6 +10,7 @@
 //! - 过滤后可用条目不足 `min_entries`（贸易/制造 = 3，发电/中枢 = 1）时回退全池
 //! - `OnceLock` 惰性缓存，首次调用后常驻
 
+use std::collections::BTreeSet;
 use std::sync::OnceLock;
 
 use serde::Deserialize;
@@ -335,6 +336,42 @@ pub fn filter_standalone_exact_with<T: HasName + HasProgress + Clone>(
         entries: filtered,
         skipped: pool.skipped.clone(),
     })
+}
+
+/// Return standalone whitelist names for a facility/signature filter.
+///
+/// Bake uses this to build single-room tool catalogs from the same source as
+/// runtime greedy fill, instead of accidentally caching meta/system operators.
+pub fn standalone_names_for(
+    facility: FacilityKind,
+    filter: StandaloneFilter,
+) -> Option<BTreeSet<String>> {
+    let roster = load_standalone_roster()?;
+    let entries = roster.get(facility)?;
+    Some(
+        entries
+            .iter()
+            .filter(|(_, spec)| standalone_spec_matches_filter(spec, filter))
+            .map(|(name, _)| name.clone())
+            .collect(),
+    )
+}
+
+fn standalone_spec_matches_filter(spec: &StandaloneEntry, filter: StandaloneFilter) -> bool {
+    if let Some(recipe) = filter.recipe {
+        if !spec.recipes.is_empty()
+            && !spec.recipes.contains(&RecipeKind::All)
+            && !spec.recipes.contains(&recipe)
+        {
+            return false;
+        }
+    }
+    if let Some(order_type) = filter.order_type {
+        if !spec.order_types.is_empty() && !spec.order_types.contains(&order_type) {
+            return false;
+        }
+    }
+    true
 }
 
 #[cfg(test)]
