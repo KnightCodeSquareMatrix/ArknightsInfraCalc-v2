@@ -22,8 +22,8 @@ use super::control_fill::{assign_control, pin_daifeen_for_vina_priority};
 use super::manufacture_fill::assign_manufacture_lines;
 use super::power_fill::assign_power_stations;
 use super::producer_fill::{
-    assign_dorm_producers, assign_sphinx_urrbian_dorm_anchor, place_system_anchors,
-    place_system_producers,
+    assign_dorm_producers, assign_sphinx_urrbian_dorm_anchor,
+    cleanup_unused_sphinx_urrbian_dorm_anchor, place_system_anchors, place_system_producers,
 };
 use super::run::{AssignmentRun, StageTimer};
 use super::trade_fill::{assign_trade_jie_remainder, assign_trade_remainder};
@@ -161,6 +161,11 @@ pub(super) fn run_shift_pipeline(
                 &mut run.assignment,
                 &mut run.used,
             )?;
+            cleanup_unused_sphinx_urrbian_dorm_anchor(
+                blueprint,
+                &mut run.assignment,
+                &mut run.used,
+            );
             timer.mark("贸易余站");
 
             // resolve #4：贸易落位后制造搜索前快照。

@@ -145,6 +145,37 @@ pub(crate) fn assign_sphinx_urrbian_dorm_anchor(
     );
 }
 
+pub(crate) fn cleanup_unused_sphinx_urrbian_dorm_anchor(
+    blueprint: &BaseBlueprint,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) {
+    let sphinx_used = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::TradePost)
+        .any(|room| {
+            assignment
+                .operators_in(&room.id)
+                .iter()
+                .any(|op| op.name == SPHINX_NAME)
+        });
+    if sphinx_used {
+        return;
+    }
+
+    for room in &blueprint.rooms {
+        if room.kind != FacilityKind::Dormitory {
+            continue;
+        }
+        let ops = assignment.operators_in(&room.id);
+        if ops.len() == 1 && ops[0].name == URRBIAN_NAME {
+            assignment.set_room(room.id.clone(), Vec::new());
+            used.remove(URRBIAN_NAME);
+        }
+    }
+}
+
 fn best_dorm_producer(
     operbox: &OperBox,
     instances: &OperatorInstances,

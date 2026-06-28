@@ -310,7 +310,9 @@ mod tests {
         gongsun_gold_manu_anchors_ready, manufacture_candidate_pool_for_demand, pick_manu_hit,
         try_assign_gongsun_gold_manu_team, QINGLIU_RENEWABLE_ENERGY_BUFF,
     };
-    use super::producer_fill::assign_sphinx_urrbian_dorm_anchor;
+    use super::producer_fill::{
+        assign_sphinx_urrbian_dorm_anchor, cleanup_unused_sphinx_urrbian_dorm_anchor,
+    };
     use super::*;
     use crate::layout::resolve::resolve_base;
     use std::collections::HashSet;
@@ -419,6 +421,51 @@ mod tests {
         assert!(
             layout.base_workforce.iter().any(|name| name == "乌尔比安"),
             "宿舍进驻的乌尔比安应进入 OperatorInBase 判定"
+        );
+    }
+
+    #[test]
+    fn sphinx_urrbian_anchor_is_removed_when_sphinx_not_assigned() {
+        let (blueprint, _, _, _) = fixtures();
+        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+
+        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
+        cleanup_unused_sphinx_urrbian_dorm_anchor(&blueprint, &mut assignment, &mut used);
+
+        assert!(!used.contains("乌尔比安"));
+        assert!(
+            !assignment.rooms.iter().any(|room| {
+                room.room_id.0.starts_with("dorm_")
+                    && room.operators.iter().any(|op| op.name == "乌尔比安")
+            }),
+            "深巡未进贸易站时，不应保留乌尔比安宿舍锚点"
+        );
+    }
+
+    #[test]
+    fn sphinx_urrbian_anchor_stays_when_sphinx_is_assigned() {
+        let (blueprint, _, _, _) = fixtures();
+        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+
+        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
+        assignment.set_room(
+            RoomId::from("trade_1"),
+            vec![AssignedOperator::new("深巡", 2)],
+        );
+        used.insert("深巡".to_string());
+        cleanup_unused_sphinx_urrbian_dorm_anchor(&blueprint, &mut assignment, &mut used);
+
+        assert!(used.contains("乌尔比安"));
+        assert!(
+            assignment.rooms.iter().any(|room| {
+                room.room_id.0.starts_with("dorm_")
+                    && room.operators.iter().any(|op| op.name == "乌尔比安")
+            }),
+            "深巡进贸易站时，应保留乌尔比安作为 OperatorInBase 锚点"
         );
     }
 
