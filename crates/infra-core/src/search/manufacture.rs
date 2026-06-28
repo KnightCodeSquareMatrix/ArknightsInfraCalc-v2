@@ -591,6 +591,49 @@ mod tests {
     }
 
     #[test]
+    fn huaihu_prefers_peer_that_fully_feeds_bucket_on_two_slot_exp_line() {
+        let table = table();
+        let pool = ManuPool {
+            entries: vec![
+                test_entry("槐琥", &["manu_prod_spd_variable2[000]"]),
+                test_entry("断罪者", &["manu_formula_spd[020]"]),
+                test_entry("满触发搭档", &["manu_formula_spd[020]", "manu_prod_spd[000]"]),
+            ],
+            skipped: vec![],
+        };
+
+        let report = search_manufacture_triples(
+            &pool,
+            &table,
+            &ManuSearchOptions {
+                level: 2,
+                operator_capacity: 2,
+                recipe_mode: ManuSearchRecipeMode::Single(RecipeKind::BattleRecord),
+                top_k: 5,
+                use_baked: false,
+                full_pool: true,
+                ..ManuSearchOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.best.names, vec!["槐琥", "满触发搭档"]);
+        assert!(
+            (report.best.breakdown.prod_skill - 90.0).abs() < 0.01,
+            "槐琥应由 50% 搭档喂满 40%，got {:?}",
+            report.best.breakdown
+        );
+        assert!(
+            report
+                .top
+                .iter()
+                .any(|hit| hit.names == vec!["断罪者", "满触发搭档"]),
+            "普通 35+50 组合仍应存在，只是不能压过槐琥满触发: {:?}",
+            report.top
+        );
+    }
+
+    #[test]
     fn shitie_beast_worth_more_on_battle_record_lines_in_composite() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = table();
