@@ -75,7 +75,7 @@ pub fn assign_power_rooms(
     }
 
     let sub = filter_power_pool(pool, used);
-    let sub = try_filter_standalone(&sub, FacilityKind::PowerPlant, 1);
+    let sub = try_filter_standalone(&sub, FacilityKind::PowerPlant, empty_rooms.len());
     if sub.entries.is_empty() {
         return Err(Error::msg("power: no available operators"));
     }
@@ -120,5 +120,89 @@ fn filter_power_pool(pool: &PowerPool, exclude: &HashSet<String>) -> PowerPool {
             .cloned()
             .collect(),
         skipped: pool.skipped.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::blueprint::RoomBlueprint;
+    use crate::layout::tier::OperatorTier;
+    use crate::pool::PowerPoolEntry;
+    use crate::roster::OperatorProgress;
+
+    fn power_entry(name: &str, skill_id: &str, hint: f64) -> PowerPoolEntry {
+        PowerPoolEntry {
+            name: name.to_string(),
+            elite: 2,
+            progress: OperatorProgress::elite_only(2),
+            buff_ids: vec![skill_id.to_string()],
+            tags: vec![],
+            flat_charge_hint: hint,
+            has_l2_delegate: false,
+            tier: OperatorTier::Standalone,
+        }
+    }
+
+    #[test]
+    fn power_filter_falls_back_when_whitelist_cannot_fill_all_rooms() {
+        let blueprint = BaseBlueprint {
+            template: Some("test_243_power".to_string()),
+            drone_cap: 135,
+            scenario: Default::default(),
+            rooms: vec![
+                RoomBlueprint {
+                    id: RoomId::from("power_1"),
+                    kind: FacilityKind::PowerPlant,
+                    level: 3,
+                    product: None,
+                    dorm_beds: None,
+                    dorm_ambience_level: None,
+                },
+                RoomBlueprint {
+                    id: RoomId::from("power_2"),
+                    kind: FacilityKind::PowerPlant,
+                    level: 3,
+                    product: None,
+                    dorm_beds: None,
+                    dorm_ambience_level: None,
+                },
+                RoomBlueprint {
+                    id: RoomId::from("power_3"),
+                    kind: FacilityKind::PowerPlant,
+                    level: 3,
+                    product: None,
+                    dorm_beds: None,
+                    dorm_ambience_level: None,
+                },
+            ],
+        };
+        let pool = PowerPool {
+            entries: vec![
+                power_entry("承曦格雷伊", "power_rec_drone[000]", 0.0),
+                power_entry("格雷伊", "power_rec_spd[020]", 20.0),
+                power_entry("阿消", "power_rec_spd[010]", 10.0),
+            ],
+            skipped: vec![],
+        };
+        let table = SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap())
+            .unwrap();
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+
+        assign_power_stations(
+            &blueprint,
+            &pool,
+            &table,
+            &LayoutContext::default(),
+            &AssignBaseOptions::default(),
+            &mut assignment,
+            &mut used,
+        )
+        .unwrap();
+
+        assert_eq!(assignment.rooms.len(), 3);
+        assert_eq!(used.len(), 3);
+        assert!(used.contains("阿消"));
     }
 }
