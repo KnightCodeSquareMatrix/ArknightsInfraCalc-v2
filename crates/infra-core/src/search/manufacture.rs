@@ -705,6 +705,81 @@ mod tests {
     }
 
     #[test]
+    fn battle_record_search_picks_christine_wine_god_hongyun() {
+        use crate::operbox::{OperBox, OperBoxEntry};
+
+        let entries = vec![
+            OperBoxEntry {
+                id: "christine".into(),
+                name: "Miss.Christine".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+            OperBoxEntry {
+                id: "dionysus".into(),
+                name: "酒神".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "crownslayer".into(),
+                name: "弑君者".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "hongyun".into(),
+                name: "红云".into(),
+                elite: 1,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 4,
+            },
+        ];
+        let operbox = OperBox::from_entries(entries);
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = table();
+        let pool =
+            build_manufacture_pool(&operbox.manufacture_roster(&instances), &instances, &table)
+                .unwrap();
+
+        let report = search_manufacture_triples(
+            &pool,
+            &table,
+            &ManuSearchOptions {
+                recipe_mode: ManuSearchRecipeMode::Single(RecipeKind::BattleRecord),
+                use_baked: false,
+                ..ManuSearchOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.best.names,
+            vec![
+                "Miss.Christine".to_string(),
+                "红云".to_string(),
+                "酒神".to_string()
+            ]
+        );
+        assert!(
+            (report.best.composite_score - 104.0).abs() < 0.01,
+            "expected 3 base + 101% skill, got {:?}",
+            report.best.breakdown
+        );
+    }
+
+    #[test]
     fn gongsun_operbox_peer_absorb_operators_pool_and_solve() {
         use crate::manufacture::solver::solve_manufacture;
         use crate::operbox::{default_operbox_gongsun_path, OperBox, OperBoxEntry};

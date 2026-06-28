@@ -1094,60 +1094,6 @@ mod tests {
     }
 
     #[test]
-    fn assign_full_e2_peak_pairs_christine_with_dionysus_on_battle_record() {
-        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
-        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
-        if !operbox.owns("Miss.Christine") || !operbox.owns("酒神") {
-            return;
-        }
-
-        let peak = assign_shift(
-            &blueprint,
-            &operbox,
-            &instances,
-            &table,
-            &AssignBaseOptions {
-                top_k: 30,
-                ..Default::default()
-            },
-            AssignShiftMode::Peak,
-            &BaseAssignment::default(),
-        )
-        .unwrap();
-
-        let christine_room = peak.rooms.iter().find(|r| {
-            blueprint.rooms.iter().any(|b| {
-                b.id == r.room_id
-                    && b.kind == FacilityKind::Factory
-                    && matches!(
-                        b.product.as_ref(),
-                        Some(RoomProduct::Factory {
-                            recipe: RecipeKind::BattleRecord
-                        })
-                    )
-            }) && ["Miss.Christine", "酒神"]
-                .iter()
-                .all(|n| r.operators.iter().any(|o| o.name == *n))
-                && r.operators.len() == 3
-        });
-        assert!(
-            christine_room.is_some(),
-            "经验线应有 Miss.Christine+酒神，实际制造编制: {:?}",
-            peak.rooms
-                .iter()
-                .filter(|r| {
-                    blueprint
-                        .rooms
-                        .iter()
-                        .any(|b| b.id == r.room_id && b.kind == FacilityKind::Factory)
-                })
-                .collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
     fn assign_peak_fills_automation_gold_line_with_dongshi_without_senxi() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();

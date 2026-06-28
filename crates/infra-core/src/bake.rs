@@ -1522,6 +1522,7 @@ fn bake_input_fingerprints() -> Result<Vec<BakeInputFingerprint>> {
     for name in [
         "operator_instances.json",
         "skill_table.json",
+        "standalone_roster.json",
         "trade_shortcuts.json",
         "trade_segments.json",
         "base_systems.json",

@@ -298,27 +298,6 @@
       ]
     },
     {
-      "id": "christine_dionysus_battle_record",
-      "label": "Miss.Christine+酒神：盛餐的回报，经验线低优先同站 bond",
-      "tier": "same_station",
-      "priority": 8,
-      "shift_modes": ["peak"],
-      "slots": [
-        {
-          "facility": "factory",
-          "recipe": "battle_record",
-          "operators": [
-            { "name": "Miss.Christine", "elite": 2 },
-            { "name": "酒神", "elite": 2 },
-            {
-              "pick_one": ["弑君者", "断罪者", "槐琥", "裂响", "食铁兽", "白雪", "红豆"],
-              "elite": 2
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "vina_lungmen",
       "label": "推王组：戴菲恩+推进之王+摩根+维娜·维多利亚（135%贸，但书替补）",
       "tier": "cross_station",

@@ -232,6 +232,13 @@
         ]
       },
       {
+        "name": "红云",
+        "min_tier": "tier_up",
+        "recipes": [
+          "battle_record"
+        ]
+      },
+      {
         "name": "食铁兽",
         "recipes": [
           "battle_record"
