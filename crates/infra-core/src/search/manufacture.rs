@@ -482,6 +482,94 @@ mod tests {
     }
 
     #[test]
+    fn e0_haze_is_gold_thirty_and_chestnut_stays_originium_scoped() {
+        use crate::operbox::{OperBox, OperBoxEntry};
+
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = table();
+        let operbox = OperBox::from_entries(vec![
+            OperBoxEntry {
+                id: "haze".into(),
+                name: "夜烟".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 4,
+            },
+            OperBoxEntry {
+                id: "chestnut".into(),
+                name: "褐果".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 4,
+            },
+            OperBoxEntry {
+                id: "spot".into(),
+                name: "斑点".into(),
+                elite: 1,
+                level: 55,
+                own: true,
+                potential: 1,
+                rarity: 3,
+            },
+            OperBoxEntry {
+                id: "gravel".into(),
+                name: "砾".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 4,
+            },
+        ]);
+        let pool =
+            build_manufacture_pool(&operbox.manufacture_roster(&instances), &instances, &table)
+                .unwrap();
+
+        assert_eq!(
+            instances.resolve_manufacture_buff_ids("夜烟", PromotionTier::Tier0),
+            vec!["manu_formula_spd[100]".to_string()]
+        );
+
+        let gold_scope = filter_standalone_exact_with(
+            &pool,
+            FacilityKind::Factory,
+            StandaloneFilter::for_recipe(RecipeKind::Gold),
+        )
+        .expect("gold standalone scope");
+        assert!(gold_scope.entry("夜烟").is_some());
+        assert!(
+            gold_scope.entry("褐果").is_none(),
+            "Chestnut is only whitelisted for originium specialist use"
+        );
+
+        let report = search_manufacture_triples(
+            &pool,
+            &table,
+            &ManuSearchOptions {
+                recipe_mode: ManuSearchRecipeMode::Single(RecipeKind::Gold),
+                use_baked: false,
+                ..ManuSearchOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert!(
+            report.best.names.contains(&"夜烟".to_string()),
+            "gold search should use Haze's e0 metalwork skill, got {:?}",
+            report.best.names
+        );
+        assert!(
+            (report.best.composite_score - 98.0).abs() < 0.01,
+            "expected 3 base + 30 + 30 + 35 gold skill pct, got {:?}",
+            report.best.breakdown
+        );
+    }
+
+    #[test]
     fn manufacture_search_score_is_prod_total_sort_key() {
         let hit = ManuSearchHit {
             names: vec!["a".into()],

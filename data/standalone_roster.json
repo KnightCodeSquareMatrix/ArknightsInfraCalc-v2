@@ -191,7 +191,6 @@
       },
       {
         "name": "夜烟",
-        "min_tier": "tier_up",
         "recipes": [
           "gold"
         ]

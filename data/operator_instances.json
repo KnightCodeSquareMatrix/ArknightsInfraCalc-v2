@@ -1438,6 +1438,25 @@
         }
       }
     },
+    "夜烟@tier_0": {
+      "name": "夜烟",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "manufacture": {
+          "buff_ids": [
+            "manu_formula_spd[100]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "夜烟@tier_up": {
       "name": "夜烟",
       "tier": "tier_up",

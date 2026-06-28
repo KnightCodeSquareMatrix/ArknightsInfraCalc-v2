@@ -185,8 +185,8 @@ mod tests {
             ],
             skipped: vec![],
         };
-        let table = SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap())
-            .unwrap();
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
         let mut assignment = BaseAssignment::default();
         let mut used = HashSet::new();
 
