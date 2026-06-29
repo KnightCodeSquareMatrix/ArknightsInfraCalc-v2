@@ -181,6 +181,10 @@ fn merge_rooms(target: &mut BaseAssignment, source: &BaseAssignment) {
     }
 }
 
+fn clear_room(assignment: &mut BaseAssignment, room_id: &str) {
+    assignment.rooms.retain(|room| room.room_id.0 != room_id);
+}
+
 // ── 深海链 S2 短班入口 ──
 
 const ABYSSAL_GLADIIA: &str = "歌蕾蒂娅";
@@ -282,6 +286,14 @@ struct AbyssalBuildCtx<'a> {
     gamma_h1: &'a BaseAssignment,
 }
 
+fn owned_abyssal_hunters(operbox: &OperBox, used_ab: &HashSet<String>) -> Vec<String> {
+    ABYSSAL_HUNTERS
+        .iter()
+        .filter(|name| operbox.owns(name) && !used_ab.contains(**name))
+        .map(|name| (*name).to_string())
+        .collect()
+}
+
 fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidate> {
     let Some(gladiia_elite) = ctx.operbox.elite_of(ABYSSAL_GLADIIA) else {
         return Vec::new();
@@ -290,12 +302,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         return Vec::new();
     }
 
-    let mut hunters = Vec::new();
-    for name in ABYSSAL_HUNTERS {
-        if ctx.operbox.elite_of(name).is_some() && !ctx.used_ab.contains(name) {
-            hunters.push(name.to_string());
-        }
-    }
+    let hunters = owned_abyssal_hunters(ctx.operbox, ctx.used_ab);
     if hunters.len() < 4 {
         return Vec::new();
     }
@@ -673,6 +680,25 @@ fn balance_control_plugin_class(
     }
 }
 
+fn normalize_control_team_membership(
+    team_ctrl: &mut HashMap<TeamLabel, Vec<String>>,
+    production_team_by_name: &HashMap<String, TeamLabel>,
+) {
+    let mut chosen: HashMap<String, TeamLabel> = HashMap::new();
+    for team in TeamLabel::ALL {
+        for name in team_ctrl.get(&team).into_iter().flatten() {
+            let target = production_team_by_name.get(name).copied().unwrap_or(team);
+            chosen.entry(name.clone()).or_insert(target);
+        }
+    }
+    for names in team_ctrl.values_mut() {
+        names.clear();
+    }
+    for (name, team) in chosen {
+        team_ctrl.entry(team).or_default().push(name);
+    }
+}
+
 fn control_room_has_class(
     ops: &[AssignedOperator],
     entry_by_name: &HashMap<String, crate::pool::ControlPoolEntry>,
@@ -997,6 +1023,7 @@ pub fn schedule_team_rotation(
     }
     balance_control_plugin_class(&mut team_ctrl, &entry_by_name, control_entry_trade_inject);
     balance_control_plugin_class(&mut team_ctrl, &entry_by_name, control_entry_manu_inject);
+    normalize_control_team_membership(&mut team_ctrl, &production_team_by_name);
     for names in team_ctrl.values_mut() {
         names.sort();
         names.dedup();
@@ -1116,10 +1143,23 @@ pub fn schedule_team_rotation(
 
         // 体系中枢干员是当班硬锚点：先 pin 到 control，再由 assign_control 补满 5 人。
         // 这样薇薇安娜/夕等不在 standalone 中枢白名单内的体系位不会被搜索阶段丢掉。
-        let pin_active_system_control = |a: &mut BaseAssignment| {
+        let pin_active_system_control = |a: &mut BaseAssignment, extra_control_pins: &[&str]| {
             let mut ops = a.control_operators();
             let mut room_names: HashSet<String> = ops.iter().map(|o| o.name.clone()).collect();
             let assigned_names = a.operator_names();
+            for name in extra_control_pins {
+                if ops.len() >= 5 {
+                    break;
+                }
+                if room_names.contains(*name) || assigned_names.contains(*name) {
+                    continue;
+                }
+                let Some(progress) = operbox.progress_of(name) else {
+                    continue;
+                };
+                ops.push(AssignedOperator::from_progress(*name, progress));
+                room_names.insert((*name).to_string());
+            }
             let requires_karlan_control = assigned_names.contains("孑") && operbox.owns("灵知");
             if requires_karlan_control && !room_names.contains("灵知") && ops.len() < 5 {
                 let op = operbox
@@ -1164,8 +1204,10 @@ pub fn schedule_team_rotation(
         };
 
         // 从队池分配中枢（池小不报错，有多少填多少）
-        let assign_ctrl = |a: &mut BaseAssignment, used: &mut HashSet<String>| {
-            pin_active_system_control(a);
+        let assign_ctrl = |a: &mut BaseAssignment,
+                           used: &mut HashSet<String>,
+                           extra_control_pins: &[&str]| {
+            pin_active_system_control(a, extra_control_pins);
             *used = a.operator_names();
             let mut final_pool = base_control_pool.clone();
             let present: HashSet<String> =
@@ -1221,8 +1263,9 @@ pub fn schedule_team_rotation(
             for part in parts {
                 merge_rooms(&mut base, part);
             }
+            clear_room(&mut base, "control");
             let mut base_used = base.operator_names();
-            assign_ctrl(&mut base, &mut base_used)?;
+            assign_ctrl(&mut base, &mut base_used, &[])?;
             let mut base_warmup_room = warmup_sticky_trade_room.clone();
             align_trade_warmup_room(blueprint, &mut base, &mut base_warmup_room);
             let score_base =
@@ -1239,8 +1282,9 @@ pub fn schedule_team_rotation(
             });
             let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores, Option<RoomId>)> = None;
             for mut candidate in abyssal_candidates {
+                clear_room(&mut candidate.assignment, "control");
                 let mut aby_used = candidate.assignment.operator_names();
-                assign_ctrl(&mut candidate.assignment, &mut aby_used)?;
+                assign_ctrl(&mut candidate.assignment, &mut aby_used, &[ABYSSAL_GLADIIA])?;
                 let mut candidate_warmup_room = warmup_sticky_trade_room.clone();
                 align_trade_warmup_room(
                     blueprint,
@@ -1322,8 +1366,9 @@ pub fn schedule_team_rotation(
             for part in parts {
                 merge_rooms(&mut assignment, part);
             }
+            clear_room(&mut assignment, "control");
             let mut s13_used = assignment.operator_names();
-            assign_ctrl(&mut assignment, &mut s13_used)?;
+            assign_ctrl(&mut assignment, &mut s13_used, &[])?;
             align_trade_warmup_room(blueprint, &mut assignment, &mut warmup_sticky_trade_room);
             let scores = score_base_assignment(
                 blueprint,
@@ -1388,7 +1433,9 @@ mod tests {
     use super::*;
     use crate::instances::default_instances_path;
     use crate::layout::{assign_shift, blackkey_witch_same_trade_room};
-    use crate::operbox::{default_operbox_full_e2_path, default_operbox_gongsun_path};
+    use crate::operbox::{
+        default_operbox_full_e2_path, default_operbox_gongsun_path, OperBoxEntry,
+    };
     use crate::skill_table::default_skill_table_path;
 
     fn fixtures() -> (BaseBlueprint, OperBox, OperatorInstances, SkillTable) {
@@ -1461,6 +1508,147 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn abyssal_candidate_accepts_original_hunters_at_any_tier_but_not_alternates() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::from_entries(vec![
+            OperBoxEntry {
+                id: "gladiia".into(),
+                name: "歌蕾蒂娅".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ulpian".into(),
+                name: "乌尔比安".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "skadi".into(),
+                name: "斯卡蒂".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ghost".into(),
+                name: "幽灵鲨".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "angel".into(),
+                name: "安哲拉".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ghost2".into(),
+                name: "归溟幽灵鲨".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+        ]);
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            blueprint: &blueprint,
+            used_ab: &HashSet::new(),
+            shared: &BaseAssignment::default(),
+            beta: &BaseAssignment::default(),
+            gamma_h1: &BaseAssignment::default(),
+        });
+
+        assert!(
+            !candidates.is_empty(),
+            "原阵营四名深海猎人齐备时应进入 S2 深海候选"
+        );
+    }
+
+    #[test]
+    fn abyssal_candidate_requires_all_four_original_hunters() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::from_entries(vec![
+            OperBoxEntry {
+                id: "gladiia".into(),
+                name: "歌蕾蒂娅".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ulpian".into(),
+                name: "乌尔比安".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "skadi".into(),
+                name: "斯卡蒂".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "angel".into(),
+                name: "安哲拉".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ghost2".into(),
+                name: "归溟幽灵鲨".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+        ]);
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            blueprint: &blueprint,
+            used_ab: &HashSet::new(),
+            shared: &BaseAssignment::default(),
+            beta: &BaseAssignment::default(),
+            gamma_h1: &BaseAssignment::default(),
+        });
+
+        assert!(
+            candidates.is_empty(),
+            "归溟幽灵鲨不能代替本体幽灵鲨进入深海候选"
+        );
     }
 
     #[test]
@@ -1743,6 +1931,48 @@ mod tests {
             shifts_with_abyssal_manu.is_empty() || shifts_with_abyssal_manu == vec![1],
             "深海制造只应出现在 S2: {shifts_with_abyssal_manu:?}"
         );
+    }
+
+    #[test]
+    fn team_rotation_assignments_do_not_use_resting_team_members() {
+        let (blueprint, operbox, instances, table) = fixtures();
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let team_by_name = operator_team_map(&report);
+
+        for shift in &report.shifts {
+            for room in &shift.assignment.rooms {
+                if blueprint.room(&room.room_id).is_some_and(|bp| {
+                    matches!(bp.kind, FacilityKind::Dormitory | FacilityKind::Office)
+                }) {
+                    continue;
+                }
+                for op in &room.operators {
+                    let team = team_by_name
+                        .get(&op.name)
+                        .copied()
+                        .unwrap_or_else(|| panic!("上岗干员 {} 缺少 α/β/γ 归属", op.name));
+                    assert_ne!(
+                        team,
+                        shift.resting_team,
+                        "shift {} 房间 {} 使用了休息队 {:?} 干员 {}",
+                        shift.index + 1,
+                        room.room_id.0,
+                        shift.resting_team,
+                        op.name
+                    );
+                }
+            }
+        }
     }
 
     #[test]
