@@ -1360,27 +1360,22 @@ pub fn schedule_team_rotation(
             }
             let (best_assignment, best_scores, best_warmup_room) =
                 if let Some((candidate, score_aby, candidate_warmup_room)) = best_abyssal {
-                    if score_aby.manu_prod_sum > score_base.manu_prod_sum {
-                        let alpha_beta: HashSet<String> = teams
-                            .iter()
-                            .filter(|team| matches!(team.label, TeamLabel::Alpha | TeamLabel::Beta))
-                            .flat_map(|team| team.operators.iter().cloned())
-                            .collect();
-                        if let Some(team) =
-                            teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
-                        {
-                            let mut ops = team.operators.clone();
-                            ops.extend(candidate.gamma_ops.clone());
-                            ops.push(ABYSSAL_GLADIIA.to_string());
-                            ops.sort();
-                            ops.dedup();
-                            ops.retain(|name| !alpha_beta.contains(name));
-                            team.operators = ops;
-                        }
-                        (candidate.assignment, score_aby, candidate_warmup_room)
-                    } else {
-                        (base, score_base, base_warmup_room)
+                    let alpha_beta: HashSet<String> = teams
+                        .iter()
+                        .filter(|team| matches!(team.label, TeamLabel::Alpha | TeamLabel::Beta))
+                        .flat_map(|team| team.operators.iter().cloned())
+                        .collect();
+                    if let Some(team) = teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
+                    {
+                        let mut ops = team.operators.clone();
+                        ops.extend(candidate.gamma_ops.clone());
+                        ops.push(ABYSSAL_GLADIIA.to_string());
+                        ops.sort();
+                        ops.dedup();
+                        ops.retain(|name| !alpha_beta.contains(name));
+                        team.operators = ops;
                     }
+                    (candidate.assignment, score_aby, candidate_warmup_room)
                 } else {
                     (base, score_base, base_warmup_room)
                 };
@@ -2245,7 +2240,7 @@ mod tests {
         }
 
         assert!(
-            shifts_with_abyssal_manu.is_empty() || shifts_with_abyssal_manu == vec![1],
+            shifts_with_abyssal_manu == vec![1],
             "深海制造只应出现在 S2: {shifts_with_abyssal_manu:?}"
         );
     }
