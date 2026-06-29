@@ -190,6 +190,11 @@ fn clear_room(assignment: &mut BaseAssignment, room_id: &str) {
 
 const ABYSSAL_GLADIIA: &str = "歌蕾蒂娅";
 const ABYSSAL_HUNTERS: [&str; 4] = ["乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"];
+const ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS: [&str; 3] = [
+    "manu_prod_spd&power[000]",
+    "manu_prod_spd&power[010]",
+    "manu_prod_spd&power[020]",
+];
 const TAG_ABYSSAL: &str = "cc.g.abyssal";
 const DAIFEEN: &str = "戴菲恩";
 const VINA_TRADE_GROUP: [&str; 3] = ["推进之王", "摩根", "维娜·维多利亚"];
@@ -343,7 +348,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
     }
 
     let hunters = owned_abyssal_hunters(ctx.operbox, ctx.used_ab);
-    if hunters.len() < 4 {
+    if hunters.len() < 3 {
         return Vec::new();
     }
 
@@ -367,7 +372,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
 
     let mut count_vectors = Vec::new();
     enumerate_abyssal_counts(
-        4,
+        hunters.len(),
         ctx.mutable_manu_rooms.len(),
         &mut Vec::new(),
         &mut count_vectors,
@@ -409,6 +414,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
                 *recipe,
                 room.level,
                 &mut used,
+                &ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS,
             )
             .is_err()
             {
@@ -1804,7 +1810,7 @@ mod tests {
     }
 
     #[test]
-    fn abyssal_candidate_requires_all_four_original_hunters() {
+    fn abyssal_candidate_runs_with_three_original_hunters() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -1879,8 +1885,86 @@ mod tests {
         });
 
         assert!(
+            !candidates.is_empty(),
+            "缺一名原阵营深海猎人时应进入降级 S2 深海候选"
+        );
+        for candidate in candidates {
+            assert!(
+                !operators_of(&candidate.assignment).contains(&"归溟幽灵鲨".to_string()),
+                "归溟幽灵鲨不能代替本体幽灵鲨进入深海候选"
+            );
+        }
+    }
+
+    #[test]
+    fn abyssal_candidate_requires_at_least_three_original_hunters() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let operbox = OperBox::from_entries(vec![
+            OperBoxEntry {
+                id: "gladiia".into(),
+                name: "歌蕾蒂娅".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "skadi".into(),
+                name: "斯卡蒂".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "angel".into(),
+                name: "安哲拉".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ghost2".into(),
+                name: "归溟幽灵鲨".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+        ]);
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let gamma_h1 = BaseAssignment::default();
+        let blocked_ops = HashSet::new();
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
+            used_ab: &HashSet::new(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+        });
+
+        assert!(
             candidates.is_empty(),
-            "归溟幽灵鲨不能代替本体幽灵鲨进入深海候选"
+            "两名原阵营深海猎人收益不足，不应进入 S2 深海候选"
         );
     }
 

@@ -236,6 +236,10 @@ fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
     const GLADIIA_BETA: &str = "control_mp_aegir2[010]";
     const TAG_ABYSSAL: &str = "cc.g.abyssal";
 
+    if room_has_peer_eff_absorb(ctx) {
+        return;
+    }
+
     let room_abyssal_count = ctx
         .operators
         .iter()
@@ -264,6 +268,16 @@ fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
     );
     let bonus = (room_abyssal_count * abyssal_count * rate).min(cap);
     ctx.station_eff.add(None, bonus);
+}
+
+fn room_has_peer_eff_absorb(ctx: &ManuContext) -> bool {
+    ctx.operators.iter().any(|op| {
+        op.buff_ids.iter().any(|buff_id| {
+            buff_id == "manu_prod_spd&power[000]"
+                || buff_id == "manu_prod_spd&power[010]"
+                || buff_id == "manu_prod_spd&power[020]"
+        })
+    })
 }
 
 fn condition_met(cond: &Option<Condition>, ctx: &ManuContext, owner: &str) -> bool {
@@ -1207,6 +1221,41 @@ mod tests {
             (capped.prod_skill - 105.0).abs() < 0.01,
             "tier_up cap 90 plus 芬15, got {}",
             capped.prod_skill
+        );
+    }
+
+    #[test]
+    fn abyssal_control_does_not_stack_with_bionic_seadragon() {
+        let table = table();
+        let mut layout = LayoutContext::default();
+        layout.control_workforce.push("歌蕾蒂娅".to_string());
+        layout
+            .control_buffs
+            .push(("歌蕾蒂娅".to_string(), "control_mp_aegir2[010]".to_string()));
+        layout
+            .manu_tagged_count_sum
+            .insert("cc.g.abyssal".to_string(), 2);
+        layout.power_station_count = 4;
+
+        let mut room = ManuRoomInput::with_operators(
+            3,
+            RecipeKind::Gold,
+            vec![
+                ManuOperator {
+                    name: "乌尔比安".into(),
+                    elite: 0,
+                    buff_ids: vec![],
+                    tags: vec!["cc.g.abyssal".into()],
+                },
+                op("温蒂", 2, vec!["manu_prod_spd&power[020]"]),
+            ],
+        );
+        room.layout = Arc::new(layout);
+        let result = crate::manufacture::solver::solve_manufacture(&room, &table).unwrap();
+        assert!(
+            (result.prod_skill - 60.0).abs() < 0.01,
+            "仿生海龙同站时不应再叠深海站级加成，got {}",
+            result.prod_skill
         );
     }
 

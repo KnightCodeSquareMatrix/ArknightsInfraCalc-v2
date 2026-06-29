@@ -295,6 +295,7 @@ pub(crate) fn assign_manu_room_with_anchors(
     recipe: RecipeKind,
     room_level: u8,
     used: &mut HashSet<String>,
+    forbidden_filler_buff_ids: &[&str],
 ) -> Result<()> {
     let capacity = station_operator_capacity(room_level);
     if anchors.is_empty() || anchors.len() > capacity {
@@ -325,6 +326,12 @@ pub(crate) fn assign_manu_room_with_anchors(
         .entries
         .iter()
         .filter(|entry| !seen.contains(&entry.name) && !used.contains(&entry.name))
+        .filter(|entry| {
+            !entry
+                .buff_ids
+                .iter()
+                .any(|buff_id| forbidden_filler_buff_ids.contains(&buff_id.as_str()))
+        })
         .cloned()
         .collect();
     if fillers.len() < filler_need {
