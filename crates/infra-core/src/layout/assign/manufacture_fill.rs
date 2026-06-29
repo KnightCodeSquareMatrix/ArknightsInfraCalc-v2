@@ -7,10 +7,11 @@ use crate::layout::blueprint::{
     station_operator_capacity, BaseBlueprint, FacilityKind, RoomId, RoomProduct,
 };
 use crate::layout::context::LayoutContext;
+use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::input::ManuSearchRecipeMode;
 use crate::pool::{
     expand_manufacture_candidate_pool, filter_general_manufacture_search_pool,
-    filter_manufacture_pool, filter_standalone_exact, ManuPool,
+    filter_manufacture_pool, filter_standalone_exact, ManuPool, ManuPoolEntry,
 };
 use crate::search::{search_manufacture_triples, ManuSearchHit, ManuSearchOptions};
 use crate::skill_table::SkillTable;
@@ -281,6 +282,176 @@ pub(super) fn pick_manu_hit_with_anchor(
         top_k,
         "anchor pool",
     )
+}
+
+pub(crate) fn assign_manu_room_with_anchors(
+    assignment: &mut BaseAssignment,
+    room_id: &RoomId,
+    anchors: Vec<ManuPoolEntry>,
+    pool: &ManuPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    recipe: RecipeKind,
+    room_level: u8,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    let capacity = station_operator_capacity(room_level);
+    if anchors.is_empty() || anchors.len() > capacity {
+        return Err(Error::msg(format!(
+            "manufacture {} invalid anchor count {}",
+            room_id.0,
+            anchors.len()
+        )));
+    }
+    let mut seen = HashSet::new();
+    for anchor in &anchors {
+        if !seen.insert(anchor.name.clone()) {
+            return Err(Error::msg(format!(
+                "manufacture {} duplicate anchor {}",
+                room_id.0, anchor.name
+            )));
+        }
+        if used.contains(&anchor.name) {
+            return Err(Error::msg(format!(
+                "manufacture {} anchor {} already used",
+                room_id.0, anchor.name
+            )));
+        }
+    }
+
+    let filler_need = capacity - anchors.len();
+    let fillers: Vec<ManuPoolEntry> = pool
+        .entries
+        .iter()
+        .filter(|entry| !seen.contains(&entry.name) && !used.contains(&entry.name))
+        .cloned()
+        .collect();
+    if fillers.len() < filler_need {
+        return Err(Error::msg(format!(
+            "manufacture {} has {} ready fillers (need {filler_need})",
+            room_id.0,
+            fillers.len()
+        )));
+    }
+
+    let mut combos = Vec::new();
+    collect_manu_filler_combos(&fillers, filler_need, 0, &mut Vec::new(), &mut combos);
+    let Some(hit) = combos
+        .into_iter()
+        .filter_map(|mut combo| {
+            let mut entries = anchors.clone();
+            entries.append(&mut combo);
+            score_manu_entries(&entries, table, layout, options, recipe, room_level)
+        })
+        .max_by(|a, b| {
+            a.composite_score
+                .partial_cmp(&b.composite_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    a.storage
+                        .gold
+                        .max(a.storage.battle_record)
+                        .cmp(&b.storage.gold.max(b.storage.battle_record))
+                })
+                .then_with(|| b.names.cmp(&a.names))
+        })
+    else {
+        return Err(Error::msg(format!(
+            "manufacture {} produced no anchored hit",
+            room_id.0
+        )));
+    };
+    let mut commit_pool = pool.clone();
+    for anchor in anchors {
+        if commit_pool.entry(&anchor.name).is_none() {
+            commit_pool.entries.push(anchor);
+        }
+    }
+    commit_manu_room(assignment, room_id, &hit, &commit_pool, used)
+}
+
+fn collect_manu_filler_combos(
+    entries: &[ManuPoolEntry],
+    need: usize,
+    start: usize,
+    current: &mut Vec<ManuPoolEntry>,
+    out: &mut Vec<Vec<ManuPoolEntry>>,
+) {
+    if current.len() == need {
+        out.push(current.clone());
+        return;
+    }
+    if need == 0 {
+        out.push(Vec::new());
+        return;
+    }
+    for idx in start..entries.len() {
+        if current.len() + entries.len().saturating_sub(idx) < need {
+            break;
+        }
+        current.push(entries[idx].clone());
+        collect_manu_filler_combos(entries, need, idx + 1, current, out);
+        current.pop();
+    }
+}
+
+fn score_manu_entries(
+    entries: &[ManuPoolEntry],
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    recipe: RecipeKind,
+    room_level: u8,
+) -> Option<ManuSearchHit> {
+    let input = ManuRoomInput {
+        level: room_level,
+        operators: entries
+            .iter()
+            .map(ManuPoolEntry::to_manu_operator)
+            .collect(),
+        active_recipe: recipe,
+        mood: options.mood,
+        layout: Arc::new(layout.clone()),
+    };
+    let result = crate::manufacture::solve_manufacture(&input, table).ok()?;
+    let names = entries.iter().map(|entry| entry.name.clone()).collect();
+    let mut per_station = crate::manufacture::ManuProdBreakdown::default();
+    let mut storage = crate::manufacture::ManuStorageBreakdown::default();
+    let recipe_label = match recipe {
+        RecipeKind::Gold => {
+            per_station.gold = result.prod_total;
+            storage.gold = result.storage_limit;
+            "gold"
+        }
+        RecipeKind::BattleRecord => {
+            per_station.battle_record = result.prod_total;
+            storage.battle_record = result.storage_limit;
+            "battle_record"
+        }
+        RecipeKind::Originium => {
+            per_station.originium = result.prod_total;
+            storage.originium = result.storage_limit;
+            "originium"
+        }
+        RecipeKind::All => "all",
+    };
+    Some(ManuSearchHit {
+        names,
+        gold_names: vec![],
+        battle_record_names: vec![],
+        composite_score: result.prod_total,
+        per_station,
+        storage,
+        breakdown: crate::search::ManuScoreBreakdown {
+            prod_base: result.prod_base,
+            prod_skill: result.prod_skill,
+            prod_global: result.prod_total - result.prod_base - result.prod_skill,
+            prod_total: result.prod_total,
+            storage_limit: result.storage_limit,
+            recipe: recipe_label.to_string(),
+        },
+    })
 }
 
 pub(super) fn pick_capacity_manu_hit(

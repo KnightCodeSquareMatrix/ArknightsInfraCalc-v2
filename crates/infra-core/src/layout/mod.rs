@@ -11,6 +11,7 @@ pub mod tier;
 mod workforce;
 
 pub(crate) use assign::assign_control;
+pub(crate) use assign::assign_manu_room_with_anchors;
 pub use assign::{
     assign_base_greedy, assign_power_rooms, assign_power_stations, assign_shift,
     assign_shift_with_plan, assign_shift_with_plan_skip, assign_team_gamma_half,

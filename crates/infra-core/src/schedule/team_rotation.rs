@@ -6,18 +6,19 @@ use serde::Serialize;
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
 use crate::layout::{
-    assign_control, assign_shift_with_plan_skip, assign_team_gamma_half, pinned_assignment,
-    resolve_base, ActivatedSystem, AssignBaseOptions, AssignShiftMode, AssignedOperator,
-    AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomAssignment, RoomId,
-    RoomProduct, SlotFill,
+    assign_control, assign_manu_room_with_anchors, assign_shift_with_plan_skip,
+    assign_team_gamma_half, pinned_assignment, resolve_base, ActivatedSystem, AssignBaseOptions,
+    AssignShiftMode, AssignedOperator, AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind,
+    LayoutContext, RoomAssignment, RoomId, RoomProduct, SlotFill,
 };
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool, build_manufacture_pool, build_power_pool,
-    build_trade_pool, karlan_precision_active,
+    build_trade_pool, karlan_precision_active, ManuPool, ManuPoolEntry,
 };
 use crate::search::{control_efficiency_fill_sort_weight, control_entry_plugin_fill};
 use crate::skill_table::SkillTable;
+use crate::tier::PromotionTier;
 
 use super::base_rotation::{score_base_assignment, ShiftScores};
 use super::shift_bind::{align_shift_binds_in_halves, shift_binds_from_plan};
@@ -189,6 +190,7 @@ fn clear_room(assignment: &mut BaseAssignment, room_id: &str) {
 
 const ABYSSAL_GLADIIA: &str = "歌蕾蒂娅";
 const ABYSSAL_HUNTERS: [&str; 4] = ["乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"];
+const TAG_ABYSSAL: &str = "cc.g.abyssal";
 const DAIFEEN: &str = "戴菲恩";
 const VINA_TRADE_GROUP: [&str; 3] = ["推进之王", "摩根", "维娜·维多利亚"];
 const WARMUP_STICKY_TRADE_OPERATORS: [&str; 2] = ["巫恋", "龙舌兰"];
@@ -279,11 +281,18 @@ struct AbyssalCandidate {
 /// 歌蕾蒂娅只能承受约 7h 短班；深海链不进入普通 base_systems registry。
 struct AbyssalBuildCtx<'a> {
     operbox: &'a OperBox,
+    instances: &'a OperatorInstances,
+    table: &'a SkillTable,
     blueprint: &'a BaseBlueprint,
+    layout: &'a LayoutContext,
+    options: &'a AssignBaseOptions,
+    manu_pool: &'a ManuPool,
     used_ab: &'a HashSet<String>,
+    blocked_ops: &'a HashSet<String>,
     shared: &'a BaseAssignment,
     beta: &'a BaseAssignment,
     gamma_h1: &'a BaseAssignment,
+    mutable_manu_rooms: &'a [RoomId],
 }
 
 fn owned_abyssal_hunters(operbox: &OperBox, used_ab: &HashSet<String>) -> Vec<String> {
@@ -292,6 +301,37 @@ fn owned_abyssal_hunters(operbox: &OperBox, used_ab: &HashSet<String>) -> Vec<St
         .filter(|name| operbox.owns(name) && !used_ab.contains(**name))
         .map(|name| (*name).to_string())
         .collect()
+}
+
+fn abyssal_manu_entry(
+    name: &str,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Option<ManuPoolEntry> {
+    let progress = operbox.progress_of(name)?;
+    let tier = PromotionTier::from_progress(progress);
+    let buff_ids = instances.resolve_manufacture_buff_ids(name, tier);
+    for buff_id in &buff_ids {
+        let skill = table.get(buff_id)?;
+        if skill.facility != "manufacture" {
+            return None;
+        }
+    }
+    let mut tags = instances.tags_for(name, tier);
+    if !tags.iter().any(|tag| tag == TAG_ABYSSAL) {
+        tags.push(TAG_ABYSSAL.to_string());
+    }
+    Some(ManuPoolEntry {
+        name: name.to_string(),
+        elite: progress.elite,
+        progress,
+        buff_ids,
+        tags,
+        flat_eff_hint: 0.0,
+        has_l2_delegate: false,
+        tier: crate::layout::OperatorTier::CrossStation,
+    })
 }
 
 fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidate> {
@@ -307,78 +347,85 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         return Vec::new();
     }
 
-    let manu_rooms: Vec<RoomId> = ctx
-        .blueprint
-        .rooms_of(FacilityKind::Factory)
-        .iter()
-        .map(|r| r.id.clone())
-        .collect();
-    if manu_rooms.is_empty() {
+    if ctx.mutable_manu_rooms.is_empty() {
         return Vec::new();
     }
 
     let mut base = ctx.shared.clone();
-    let Some(control) = abyssal_control_room(ctx.shared, gladiia_elite) else {
-        return Vec::new();
-    };
-    base.set_room(RoomId::from("control"), control);
     merge_rooms(&mut base, ctx.beta);
     merge_rooms(&mut base, ctx.gamma_h1);
 
-    let original_rooms: Vec<Vec<AssignedOperator>> = manu_rooms
-        .iter()
-        .map(|room_id| base.operators_in(room_id).to_vec())
-        .collect();
     let gamma_original: HashSet<String> = operators_of(ctx.gamma_h1).into_iter().collect();
-    let hunter_names: HashSet<&str> = hunters.iter().map(String::as_str).collect();
-    let hunter_ops: Vec<AssignedOperator> = hunters
+    let hunter_names: HashSet<String> = hunters.iter().cloned().collect();
+    let hunter_entries: Vec<ManuPoolEntry> = hunters
         .iter()
-        .filter_map(|name| {
-            ctx.operbox
-                .progress_of(name)
-                .map(|progress| AssignedOperator::from_progress(name, progress))
-        })
+        .filter_map(|name| abyssal_manu_entry(name, ctx.operbox, ctx.instances, ctx.table))
         .collect();
-    if hunter_ops.len() != hunters.len() {
+    if hunter_entries.len() != hunters.len() {
         return Vec::new();
     }
 
     let mut count_vectors = Vec::new();
-    enumerate_abyssal_counts(4, manu_rooms.len(), &mut Vec::new(), &mut count_vectors);
+    enumerate_abyssal_counts(
+        4,
+        ctx.mutable_manu_rooms.len(),
+        &mut Vec::new(),
+        &mut count_vectors,
+    );
 
     let mut out = Vec::new();
     for counts in count_vectors {
         let mut candidate = base.clone();
+        for room_id in ctx.mutable_manu_rooms {
+            clear_room(&mut candidate, room_id.0.as_str());
+        }
+        let mut used = candidate.operator_names();
+        used.extend(ctx.blocked_ops.iter().cloned());
         let mut next_hunter = 0;
+        let mut ok = true;
         for (room_idx, count) in counts.iter().copied().enumerate() {
             if count == 0 {
                 continue;
             }
-            let mut ops = Vec::new();
-            for _ in 0..count {
-                ops.push(hunter_ops[next_hunter].clone());
-                next_hunter += 1;
+            let room_id = &ctx.mutable_manu_rooms[room_idx];
+            let Some(room) = ctx.blueprint.room(room_id) else {
+                ok = false;
+                break;
+            };
+            let Some(RoomProduct::Factory { recipe }) = room.product.as_ref() else {
+                ok = false;
+                break;
+            };
+            let anchors = hunter_entries[next_hunter..next_hunter + count].to_vec();
+            next_hunter += count;
+            if assign_manu_room_with_anchors(
+                &mut candidate,
+                room_id,
+                anchors,
+                ctx.manu_pool,
+                ctx.table,
+                ctx.layout,
+                ctx.options,
+                *recipe,
+                room.level,
+                &mut used,
+            )
+            .is_err()
+            {
+                ok = false;
+                break;
             }
-            for op in &original_rooms[room_idx] {
-                if ops.len() >= 3 {
-                    break;
-                }
-                if hunter_names.contains(op.name.as_str()) {
-                    continue;
-                }
-                ops.push(op.clone());
-            }
-            candidate.set_room(manu_rooms[room_idx].clone(), ops);
+        }
+        if !ok {
+            continue;
         }
 
         let mut gamma_ops: Vec<String> = candidate
             .rooms
             .iter()
-            .filter(|room| manu_rooms.contains(&room.room_id))
+            .filter(|room| ctx.mutable_manu_rooms.contains(&room.room_id))
             .flat_map(|room| room.operators.iter())
-            .filter(|op| {
-                gamma_original.contains(&op.name) || hunter_names.contains(op.name.as_str())
-            })
+            .filter(|op| gamma_original.contains(&op.name) || hunter_names.contains(&op.name))
             .map(|op| op.name.clone())
             .collect();
         gamma_ops.sort();
@@ -390,23 +437,6 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
     }
 
     out
-}
-
-fn abyssal_control_room(
-    shared: &BaseAssignment,
-    gladiia_elite: u8,
-) -> Option<Vec<AssignedOperator>> {
-    let mut control = shared.control_operators();
-    if control.iter().any(|o| o.name == ABYSSAL_GLADIIA) {
-        return Some(control);
-    }
-    if control.len() >= 5 {
-        let drop = control.iter().position(|o| o.name == "焰尾")?;
-        control[drop] = AssignedOperator::new(ABYSSAL_GLADIIA, gladiia_elite);
-    } else {
-        control.push(AssignedOperator::new(ABYSSAL_GLADIIA, gladiia_elite));
-    }
-    Some(control)
 }
 
 fn enumerate_abyssal_counts(
@@ -1272,13 +1302,21 @@ pub fn schedule_team_rotation(
                 score_base_assignment(blueprint, &base, instances, table, hours, Some(durin_plan))?;
 
             // 路径 B: 有深海（S2 短班候选）
+            let alpha_blocked_ops: HashSet<String> = operators_of(&alpha).into_iter().collect();
             let abyssal_candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
                 operbox,
+                instances,
+                table,
                 blueprint,
+                layout: &production_layout,
+                options,
+                manu_pool: &pools.manu,
                 used_ab: &used_ab,
+                blocked_ops: &alpha_blocked_ops,
                 shared: &shared,
                 beta: &beta,
                 gamma_h1: &gamma_h1,
+                mutable_manu_rooms: &h1.manu,
             });
             let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores, Option<RoomId>)> = None;
             for mut candidate in abyssal_candidates {
@@ -1448,6 +1486,28 @@ mod tests {
         (blueprint, operbox, instances, table)
     }
 
+    fn build_test_manu_ctx(
+        blueprint: &BaseBlueprint,
+        operbox: &OperBox,
+        instances: &OperatorInstances,
+        table: &SkillTable,
+    ) -> (LayoutContext, ManuPool, AssignBaseOptions) {
+        let layout = resolve_base(
+            blueprint,
+            &BaseAssignment::default(),
+            Some(instances),
+            Some(table),
+            24.0,
+            None,
+        )
+        .unwrap()
+        .layout_snapshot();
+        let manu_pool =
+            build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)
+                .unwrap();
+        (layout, manu_pool, AssignBaseOptions::default())
+    }
+
     fn trade_room_contains(
         assignment: &BaseAssignment,
         blueprint: &BaseBlueprint,
@@ -1465,13 +1525,15 @@ mod tests {
 
     #[test]
     fn abyssal_candidate_does_not_materialize_empty_factory_rooms() {
-        let (blueprint, operbox, _, _) = fixtures();
+        let (blueprint, operbox, instances, table) = fixtures();
         if !["歌蕾蒂娅", "乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"]
             .iter()
             .all(|name| operbox.owns(name))
         {
             return;
         }
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
 
         let shared = BaseAssignment::default();
         let beta = BaseAssignment::default();
@@ -1485,13 +1547,21 @@ mod tests {
             ],
         );
 
+        let blocked_ops = HashSet::new();
         let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
             operbox: &operbox,
+            instances: &instances,
+            table: &table,
             blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
+            blocked_ops: &blocked_ops,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
         });
 
         assert!(!candidates.is_empty());
@@ -1511,8 +1581,125 @@ mod tests {
     }
 
     #[test]
+    fn abyssal_candidate_only_replaces_mutable_gamma_rooms() {
+        let (blueprint, operbox, instances, table) = fixtures();
+        if !["歌蕾蒂娅", "乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"]
+            .iter()
+            .all(|name| operbox.owns(name))
+        {
+            return;
+        }
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+
+        let shared = BaseAssignment::default();
+        let mut beta = BaseAssignment::default();
+        beta.set_room(
+            "manu_2",
+            vec![
+                AssignedOperator::new("清流", 2),
+                AssignedOperator::new("温蒂", 2),
+                AssignedOperator::new("森蚺", 2),
+            ],
+        );
+        let mut gamma_h1 = BaseAssignment::default();
+        gamma_h1.set_room(
+            "manu_1",
+            vec![
+                AssignedOperator::new("芬", 0),
+                AssignedOperator::new("克洛丝", 0),
+                AssignedOperator::new("泡普卡", 0),
+            ],
+        );
+        gamma_h1.set_room(
+            "manu_3",
+            vec![
+                AssignedOperator::new("斑点", 0),
+                AssignedOperator::new("米格鲁", 0),
+                AssignedOperator::new("玫兰莎", 0),
+            ],
+        );
+
+        let blocked_ops = HashSet::new();
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
+            used_ab: &HashSet::new(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+        });
+
+        assert!(!candidates.is_empty());
+        for candidate in candidates {
+            let beta_names: Vec<_> = candidate
+                .assignment
+                .operators_in(&RoomId::from("manu_2"))
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect();
+            assert_eq!(
+                beta_names,
+                vec!["清流", "温蒂", "森蚺"],
+                "深海候选不应替换 β/活跃体系制造房"
+            );
+        }
+    }
+
+    #[test]
+    fn abyssal_candidate_does_not_fill_with_blocked_resting_ops() {
+        let (blueprint, operbox, instances, table) = fixtures();
+        if !["歌蕾蒂娅", "乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"]
+            .iter()
+            .all(|name| operbox.owns(name))
+        {
+            return;
+        }
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let gamma_h1 = BaseAssignment::default();
+        let blocked_ops: HashSet<String> = ["芬"].into_iter().map(str::to_string).collect();
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
+            used_ab: &HashSet::new(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+        });
+
+        assert!(!candidates.is_empty());
+        for candidate in candidates {
+            assert!(
+                !operators_of(&candidate.assignment).contains(&"芬".to_string()),
+                "深海候选补位不应使用 S2 休息队员"
+            );
+        }
+    }
+
+    #[test]
     fn abyssal_candidate_accepts_original_hunters_at_any_tier_but_not_alternates() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let operbox = OperBox::from_entries(vec![
             OperBoxEntry {
                 id: "gladiia".into(),
@@ -1568,15 +1755,46 @@ mod tests {
                 potential: 1,
                 rarity: 6,
             },
+            OperBoxEntry {
+                id: "fen".into(),
+                name: "芬".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 3,
+            },
+            OperBoxEntry {
+                id: "kroos".into(),
+                name: "克洛丝".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 3,
+            },
         ]);
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let gamma_h1 = BaseAssignment::default();
+        let blocked_ops = HashSet::new();
 
         let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
             operbox: &operbox,
+            instances: &instances,
+            table: &table,
             blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
-            shared: &BaseAssignment::default(),
-            beta: &BaseAssignment::default(),
-            gamma_h1: &BaseAssignment::default(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
         });
 
         assert!(
@@ -1588,6 +1806,8 @@ mod tests {
     #[test]
     fn abyssal_candidate_requires_all_four_original_hunters() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let operbox = OperBox::from_entries(vec![
             OperBoxEntry {
                 id: "gladiia".into(),
@@ -1635,14 +1855,27 @@ mod tests {
                 rarity: 6,
             },
         ]);
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let gamma_h1 = BaseAssignment::default();
+        let blocked_ops = HashSet::new();
 
         let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
             operbox: &operbox,
+            instances: &instances,
+            table: &table,
             blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
-            shared: &BaseAssignment::default(),
-            beta: &BaseAssignment::default(),
-            gamma_h1: &BaseAssignment::default(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1")],
         });
 
         assert!(
