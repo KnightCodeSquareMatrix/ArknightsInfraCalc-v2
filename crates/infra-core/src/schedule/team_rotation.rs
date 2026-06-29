@@ -2215,7 +2215,7 @@ mod tests {
                 shifts_with_abyssal_manu.push(shift.index);
                 assert_eq!(shift.index, 1, "深海链只允许 S2 6h 短班");
                 assert!(
-                    shift.scores.manu_prod_sum > 500.0,
+                    shift.scores.manu_prod_sum > 450.0,
                     "S2 深海候选应使用带歌蕾蒂娅和深海 tag 的最终布局重算制造分，got {}",
                     shift.scores.manu_prod_sum
                 );

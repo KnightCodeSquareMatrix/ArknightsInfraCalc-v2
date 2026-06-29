@@ -158,7 +158,7 @@
     },
     {
       "id": "pinus_sylvestris",
-      "label": "红松林（公孙）：焰尾+薇薇安娜中枢；manu_1 经验三线；manu_4 砾赤金",
+      "label": "红松林（公孙）：焰尾+薇薇安娜中枢；红松制造干员交由制造搜索分布；manu_4 砾赤金",
       "tier": "cross_station",
       "priority": 19,
       "exclusive_group": "pinus_sylvestris",
@@ -169,16 +169,6 @@
           "operators": [
             { "name": "焰尾", "elite": 2 },
             { "name": "薇薇安娜", "elite": 2 }
-          ]
-        },
-        {
-          "facility": "factory",
-          "room_id": "manu_1",
-          "recipe": "battle_record",
-          "operators": [
-            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
-            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
-            { "pick_one": ["灰毫", "远牙", "野鬃", "食铁兽", "断罪者"], "elite": 2 }
           ]
         },
         {
@@ -193,7 +183,7 @@
     },
     {
       "id": "pinus_sylvestris_battle_manu4",
-      "label": "红松林（公孙）：焰尾+薇薇安娜中枢；manu_4 经验三线；砾赤金按产线匹配",
+      "label": "红松林（公孙）：焰尾+薇薇安娜中枢；红松制造干员交由制造搜索分布；砾赤金按产线匹配",
       "tier": "cross_station",
       "priority": 19,
       "exclusive_group": "pinus_sylvestris",
@@ -204,16 +194,6 @@
           "operators": [
             { "name": "焰尾", "elite": 2 },
             { "name": "薇薇安娜", "elite": 2 }
-          ]
-        },
-        {
-          "facility": "factory",
-          "room_id": "manu_4",
-          "recipe": "battle_record",
-          "operators": [
-            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
-            { "pick_one": ["灰毫", "远牙", "野鬃"], "elite": 2 },
-            { "pick_one": ["灰毫", "远牙", "野鬃", "食铁兽", "断罪者"], "elite": 2 }
           ]
         },
         {

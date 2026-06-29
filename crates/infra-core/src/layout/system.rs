@@ -1349,17 +1349,24 @@ mod tests {
         assert!(control.contains("薇薇安娜"), "control: {:?}", control);
 
         let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
-        assert_eq!(manu_1.len(), 3);
-        assert!(manu_1.iter().any(|o| o.name == "灰毫"));
-        assert!(manu_1.iter().any(|o| o.name == "远牙"));
-        assert!(manu_1.iter().any(|o| o.name == "野鬃"));
-
-        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
         assert!(
-            manu_4.iter().any(|o| o.name == "砾"),
-            "manu_4: {:?}",
-            manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
+            !manu_1.iter().any(|o| ["灰毫", "远牙", "野鬃"].contains(&o.name.as_str())),
+            "红松制造干员不应由 registry 固定同站，交给制造搜索分布: {:?}",
+            manu_1.iter().map(|o| &o.name).collect::<Vec<_>>()
         );
+
+        let gold_room_has_gravel = blueprint.rooms.iter().any(|room| {
+            matches!(
+                room.product,
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Gold
+                })
+            ) && assignment
+                .operators_in(&room.id)
+                .iter()
+                .any(|op| op.name == "砾")
+        });
+        assert!(gold_room_has_gravel, "砾应落在赤金产线");
     }
 
     #[test]
@@ -1409,17 +1416,11 @@ mod tests {
                 .any(|id| id == "pinus_sylvestris_battle_manu4"),
             "manu_4 经验布局应选择红松林变体: {system_ids:?}"
         );
-        assert!(
-            !system_ids.iter().any(|id| id == "standardization_mizuki"),
-            "红松林应先占用 manu_4，标准化组不应反占: {system_ids:?}"
-        );
 
         let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
         assert!(
-            manu_4.iter().any(|o| o.name == "灰毫")
-                && manu_4.iter().any(|o| o.name == "远牙")
-                && manu_4.iter().any(|o| o.name == "野鬃"),
-            "manu_4 应为红松经验线: {:?}",
+            !manu_4.iter().any(|o| ["灰毫", "远牙", "野鬃"].contains(&o.name.as_str())),
+            "红松制造干员不应由 registry 固定到 manu_4: {:?}",
             manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
         );
 
@@ -1481,7 +1482,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_pinus_sylvestris_substitutes_shisibao_when_one_pinus_missing() {
+    fn claim_pinus_sylvestris_does_not_registry_pin_manu_when_one_pinus_missing() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = operbox_without_names(&ideal_e2_operbox(), &["灰毫"]);
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -1501,12 +1502,9 @@ mod tests {
 
         assert!(pinus_claimed(&assignment));
         let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
-        assert_eq!(manu_1.len(), 3);
-        assert!(manu_1.iter().any(|o| o.name == "远牙"));
-        assert!(manu_1.iter().any(|o| o.name == "野鬃"));
         assert!(
-            manu_1.iter().any(|o| o.name == "食铁兽"),
-            "缺 1 红松应食铁兽替补: {:?}",
+            !manu_1.iter().any(|o| ["远牙", "野鬃", "食铁兽"].contains(&o.name.as_str())),
+            "缺 1 红松时 registry 仍不固定制造同站，交给制造搜索分布: {:?}",
             manu_1.iter().map(|o| &o.name).collect::<Vec<_>>()
         );
         assert!(!manu_1.iter().any(|o| o.name == "灰毫"));
@@ -1514,10 +1512,8 @@ mod tests {
 
     #[test]
     fn claim_pinus_robust_when_manu4_gold_teammates_unavailable() {
-        // 回归：manu_4 赤金槽只钉砾（队友由制造贪心补齐），不再 pick_one 迷迭香/阿罗玛/
-        // 断罪者/槐琥。即使这些干员全缺，红松林仍应认领——焰尾/薇薇安娜进中枢、
-        // manu_1 红松三线落位。修复前缺这些队友会使 manu_4 非 optional 槽失败，
-        // 整链 all-or-nothing 被拒，导致中枢无焰尾、水月等低 priority 体系反占。
+        // 回归：manu_4 赤金槽只钉砾（队友由制造贪心补齐），红松制造干员也交回
+        // 制造搜索分布。即使赤金队友全缺，红松林仍应认领焰尾/薇薇安娜中枢。
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox =
             operbox_without_names(&ideal_e2_operbox(), &["迷迭香", "阿罗玛", "断罪者", "槐琥"]);
@@ -1547,19 +1543,23 @@ mod tests {
         );
         let manu_1 = assignment.operators_in(&RoomId::from("manu_1"));
         assert!(
-            manu_1.iter().any(|o| o.name == "灰毫")
-                && manu_1.iter().any(|o| o.name == "远牙")
-                && manu_1.iter().any(|o| o.name == "野鬃"),
-            "manu_1 应为红松三线: {:?}",
+            !manu_1.iter().any(|o| ["灰毫", "远牙", "野鬃"].contains(&o.name.as_str())),
+            "红松制造干员不应由 registry 固定同站: {:?}",
             manu_1.iter().map(|o| &o.name).collect::<Vec<_>>()
         );
         // manu_4 只钉砾，队友交给制造贪心（不再硬编码）。
-        let manu_4 = assignment.operators_in(&RoomId::from("manu_4"));
-        assert!(
-            manu_4.iter().any(|o| o.name == "砾"),
-            "manu_4 应含砾 anchor: {:?}",
-            manu_4.iter().map(|o| &o.name).collect::<Vec<_>>()
-        );
+        let gold_room_has_gravel = blueprint.rooms.iter().any(|room| {
+            matches!(
+                room.product,
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Gold
+                })
+            ) && assignment
+                .operators_in(&room.id)
+                .iter()
+                .any(|op| op.name == "砾")
+        });
+        assert!(gold_room_has_gravel, "砾应落在赤金产线");
     }
 
     #[test]
@@ -1586,7 +1586,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_pinus_sylvestris_skipped_with_only_one_pinus_member() {
+    fn claim_pinus_sylvestris_claims_control_with_only_one_pinus_member() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = operbox_without_names(&ideal_e2_operbox(), &["远牙", "野鬃"]);
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -1604,7 +1604,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!pinus_claimed(&assignment), "仅 1 名红松制造核时不应开启");
+        assert!(
+            pinus_claimed(&assignment),
+            "红松不再要求制造同站，仅 1 名红松制造成员时仍可认领中枢"
+        );
     }
 
     #[test]

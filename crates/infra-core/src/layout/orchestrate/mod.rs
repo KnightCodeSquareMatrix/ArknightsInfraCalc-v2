@@ -60,7 +60,7 @@ mod tests {
         assert!(
             plan.registry_claims
                 .iter()
-                .any(|c| c.system_id == "pinus_sylvestris"),
+                .any(|c| c.system_id.starts_with("pinus_sylvestris")),
             "peak plan 应含红松林: {:?}",
             plan.registry_system_ids()
         );
