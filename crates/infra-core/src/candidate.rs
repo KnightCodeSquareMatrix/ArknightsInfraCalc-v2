@@ -388,6 +388,9 @@ mod tests {
         assert_eq!(candidate.rejection_reason.as_deref(), Some("tier_gate_not_met"));
         assert_eq!(candidate.score.raw_score, 128.0);
         assert_eq!(candidate.score.decision_score, 128.0);
+        let value = serde_json::to_value(&candidate).unwrap();
+        assert_eq!(value["source"], "manual_system_candidate");
+        assert_eq!(value["score"]["raw_score"], value["score"]["decision_score"]);
         assert!(candidate.metadata["linked_producers"]
             .as_array()
             .unwrap()

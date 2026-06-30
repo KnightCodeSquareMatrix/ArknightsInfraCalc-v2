@@ -236,7 +236,7 @@ decision_score = raw_score + soft preferences，用于排序 / 选择
 
 ### 5.4 当前 v0 状态
 
-已引入 shadow `TeamCandidate` / `TeamColumn` 模型，并提供从当前 manufacture / trade search hit 与 manual manufacture system trace 的 adapter。该模型暂不参与默认选择；`decision_score` 暂等于 `raw_score`，不触发 near-optimal preference。
+已引入 shadow `TeamCandidate` / `TeamColumn` 模型，并提供从当前 manufacture / trade search hit 与 manual manufacture system trace 的 adapter。debug JSON 已暴露从 manufacture trace 投影出的 `TeamCandidate` payload；该模型暂不参与默认选择，`decision_score` 暂等于 `raw_score`，不触发 near-optimal preference。
 
 ## 6. Phase C：制造站体系烘焙候选注入
 
@@ -488,7 +488,7 @@ explanation template
 
 ### 10.2 要求
 
-当前已增加最小 debug-only 输出：`infra-cli layout test --debug-manufacture-trace [path]` 会在生成新 assignment 时额外收集制造站 `manual-system-candidate` trace，并输出 `manufacture_trace_debug_v0` JSON；默认推荐路径和普通 `layout test` 输出不变。该输出目前只覆盖 Phase C pilot 的候选来源 / 拒绝原因 / linked producer，不代表完整解释层完成。
+当前已增加最小 debug-only 输出：`infra-cli layout test --debug-manufacture-trace [path]` 会在生成新 assignment 时额外收集制造站 `manual-system-candidate` trace，并输出 `manufacture_trace_debug_v0` JSON；默认推荐路径和普通 `layout test` 输出不变。该输出目前覆盖 Phase C pilot 的候选来源 / 拒绝原因 / linked producer，并额外暴露 shadow `TeamCandidate` 投影，但不代表完整解释层完成。
 
 trace 至少能解释：
 
@@ -566,6 +566,7 @@ trace 至少能解释：
 ### Milestone 3：trace 与解释
 
 - [x] 最小 CLI debug JSON 输出：`layout test --debug-manufacture-trace [path]` 输出 Phase C pilot trace；
+- [x] debug JSON exposes projected `TeamCandidate` payload for manufacture trace pilot；
 - [ ] 候选来源 trace；
 - [ ] best raw alternative trace；
 - [ ] rejected reason trace；

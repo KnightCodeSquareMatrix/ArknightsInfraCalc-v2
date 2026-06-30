@@ -110,6 +110,7 @@ struct ManufactureTraceDebugReport<'a> {
     layout: &'a str,
     operbox: &'a str,
     manufacture_traces: &'a [infra_core::layout::ManufactureSystemCandidateTrace],
+    team_candidates: &'a [infra_core::TeamCandidate],
 }
 
 fn emit_manufacture_trace_debug_report(
@@ -438,11 +439,16 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
         let layout_str = layout_path.to_string_lossy();
         let operbox_str = operbox_path.to_string_lossy();
         let traces = manufacture_trace_report.unwrap_or_default();
+        let team_candidates: Vec<infra_core::TeamCandidate> = traces
+            .iter()
+            .map(infra_core::TeamCandidate::from_manufacture_system_trace)
+            .collect();
         let report = ManufactureTraceDebugReport {
             schema: "manufacture_trace_debug_v0",
             layout: layout_str.as_ref(),
             operbox: operbox_str.as_ref(),
             manufacture_traces: &traces,
+            team_candidates: &team_candidates,
         };
         emit_manufacture_trace_debug_report(path.as_deref(), &report)?;
         if path.is_none() {
