@@ -1,0 +1,45 @@
+{
+  "schema": "feedback_regression_seed_v0",
+  "name": "purestream-weedy-windflit-gold-automation",
+  "source_feedback": "feedback/2026-06-29/010315-推荐调整成清流温蒂冬时-挂钩发电承曦格雷伊-130",
+  "status": "draft",
+  "scope": "manufacture_candidate_selection",
+  "input": {
+    "layout_from_debug_bundle": "feedback/2026-06-29/010315-推荐调整成清流温蒂冬时-挂钩发电承曦格雷伊-130/debug-bundle.json#/layout",
+    "operbox": "feedback/2026-06-29/010315-推荐调整成清流温蒂冬时-挂钩发电承曦格雷伊-130/operbox.json"
+  },
+  "observed": {
+    "room": "manufacture_1",
+    "product": "gold",
+    "operators": ["斑点", "清流", "至简"],
+    "inferred_rule": "急性子/慢性子回退池"
+  },
+  "preferred_patterns": [
+    {
+      "station": "manufacture",
+      "recipe": "gold",
+      "operators": ["清流", "温蒂", "冬时"],
+      "source": "SystemBaked",
+      "system_tags": ["automation_group", "gold_line"],
+      "max_regret": 0.03
+    }
+  ],
+  "linked_producers": [
+    {
+      "station": "power",
+      "operators": ["承曦格雷伊"],
+      "reason": "automation effective power support"
+    }
+  ],
+  "forbidden_patterns": [],
+  "explanation_expectations": [
+    "candidate source is visible",
+    "best raw alternative is visible",
+    "system candidate selected within tolerance or rejected by explicit raw-score gap/operator conflict",
+    "linked power producer is visible when present"
+  ],
+  "notes": [
+    "Draft seed only; it does not drive runtime or tests yet.",
+    "The expected operators come from user feedback note, not from automatic parsing of game text."
+  ]
+}

@@ -10,6 +10,11 @@
 - Manufacture risk rows: 53
 - Cross-facility / global candidate rows: 73
 - High-risk runtime model-gap rows: 144
+- Top-priority manual audit rows: 58
+
+Important caveat: `skill_table_status` is a coarse triage signal, not coverage proof. It matches by runtime facility and Chinese skill name, so name drift, buff-id-only modeling, reused skill names, and multi-operator registry rows can all produce false positives.
+
+Machine-readable full output: `python3 scripts/audit_mechanics_registry.py --json-output target/generated/mechanics_registry_audit_full.json`.
 
 ## Facility Counts
 
@@ -41,18 +46,20 @@ Operator-instance status:
 ## Tag Taxonomy Counts
 
 - `flat_bonus`: 345
-- `threshold`: 343
 - `cap_rule`: 150
-- `negative_effect`: 132
+- `count_based`: 136
 - `special_stacking`: 121
 - `mood_recovery`: 112
 - `mood_consumption`: 96
 - `max_of_same_effect`: 92
 - `conditional_if`: 67
 - `capacity_bonus`: 56
+- `negative_effect`: 53
 - `faction_count_bonus`: 43
 - `global_bonus`: 39
+- `threshold_gate`: 36
 - `resource_token`: 35
+- `ratio_conversion`: 29
 - `pair_synergy`: 27
 - `recipe_specific_bonus`: 25
 - `cross_room_synergy`: 13
@@ -76,182 +83,219 @@ Operator-instance status:
 - `热情值`: 7
 - `特殊`: 5
 
+## Top Priority Manual Audit
+
+Priority favors runtime-scope rows that affect manufacture, carry coupling/global/high-risk tags, have coarse model gaps, and mention recent feedback terms.
+
+| # | score | facility | operator | skill | status | tags | targets | text |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 68 | 16 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | empty_atoms / bound | count_based, cross_room_synergy | manufacture | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
+| 73 | 15 | 控制中枢 | 斩业星熊 | 共事情谊 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect, pair_synergy | manufacture | 当与龙门近卫局干员进驻控制中枢一起工作时，所有制造站生产力+3%（同种效果取最高） |
+| 71 | 15 | 控制中枢 | 望 | 权变 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect, threshold_gate | manufacture, trade | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
+| 72 | 15 | 控制中枢 | 麒麟R夜刀 | 以身作则 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect, pair_synergy | manufacture | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有制造站生产力+2%（同种效果取最高） |
+| 281 | 14 | 制造站 | 清流 | 再生能源 | has_atoms / bound | count_based, cross_room_synergy | trade | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
+| 216 | 14 | 制造站 | 至简 | 绘图设计 | has_atoms / bound | cap_rule, count_based, global_bonus | - | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
+| 214 | 14 | 办公室 | 凯尔希·思衡托 | “泰拉的方舟” | not_found_by_name / not_bound | count_based, flat_bonus, global_bonus, special_stacking | - | 进驻人力办公室时，人脉资源的联络速度+30%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，联络速度额外+4%（最多5间） |
+| 70 | 14 | 控制中枢 | Mon3tr | 最高权限 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect | manufacture | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 69 | 14 | 控制中枢 | 凯尔希 | 最高权限 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect | manufacture | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 311 | 13 | 制造站 | Miss.Christine | 盛餐的回报 | has_atoms / bound | pair_synergy, same_room_synergy | - | 进驻制造站时，当与酒神在同一个制造站时，作战记录类配方的生产力+30% |
+| 309 | 13 | 制造站 | 迷迭香 | 超感 | has_atoms / bound | count_based, ratio_conversion, resource_token, special_stacking | dorm | 进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环 |
+| 278 | 12 | 制造站 | 异客；掠风；森蚺 | 自动化·α | has_atoms / not_bound | count_based | power | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力 |
+| 224 | 12 | 制造站 | 怒潮凛冬 | 情同手足 | not_found_by_name / bound | faction_count_bonus, flat_bonus, pair_synergy, same_room_synergy, special_stacking | - | 进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10% |
+| 279 | 12 | 制造站 | 森蚺；温蒂 | 自动化·β | has_atoms / not_bound | count_based | power | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力 |
+| 314 | 12 | 制造站 | 槐琥 | 配合意识 | empty_atoms / bound | count_based, special_stacking | - | 进驻制造站时，当前制造站内其他干员提供的每5%生产力（不包含根据设施数量提供加成的生产力），额外提供5%生产力，最多提供40%生产力 |
+| 190 | 12 | 办公室 | 絮雨 | 追忆 | not_found_by_name / bound | count_based, negative_effect, ratio_conversion, resource_token, special_stacking | - | 进驻人力办公室时，每1点记忆碎片转化为1点感知信息，心情耗尽时清空所有记忆碎片和自身累积的感知信息 |
+| 74 | 12 | 控制中枢 | 布丁 | 超频 | has_atoms / bound | cap_rule, conditional_if, cross_room_synergy, global_bonus, max_of_same_effect | manufacture, power | 进驻控制中枢时，如果有2台以上作业平台进驻在发电站，则所有制造站生产力+2%（同种效果取最高） |
+| 65 | 12 | 控制中枢 | 森蚺 | 我寻思能行 | has_atoms / bound | conditional_if, cross_room_synergy, special_stacking | power | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
+| 75 | 12 | 控制中枢 | 火龙S黑角 | 秘传交涉术 | has_atoms / bound | cap_rule, global_bonus, max_of_same_effect, pair_synergy | trade | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有贸易站订单效率+7%（同种效果取最高） |
+| 64 | 12 | 控制中枢 | 焰尾 | 红松的骑士 | empty_atoms / bound | count_based, cross_room_synergy, faction_count_bonus, negative_effect | manufacture | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
+| 277 | 11 | 制造站 | 冬时 | 流程优化 | has_atoms / bound | cap_rule, capacity_bonus, count_based | - | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5 |
+| 276 | 11 | 制造站 | 冬时 | 科学改造 | has_atoms / bound | cap_rule, capacity_bonus, count_based | - | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5 |
+| 215 | 11 | 制造站 | 截云 | 古老巫术 | empty_atoms / bound | count_based, ratio_conversion, resource_token, special_stacking | - | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
+| 227 | 11 | 制造站 | 杏仁 | 挑大梁 | empty_atoms / bound | count_based, faction_count_bonus, global_bonus, mood_consumption | - | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
+| 280 | 11 | 制造站 | 温蒂 | 仿生海龙 | has_atoms / bound | count_based | power | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力 |
+| 295 | 11 | 制造站 | 铅踝 | 窗外雪啸 | not_found_by_name / bound | capacity_bonus, conditional_if, threshold_gate | - | 进驻制造站时，当自身心情落差大于12时，生产力+10%，仓库容量+6 |
+| 196 | 11 | 办公室 | 圣聆初雪 | 雪境归心 | not_found_by_name / not_bound | conditional_if, cross_room_synergy, flat_bonus, mood_consumption, special_stacking | control | 进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10% |
+| 426 | 11 | 发电站 | Friston-3 | “愉快的对谈” | has_atoms / bound | conditional_if, cross_room_synergy | control | 进驻发电站时，如果凯尔希进驻在控制中枢，则无人机充能速度+5% |
+| 169 | 11 | 宿舍 | 新约能天使 | 圣城趣事通 | not_found_by_name / bound | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking | - | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是拉特兰干员，则恢复效果额外+0.45 |
+| 18 | 11 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | not_found_by_name / not_bound | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | - | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+
 ## Manufacture Risk Rows
 
 | # | operator | skill | product | tags | risk terms | skill status | text |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 277 | 冬时 | 流程优化 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, threshold | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5 |
-| 276 | 冬时 | 科学改造 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, threshold | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5 |
-| 278 | 异客；掠风；森蚺 | 自动化·α | 赤金；战斗记录；源石 | threshold | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力 |
-| 282 | 引星棘刺 | 原质塑金副产物 | 赤金 | cross_room_synergy, threshold | 每个, 贸易站 | has_atoms | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+3% |
+| 277 | 冬时 | 流程优化 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, count_based | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5 |
+| 276 | 冬时 | 科学改造 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, count_based | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5 |
+| 278 | 异客；掠风；森蚺 | 自动化·α | 赤金；战斗记录；源石 | count_based | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力 |
+| 282 | 引星棘刺 | 原质塑金副产物 | 赤金 | count_based, cross_room_synergy | 每个, 贸易站 | has_atoms | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+3% |
 | 224 | 怒潮凛冬 | 情同手足 | 战斗记录 | faction_count_bonus, flat_bonus, pair_synergy, same_room_synergy, special_stacking | 当与, 额外 | not_found_by_name | 进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10% |
-| 279 | 森蚺；温蒂 | 自动化·β | 赤金；战斗记录；源石 | threshold | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力 |
-| 281 | 清流 | 再生能源 | 赤金 | cross_room_synergy, threshold | 每个, 贸易站 | has_atoms | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
-| 280 | 温蒂 | 仿生海龙 | 赤金；战斗记录；源石 | threshold | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力 |
-| 318 | 溯光星源 | 勘探背包 | 赤金；战斗记录；源石 | cap_rule, threshold | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5的仓库上限容量 |
-| 216 | 至简 | 绘图设计 | - | cap_rule, global_bonus, threshold | 基建内, 上限 | has_atoms | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
-| 258 | Miss.Christine | 午休好去处 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
+| 279 | 森蚺；温蒂 | 自动化·β | 赤金；战斗记录；源石 | count_based | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力 |
+| 281 | 清流 | 再生能源 | 赤金 | count_based, cross_room_synergy | 每个, 贸易站 | has_atoms | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
+| 280 | 温蒂 | 仿生海龙 | 赤金；战斗记录；源石 | count_based | 每个, 发电站 | has_atoms | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力 |
+| 318 | 溯光星源 | 勘探背包 | 赤金；战斗记录；源石 | cap_rule, count_based | 每个, 上限 | has_atoms | 进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5的仓库上限容量 |
+| 216 | 至简 | 绘图设计 | - | cap_rule, count_based, global_bonus | 基建内, 上限 | has_atoms | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
+| 258 | Miss.Christine | 午休好去处 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
 | 311 | Miss.Christine | 盛餐的回报 | 战斗记录 | pair_synergy, same_room_synergy | 当与 | has_atoms | 进驻制造站时，当与酒神在同一个制造站时，作战记录类配方的生产力+30% |
-| 254 | 刻俄柏 | “都想要” | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
+| 254 | 刻俄柏 | “都想要” | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
 | 274 | 卡缇；米格鲁 | 仓库整备·α | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus | 上限 | has_atoms | 进驻制造站时，仓库容量上限+6，生产力+10% |
 | 221 | 卡达 | 剪辑·β | 战斗记录 | cap_rule, capacity_bonus | 上限 | has_atoms | 进驻制造站时，生产作战记录类配方时，仓库容量上限+15 |
-| 262 | 历阵锐枪芬 | 重聚时光 | 赤金；战斗记录；源石 | threshold | 每个 | has_atoms | 进驻制造站时，当前制造站内每个A1小队干员为自身+10%的生产力 |
+| 262 | 历阵锐枪芬 | 重聚时光 | 赤金；战斗记录；源石 | count_based | 每个 | has_atoms | 进驻制造站时，当前制造站内每个A1小队干员为自身+10%的生产力 |
 | 222 | 圣约送葬人 | 合理利用 | 战斗记录 | cap_rule, capacity_bonus | 上限 | has_atoms | 进驻制造站时，生产作战记录类配方时，仓库容量上限+4 |
-| 320 | 多萝西 | 源石技艺理论应用 | 赤金；战斗记录；源石 | threshold | 每个 | has_atoms | 进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5%的生产力 |
-| 257 | 娜仁图亚 | 无畏豪情 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
-| 228 | 娜斯提 | 造价高昂 | 赤金 | faction_count_bonus, global_bonus, threshold | 基建内 | has_atoms | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3% |
-| 250 | 导火索 | 实干的寡言者 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, threshold | 上限 | has_atoms | 进驻制造站时，生产力+20%，每有1瓶乌萨斯特饮，则仓库容量上限+2 |
-| 255 | 帕拉斯 | 智慧之境 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
-| 215 | 截云 | 古老巫术 | - | resource_token, special_stacking, threshold | 人间烟火 | empty_atoms | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
-| 227 | 杏仁 | 挑大梁 | 赤金 | faction_count_bonus, global_bonus, mood_consumption, negative_effect, threshold | 基建内 | empty_atoms | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
-| 314 | 槐琥 | 配合意识 | 赤金；战斗记录；源石 | special_stacking, threshold | 额外 | empty_atoms | 进驻制造站时，当前制造站内其他干员提供的每5%生产力（不包含根据设施数量提供加成的生产力），额外提供5%生产力，最多提供40%生产力 |
-| 319 | 水月 | 意识协议 | 赤金；战斗记录；源石 | threshold | 每个 | has_atoms | 进驻制造站时，当前制造站内每个标准化类技能为自身+5%的生产力 |
-| 266 | 泡普卡 | 麻烦制造者 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25 |
-| 256 | 泡泡 | 囤积者 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
-| 263 | 泰拉大陆调查团 | 可靠的随从们 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, resource_token, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，生产力+5%，同时每有1个木天蓼，则生产力+1% |
-| 260 | 洋灰 | 掘进工程 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
-| 252 | 清道夫 | 拾荒者 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
-| 264 | 火神 | 工匠精神·α | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，生产力-5%，仓库容量上限+16，心情每小时消耗-0.15 |
-| 265 | 火神 | 工匠精神·β | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，生产力-5%，仓库容量上限+19，心情每小时消耗-0.25 |
+| 320 | 多萝西 | 源石技艺理论应用 | 赤金；战斗记录；源石 | count_based | 每个 | has_atoms | 进驻制造站时，当前制造站内每个莱茵科技类技能为自身+5%的生产力 |
+| 257 | 娜仁图亚 | 无畏豪情 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
+| 228 | 娜斯提 | 造价高昂 | 赤金 | count_based, faction_count_bonus, global_bonus | 基建内 | has_atoms | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3% |
+| 250 | 导火索 | 实干的寡言者 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, count_based, flat_bonus, ratio_conversion | 上限 | has_atoms | 进驻制造站时，生产力+20%，每有1瓶乌萨斯特饮，则仓库容量上限+2 |
+| 255 | 帕拉斯 | 智慧之境 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
+| 215 | 截云 | 古老巫术 | - | count_based, ratio_conversion, resource_token, special_stacking | 人间烟火 | empty_atoms | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
+| 227 | 杏仁 | 挑大梁 | 赤金 | count_based, faction_count_bonus, global_bonus, mood_consumption | 基建内 | empty_atoms | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
+| 314 | 槐琥 | 配合意识 | 赤金；战斗记录；源石 | count_based, special_stacking | 额外 | empty_atoms | 进驻制造站时，当前制造站内其他干员提供的每5%生产力（不包含根据设施数量提供加成的生产力），额外提供5%生产力，最多提供40%生产力 |
+| 319 | 水月 | 意识协议 | 赤金；战斗记录；源石 | count_based | 每个 | has_atoms | 进驻制造站时，当前制造站内每个标准化类技能为自身+5%的生产力 |
+| 266 | 泡普卡 | 麻烦制造者 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect | 上限 | has_atoms | 进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25 |
+| 256 | 泡泡 | 囤积者 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
+| 263 | 泰拉大陆调查团 | 可靠的随从们 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, count_based, flat_bonus, ratio_conversion, resource_token | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，生产力+5%，同时每有1个木天蓼，则生产力+1% |
+| 260 | 洋灰 | 掘进工程 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
+| 252 | 清道夫 | 拾荒者 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
+| 264 | 火神 | 工匠精神·α | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect | 上限 | has_atoms | 进驻制造站时，生产力-5%，仓库容量上限+16，心情每小时消耗-0.15 |
+| 265 | 火神 | 工匠精神·β | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect | 上限 | has_atoms | 进驻制造站时，生产力-5%，仓库容量上限+19，心情每小时消耗-0.25 |
 | 249 | 烈夏 | 患难拍档 | 战斗记录 | - | 贸易站 | has_atoms | 进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35% |
-| 259 | 石棉 | 探险者 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+16，心情每小时消耗-0.25 |
-| 267 | 石棉 | 特立独行 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25 |
+| 259 | 石棉 | 探险者 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+16，心情每小时消耗-0.25 |
+| 267 | 石棉 | 特立独行 | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus, mood_consumption, negative_effect | 上限 | has_atoms | 进驻制造站时，生产力+25%，仓库容量上限-12，心情每小时消耗+0.25 |
 | 220 | 稀音 | 剪辑·α | 战斗记录 | cap_rule, capacity_bonus | 上限 | has_atoms | 进驻制造站时，生产作战记录类配方时，仓库容量上限+12 |
-| 251 | 红云 | 拾荒者 | - | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
-| 321 | 苍苔 | 打工心得 | 赤金；战斗记录；源石 | threshold | 每个 | has_atoms | 进驻制造站时，当前制造站内每个金属工艺类技能为自身+5%的生产力 |
+| 251 | 红云 | 拾荒者 | - | cap_rule, capacity_bonus, mood_consumption | 上限 | has_atoms | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
+| 321 | 苍苔 | 打工心得 | 赤金；战斗记录；源石 | count_based | 每个 | has_atoms | 进驻制造站时，当前制造站内每个金属工艺类技能为自身+5%的生产力 |
 | 275 | 蛇屠箱；黑角 | 仓库整备·β | 赤金；战斗记录；源石 | cap_rule, capacity_bonus, flat_bonus | 上限 | has_atoms | 进驻制造站时，仓库容量上限+10，生产力+10% |
 
 ## Cross-Facility / Global Candidate Rows
 
+| # | source | targets | operator | skill | tags | risk terms | text |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 控制中枢 | manufacture | 涤火杰西卡 | 老友相聚 | count_based, cross_room_synergy, faction_count_bonus, mood_consumption, negative_effect | 每个, 制造站 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个进驻在制造站的黑钢国际干员，生产力+5% |
+| 8 | 控制中枢 | - | 令 | “山河远阔” | conditional_if, resource_token, threshold_gate | 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
+| 9 | 控制中枢 | dorm | 三角初华 | 偶像光环 | count_based, resource_token | 热情值 | 进驻控制中枢时，宿舍内每有1名干员，热情值+1 |
+| 16 | 控制中枢 | - | 八幡海铃 | 可靠伙伴 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 热情值 | 进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高） |
+| 18 | 控制中枢 | - | 摆渡人 | 英雄的骄傲·α | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 19 | 控制中枢 | - | 摆渡人 | 英雄的骄傲·β | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 23 | 控制中枢 | - | 祐天寺若麦 | 勤学苦练 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 热情值 | 进驻控制中枢时，热情值+10；会客室线索搜集速度提升+5%（同种效果取最高） |
+| 26 | 控制中枢 | - | 歌蕾蒂娅 | 集群狩猎·α | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 27 | 控制中枢 | - | 歌蕾蒂娅 | 集群狩猎·β | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 28 | 控制中枢 | trade | 若叶睦 | 演技的怪物 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, resource_token | 同种效果取最高, 贸易站, 热情值 | 进驻控制中枢时，热情值+20；每有8点热情值，自身心情每小时消耗+0.01，所有贸易站订单效率+1%（同种效果取最高） |
+| 29 | 控制中枢 | - | 火龙S黑角 | 团队合作 | count_based, ratio_conversion, resource_token | - | 进驻控制中枢时，控制中枢内每有1名怪物猎人小队干员，则木天蓼+2 |
+| 32 | 控制中枢 | - | 重岳 | 孤光共照 | count_based, mood_recovery, ratio_conversion, resource_token, special_stacking, threshold_gate | 额外, 特殊, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
+| 33 | 控制中枢 | - | 夕 | "不以物喜" | conditional_if, mood_recovery, resource_token, threshold_gate | 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
+| 34 | 控制中枢 | - | 夕 | "不以己悲" | conditional_if, mood_consumption, negative_effect, resource_token, threshold_gate | 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
+| 35 | 控制中枢 | - | 麒麟R夜刀 | 耐力回复 | mood_consumption, negative_effect, resource_token | - | 进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8 |
+| 36 | 控制中枢 | - | 丰川祥子 | 生活的重压 | mood_consumption, negative_effect, resource_token, threshold_gate | 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
+| 37 | 控制中枢 | dorm | 重岳 | 知我为我 | count_based, mood_consumption, negative_effect, resource_token | 每个, 人间烟火 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个岁干员进驻在宿舍和活动室以外的设施则人间烟火+5（最多5名） |
+| 64 | 控制中枢 | manufacture | 焰尾 | 红松的骑士 | count_based, cross_room_synergy, faction_count_bonus, negative_effect | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
+| 65 | 控制中枢 | power | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, special_stacking | 如果, 额外, 发电站 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
+| 66 | 控制中枢 | manufacture | 丰川祥子 | 丰富工作经验 | count_based, resource_token | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+0.5%，每有20点热情值，所有生产贵金属类配方的制造站生产力+0.5% |
+| 67 | 控制中枢 | manufacture | 丰川祥子 | 丰富工作经验 | count_based, resource_token | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+1%，每有20点热情值，所有生产贵金属类配方的制造站生产力+1% |
+| 68 | 控制中枢 | manufacture | 薇薇安娜 | 烛骑士微光 | count_based, cross_room_synergy | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
+| 69 | 控制中枢 | manufacture | 凯尔希 | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 70 | 控制中枢 | manufacture | Mon3tr | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 71 | 控制中枢 | manufacture, trade | 望 | 权变 | cap_rule, global_bonus, max_of_same_effect, threshold_gate | 同种效果取最高, 制造站, 贸易站 | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
+| 72 | 控制中枢 | manufacture | 麒麟R夜刀 | 以身作则 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有制造站生产力+2%（同种效果取最高） |
+| 73 | 控制中枢 | manufacture | 斩业星熊 | 共事情谊 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与龙门近卫局干员进驻控制中枢一起工作时，所有制造站生产力+3%（同种效果取最高） |
+| 74 | 控制中枢 | manufacture, power | 布丁 | 超频 | cap_rule, conditional_if, cross_room_synergy, global_bonus, max_of_same_effect | 如果, 同种效果取最高, 制造站, 发电站 | 进驻控制中枢时，如果有2台以上作业平台进驻在发电站，则所有制造站生产力+2%（同种效果取最高） |
+| 75 | 控制中枢 | trade | 火龙S黑角 | 秘传交涉术 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 贸易站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有贸易站订单效率+7%（同种效果取最高） |
+| 76 | 控制中枢 | trade | 八幡海铃 | 家族认可 | count_based, cross_room_synergy, faction_count_bonus | 每个, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的叙拉古干员，订单获取效率+5% |
+| 78 | 控制中枢 | trade | 灵知 | 精密计算 | cap_rule, capacity_bonus, count_based, cross_room_synergy, negative_effect | 每个, 上限, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的谢拉格干员，订单获取效率-15%，订单上限+6 |
+| 80 | 控制中枢 | trade | 阿米娅 | 合作协议 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
+| 81 | 控制中枢 | trade | 诗怀雅 | 大小姐 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
+| 82 | 控制中枢 | trade | 明椒 | 朝气蓬勃 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
+| 83 | 控制中枢 | trade | 阿斯卡纶 | 情报主脑 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
+| 98 | 宿舍 | - | 余 | 调众口 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 109 | 宿舍 | - | 纯烬艾雅法拉 | 火山温泉浴 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 133 | 宿舍 | - | 森西 | 森西大食堂 | resource_token | - | 进驻宿舍时，当前宿舍每级提供1层魔物料理 |
+| 134 | 宿舍 | - | 爱丽丝 | 梦境呓语 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻宿舍时，每1层梦境转化为1点感知信息 |
+| 135 | 宿舍 | - | 车尔尼 | 琴键漫步 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻宿舍时，每1个小节转化为1点感知信息 |
+| 190 | 办公室 | - | 絮雨 | 追忆 | count_based, negative_effect, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻人力办公室时，每1点记忆碎片转化为1点感知信息，心情耗尽时清空所有记忆碎片和自身累积的感知信息 |
+| 192 | 办公室 | - | 桑葚 | 救援队·灾后普查 | count_based, resource_token | 每个, 人间烟火 | 进驻人力办公室时，每个招募位（不包含初始招募位）+10点人间烟火 |
+| 196 | 办公室 | control | 圣聆初雪 | 雪境归心 | conditional_if, cross_room_synergy, flat_bonus, mood_consumption, special_stacking | 如果, 额外, 控制中枢 | 进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10% |
+| 214 | 办公室 | - | 凯尔希·思衡托 | “泰拉的方舟” | count_based, flat_bonus, global_bonus, special_stacking | 基建内, 额外 | 进驻人力办公室时，人脉资源的联络速度+30%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，联络速度额外+4%（最多5间） |
+| 215 | 制造站 | - | 截云 | 古老巫术 | count_based, ratio_conversion, resource_token, special_stacking | 人间烟火 | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
+| 216 | 制造站 | - | 至简 | 绘图设计 | cap_rule, count_based, global_bonus | 基建内, 上限 | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
+| 227 | 制造站 | - | 杏仁 | 挑大梁 | count_based, faction_count_bonus, global_bonus, mood_consumption | 基建内 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
+| 228 | 制造站 | - | 娜斯提 | 造价高昂 | count_based, faction_count_bonus, global_bonus | 基建内 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3% |
+| 263 | 制造站 | - | 泰拉大陆调查团 | 可靠的随从们 | cap_rule, capacity_bonus, count_based, flat_bonus, ratio_conversion, resource_token | 上限 | 进驻制造站时，仓库容量上限+8，生产力+5%，同时每有1个木天蓼，则生产力+1% |
+| 281 | 制造站 | trade | 清流 | 再生能源 | count_based, cross_room_synergy | 每个, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
+| 282 | 制造站 | trade | 引星棘刺 | 原质塑金副产物 | count_based, cross_room_synergy | 每个, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+3% |
+| 305 | 制造站 | - | 截云 | 逐水草 | count_based, resource_token | - | 进驻制造站时，每1点巫术结晶+1%生产力 |
+| 306 | 制造站 | - | 截云 | 问枯荣 | count_based, resource_token | - | 进驻制造站时，每1点巫术结晶+2%生产力 |
+| 307 | 制造站 | - | 黍 | 稻禾厚，顺秋收 | count_based, resource_token | 人间烟火 | 进驻制造站时，每3点人间烟火+1%生产力 |
+| 308 | 制造站 | - | 玛露西尔 | 意想不到的美味 | count_based, resource_token | - | 进驻制造站时，每1点魔物料理+1%生产力 |
+| 309 | 制造站 | dorm | 迷迭香 | 超感 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环 |
+| 394 | 发电站 | - | 缪尔赛思 | 生态科主任 | count_based, faction_count_bonus, flat_bonus, global_bonus, special_stacking | 基建内, 额外 | 进驻发电站时，无人机充能速度+10%，基建内（不包含副手及活动室使用者）每有1名除自身以外的莱茵生命干员（最多5名），充能速度额外+3% |
+| 426 | 发电站 | control | Friston-3 | “愉快的对谈” | conditional_if, cross_room_synergy | 如果, 控制中枢 | 进驻发电站时，如果凯尔希进驻在控制中枢，则无人机充能速度+5% |
+| 428 | 发电站 | - | CONFESS-47 | 维护中 | conditional_if, cross_room_synergy | 如果 | 进驻发电站时，如果其他拉特兰干员进驻在发电站，则无人机充能速度+5% |
+| 429 | 发电站 | - | GALLUS² | 鸡励机制 | conditional_if, cross_room_synergy | 如果 | 进驻发电站时，如果其他作业平台进驻在发电站，则无人机充能速度+5% |
+
+## System Candidate Discovery
+
+Rows below are candidates for human review only. They are selected by coupling tags, high-risk terms, and system/feedback terms loaded from data, not a hand-maintained operator list.
+
 | # | facility | operator | skill | tags | risk terms | text |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2 | 控制中枢 | 涤火杰西卡 | 老友相聚 | cross_room_synergy, faction_count_bonus, mood_consumption, negative_effect, threshold | 每个, 制造站 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个进驻在制造站的黑钢国际干员，生产力+5% |
-| 8 | 控制中枢 | 令 | “山河远阔” | conditional_if, resource_token, threshold | 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
-| 9 | 控制中枢 | 三角初华 | 偶像光环 | resource_token, threshold | 热情值 | 进驻控制中枢时，宿舍内每有1名干员，热情值+1 |
+| 1 | 控制中枢 | 老鲤 | 浮生得闲 | mood_recovery, pair_synergy | 当与 | 当与阿进驻控制中枢一起工作时，控制中枢内所有干员心情每小时恢复+0.25 |
+| 2 | 控制中枢 | 涤火杰西卡 | 老友相聚 | count_based, cross_room_synergy, faction_count_bonus, mood_consumption, negative_effect | 每个, 制造站 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个进驻在制造站的黑钢国际干员，生产力+5% |
+| 8 | 控制中枢 | 令 | “山河远阔” | conditional_if, resource_token, threshold_gate | 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
+| 9 | 控制中枢 | 三角初华 | 偶像光环 | count_based, resource_token | 热情值 | 进驻控制中枢时，宿舍内每有1名干员，热情值+1 |
+| 10 | 控制中枢 | 三角初华 | 羁绊相生 | cap_rule, max_of_same_effect, mood_recovery, pair_synergy | 当与, 同种效果取最高 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）；当与丰川祥子一起进驻控制中枢时，丰川祥子的心情每小时恢复+0.1 |
 | 16 | 控制中枢 | 八幡海铃 | 可靠伙伴 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 热情值 | 进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高） |
-| 18 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
-| 19 | 控制中枢 | 摆渡人 | 英雄的骄傲·β | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 18 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 19 | 控制中枢 | 摆渡人 | 英雄的骄傲·β | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
 | 23 | 控制中枢 | 祐天寺若麦 | 勤学苦练 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 热情值 | 进驻控制中枢时，热情值+10；会客室线索搜集速度提升+5%（同种效果取最高） |
-| 26 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·α | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 27 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·β | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 28 | 控制中枢 | 若叶睦 | 演技的怪物 | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, resource_token, threshold | 同种效果取最高, 贸易站, 热情值 | 进驻控制中枢时，热情值+20；每有8点热情值，自身心情每小时消耗+0.01，所有贸易站订单效率+1%（同种效果取最高） |
-| 29 | 控制中枢 | 火龙S黑角 | 团队合作 | resource_token, threshold | - | 进驻控制中枢时，控制中枢内每有1名怪物猎人小队干员，则木天蓼+2 |
-| 32 | 控制中枢 | 重岳 | 孤光共照 | mood_recovery, resource_token, special_stacking, threshold | 额外, 特殊, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
-| 33 | 控制中枢 | 夕 | "不以物喜" | conditional_if, mood_recovery, resource_token, threshold | 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
-| 34 | 控制中枢 | 夕 | "不以己悲" | conditional_if, mood_consumption, negative_effect, resource_token, threshold | 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
-| 35 | 控制中枢 | 麒麟R夜刀 | 耐力回复 | mood_consumption, negative_effect, resource_token, threshold | - | 进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8 |
-| 36 | 控制中枢 | 丰川祥子 | 生活的重压 | mood_consumption, negative_effect, resource_token, threshold | 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
-| 37 | 控制中枢 | 重岳 | 知我为我 | mood_consumption, negative_effect, resource_token, threshold | 每个, 人间烟火 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个岁干员进驻在宿舍和活动室以外的设施则人间烟火+5（最多5名） |
-| 64 | 控制中枢 | 焰尾 | 红松的骑士 | cross_room_synergy, faction_count_bonus, negative_effect, threshold | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
-| 65 | 控制中枢 | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, negative_effect, special_stacking | 如果, 额外, 发电站 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
-| 66 | 控制中枢 | 丰川祥子 | 丰富工作经验 | resource_token, threshold | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+0.5%，每有20点热情值，所有生产贵金属类配方的制造站生产力+0.5% |
-| 67 | 控制中枢 | 丰川祥子 | 丰富工作经验 | resource_token, threshold | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+1%，每有20点热情值，所有生产贵金属类配方的制造站生产力+1% |
-| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | cross_room_synergy, threshold | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
+| 24 | 控制中枢 | 祐天寺若麦 | 成效优先 | cap_rule, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, special_stacking | 当与, 额外, 同种效果取最高 | 当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高） |
+| 25 | 控制中枢 | 歌蕾蒂娅 | 潮汐守望 | conditional_if, count_based, faction_count_bonus, mood_consumption, mood_recovery, negative_effect, ratio_conversion, special_stacking | 如果, 额外 | 进驻控制中枢时，每有1个深海猎人干员进驻在宿舍以外的设施，则自身心情每小时消耗+0.5；反之则自身心情每小时恢复+0.5，如果进驻在宿舍内的深海猎人干员为满心情，则额外+0.5 |
+| 26 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·α | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 27 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·β | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 28 | 控制中枢 | 若叶睦 | 演技的怪物 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, resource_token | 同种效果取最高, 贸易站, 热情值 | 进驻控制中枢时，热情值+20；每有8点热情值，自身心情每小时消耗+0.01，所有贸易站订单效率+1%（同种效果取最高） |
+| 29 | 控制中枢 | 火龙S黑角 | 团队合作 | count_based, ratio_conversion, resource_token | - | 进驻控制中枢时，控制中枢内每有1名怪物猎人小队干员，则木天蓼+2 |
+| 32 | 控制中枢 | 重岳 | 孤光共照 | count_based, mood_recovery, ratio_conversion, resource_token, special_stacking, threshold_gate | 额外, 特殊, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
+| 33 | 控制中枢 | 夕 | "不以物喜" | conditional_if, mood_recovery, resource_token, threshold_gate | 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
+| 34 | 控制中枢 | 夕 | "不以己悲" | conditional_if, mood_consumption, negative_effect, resource_token, threshold_gate | 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
+| 35 | 控制中枢 | 麒麟R夜刀 | 耐力回复 | mood_consumption, negative_effect, resource_token | - | 进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8 |
+| 36 | 控制中枢 | 丰川祥子 | 生活的重压 | mood_consumption, negative_effect, resource_token, threshold_gate | 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
+| 37 | 控制中枢 | 重岳 | 知我为我 | count_based, mood_consumption, negative_effect, resource_token | 每个, 人间烟火 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个岁干员进驻在宿舍和活动室以外的设施则人间烟火+5（最多5名） |
+| 39 | 控制中枢 | 陈 | 德才兼备 | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个龙门近卫局干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 51 | 控制中枢 | 焰尾 | 小小的领袖 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 54 | 控制中枢 | 薇薇安娜 | 金盏花诗会 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 56 | 控制中枢 | Mon3tr | 博识生手 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 58 | 控制中枢 | 可露希尔 | 总工程师 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 59 | 控制中枢 | 魔王 | 魔王传承 | mood_recovery, pair_synergy | 当与 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.05 |
+| 60 | 控制中枢 | 魔王 | “未完的故事” | mood_recovery, pair_synergy | 当与 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.1 |
+| 61 | 控制中枢 | 若叶睦 | 互为半身 | pair_synergy | 当与 | 当与丰川祥子一起进驻控制中枢时，消除自身心情消耗的影响 |
+| 64 | 控制中枢 | 焰尾 | 红松的骑士 | count_based, cross_room_synergy, faction_count_bonus, negative_effect | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
+| 65 | 控制中枢 | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, special_stacking | 如果, 额外, 发电站 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
+| 66 | 控制中枢 | 丰川祥子 | 丰富工作经验 | count_based, resource_token | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+0.5%，每有20点热情值，所有生产贵金属类配方的制造站生产力+0.5% |
+| 67 | 控制中枢 | 丰川祥子 | 丰富工作经验 | count_based, resource_token | 制造站, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+1%，每有20点热情值，所有生产贵金属类配方的制造站生产力+1% |
+| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | count_based, cross_room_synergy | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
 | 69 | 控制中枢 | 凯尔希 | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
 | 70 | 控制中枢 | Mon3tr | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
-| 71 | 控制中枢 | 望 | 权变 | cap_rule, global_bonus, max_of_same_effect, threshold | 同种效果取最高, 制造站, 贸易站 | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
+| 71 | 控制中枢 | 望 | 权变 | cap_rule, global_bonus, max_of_same_effect, threshold_gate | 同种效果取最高, 制造站, 贸易站 | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
 | 72 | 控制中枢 | 麒麟R夜刀 | 以身作则 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有制造站生产力+2%（同种效果取最高） |
 | 73 | 控制中枢 | 斩业星熊 | 共事情谊 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与龙门近卫局干员进驻控制中枢一起工作时，所有制造站生产力+3%（同种效果取最高） |
 | 74 | 控制中枢 | 布丁 | 超频 | cap_rule, conditional_if, cross_room_synergy, global_bonus, max_of_same_effect | 如果, 同种效果取最高, 制造站, 发电站 | 进驻控制中枢时，如果有2台以上作业平台进驻在发电站，则所有制造站生产力+2%（同种效果取最高） |
 | 75 | 控制中枢 | 火龙S黑角 | 秘传交涉术 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 贸易站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有贸易站订单效率+7%（同种效果取最高） |
-| 76 | 控制中枢 | 八幡海铃 | 家族认可 | cross_room_synergy, faction_count_bonus, threshold | 每个, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的叙拉古干员，订单获取效率+5% |
-| 78 | 控制中枢 | 灵知 | 精密计算 | cap_rule, capacity_bonus, cross_room_synergy, negative_effect, threshold | 每个, 上限, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的谢拉格干员，订单获取效率-15%，订单上限+6 |
+| 76 | 控制中枢 | 八幡海铃 | 家族认可 | count_based, cross_room_synergy, faction_count_bonus | 每个, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的叙拉古干员，订单获取效率+5% |
+| 78 | 控制中枢 | 灵知 | 精密计算 | cap_rule, capacity_bonus, count_based, cross_room_synergy, negative_effect | 每个, 上限, 贸易站 | 进驻控制中枢时，每个进驻在贸易站的谢拉格干员，订单获取效率-15%，订单上限+6 |
+| 79 | 控制中枢 | 戴菲恩 | 运筹好手 | count_based, faction_count_bonus, same_room_synergy | 贸易站 | 进驻控制中枢时，同一贸易站中，每有1名格拉斯哥帮干员，订单获取效率+10% |
 | 80 | 控制中枢 | 阿米娅 | 合作协议 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
 | 81 | 控制中枢 | 诗怀雅 | 大小姐 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
 | 82 | 控制中枢 | 明椒 | 朝气蓬勃 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
 | 83 | 控制中枢 | 阿斯卡纶 | 情报主脑 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
-| 98 | 宿舍 | 余 | 调众口 | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 109 | 宿舍 | 纯烬艾雅法拉 | 火山温泉浴 | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 133 | 宿舍 | 森西 | 森西大食堂 | resource_token, threshold | - | 进驻宿舍时，当前宿舍每级提供1层魔物料理 |
-| 134 | 宿舍 | 爱丽丝 | 梦境呓语 | resource_token, special_stacking, threshold | 感知信息 | 进驻宿舍时，每1层梦境转化为1点感知信息 |
-| 135 | 宿舍 | 车尔尼 | 琴键漫步 | resource_token, special_stacking, threshold | 感知信息 | 进驻宿舍时，每1个小节转化为1点感知信息 |
-| 190 | 办公室 | 絮雨 | 追忆 | negative_effect, resource_token, special_stacking, threshold | 感知信息 | 进驻人力办公室时，每1点记忆碎片转化为1点感知信息，心情耗尽时清空所有记忆碎片和自身累积的感知信息 |
-| 192 | 办公室 | 桑葚 | 救援队·灾后普查 | resource_token, threshold | 每个, 人间烟火 | 进驻人力办公室时，每个招募位（不包含初始招募位）+10点人间烟火 |
-| 196 | 办公室 | 圣聆初雪 | 雪境归心 | conditional_if, cross_room_synergy, flat_bonus, mood_consumption, negative_effect, special_stacking, threshold | 如果, 额外, 控制中枢 | 进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10% |
-| 214 | 办公室 | 凯尔希·思衡托 | “泰拉的方舟” | flat_bonus, global_bonus, special_stacking, threshold | 基建内, 额外 | 进驻人力办公室时，人脉资源的联络速度+30%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，联络速度额外+4%（最多5间） |
-| 215 | 制造站 | 截云 | 古老巫术 | resource_token, special_stacking, threshold | 人间烟火 | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
-| 216 | 制造站 | 至简 | 绘图设计 | cap_rule, global_bonus, threshold | 基建内, 上限 | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
-| 227 | 制造站 | 杏仁 | 挑大梁 | faction_count_bonus, global_bonus, mood_consumption, negative_effect, threshold | 基建内 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
-| 228 | 制造站 | 娜斯提 | 造价高昂 | faction_count_bonus, global_bonus, threshold | 基建内 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3% |
-| 263 | 制造站 | 泰拉大陆调查团 | 可靠的随从们 | cap_rule, capacity_bonus, flat_bonus, resource_token, threshold | 上限 | 进驻制造站时，仓库容量上限+8，生产力+5%，同时每有1个木天蓼，则生产力+1% |
-| 281 | 制造站 | 清流 | 再生能源 | cross_room_synergy, threshold | 每个, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
-| 282 | 制造站 | 引星棘刺 | 原质塑金副产物 | cross_room_synergy, threshold | 每个, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+3% |
-| 305 | 制造站 | 截云 | 逐水草 | resource_token, threshold | - | 进驻制造站时，每1点巫术结晶+1%生产力 |
-| 306 | 制造站 | 截云 | 问枯荣 | resource_token, threshold | - | 进驻制造站时，每1点巫术结晶+2%生产力 |
-| 307 | 制造站 | 黍 | 稻禾厚，顺秋收 | resource_token, threshold | 人间烟火 | 进驻制造站时，每3点人间烟火+1%生产力 |
-| 308 | 制造站 | 玛露西尔 | 意想不到的美味 | resource_token, threshold | - | 进驻制造站时，每1点魔物料理+1%生产力 |
-| 309 | 制造站 | 迷迭香 | 超感 | resource_token, special_stacking, threshold | 感知信息 | 进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环 |
-| 394 | 发电站 | 缪尔赛思 | 生态科主任 | faction_count_bonus, flat_bonus, global_bonus, special_stacking, threshold | 基建内, 额外 | 进驻发电站时，无人机充能速度+10%，基建内（不包含副手及活动室使用者）每有1名除自身以外的莱茵生命干员（最多5名），充能速度额外+3% |
-| 426 | 发电站 | Friston-3 | “愉快的对谈” | conditional_if, cross_room_synergy | 如果, 控制中枢 | 进驻发电站时，如果凯尔希进驻在控制中枢，则无人机充能速度+5% |
-| 428 | 发电站 | CONFESS-47 | 维护中 | conditional_if, cross_room_synergy | 如果 | 进驻发电站时，如果其他拉特兰干员进驻在发电站，则无人机充能速度+5% |
-| 429 | 发电站 | GALLUS² | 鸡励机制 | conditional_if, cross_room_synergy | 如果 | 进驻发电站时，如果其他作业平台进驻在发电站，则无人机充能速度+5% |
-
-## System Candidate Discovery
-
-Rows below are candidates for human review only. They are selected by coupling tags, high-risk terms, and known system/operator names.
-
-| # | facility | operator | skill | tags | risk terms | text |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | 控制中枢 | 老鲤 | 浮生得闲 | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿进驻控制中枢一起工作时，控制中枢内所有干员心情每小时恢复+0.25 |
-| 2 | 控制中枢 | 涤火杰西卡 | 老友相聚 | cross_room_synergy, faction_count_bonus, mood_consumption, negative_effect, threshold | 每个, 制造站, 控制中枢 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个进驻在制造站的黑钢国际干员，生产力+5% |
-| 8 | 控制中枢 | 令 | “山河远阔” | conditional_if, resource_token, threshold | 控制中枢, 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
-| 9 | 控制中枢 | 三角初华 | 偶像光环 | resource_token, threshold | 控制中枢, 热情值 | 进驻控制中枢时，宿舍内每有1名干员，热情值+1 |
-| 10 | 控制中枢 | 三角初华 | 羁绊相生 | cap_rule, max_of_same_effect, mood_recovery, pair_synergy, threshold | 当与, 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）；当与丰川祥子一起进驻控制中枢时，丰川祥子的心情每小时恢复+0.1 |
-| 16 | 控制中枢 | 八幡海铃 | 可靠伙伴 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 控制中枢, 热情值 | 进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高） |
-| 18 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高, 控制中枢 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
-| 19 | 控制中枢 | 摆渡人 | 英雄的骄傲·β | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高, 控制中枢 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
-| 23 | 控制中枢 | 祐天寺若麦 | 勤学苦练 | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 控制中枢, 热情值 | 进驻控制中枢时，热情值+10；会客室线索搜集速度提升+5%（同种效果取最高） |
-| 24 | 控制中枢 | 祐天寺若麦 | 成效优先 | cap_rule, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, special_stacking, threshold | 当与, 额外, 同种效果取最高, 控制中枢 | 当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高） |
-| 26 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·α | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊, 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 27 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·β | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊, 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 28 | 控制中枢 | 若叶睦 | 演技的怪物 | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, resource_token, threshold | 同种效果取最高, 贸易站, 控制中枢, 热情值 | 进驻控制中枢时，热情值+20；每有8点热情值，自身心情每小时消耗+0.01，所有贸易站订单效率+1%（同种效果取最高） |
-| 29 | 控制中枢 | 火龙S黑角 | 团队合作 | resource_token, threshold | 控制中枢 | 进驻控制中枢时，控制中枢内每有1名怪物猎人小队干员，则木天蓼+2 |
-| 32 | 控制中枢 | 重岳 | 孤光共照 | mood_recovery, resource_token, special_stacking, threshold | 额外, 特殊, 控制中枢, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
-| 33 | 控制中枢 | 夕 | "不以物喜" | conditional_if, mood_recovery, resource_token, threshold | 控制中枢, 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
-| 34 | 控制中枢 | 夕 | "不以己悲" | conditional_if, mood_consumption, negative_effect, resource_token, threshold | 控制中枢, 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
-| 35 | 控制中枢 | 麒麟R夜刀 | 耐力回复 | mood_consumption, negative_effect, resource_token, threshold | 控制中枢 | 进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8 |
-| 36 | 控制中枢 | 丰川祥子 | 生活的重压 | mood_consumption, negative_effect, resource_token, threshold | 控制中枢, 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
-| 37 | 控制中枢 | 重岳 | 知我为我 | mood_consumption, negative_effect, resource_token, threshold | 每个, 控制中枢, 人间烟火 | 进驻控制中枢时，自身心情每小时消耗+0.5；每个岁干员进驻在宿舍和活动室以外的设施则人间烟火+5（最多5名） |
-| 58 | 控制中枢 | 可露希尔 | 总工程师 | mood_recovery, threshold | 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
-| 59 | 控制中枢 | 魔王 | 魔王传承 | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.05 |
-| 60 | 控制中枢 | 魔王 | “未完的故事” | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.1 |
-| 61 | 控制中枢 | 若叶睦 | 互为半身 | pair_synergy | 当与, 控制中枢 | 当与丰川祥子一起进驻控制中枢时，消除自身心情消耗的影响 |
-| 64 | 控制中枢 | 焰尾 | 红松的骑士 | cross_room_synergy, faction_count_bonus, negative_effect, threshold | 每个, 制造站, 控制中枢 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
-| 65 | 控制中枢 | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, negative_effect, special_stacking | 如果, 额外, 发电站, 控制中枢 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
-| 66 | 控制中枢 | 丰川祥子 | 丰富工作经验 | resource_token, threshold | 制造站, 控制中枢, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+0.5%，每有20点热情值，所有生产贵金属类配方的制造站生产力+0.5% |
-| 67 | 控制中枢 | 丰川祥子 | 丰富工作经验 | resource_token, threshold | 制造站, 控制中枢, 热情值 | 进驻控制中枢时，所有生产贵金属类配方的制造站生产力+1%，每有20点热情值，所有生产贵金属类配方的制造站生产力+1% |
-| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | cross_room_synergy, threshold | 每个, 制造站, 控制中枢 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
-| 69 | 控制中枢 | 凯尔希 | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站, 控制中枢 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
-| 70 | 控制中枢 | Mon3tr | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站, 控制中枢 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
-| 71 | 控制中枢 | 望 | 权变 | cap_rule, global_bonus, max_of_same_effect, threshold | 同种效果取最高, 制造站, 贸易站, 控制中枢 | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
-| 72 | 控制中枢 | 麒麟R夜刀 | 以身作则 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站, 控制中枢 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有制造站生产力+2%（同种效果取最高） |
-| 73 | 控制中枢 | 斩业星熊 | 共事情谊 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站, 控制中枢 | 当与龙门近卫局干员进驻控制中枢一起工作时，所有制造站生产力+3%（同种效果取最高） |
-| 74 | 控制中枢 | 布丁 | 超频 | cap_rule, conditional_if, cross_room_synergy, global_bonus, max_of_same_effect | 如果, 同种效果取最高, 制造站, 发电站, 控制中枢 | 进驻控制中枢时，如果有2台以上作业平台进驻在发电站，则所有制造站生产力+2%（同种效果取最高） |
-| 75 | 控制中枢 | 火龙S黑角 | 秘传交涉术 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 贸易站, 控制中枢 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有贸易站订单效率+7%（同种效果取最高） |
-| 76 | 控制中枢 | 八幡海铃 | 家族认可 | cross_room_synergy, faction_count_bonus, threshold | 每个, 贸易站, 控制中枢 | 进驻控制中枢时，每个进驻在贸易站的叙拉古干员，订单获取效率+5% |
-| 78 | 控制中枢 | 灵知 | 精密计算 | cap_rule, capacity_bonus, cross_room_synergy, negative_effect, threshold | 每个, 上限, 贸易站, 控制中枢 | 进驻控制中枢时，每个进驻在贸易站的谢拉格干员，订单获取效率-15%，订单上限+6 |
-| 79 | 控制中枢 | 戴菲恩 | 运筹好手 | faction_count_bonus, same_room_synergy, threshold | 贸易站, 控制中枢 | 进驻控制中枢时，同一贸易站中，每有1名格拉斯哥帮干员，订单获取效率+10% |
-| 80 | 控制中枢 | 阿米娅 | 合作协议 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站, 控制中枢 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
-| 81 | 控制中枢 | 诗怀雅 | 大小姐 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站, 控制中枢 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
-| 82 | 控制中枢 | 明椒 | 朝气蓬勃 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站, 控制中枢 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
-| 83 | 控制中枢 | 阿斯卡纶 | 情报主脑 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站, 控制中枢 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
-| 98 | 宿舍 | 余 | 调众口 | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 109 | 宿舍 | 纯烬艾雅法拉 | 火山温泉浴 | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 111 | 宿舍 | 森西 | 资深料理人 | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking, threshold | 如果, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高） |
-| 134 | 宿舍 | 爱丽丝 | 梦境呓语 | resource_token, special_stacking, threshold | 感知信息 | 进驻宿舍时，每1层梦境转化为1点感知信息 |
-| 135 | 宿舍 | 车尔尼 | 琴键漫步 | resource_token, special_stacking, threshold | 感知信息 | 进驻宿舍时，每1个小节转化为1点感知信息 |
-| 177 | 办公室 | 乌有 | 好事之徒 | flat_bonus, special_stacking, threshold | 每个, 额外 | 进驻人力办公室时，人脉资源的联络速度+35%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度 |
-| 190 | 办公室 | 絮雨 | 追忆 | negative_effect, resource_token, special_stacking, threshold | 感知信息 | 进驻人力办公室时，每1点记忆碎片转化为1点感知信息，心情耗尽时清空所有记忆碎片和自身累积的感知信息 |
-| 192 | 办公室 | 桑葚 | 救援队·灾后普查 | resource_token, threshold | 每个, 人间烟火 | 进驻人力办公室时，每个招募位（不包含初始招募位）+10点人间烟火 |
-| 196 | 办公室 | 圣聆初雪 | 雪境归心 | conditional_if, cross_room_synergy, flat_bonus, mood_consumption, negative_effect, special_stacking, threshold | 如果, 额外, 控制中枢 | 进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10% |
-| 214 | 办公室 | 凯尔希·思衡托 | “泰拉的方舟” | flat_bonus, global_bonus, special_stacking, threshold | 基建内, 额外 | 进驻人力办公室时，人脉资源的联络速度+30%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，联络速度额外+4%（最多5间） |
-| 215 | 制造站 | 截云 | 古老巫术 | resource_token, special_stacking, threshold | 制造站, 人间烟火 | 进驻制造站时，每5点人间烟火转化为1点巫术结晶 |
-| 216 | 制造站 | 至简 | 绘图设计 | cap_rule, global_bonus, threshold | 基建内, 上限, 制造站 | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
-| 224 | 制造站 | 怒潮凛冬 | 情同手足 | faction_count_bonus, flat_bonus, pair_synergy, same_room_synergy, special_stacking | 当与, 额外, 制造站 | 进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10% |
-| 227 | 制造站 | 杏仁 | 挑大梁 | faction_count_bonus, global_bonus, mood_consumption, negative_effect, threshold | 基建内, 制造站 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名黑钢国际干员（最多3名），贵金属类配方的生产力+2%，心情每小时消耗-0.15 |
-| 228 | 制造站 | 娜斯提 | 造价高昂 | faction_count_bonus, global_bonus, threshold | 基建内, 制造站 | 进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3% |
-| 230 | 制造站 | 酒神 | 镜中影 | flat_bonus, mood_consumption, negative_effect, threshold | 制造站 | 进驻制造站时，作战记录类配方的生产力+20%，心情每小时消耗-0.25 |
-| 231 | 制造站 | 酒神 | 戏中人 | flat_bonus, mood_consumption, negative_effect, threshold | 制造站 | 进驻制造站时，作战记录类配方的生产力+35%，心情每小时消耗-0.25 |
+| 86 | 控制中枢 | 斩业星熊 | 下城人脉 | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
+| 98 | 宿舍 | 余 | 调众口 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 109 | 宿舍 | 纯烬艾雅法拉 | 火山温泉浴 | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 118 | 宿舍 | 空 | 偶像 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 120 | 宿舍 | 凛冬；推进之王；桃金娘 | 领袖 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 125 | 宿舍 | 推进之王 | 狮心王 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 134 | 宿舍 | 爱丽丝 | 梦境呓语 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻宿舍时，每1层梦境转化为1点感知信息 |
+| 135 | 宿舍 | 车尔尼 | 琴键漫步 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻宿舍时，每1个小节转化为1点感知信息 |
+| 160 | 宿舍 | 断罪者 | 天启 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.7（同种效果取最高） |
+| 169 | 宿舍 | 新约能天使 | 圣城趣事通 | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking | 如果, 额外, 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是拉特兰干员，则恢复效果额外+0.45 |
+| 170 | 宿舍 | 新约能天使 | 天生乐天派 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高） |
+| 171 | 宿舍 | 摩根 | 头号陪练 | faction_count_bonus, special_stacking | 额外 | 进驻宿舍时，推进之王对该宿舍中格拉斯哥帮干员恢复效果额外+0.3 |
 
 ## Existing base_systems Overlap
 
@@ -278,50 +322,66 @@ These rows mention operators or mechanics seen in recent feedback. Suggested nex
 
 | # | facility | operator | skill | tags | risk terms | text |
 | --- | --- | --- | --- | --- | --- | --- |
-| 58 | 控制中枢 | 可露希尔 | 总工程师 | mood_recovery, threshold | 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
-| 65 | 控制中枢 | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, negative_effect, special_stacking | 如果, 额外, 发电站, 控制中枢 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
-| 111 | 宿舍 | 森西 | 资深料理人 | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking, threshold | 如果, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高） |
-| 133 | 宿舍 | 森西 | 森西大食堂 | resource_token, threshold | - | 进驻宿舍时，当前宿舍每级提供1层魔物料理 |
-| 177 | 办公室 | 乌有 | 好事之徒 | flat_bonus, special_stacking, threshold | 每个, 额外 | 进驻人力办公室时，人脉资源的联络速度+35%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度 |
-| 230 | 制造站 | 酒神 | 镜中影 | flat_bonus, mood_consumption, negative_effect, threshold | 制造站 | 进驻制造站时，作战记录类配方的生产力+20%，心情每小时消耗-0.25 |
-| 231 | 制造站 | 酒神 | 戏中人 | flat_bonus, mood_consumption, negative_effect, threshold | 制造站 | 进驻制造站时，作战记录类配方的生产力+35%，心情每小时消耗-0.25 |
-| 251 | 制造站 | 红云 | 拾荒者 | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限, 制造站 | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
-| 258 | 制造站 | Miss.Christine | 午休好去处 | cap_rule, capacity_bonus, mood_consumption, negative_effect, threshold | 上限, 制造站 | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
-| 276 | 制造站 | 冬时 | 科学改造 | cap_rule, capacity_bonus, threshold | 每个, 上限, 制造站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5 |
-| 277 | 制造站 | 冬时 | 流程优化 | cap_rule, capacity_bonus, threshold | 每个, 上限, 制造站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5 |
-| 278 | 制造站 | 异客；掠风；森蚺 | 自动化·α | threshold | 每个, 制造站, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力 |
-| 279 | 制造站 | 森蚺；温蒂 | 自动化·β | threshold | 每个, 制造站, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力 |
-| 280 | 制造站 | 温蒂 | 仿生海龙 | threshold | 每个, 制造站, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力 |
-| 281 | 制造站 | 清流 | 再生能源 | cross_room_synergy, threshold | 每个, 制造站, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
-| 283 | 制造站 | 夜刀；洋灰；流星；石英；褐果 | 标准化·α | flat_bonus | 制造站 | 进驻制造站时，生产力+15% |
-| 288 | 制造站 | 史都华德；杰西卡；水月；海沫；罗比菈塔；调香师；香草 | 标准化·β | flat_bonus | 制造站 | 进驻制造站时，生产力+25% |
-| 294 | 制造站 | 历阵锐枪芬 | 标准化·α | flat_bonus | 制造站 | 进驻制造站时，生产力+15% |
-| 301 | 制造站 | 迷迭香 | 念力 | threshold | 制造站 | 进驻制造站时，每2点思维链环+1%生产力 |
-| 302 | 制造站 | 迷迭香 | 意识实体 | threshold | 制造站 | 进驻制造站时，每1点思维链环+1%生产力 |
-| 309 | 制造站 | 迷迭香 | 超感 | resource_token, special_stacking, threshold | 制造站, 感知信息 | 进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环 |
-| 311 | 制造站 | Miss.Christine | 盛餐的回报 | pair_synergy, same_room_synergy | 当与, 制造站 | 进驻制造站时，当与酒神在同一个制造站时，作战记录类配方的生产力+30% |
-| 316 | 制造站 | 红云 | 回收利用 | capacity_bonus, threshold | 制造站 | 进驻制造站时，当前制造站内干员提升的每格仓库容量，提供2%生产力 |
-| 317 | 制造站 | 海沫 | 意识兼容 | faction_count_bonus | 制造站 | 进驻制造站时，当前制造站内所有莱茵科技类、红松骑士团类技能也全都视作标准化类技能 |
-| 319 | 制造站 | 水月 | 意识协议 | threshold | 每个, 制造站 | 进驻制造站时，当前制造站内每个标准化类技能为自身+5%的生产力 |
-| 391 | 发电站 | 承曦格雷伊 | 晨曦 | conditional_if, special_stacking | 如果, 额外, 发电站 | 进驻发电站时，如果其他发电站内没有进驻作业平台，则发电站额外+1(仅影响设施数量) |
-| 393 | 发电站 | 承曦格雷伊 | 巡线框架 | cap_rule, threshold | 上限, 发电站 | 进驻发电站时，每10架无人机上限+1%无人机充能速度（最多+25%） |
-| 412 | 发电站 | 清流 | 清洁能源 | flat_bonus | 发电站 | 进驻发电站时，无人机充能速度+15% |
-| 433 | 贸易站 | 但书 | 违约索赔·α | conditional_if, recipe_specific_bonus, special_stacking | 如果, 额外, 贸易站 | 进驻贸易站时，如果下笔赤金订单是违约订单，则赤金交付数额外+1 |
-| 434 | 贸易站 | 但书 | 违约索赔·β | conditional_if, recipe_specific_bonus, special_stacking | 如果, 额外, 贸易站 | 进驻贸易站时，如果下笔赤金订单是违约订单，则赤金交付数额外+2 |
-| 435 | 贸易站 | 可露希尔 | 特别订单 | flat_bonus | 贸易站 | 进驻贸易站时，订单获取效率+10%，固定获取可露希尔特别订单（不视作违约订单） |
-| 436 | 贸易站 | 但书 | 合同法 | conditional_if, recipe_specific_bonus | 如果, 贸易站 | 进驻贸易站时，如果下笔赤金订单交付数小于4，则视为违约订单 |
-| 441 | 贸易站 | 贝洛内 | 未偿还的债务 | cap_rule, capacity_bonus, mood_consumption, negative_effect, pair_synergy, same_room_synergy, threshold | 当与, 上限, 贸易站 | 当与伺夜在同一个贸易站时，心情每小时消耗-0.1，订单上限+2 |
-| 449 | 贸易站 | 龙舌兰 | 投资·α | conditional_if, mood_consumption, negative_effect, recipe_specific_bonus, threshold | 如果, 贸易站 | 进驻贸易站后，如果下笔赤金订单交付数大于3（违约订单不视作赤金订单），则其龙门币收益+250，心情每小时消耗-0.25 |
-| 450 | 贸易站 | 龙舌兰 | 投资·β | conditional_if, mood_consumption, negative_effect, recipe_specific_bonus, threshold | 如果, 贸易站 | 进驻贸易站后，如果下笔赤金订单交付数大于3（违约订单不视作赤金订单），则其龙门币收益+500，心情每小时消耗-0.25 |
-| 478 | 贸易站 | 伺夜 | 新城贸易 | flat_bonus, special_stacking, threshold | 额外, 贸易站 | 进驻贸易站时，订单获取效率+25%，会客室每级额外提供5%获取效率，最多提供40%效率 |
-| 498 | 贸易站 | 黑键 | 徘徊旋律 | threshold | 贸易站 | 进驻贸易站时，每4点无声共鸣+1%订单效率 |
-| 499 | 贸易站 | 黑键 | 怅惘和声 | threshold | 贸易站 | 进驻贸易站时，每2点无声共鸣+1%订单效率 |
-| 501 | 贸易站 | 黑键 | 乐感 | resource_token, special_stacking, threshold | 贸易站, 感知信息 | 进驻贸易站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点无声共鸣 |
-| 502 | 贸易站 | 乌有 | “愿者上钩” | resource_token, threshold | 贸易站, 人间烟火 | 进驻贸易站时，宿舍内每有1名干员则人间烟火+1，同时每有1点人间烟火，则订单获取效率+1% |
-| 505 | 贸易站 | 贝洛内 | 家族经营·α | flat_bonus, global_bonus, special_stacking | 基建内, 额外, 贸易站 | 进驻贸易站时，订单获取效率+25%；当伺夜在基建内时（不包含副手及活动室使用者），订单获取效率额外+5% |
-| 506 | 贸易站 | 贝洛内 | 家族经营·β | flat_bonus, global_bonus, special_stacking | 基建内, 额外, 贸易站 | 进驻贸易站时，订单获取效率+30%；当伺夜在基建内时（不包含副手及活动室使用者），订单获取效率额外+10% |
-| 513 | 贸易站 | 巫恋 | 低语 | mood_consumption, negative_effect, threshold | 贸易站 | 进驻贸易站时，当前贸易站内其他干员提供的订单获取效率全部归零，且每人为自身+45%订单获取效率，同时全体心情每小时消耗+0.25 |
-| 514 | 贸易站 | 巫恋；明椒；柏喙；贝娜 | 裁缝·α | mood_consumption, negative_effect, recipe_specific_bonus, threshold | 贸易站 | 进驻贸易站时，小幅提升当前贸易站高品质贵金属订单的出现概率（工作时长影响概率），心情每小时消耗-0.25 |
+| 25 | 控制中枢 | 歌蕾蒂娅 | 潮汐守望 | conditional_if, count_based, faction_count_bonus, mood_consumption, mood_recovery, negative_effect, ratio_conversion, special_stacking | 如果, 额外 | 进驻控制中枢时，每有1个深海猎人干员进驻在宿舍以外的设施，则自身心情每小时消耗+0.5；反之则自身心情每小时恢复+0.5，如果进驻在宿舍内的深海猎人干员为满心情，则额外+0.5 |
+| 29 | 控制中枢 | 火龙S黑角 | 团队合作 | count_based, ratio_conversion, resource_token | - | 进驻控制中枢时，控制中枢内每有1名怪物猎人小队干员，则木天蓼+2 |
+| 35 | 控制中枢 | 麒麟R夜刀 | 耐力回复 | mood_consumption, negative_effect, resource_token | - | 进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8 |
+| 39 | 控制中枢 | 陈 | 德才兼备 | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个龙门近卫局干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 54 | 控制中枢 | 薇薇安娜 | 金盏花诗会 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 56 | 控制中枢 | Mon3tr | 博识生手 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 58 | 控制中枢 | 可露希尔 | 总工程师 | mood_recovery | - | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05 |
+| 65 | 控制中枢 | 森蚺 | 我寻思能行 | conditional_if, cross_room_synergy, special_stacking | 如果, 额外, 发电站 | 进驻控制中枢时，如果Lancet-2进驻在发电站，发电站额外+2（仅影响设施数量） |
+| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | count_based, cross_room_synergy | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
+| 69 | 控制中枢 | 凯尔希 | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 70 | 控制中枢 | Mon3tr | 最高权限 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 制造站 | 进驻控制中枢时，所有制造站生产力+2%（同种效果取最高） |
+| 71 | 控制中枢 | 望 | 权变 | cap_rule, global_bonus, max_of_same_effect, threshold_gate | 同种效果取最高, 制造站, 贸易站 | 进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高） |
+| 72 | 控制中枢 | 麒麟R夜刀 | 以身作则 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有制造站生产力+2%（同种效果取最高） |
+| 73 | 控制中枢 | 斩业星熊 | 共事情谊 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 制造站 | 当与龙门近卫局干员进驻控制中枢一起工作时，所有制造站生产力+3%（同种效果取最高） |
+| 75 | 控制中枢 | 火龙S黑角 | 秘传交涉术 | cap_rule, global_bonus, max_of_same_effect, pair_synergy | 当与, 同种效果取最高, 贸易站 | 当与怪物猎人小队干员进驻控制中枢一起工作时，所有贸易站订单效率+7%（同种效果取最高） |
+| 79 | 控制中枢 | 戴菲恩 | 运筹好手 | count_based, faction_count_bonus, same_room_synergy | 贸易站 | 进驻控制中枢时，同一贸易站中，每有1名格拉斯哥帮干员，订单获取效率+10% |
+| 81 | 控制中枢 | 诗怀雅 | 大小姐 | cap_rule, global_bonus, max_of_same_effect | 同种效果取最高, 贸易站 | 进驻控制中枢时，所有贸易站订单效率+7%（同种效果取最高） |
+| 86 | 控制中枢 | 斩业星熊 | 下城人脉 | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
+| 118 | 宿舍 | 空 | 偶像 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 160 | 宿舍 | 断罪者 | 天启 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.7（同种效果取最高） |
+| 169 | 宿舍 | 新约能天使 | 圣城趣事通 | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking | 如果, 额外, 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是拉特兰干员，则恢复效果额外+0.45 |
+| 170 | 宿舍 | 新约能天使 | 天生乐天派 | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高） |
+| 173 | 办公室 | 早露 | 人望 | faction_count_bonus, flat_bonus | - | 进驻人力办公室时，人脉资源的联络速度+20%，每产生1次联络次数，增加乌萨斯学生自治团线索的概率（工作时长和招募位影响概率） |
+| 174 | 办公室 | 戴菲恩 | 旧识新交 | faction_count_bonus, flat_bonus | - | 进驻人力办公室时，人脉资源的联络速度+20%，每产生1次联络次数，增加格拉斯哥帮线索的概率（工作时长和招募位影响概率） |
+| 190 | 办公室 | 絮雨 | 追忆 | count_based, negative_effect, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻人力办公室时，每1点记忆碎片转化为1点感知信息，心情耗尽时清空所有记忆碎片和自身累积的感知信息 |
+| 195 | 办公室 | 圣聆初雪 | 圣女声望 | flat_bonus, mood_consumption | - | 进驻人力办公室时，人脉资源的联络速度+20%，心情每小时消耗-0.25 |
+| 214 | 办公室 | 凯尔希·思衡托 | “泰拉的方舟” | count_based, flat_bonus, global_bonus, special_stacking | 基建内, 额外 | 进驻人力办公室时，人脉资源的联络速度+30%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，联络速度额外+4%（最多5间） |
+| 216 | 制造站 | 至简 | 绘图设计 | cap_rule, count_based, global_bonus | 基建内, 上限 | 进驻制造站时，基建内除活动室外每间设施每级+1个工程机器人，上限64个 |
+| 218 | 制造站 | 槐琥 | 团队精神 | - | - | 进驻制造站时，消除当前制造站内所有干员自身心情消耗的影响 |
+| 226 | 制造站 | 阿罗玛 | 净味香氛 | flat_bonus, mood_consumption, negative_effect | - | 进驻制造站时，贵金属类配方的生产力+25%，心情每小时消耗+0.25 |
+| 230 | 制造站 | 酒神 | 镜中影 | flat_bonus, mood_consumption | - | 进驻制造站时，作战记录类配方的生产力+20%，心情每小时消耗-0.25 |
+| 231 | 制造站 | 酒神 | 戏中人 | flat_bonus, mood_consumption | - | 进驻制造站时，作战记录类配方的生产力+35%，心情每小时消耗-0.25 |
+| 235 | 制造站 | 断罪者；食铁兽 | 拳术指导录像 | flat_bonus | - | 进驻制造站时，作战记录类配方的生产力+35% |
+| 236 | 制造站 | 弑君者 | 逆境荣光 | flat_bonus | - | 进驻制造站时，作战记录类配方的生产力+35% |
+| 239 | 制造站 | 夜烟；斑点；苍苔 | 金属工艺·α | flat_bonus | - | 进驻制造站时，贵金属类配方的生产力+30% |
+| 244 | 制造站 | 薄绿；褐果 | 地质学·α | flat_bonus, recipe_specific_bonus | - | 进驻制造站时，源石类配方的生产力+30% |
+| 251 | 制造站 | 红云 | 拾荒者 | cap_rule, capacity_bonus, mood_consumption | 上限 | 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25 |
+| 258 | 制造站 | Miss.Christine | 午休好去处 | cap_rule, capacity_bonus, mood_consumption | 上限 | 进驻制造站时，仓库容量上限+10，心情每小时消耗-0.25 |
+| 276 | 制造站 | 冬时 | 科学改造 | cap_rule, capacity_bonus, count_based | 每个, 上限 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5 |
+| 277 | 制造站 | 冬时 | 流程优化 | cap_rule, capacity_bonus, count_based | 每个, 上限 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站+10%生产力，仓库容量上限+5 |
+| 278 | 制造站 | 异客；掠风；森蚺 | 自动化·α | count_based | 每个, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+5%的生产力 |
+| 279 | 制造站 | 森蚺；温蒂 | 自动化·β | count_based | 每个, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+10%的生产力 |
+| 280 | 制造站 | 温蒂 | 仿生海龙 | count_based | 每个, 发电站 | 进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个发电站为当前制造站+15%的生产力 |
+| 281 | 制造站 | 清流 | 再生能源 | count_based, cross_room_synergy | 每个, 贸易站 | 进驻制造站时，每个贸易站为当前制造站贵金属类配方的生产力+20% |
+| 283 | 制造站 | 夜刀；洋灰；流星；石英；褐果 | 标准化·α | flat_bonus | - | 进驻制造站时，生产力+15% |
+| 288 | 制造站 | 史都华德；杰西卡；水月；海沫；罗比菈塔；调香师；香草 | 标准化·β | flat_bonus | - | 进驻制造站时，生产力+25% |
+| 295 | 制造站 | 铅踝 | 窗外雪啸 | capacity_bonus, conditional_if, threshold_gate | - | 进驻制造站时，当自身心情落差大于12时，生产力+10%，仓库容量+6 |
+| 300 | 制造站 | 阿罗玛 | 例行清扫 | threshold_gate | - | 进驻制造站后，生产力每小时+2%，最终达到+20% |
+| 301 | 制造站 | 迷迭香 | 念力 | count_based | - | 进驻制造站时，每2点思维链环+1%生产力 |
+| 302 | 制造站 | 迷迭香 | 意识实体 | count_based | - | 进驻制造站时，每1点思维链环+1%生产力 |
+| 303 | 制造站 | 至简 | 机械辅助·α | count_based | - | 进驻制造站时，每16个工程机器人+5%生产力 |
+| 304 | 制造站 | 至简 | 机械辅助·β | count_based | - | 进驻制造站时，每8个工程机器人+5%生产力 |
+| 309 | 制造站 | 迷迭香 | 超感 | count_based, ratio_conversion, resource_token, special_stacking | 感知信息 | 进驻制造站时，宿舍内每有1名干员则感知信息+1，同时每1点感知信息转化为1点思维链环 |
+| 311 | 制造站 | Miss.Christine | 盛餐的回报 | pair_synergy, same_room_synergy | 当与 | 进驻制造站时，当与酒神在同一个制造站时，作战记录类配方的生产力+30% |
+| 312 | 制造站 | 铅踝 | 模糊视线 | count_based, flat_bonus, negative_effect | - | 进驻制造站时，生产力+30%，自身每有4点心情落差，生产力-5% |
+| 314 | 制造站 | 槐琥 | 配合意识 | count_based, special_stacking | 额外 | 进驻制造站时，当前制造站内其他干员提供的每5%生产力（不包含根据设施数量提供加成的生产力），额外提供5%生产力，最多提供40%生产力 |
+| 316 | 制造站 | 红云 | 回收利用 | capacity_bonus | - | 进驻制造站时，当前制造站内干员提升的每格仓库容量，提供2%生产力 |
+| 391 | 发电站 | 承曦格雷伊 | 晨曦 | conditional_if, special_stacking | 如果, 额外 | 进驻发电站时，如果其他发电站内没有进驻作业平台，则发电站额外+1(仅影响设施数量) |
+| 393 | 发电站 | 承曦格雷伊 | 巡线框架 | cap_rule, count_based | 上限 | 进驻发电站时，每10架无人机上限+1%无人机充能速度（最多+25%） |
+| 395 | 发电站 | 空构 | 技术交流·α | flat_bonus, threshold_gate | - | 进驻发电站时，无人机充能速度首小时+10%，此后每小时+1%，最终达到+15% |
 
 ## High-Risk Model Gaps
 
@@ -329,90 +389,90 @@ These rows are runtime-scope entries with coarse coverage gaps and coupling/high
 
 | # | facility | operator | skill | skill status | instance status | tags | risk terms | text |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 控制中枢 | 老鲤 | 浮生得闲 | not_found_by_name | bound | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿进驻控制中枢一起工作时，控制中枢内所有干员心情每小时恢复+0.25 |
-| 8 | 控制中枢 | 令 | “山河远阔” | not_found_by_name | bound | conditional_if, resource_token, threshold | 控制中枢, 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
-| 10 | 控制中枢 | 三角初华 | 羁绊相生 | empty_atoms | bound | cap_rule, max_of_same_effect, mood_recovery, pair_synergy, threshold | 当与, 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）；当与丰川祥子一起进驻控制中枢时，丰川祥子的心情每小时恢复+0.1 |
-| 11 | 控制中枢 | 焰影苇草 | 领袖 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
-| 12 | 控制中枢 | 红隼 | 战纹 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
-| 13 | 控制中枢 | 妮芙 | 巡心 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
-| 14 | 控制中枢 | 电弧 | 无言的慈爱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高, 控制中枢 | 进驻控制中枢时，所有宿舍内精英干员的心情每小时恢复+0.1（同种效果取最高） |
-| 17 | 控制中枢 | 琴柳 | 感染力 | not_found_by_name | not_bound | special_stacking | 额外, 控制中枢 | 进驻控制中枢时，人力办公室联络速度小于30%时（其中包含基础联络速度5%），则联络速度额外+20%（该加成全局效果唯一，不受其它加成影响） |
-| 18 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | not_found_by_name | not_bound | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高, 控制中枢 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
-| 19 | 控制中枢 | 摆渡人 | 英雄的骄傲·β | not_found_by_name | not_bound | cap_rule, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, threshold | 当与, 基建内, 同种效果取最高, 控制中枢 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
-| 20 | 控制中枢 | 维什戴尔 | 同谋·α | not_found_by_name | bound | cap_rule, capacity_bonus | 上限, 贸易站, 控制中枢 | 进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+1 |
-| 21 | 控制中枢 | 维什戴尔 | 同谋·β | not_found_by_name | bound | cap_rule, capacity_bonus | 上限, 贸易站, 控制中枢 | 进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+2 |
-| 22 | 控制中枢 | 怒潮凛冬 | “是，团长！” | not_found_by_name | not_bound | faction_count_bonus, mood_consumption, negative_effect, threshold | 每个, 控制中枢 | 进驻控制中枢时，自身心情每小时消耗+0.5，每个进驻在会客室的乌萨斯学生自治团干员，线索搜集速度+10% |
-| 23 | 控制中枢 | 祐天寺若麦 | 勤学苦练 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 控制中枢, 热情值 | 进驻控制中枢时，热情值+10；会客室线索搜集速度提升+5%（同种效果取最高） |
-| 24 | 控制中枢 | 祐天寺若麦 | 成效优先 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, special_stacking, threshold | 当与, 额外, 同种效果取最高, 控制中枢 | 当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高） |
-| 25 | 控制中枢 | 歌蕾蒂娅 | 潮汐守望 | empty_atoms | bound | conditional_if, faction_count_bonus, mood_consumption, mood_recovery, negative_effect, special_stacking, threshold | 如果, 额外, 控制中枢 | 进驻控制中枢时，每有1个深海猎人干员进驻在宿舍以外的设施，则自身心情每小时消耗+0.5；反之则自身心情每小时恢复+0.5，如果进驻在宿舍内的深海猎人干员为满心情，则额外+0.5 |
-| 26 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·α | empty_atoms | bound | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊, 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 27 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·β | empty_atoms | bound | faction_count_bonus, global_bonus, mood_recovery, special_stacking, threshold | 基建内, 特殊, 控制中枢 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
-| 32 | 控制中枢 | 重岳 | 孤光共照 | empty_atoms | bound | mood_recovery, resource_token, special_stacking, threshold | 额外, 特殊, 控制中枢, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
-| 33 | 控制中枢 | 夕 | "不以物喜" | not_found_by_name | bound | conditional_if, mood_recovery, resource_token, threshold | 控制中枢, 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
-| 34 | 控制中枢 | 夕 | "不以己悲" | not_found_by_name | bound | conditional_if, mood_consumption, negative_effect, resource_token, threshold | 控制中枢, 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
-| 36 | 控制中枢 | 丰川祥子 | 生活的重压 | empty_atoms | bound | mood_consumption, negative_effect, resource_token, threshold | 控制中枢, 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
-| 38 | 控制中枢 | 吽 | 坚毅随和 | not_found_by_name | bound | mood_recovery, special_stacking, threshold | 每个, 额外, 控制中枢 | 进驻控制中枢时，控制中枢内每个鲤氏侦探事务所干员可使该派系干员额外恢复心情，同时每人可使控制中枢内所有干员的心情每小时恢复+0.2 |
-| 39 | 控制中枢 | 陈 | 德才兼备 | not_found_by_name | bound | mood_recovery, threshold | 每个, 控制中枢 | 进驻控制中枢时，控制中枢内每个龙门近卫局干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
-| 40 | 控制中枢 | 早露 | 学生会会长 | not_found_by_name | bound | faction_count_bonus, mood_recovery, threshold | 每个, 控制中枢 | 进驻控制中枢时，控制中枢内每个乌萨斯学生自治团干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
-| 41 | 控制中枢 | 灵知 | 幕后指挥 | empty_atoms | bound | mood_recovery, threshold | 每个, 控制中枢 | 进驻控制中枢时，控制中枢内每个谢拉格干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
-| 42 | 控制中枢 | 寒芒克洛丝；濯尘芙蓉；炎狱炎熔 | 异格者 | not_found_by_name | not_bound | mood_recovery, threshold | 每个, 控制中枢 | 进驻控制中枢时，控制中枢内每个异格干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
-| 43 | 控制中枢 | 战车；灰烬；闪击；霜华 | 彩虹小队 | empty_atoms | not_bound | mood_recovery, threshold | 每个, 控制中枢 | 进驻控制中枢时，控制中枢内每个彩虹小队干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
-| 59 | 控制中枢 | 魔王 | 魔王传承 | not_found_by_name | bound | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.05 |
-| 60 | 控制中枢 | 魔王 | “未完的故事” | not_found_by_name | bound | mood_recovery, pair_synergy, threshold | 当与, 控制中枢 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.1 |
-| 61 | 控制中枢 | 若叶睦 | 互为半身 | empty_atoms | bound | pair_synergy | 当与, 控制中枢 | 当与丰川祥子一起进驻控制中枢时，消除自身心情消耗的影响 |
-| 62 | 控制中枢 | 维什戴尔 | 巴别塔之帜 | not_found_by_name | bound | mood_recovery, special_stacking, threshold | 额外, 特殊, 控制中枢 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.1，当魔王进驻中枢时额外+0.1（与控制中枢加成有特殊比较规则） |
-| 63 | 控制中枢 | 玛恩纳 | 公事公办 | not_found_by_name | bound | mood_recovery, special_stacking, threshold | 额外, 控制中枢 | 进驻控制中枢时，部分设施内处于工作状态的干员心情每小时恢复+0.1；同时控制中枢内部分技能可以为其他设施内处于工作状态的干员额外提供心情恢复 |
-| 64 | 控制中枢 | 焰尾 | 红松的骑士 | empty_atoms | bound | cross_room_synergy, faction_count_bonus, negative_effect, threshold | 每个, 制造站, 控制中枢 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
-| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | empty_atoms | bound | cross_room_synergy, threshold | 每个, 制造站, 控制中枢 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
-| 84 | 控制中枢 | 阿斯卡纶 | S.W.E.E.P.主管 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高, 控制中枢 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
-| 85 | 控制中枢 | 烛煌 | 断金之交 | not_found_by_name | not_bound | cap_rule, max_of_same_effect | 同种效果取最高, 控制中枢 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
-| 86 | 控制中枢 | 斩业星熊 | 下城人脉 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高, 控制中枢 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
-| 87 | 控制中枢 | 老鲤 | 世事洞明 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高, 控制中枢 | 进驻控制中枢时，会客室线索搜集速度+25%（同种效果取最高） |
-| 88 | 控制中枢 | 魔王 | 期冀之汇 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高, 控制中枢 | 进驻控制中枢时，会客室线索搜集速度+15%（同种效果取最高） |
+| 1 | 控制中枢 | 老鲤 | 浮生得闲 | not_found_by_name | bound | mood_recovery, pair_synergy | 当与 | 当与阿进驻控制中枢一起工作时，控制中枢内所有干员心情每小时恢复+0.25 |
+| 8 | 控制中枢 | 令 | “山河远阔” | not_found_by_name | bound | conditional_if, resource_token, threshold_gate | 人间烟火, 感知信息 | 进驻控制中枢时，当自身心情大于12时，人间烟火+15；当自身心情处于12以下时，感知信息+10 |
+| 10 | 控制中枢 | 三角初华 | 羁绊相生 | empty_atoms | bound | cap_rule, max_of_same_effect, mood_recovery, pair_synergy | 当与, 同种效果取最高 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）；当与丰川祥子一起进驻控制中枢时，丰川祥子的心情每小时恢复+0.1 |
+| 11 | 控制中枢 | 焰影苇草 | 领袖 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
+| 12 | 控制中枢 | 红隼 | 战纹 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
+| 13 | 控制中枢 | 妮芙 | 巡心 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高） |
+| 14 | 控制中枢 | 电弧 | 无言的慈爱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻控制中枢时，所有宿舍内精英干员的心情每小时恢复+0.1（同种效果取最高） |
+| 17 | 控制中枢 | 琴柳 | 感染力 | not_found_by_name | not_bound | special_stacking | 额外 | 进驻控制中枢时，人力办公室联络速度小于30%时（其中包含基础联络速度5%），则联络速度额外+20%（该加成全局效果唯一，不受其它加成影响） |
+| 18 | 控制中枢 | 摆渡人 | 英雄的骄傲·α | not_found_by_name | not_bound | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 19 | 控制中枢 | 摆渡人 | 英雄的骄傲·β | not_found_by_name | not_bound | cap_rule, count_based, global_bonus, max_of_same_effect, mood_consumption, negative_effect, pair_synergy | 当与, 基建内, 同种效果取最高 | 进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+5%（最多+25%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.... |
+| 20 | 控制中枢 | 维什戴尔 | 同谋·α | not_found_by_name | bound | cap_rule, capacity_bonus | 上限, 贸易站 | 进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+1 |
+| 21 | 控制中枢 | 维什戴尔 | 同谋·β | not_found_by_name | bound | cap_rule, capacity_bonus | 上限, 贸易站 | 进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+2 |
+| 22 | 控制中枢 | 怒潮凛冬 | “是，团长！” | not_found_by_name | not_bound | count_based, faction_count_bonus, mood_consumption, negative_effect | 每个 | 进驻控制中枢时，自身心情每小时消耗+0.5，每个进驻在会客室的乌萨斯学生自治团干员，线索搜集速度+10% |
+| 23 | 控制中枢 | 祐天寺若麦 | 勤学苦练 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, resource_token | 同种效果取最高, 热情值 | 进驻控制中枢时，热情值+10；会客室线索搜集速度提升+5%（同种效果取最高） |
+| 24 | 控制中枢 | 祐天寺若麦 | 成效优先 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_consumption, negative_effect, pair_synergy, special_stacking | 当与, 额外, 同种效果取最高 | 当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高） |
+| 25 | 控制中枢 | 歌蕾蒂娅 | 潮汐守望 | empty_atoms | bound | conditional_if, count_based, faction_count_bonus, mood_consumption, mood_recovery, negative_effect, ratio_conversion, special_stacking | 如果, 额外 | 进驻控制中枢时，每有1个深海猎人干员进驻在宿舍以外的设施，则自身心情每小时消耗+0.5；反之则自身心情每小时恢复+0.5，如果进驻在宿舍内的深海猎人干员为满心情，则额外+0.5 |
+| 26 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·α | empty_atoms | bound | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 27 | 控制中枢 | 歌蕾蒂娅 | 集群狩猎·β | empty_atoms | bound | faction_count_bonus, global_bonus, mood_recovery, special_stacking | 基建内, 特殊 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则） |
+| 32 | 控制中枢 | 重岳 | 孤光共照 | empty_atoms | bound | count_based, mood_recovery, ratio_conversion, resource_token, special_stacking, threshold_gate | 额外, 特殊, 人间烟火 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.05；同时每有20点人间烟火，则额外+0.05，（与控制中枢加成有特殊比较规则） |
+| 33 | 控制中枢 | 夕 | "不以物喜" | not_found_by_name | bound | conditional_if, mood_recovery, resource_token, threshold_gate | 人间烟火 | 进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；当自身心情处于12以下时，人间烟火+15 |
+| 34 | 控制中枢 | 夕 | "不以己悲" | not_found_by_name | bound | conditional_if, mood_consumption, negative_effect, resource_token, threshold_gate | 感知信息 | 进驻控制中枢时，自身心情每小时消耗+0.5；当自身心情大于12时，感知信息+10 |
+| 36 | 控制中枢 | 丰川祥子 | 生活的重压 | empty_atoms | bound | mood_consumption, negative_effect, resource_token, threshold_gate | 热情值 | 进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05 |
+| 38 | 控制中枢 | 吽 | 坚毅随和 | not_found_by_name | bound | count_based, mood_recovery, special_stacking | 每个, 额外 | 进驻控制中枢时，控制中枢内每个鲤氏侦探事务所干员可使该派系干员额外恢复心情，同时每人可使控制中枢内所有干员的心情每小时恢复+0.2 |
+| 39 | 控制中枢 | 陈 | 德才兼备 | not_found_by_name | bound | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个龙门近卫局干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 40 | 控制中枢 | 早露 | 学生会会长 | not_found_by_name | bound | count_based, faction_count_bonus, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个乌萨斯学生自治团干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 41 | 控制中枢 | 灵知 | 幕后指挥 | empty_atoms | bound | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个谢拉格干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 42 | 控制中枢 | 寒芒克洛丝；濯尘芙蓉；炎狱炎熔 | 异格者 | not_found_by_name | not_bound | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个异格干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 43 | 控制中枢 | 战车；灰烬；闪击；霜华 | 彩虹小队 | empty_atoms | not_bound | count_based, mood_recovery | 每个 | 进驻控制中枢时，控制中枢内每个彩虹小队干员可使控制中枢内所有干员的心情每小时恢复+0.05 |
+| 59 | 控制中枢 | 魔王 | 魔王传承 | not_found_by_name | bound | mood_recovery, pair_synergy | 当与 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.05 |
+| 60 | 控制中枢 | 魔王 | “未完的故事” | not_found_by_name | bound | mood_recovery, pair_synergy | 当与 | 当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.1 |
+| 61 | 控制中枢 | 若叶睦 | 互为半身 | empty_atoms | bound | pair_synergy | 当与 | 当与丰川祥子一起进驻控制中枢时，消除自身心情消耗的影响 |
+| 62 | 控制中枢 | 维什戴尔 | 巴别塔之帜 | not_found_by_name | bound | mood_recovery, special_stacking, threshold_gate | 额外, 特殊 | 进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.1，当魔王进驻中枢时额外+0.1（与控制中枢加成有特殊比较规则） |
+| 63 | 控制中枢 | 玛恩纳 | 公事公办 | not_found_by_name | bound | mood_recovery, special_stacking, threshold_gate | 额外 | 进驻控制中枢时，部分设施内处于工作状态的干员心情每小时恢复+0.1；同时控制中枢内部分技能可以为其他设施内处于工作状态的干员额外提供心情恢复 |
+| 64 | 控制中枢 | 焰尾 | 红松的骑士 | empty_atoms | bound | count_based, cross_room_synergy, faction_count_bonus, negative_effect | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的红松骑士团干员，作战记录类配方的生产力+10%，贵金属类配方的生产力-10% |
+| 68 | 控制中枢 | 薇薇安娜 | 烛骑士微光 | empty_atoms | bound | count_based, cross_room_synergy | 每个, 制造站 | 进驻控制中枢时，每个进驻在制造站的骑士干员生产力+7% |
+| 84 | 控制中枢 | 阿斯卡纶 | S.W.E.E.P.主管 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
+| 85 | 控制中枢 | 烛煌 | 断金之交 | not_found_by_name | not_bound | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
+| 86 | 控制中枢 | 斩业星熊 | 下城人脉 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高） |
+| 87 | 控制中枢 | 老鲤 | 世事洞明 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，会客室线索搜集速度+25%（同种效果取最高） |
+| 88 | 控制中枢 | 魔王 | 期冀之汇 | not_found_by_name | bound | cap_rule, max_of_same_effect | 同种效果取最高 | 进驻控制中枢时，会客室线索搜集速度+15%（同种效果取最高） |
 | 90 | 宿舍 | 菲亚梅塔 | 患难之交 | not_found_by_name | bound | conditional_if | 如果 | 进驻宿舍时，如果自身为满心情，则与当前宿舍前一位进驻的干员互换心情 |
-| 91 | 宿舍 | 斥罪 | 寻同路人 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.15，同时每个招募位（不包含初始招募位）额外+0.05恢复效果（叠加后的最终值同种效果取最高） |
-| 92 | 宿舍 | 隐德来希 | 无瑕心·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.1，同时每个招募位（不包含初始招募位）额外+0.05恢复效果（叠加后的最终值同种效果取最高） |
-| 93 | 宿舍 | 隐德来希 | 无瑕心·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.1，同时每个招募位（不包含初始招募位）额外+0.1恢复效果（叠加后的最终值同种效果取最高） |
-| 94 | 宿舍 | 流明 | 柔和微光·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高, 发电站 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.1，同时每有1间发电站，则恢复效果额外+0.05（叠加后的最终值同种效果取最高） |
-| 95 | 宿舍 | 流明 | 柔和微光·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高, 发电站 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，同时每有1间发电站，则恢复效果额外+0.05（叠加后的最终值同种效果取最高） |
-| 97 | 宿舍 | 塑心 | 无词颂歌 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2，每有5点无声共鸣，该宿舍内所有干员的心情每小时恢复额外+0.01（同种效果取最高） |
-| 98 | 宿舍 | 余 | 调众口 | not_found_by_name | bound | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 99 | 宿舍 | 响石 | 睡前必听故事 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 100 | 宿舍 | 响石 | 死前必做清单 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，同时当前宿舍每级为恢复效果额外+0.02（叠加后的最终值同种效果取最高） |
-| 101 | 宿舍 | 安比尔；杜林 | 慵懒 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery, negative_effect, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复-0.1，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 102 | 宿舍 | 杜林 | 嗜睡 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, negative_effect, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复-0.1，该宿舍内所有干员的心情每小时恢复+0.25（同种效果取最高） |
-| 104 | 宿舍 | 赫拉格 | 挣脱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内除自身以外所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 105 | 宿舍 | 赫拉格 | 解脱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 106 | 宿舍 | 风笛 | 牧歌 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 107 | 宿舍 | 缪尔赛思 | 天生丽质 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 108 | 宿舍 | 远牙 | “归乡” | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 109 | 宿舍 | 纯烬艾雅法拉 | 火山温泉浴 | not_found_by_name | bound | cap_rule, global_bonus, max_of_same_effect, mood_recovery, threshold | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
-| 111 | 宿舍 | 森西 | 资深料理人 | not_found_by_name | bound | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking, threshold | 如果, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高） |
-| 112 | 宿舍 | 刺玫 | 芬芳疗养·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.15，同时该宿舍内心情18以下的干员恢复效果额外+0.1（同种效果取最高） |
+| 91 | 宿舍 | 斥罪 | 寻同路人 | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, special_stacking | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.15，同时每个招募位（不包含初始招募位）额外+0.05恢复效果（叠加后的最终值同种效果取最高） |
+| 92 | 宿舍 | 隐德来希 | 无瑕心·α | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, special_stacking | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.1，同时每个招募位（不包含初始招募位）额外+0.05恢复效果（叠加后的最终值同种效果取最高） |
+| 93 | 宿舍 | 隐德来希 | 无瑕心·β | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, special_stacking | 每个, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.1，同时每个招募位（不包含初始招募位）额外+0.1恢复效果（叠加后的最终值同种效果取最高） |
+| 94 | 宿舍 | 流明 | 柔和微光·α | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, ratio_conversion, special_stacking | 额外, 同种效果取最高, 发电站 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.1，同时每有1间发电站，则恢复效果额外+0.05（叠加后的最终值同种效果取最高） |
+| 95 | 宿舍 | 流明 | 柔和微光·β | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, ratio_conversion, special_stacking | 额外, 同种效果取最高, 发电站 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，同时每有1间发电站，则恢复效果额外+0.05（叠加后的最终值同种效果取最高） |
+| 97 | 宿舍 | 塑心 | 无词颂歌 | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, special_stacking | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2，每有5点无声共鸣，该宿舍内所有干员的心情每小时恢复额外+0.01（同种效果取最高） |
+| 98 | 宿舍 | 余 | 调众口 | not_found_by_name | bound | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名岁干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 99 | 宿舍 | 响石 | 睡前必听故事 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 100 | 宿舍 | 响石 | 死前必做清单 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，同时当前宿舍每级为恢复效果额外+0.02（叠加后的最终值同种效果取最高） |
+| 101 | 宿舍 | 安比尔；杜林 | 慵懒 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复-0.1，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 102 | 宿舍 | 杜林 | 嗜睡 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复-0.1，该宿舍内所有干员的心情每小时恢复+0.25（同种效果取最高） |
+| 104 | 宿舍 | 赫拉格 | 挣脱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内除自身以外所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 105 | 宿舍 | 赫拉格 | 解脱 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 106 | 宿舍 | 风笛 | 牧歌 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 107 | 宿舍 | 缪尔赛思 | 天生丽质 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 108 | 宿舍 | 远牙 | “归乡” | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，自身心情每小时恢复+0.55，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 109 | 宿舍 | 纯烬艾雅法拉 | 火山温泉浴 | not_found_by_name | bound | cap_rule, count_based, global_bonus, max_of_same_effect, mood_recovery | 基建内, 同种效果取最高 | 进驻宿舍时，基建内（不包含副手及活动室使用者）每名行医干员为该宿舍内所有干员心情每小时恢复速度+0.06（最多生效4名，且同种效果取最高） |
+| 111 | 宿舍 | 森西 | 资深料理人 | not_found_by_name | bound | cap_rule, conditional_if, max_of_same_effect, mood_recovery, special_stacking | 如果, 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高） |
+| 112 | 宿舍 | 刺玫 | 芬芳疗养·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员心情每小时恢复+0.15，同时该宿舍内心情18以下的干员恢复效果额外+0.1（同种效果取最高） |
 | 113 | 宿舍 | 撷英调香师 | 净化呼吸 | not_found_by_name | bound | cap_rule, max_of_same_effect, special_stacking | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内心情20以下的干员恢复效果额外+0.1（同种效果取最高） |
-| 114 | 宿舍 | 波卜 | 倾听者 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 115 | 宿舍 | 波卜 | 倾谈者 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, special_stacking, threshold | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2；同时该宿舍每有1名心情未满的干员，则恢复效果额外+0.01（同种效果取最高） |
-| 116 | 宿舍 | 四月；夜莺 | 鼓舞 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
-| 117 | 宿舍 | 阿米娅 | 小提琴独奏 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 118 | 宿舍 | 空 | 偶像 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 119 | 宿舍 | 波登可 | 沁人心脾 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 120 | 宿舍 | 凛冬；推进之王；桃金娘 | 领袖 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 121 | 宿舍 | 温米 | 大锅饭·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 122 | 宿舍 | 妮芙 | 静心仪式·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 123 | 宿舍 | 凛冬 | 冬将军 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 124 | 宿舍 | 夜莺 | 提灯女神 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 125 | 宿舍 | 推进之王 | 狮心王 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 126 | 宿舍 | 刺玫 | 芬芳疗养·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 127 | 宿舍 | 温米 | 大锅饭·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 128 | 宿舍 | 小满 | 乡野笛音 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 129 | 宿舍 | 医生 | 利他主义 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 130 | 宿舍 | 妮芙 | 静心仪式·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
-| 131 | 宿舍 | 遥 | 明星效应 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
-| 132 | 宿舍 | 撷英调香师 | 沉静心灵 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery, threshold | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 114 | 宿舍 | 波卜 | 倾听者 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 115 | 宿舍 | 波卜 | 倾谈者 | not_found_by_name | bound | cap_rule, count_based, max_of_same_effect, mood_recovery, ratio_conversion, special_stacking | 额外, 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2；同时该宿舍每有1名心情未满的干员，则恢复效果额外+0.01（同种效果取最高） |
+| 116 | 宿舍 | 四月；夜莺 | 鼓舞 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.1（同种效果取最高） |
+| 117 | 宿舍 | 阿米娅 | 小提琴独奏 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 118 | 宿舍 | 空 | 偶像 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 119 | 宿舍 | 波登可 | 沁人心脾 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 120 | 宿舍 | 凛冬；推进之王；桃金娘 | 领袖 | not_found_by_name | not_bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 121 | 宿舍 | 温米 | 大锅饭·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 122 | 宿舍 | 妮芙 | 静心仪式·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 123 | 宿舍 | 凛冬 | 冬将军 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 124 | 宿舍 | 夜莺 | 提灯女神 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 125 | 宿舍 | 推进之王 | 狮心王 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 126 | 宿舍 | 刺玫 | 芬芳疗养·α | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 127 | 宿舍 | 温米 | 大锅饭·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 128 | 宿舍 | 小满 | 乡野笛音 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 129 | 宿舍 | 医生 | 利他主义 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 130 | 宿舍 | 妮芙 | 静心仪式·β | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2（同种效果取最高） |
+| 131 | 宿舍 | 遥 | 明星效应 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
+| 132 | 宿舍 | 撷英调香师 | 沉静心灵 | not_found_by_name | bound | cap_rule, max_of_same_effect, mood_recovery | 同种效果取最高 | 进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15（同种效果取最高） |
 
 ## Test Suggestions
 
-- Convert `feedback/2026-06-29/010315-推荐调整成清流温蒂冬时-挂钩发电承曦格雷伊-130` into a manufacture candidate-regression seed: preferred pattern `清流 + 温蒂 + 冬时`, linked producer `承曦格雷伊`, and max regret tolerance.
+- Draft seed: `data/feedback_regression_seeds/purestream_weedy_windflit_gold_automation.json` captures preferred pattern `清流 + 温蒂 + 冬时`, linked producer `承曦格雷伊`, and max regret tolerance.
 - Add a trace expectation that explains whether a system candidate was selected by near-optimal preference or rejected by raw-score gap/operator conflict.
 - Use the high-risk model-gap table to choose manual audits for cross-room/global tokens before adding any runtime rule.
 
