@@ -250,10 +250,29 @@ def skill_table_status(row: RegistryRow, skills_by_key: dict[str, list[dict]]) -
     return "empty_atoms"
 
 
-def instance_status(row: RegistryRow, instance_pairs: set[tuple[str, str]]) -> str:
+def instance_binding(row: RegistryRow, instance_pairs: set[tuple[str, str]]) -> dict[str, Any]:
     if row.facility not in RUNTIME_FACILITIES:
-        return "out_of_runtime_scope"
-    return "bound" if (row.operator, row.facility) in instance_pairs else "not_bound"
+        return {
+            "status": "out_of_runtime_scope",
+            "bound_operators": [],
+            "unbound_operators": [],
+        }
+    operators = sorted(split_operator_field(row.operator))
+    bound = [op for op in operators if (op, row.facility) in instance_pairs]
+    unbound = [op for op in operators if op not in bound]
+    if not operators:
+        status = "none_bound"
+    elif len(bound) == len(operators):
+        status = "all_bound"
+    elif bound:
+        status = "partial_bound"
+    else:
+        status = "none_bound"
+    return {
+        "status": status,
+        "bound_operators": bound,
+        "unbound_operators": unbound,
+    }
 
 
 def md_escape(text: str) -> str:
@@ -298,7 +317,7 @@ def row_to_json(
     risk_terms: list[str],
     actionable_risk_terms: list[str],
     skill_status: str,
-    instance_status_value: str,
+    instance_binding_value: dict[str, Any],
     system_related: bool,
     feedback_related: bool,
     priority_score: int,
@@ -318,7 +337,9 @@ def row_to_json(
         "risk_terms": risk_terms,
         "actionable_risk_terms": actionable_risk_terms,
         "skill_table_status": skill_status,
-        "instance_status": instance_status_value,
+        "instance_status": instance_binding_value["status"],
+        "bound_operators": instance_binding_value["bound_operators"],
+        "unbound_operators": instance_binding_value["unbound_operators"],
         "facility_mentions": facility_mentions(row),
         "system_related": system_related,
         "feedback_related": feedback_related,
@@ -341,7 +362,7 @@ def priority_score_for(
         score += 3
     if skill_status in {"not_found_by_name", "empty_atoms"}:
         score += 2
-    if instance_status_value == "not_bound":
+    if instance_status_value in {"none_bound", "partial_bound"}:
         score += 1
     if actionable_risks:
         score += min(4, len(actionable_risks))
@@ -363,7 +384,8 @@ def analyze_rows(rows: list[RegistryRow]) -> dict[str, Any]:
     row_risks = {row.index: risk_terms_for(row) for row in rows}
     row_actionable_risks = {row.index: actionable_risk_terms_for(row) for row in rows}
     skill_status = {row.index: skill_table_status(row, skills_by_key) for row in rows}
-    inst_status = {row.index: instance_status(row, instance_pairs) for row in rows}
+    inst_binding = {row.index: instance_binding(row, instance_pairs) for row in rows}
+    inst_status = {index: binding["status"] for index, binding in inst_binding.items()}
     system_related = {
         row.index: any(term in row.text or term in row.operator or term in row.skill_name for term in system_terms)
         for row in rows
@@ -409,7 +431,8 @@ def analyze_rows(rows: list[RegistryRow]) -> dict[str, Any]:
     cross_rows = [
         row
         for row in runtime_rows
-        if {"cross_room_synergy", "global_bonus", "resource_token"} & set(row_tags[row.index])
+        if facility_mentions(row)["targets"]
+        or {"cross_room_synergy", "global_bonus", "resource_token"} & set(row_tags[row.index])
     ]
     system_candidates = [
         row
@@ -425,7 +448,8 @@ def analyze_rows(rows: list[RegistryRow]) -> dict[str, Any]:
     model_gaps = [
         row
         for row in runtime_rows
-        if skill_status[row.index] in {"not_found_by_name", "empty_atoms"} or inst_status[row.index] == "not_bound"
+        if skill_status[row.index] in {"not_found_by_name", "empty_atoms"}
+        or inst_status[row.index] in {"none_bound", "partial_bound"}
     ]
     high_risk_gaps = [
         row
@@ -440,7 +464,7 @@ def analyze_rows(rows: list[RegistryRow]) -> dict[str, Any]:
 
     system_hits: list[dict[str, Any]] = []
     for system_id, ops in sorted(system_ops.items()):
-        hits = [row for row in rows if row.operator in ops]
+        hits = [row for row in rows if split_operator_field(row.operator) & ops]
         if not hits:
             continue
         risky_count = sum(
@@ -473,7 +497,7 @@ def analyze_rows(rows: list[RegistryRow]) -> dict[str, Any]:
             row_risks[row.index],
             row_actionable_risks[row.index],
             skill_status[row.index],
-            inst_status[row.index],
+            inst_binding[row.index],
             system_related[row.index],
             feedback_related[row.index],
             priority_scores[row.index],
@@ -563,6 +587,8 @@ def build_report(analysis: dict[str, Any]) -> str:
     append("")
     append("Operator-instance status:")
     lines.extend(bullet_counts(Counter(analysis["counts"]["instance_status"])))
+    append("")
+    append("Instance binding is split-aware: multi-operator registry rows are classified as `all_bound`, `partial_bound`, or `none_bound` after splitting fields such as `森蚺；温蒂`.")
     append("")
     append("## Tag Taxonomy Counts")
     append("")
