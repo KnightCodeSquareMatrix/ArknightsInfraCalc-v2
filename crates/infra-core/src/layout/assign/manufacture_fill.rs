@@ -28,9 +28,37 @@ use super::AssignBaseOptions;
 
 const GONGSUN_GOLD_MANU_ANCHORS: [&str; 2] = ["清流", "温蒂"];
 const GONGSUN_GOLD_MANU_THIRD_CHOICES: [&str; 2] = ["森蚺", "冬时"];
+const AUTOMATION_SYSTEM_ID: &str = "automation_group";
+const SYSTEM_BAKED_SOURCE: &str = "system-baked";
 pub(super) const QINGLIU_RENEWABLE_ENERGY_BUFF: &str = "manu_prod_spd&trade[000]";
 pub(super) const WENDY_BIONIC_SEADRAGON_BUFF: &str = "manu_prod_spd&power[020]";
 const DONGSHI_FLOW_OPTIMIZATION_BUFF: &str = "manu_prod_spd&manu[100]";
+
+#[derive(Debug, Clone)]
+struct ManufactureSystemCandidateRow {
+    source_system: &'static str,
+    source: &'static str,
+    recipe: RecipeKind,
+    operators: [&'static str; 3],
+    linked_power_operator: &'static str,
+    evidence: [&'static str; 2],
+}
+
+impl ManufactureSystemCandidateRow {
+    fn automation_gold_windflit() -> Self {
+        Self {
+            source_system: AUTOMATION_SYSTEM_ID,
+            source: SYSTEM_BAKED_SOURCE,
+            recipe: RecipeKind::Gold,
+            operators: ["清流", "温蒂", "冬时"],
+            linked_power_operator: "承曦格雷伊",
+            evidence: [
+                "base_systems.json: automation_group gold factory anchors 清流 + 温蒂",
+                "feedback seed expects 清流 + 温蒂 + 冬时 visibility",
+            ],
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ManufactureLinkedProducer {
@@ -182,24 +210,49 @@ pub(super) fn trace_gongsun_gold_windflit_candidate(
     operbox: &OperBox,
     selected_hit: Option<&ManuSearchHit>,
 ) -> Option<ManufactureSystemCandidateTrace> {
-    if room.kind != FacilityKind::Factory
-        || !matches!(
-            room.product.as_ref(),
-            Some(RoomProduct::Factory {
-                recipe: RecipeKind::Gold
-            })
-        )
-    {
+    let row = ManufactureSystemCandidateRow::automation_gold_windflit();
+    trace_system_manu_candidate(
+        &row,
+        room,
+        assignment,
+        used,
+        pool,
+        table,
+        layout,
+        options,
+        operbox,
+        selected_hit,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn trace_system_manu_candidate(
+    row: &ManufactureSystemCandidateRow,
+    room: &crate::layout::blueprint::RoomBlueprint,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    pool: &ManuPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    operbox: &OperBox,
+    selected_hit: Option<&ManuSearchHit>,
+) -> Option<ManufactureSystemCandidateTrace> {
+    if !room_matches_system_candidate(row, room) {
         return None;
     }
-    let operators = vec!["清流".to_string(), "温蒂".to_string(), "冬时".to_string()];
+    let operators: Vec<String> = row
+        .operators
+        .iter()
+        .map(|name| (*name).to_string())
+        .collect();
     let linked = ManufactureLinkedProducer {
         station: "power".to_string(),
-        operator: "承曦格雷伊".to_string(),
+        operator: row.linked_power_operator.to_string(),
         required_elite: Some(2),
-        current_elite: operbox.elite_of("承曦格雷伊"),
+        current_elite: operbox.elite_of(row.linked_power_operator),
         satisfied: operbox
-            .elite_of("承曦格雷伊")
+            .elite_of(row.linked_power_operator)
             .is_some_and(|elite| elite >= 2),
         role: "linked_virtual_power".to_string(),
     };
@@ -214,15 +267,8 @@ pub(super) fn trace_gongsun_gold_windflit_candidate(
     }
 
     let (raw_score, evaluation_failed) = if missing.is_empty() {
-        let opts = manu_options(layout, options, RecipeKind::Gold, room.level);
-        match score_manu_entries(
-            &entries,
-            table,
-            layout,
-            options,
-            RecipeKind::Gold,
-            opts.level,
-        ) {
+        let opts = manu_options(layout, options, row.recipe, room.level);
+        match score_manu_entries(&entries, table, layout, options, row.recipe, opts.level) {
             Some(hit) => (Some(hit.composite_score), None),
             None => (None, Some("evaluation_failed".to_string())),
         }
@@ -265,8 +311,9 @@ pub(super) fn trace_gongsun_gold_windflit_candidate(
             .iter()
             .map(|op| op.name.as_str())
             .collect();
-        assigned_names.len() == 3
-            && ["清流", "温蒂", "冬时"]
+        assigned_names.len() == row.operators.len()
+            && row
+                .operators
                 .iter()
                 .all(|name| assigned_names.contains(name))
     };
@@ -299,21 +346,38 @@ pub(super) fn trace_gongsun_gold_windflit_candidate(
 
     Some(ManufactureSystemCandidateTrace {
         room: room.id.0.clone(),
-        recipe: "gold".to_string(),
+        recipe: recipe_label(row.recipe).to_string(),
         operators,
-        source: "manual-system-candidate".to_string(),
+        source: row.source.to_string(),
         selected,
         rejected: !selected && rejection_reason.is_some(),
         rejection_reason,
         raw_score,
         evaluation_failed,
         linked_producers: vec![linked],
-        source_system: "automation_group".to_string(),
-        evidence: vec![
-            "AUTOMATION_GROUP_CHAIN.md: third member fallback is 森蚺 > 冬时".to_string(),
-            "feedback seed expects 清流 + 温蒂 + 冬时 visibility".to_string(),
-        ],
+        source_system: row.source_system.to_string(),
+        evidence: row.evidence.iter().map(|value| (*value).to_string()).collect(),
     })
+}
+
+fn room_matches_system_candidate(
+    row: &ManufactureSystemCandidateRow,
+    room: &crate::layout::blueprint::RoomBlueprint,
+) -> bool {
+    room.kind == FacilityKind::Factory
+        && matches!(
+            room.product.as_ref(),
+            Some(RoomProduct::Factory { recipe }) if *recipe == row.recipe
+        )
+}
+
+fn recipe_label(recipe: RecipeKind) -> &'static str {
+    match recipe {
+        RecipeKind::Gold => "gold",
+        RecipeKind::BattleRecord => "battle_record",
+        RecipeKind::Originium => "originium",
+        RecipeKind::All => "all",
+    }
 }
 
 fn manu_hit_matches_names(hit: &ManuSearchHit, expected: &[String]) -> bool {

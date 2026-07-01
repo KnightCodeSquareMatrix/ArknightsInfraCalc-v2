@@ -206,7 +206,7 @@ impl TeamCandidate {
             recipe: Some(trace.recipe.clone()),
             order_kind: None,
             operators: trace.operators.clone(),
-            source: CandidateSource::ManualSystemCandidate,
+            source: candidate_source_from_trace(&trace.source),
             source_id: Some(trace.source_system.clone()),
             system_tags: vec![trace.source_system.clone()],
             score: CandidateScore::raw_only(raw_score),
@@ -216,6 +216,15 @@ impl TeamCandidate {
             rejection_reason: trace.rejection_reason.clone(),
             metadata,
         }
+    }
+}
+
+fn candidate_source_from_trace(source: &str) -> CandidateSource {
+    match source {
+        "system-baked" => CandidateSource::SystemBaked,
+        "manual-system-candidate" => CandidateSource::ManualSystemCandidate,
+        "manual-rule" => CandidateSource::ManualRule,
+        _ => CandidateSource::Unknown,
     }
 }
 
@@ -355,12 +364,12 @@ mod tests {
     }
 
     #[test]
-    fn manual_manufacture_trace_candidate_preserves_rejection_metadata() {
+    fn system_baked_manufacture_trace_candidate_preserves_rejection_metadata() {
         let trace = ManufactureSystemCandidateTrace {
             room: "manu_1".to_string(),
             recipe: "gold".to_string(),
             operators: vec!["清流".to_string(), "温蒂".to_string(), "冬时".to_string()],
-            source: "manual-system-candidate".to_string(),
+            source: "system-baked".to_string(),
             selected: false,
             rejected: true,
             rejection_reason: Some("tier_gate_not_met".to_string()),
@@ -380,7 +389,7 @@ mod tests {
 
         let candidate = TeamCandidate::from_manufacture_system_trace(&trace);
 
-        assert_eq!(candidate.source, CandidateSource::ManualSystemCandidate);
+        assert_eq!(candidate.source, CandidateSource::SystemBaked);
         assert_eq!(candidate.source_id.as_deref(), Some("automation_group"));
         assert_eq!(candidate.system_tags, vec!["automation_group"]);
         assert_eq!(candidate.selected, Some(false));
@@ -389,7 +398,7 @@ mod tests {
         assert_eq!(candidate.score.raw_score, 128.0);
         assert_eq!(candidate.score.decision_score, 128.0);
         let value = serde_json::to_value(&candidate).unwrap();
-        assert_eq!(value["source"], "manual_system_candidate");
+        assert_eq!(value["source"], "system_baked");
         assert_eq!(value["score"]["raw_score"], value["score"]["decision_score"]);
         assert!(candidate.metadata["linked_producers"]
             .as_array()

@@ -615,7 +615,7 @@ mod tests {
         assert_eq!(trace.recipe, "gold");
         assert_eq!(trace.operators, vec!["清流", "温蒂", "冬时"]);
         assert_eq!(trace.source_system, "automation_group");
-        assert_eq!(trace.source, "manual-system-candidate");
+        assert_eq!(trace.source, "system-baked");
         assert!(!trace.selected);
         assert!(trace.rejected);
         assert_eq!(trace.rejection_reason.as_deref(), Some("tier_gate_not_met"));
@@ -844,7 +844,7 @@ mod tests {
         assert!(traced_result
             .manufacture_traces
             .iter()
-            .any(|trace| trace.source == "manual-system-candidate"
+            .any(|trace| trace.source == "system-baked"
                 && trace.source_system == "automation_group"
                 && trace.operators == ["清流", "温蒂", "冬时"]));
         assert_eq!(
@@ -904,7 +904,7 @@ mod tests {
             .find(|trace| trace.operators == expected_ops)
             .expect("feedback seed preferred manufacture trio should be visible in trace");
 
-        assert_eq!(trace.source, "manual-system-candidate");
+        assert_eq!(trace.source, "system-baked");
         assert_eq!(trace.source_system, "automation_group");
         assert!(trace.rejected, "low-progress seed should be trace-only/rejected");
         assert!(

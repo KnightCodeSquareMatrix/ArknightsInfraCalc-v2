@@ -85,7 +85,7 @@
   "uncertainties": [
     "当前 operbox 中温蒂/冬时/承曦格雷伊未达到人工复核中高档候选所需练度；实际 raw score 可能不等于用户 note 的 130%。",
     "max regret / near-optimal tolerance 尚未确定，不能从本 seed 直接推出。",
-    "清流 + 温蒂 + 冬时 应作为 system candidate、third-member candidate 还是 trace-only candidate，需要 Phase C 实现设计决定。"
+    "清流 + 温蒂 + 冬时 已进入首个 system-baked manufacture row pilot，但 runtime merge、near-optimal tolerance 与默认选择接入仍未确定。"
   ],
   "forbidden_patterns": [],
   "notes": [

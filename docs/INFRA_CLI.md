@@ -275,7 +275,7 @@ cargo run -p infra-cli -- layout test \
 | `--top` | Top-K 条数，默认 3 |
 | `-o` / `--output` | 写 CSV（UTF-8 BOM）；缺省 stdout |
 | `--text` | 人类可读摘要写 stderr（**Agent 本地探测时推荐**） |
-| `--debug-manufacture-trace [path]` | 可选 debug-only 制造站体系候选 trace。必须生成 fresh assignment，不能和 `--assignment` 同用；无 path 时打印 JSON 并返回，有 path 时写 JSON 后继续正常输出。JSON 同时包含原始 `manufacture_traces` 与 shadow `team_candidates` 投影，不改变默认推荐行为。 |
+| `--debug-manufacture-trace [path]` | 可选 debug-only 制造站体系候选 trace。必须生成 fresh assignment，不能和 `--assignment` 同用；无 path 时打印 JSON 并返回，有 path 时写 JSON 后继续正常输出。JSON 同时包含原始 `manufacture_traces` 与 shadow `team_candidates` 投影；当前自动化金线 pilot 会以 `system-baked` 候选来源暴露“清流 + 温蒂 + 冬时”及 linked producer，但仍不改变默认推荐行为。 |
 
 ### 内部链路（`layout test`）
 
