@@ -197,6 +197,8 @@ impl TeamCandidate {
         let mut metadata = BTreeMap::new();
         metadata.insert("trace_source".to_string(), json!(trace.source));
         metadata.insert("evaluation_failed".to_string(), json!(trace.evaluation_failed));
+        metadata.insert("selected_score".to_string(), json!(trace.selected_score));
+        metadata.insert("score_delta".to_string(), json!(trace.score_delta));
         metadata.insert("linked_producers".to_string(), json!(trace.linked_producers));
         metadata.insert("evidence".to_string(), json!(trace.evidence));
 
@@ -374,6 +376,8 @@ mod tests {
             rejected: true,
             rejection_reason: Some("tier_gate_not_met".to_string()),
             raw_score: Some(128.0),
+            selected_score: Some(130.0),
+            score_delta: Some(-2.0),
             evaluation_failed: None,
             linked_producers: vec![ManufactureLinkedProducer {
                 station: "power".to_string(),
@@ -400,6 +404,8 @@ mod tests {
         let value = serde_json::to_value(&candidate).unwrap();
         assert_eq!(value["source"], "system_baked");
         assert_eq!(value["score"]["raw_score"], value["score"]["decision_score"]);
+        assert_eq!(candidate.metadata["selected_score"], 130.0);
+        assert_eq!(candidate.metadata["score_delta"], -2.0);
         assert!(candidate.metadata["linked_producers"]
             .as_array()
             .unwrap()
@@ -419,6 +425,8 @@ mod tests {
             rejected: true,
             rejection_reason: Some("missing_operator".to_string()),
             raw_score: None,
+            selected_score: None,
+            score_delta: None,
             evaluation_failed: Some("missing_operator:温蒂".to_string()),
             linked_producers: vec![],
             source_system: "automation_group".to_string(),

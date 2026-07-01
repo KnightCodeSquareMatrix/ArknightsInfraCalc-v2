@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "layout_label": "C:\\Users\\KnightCode\\projects\\ArknightsInfraCalc-v2\\data\\fixtures/243/layout.json",
+  "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2/data/fixtures/243/layout.json",
   "operbox_label": "data/fixtures/243/operbox_full_e2.json",
-  "baseline_label": "C:\\Users\\KnightCode\\projects\\ArknightsInfraCalc-v2\\data\\fixtures/243/schedule_export.json (full_e2)",
+  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2/data/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 418,
     "tier_up_owned": 418,
-    "trade_pool_ready": 75,
+    "trade_pool_ready": 76,
     "manu_pool_ready": 90
   },
   "domains": [
@@ -15,8 +15,8 @@
       "label": "贸易·赤金线",
       "current": {
         "operators": [
-          "巫恋",
           "卡夫卡",
+          "巫恋",
           "龙舌兰"
         ],
         "score": 138.0,
@@ -41,8 +41,8 @@
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "可露希尔",
           "吉星",
+          "可露希尔",
           "黑键"
         ],
         "score": 114.0,
@@ -65,11 +65,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "夜烟",
-          "引星棘刺",
-          "苍苔"
+          "幽灵鲨",
+          "安哲拉",
+          "梅尔"
         ],
-        "score": 482.5
+        "score": 506.0
       },
       "baseline": {
         "operators": [
@@ -79,7 +79,7 @@
         ],
         "score": 439.0
       },
-      "gap_ratio": 0.09908883826879271,
+      "gap_ratio": 0.15261958997722094,
       "severity": "ok"
     },
     {
@@ -87,11 +87,11 @@
       "label": "制造·赤金产线",
       "current": {
         "operators": [
-          "夜烟",
-          "引星棘刺",
-          "苍苔"
+          "幽灵鲨",
+          "安哲拉",
+          "梅尔"
         ],
-        "score": 131.25
+        "score": 119.0
       },
       "baseline": {
         "operators": [
@@ -101,7 +101,7 @@
         ],
         "score": 123.75
       },
-      "gap_ratio": 0.06060606060606061,
+      "gap_ratio": -0.03838383838383838,
       "severity": "ok"
     },
     {
@@ -109,11 +109,11 @@
       "label": "制造·经验产线",
       "current": {
         "operators": [
-          "断罪者",
-          "槐琥",
-          "裂响"
+          "乌尔比安",
+          "斯卡蒂",
+          "断罪者"
         ],
-        "score": 110.0
+        "score": 134.0
       },
       "baseline": {
         "operators": [
@@ -123,7 +123,7 @@
         ],
         "score": 95.75
       },
-      "gap_ratio": 0.14882506527415143,
+      "gap_ratio": 0.39947780678851175,
       "severity": "ok"
     },
     {
@@ -145,19 +145,19 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "score": 517.125
+        "score": 543.875
       },
       "baseline": {
         "operators": [],
         "score": 495.0
       },
-      "gap_ratio": 0.0446969696969697,
+      "gap_ratio": 0.09873737373737373,
       "severity": "ok"
     }
   ],
   "rotation": {
     "daily_trade": 7.44622,
-    "daily_manu": 517.125,
+    "daily_manu": 543.875,
     "daily_power": 55.125
   },
   "baseline_rotation": {

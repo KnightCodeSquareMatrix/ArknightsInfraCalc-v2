@@ -80,6 +80,8 @@ pub struct ManufactureSystemCandidateTrace {
     pub rejected: bool,
     pub rejection_reason: Option<String>,
     pub raw_score: Option<f64>,
+    pub selected_score: Option<f64>,
+    pub score_delta: Option<f64>,
     pub evaluation_failed: Option<String>,
     pub linked_producers: Vec<ManufactureLinkedProducer>,
     pub source_system: String,
@@ -320,6 +322,7 @@ fn trace_system_manu_candidate(
     let selected_by_hit = selected_hit.is_some_and(|hit| manu_hit_matches_names(hit, &operators));
     let selected = selected_by_assignment || selected_by_hit;
     let selected_score = selected_hit.map(|hit| hit.composite_score);
+    let score_delta = raw_score.zip(selected_score).map(|(raw, selected)| raw - selected);
     let rejection_reason = if selected {
         None
     } else if !missing.is_empty() {
@@ -332,16 +335,18 @@ fn trace_system_manu_candidate(
         Some("required_buff_missing".to_string())
     } else if !linked.satisfied {
         Some("linked_producer_not_satisfied".to_string())
-    } else if let (Some(raw), Some(selected)) = (raw_score, selected_score) {
-        if raw < selected {
+    } else if let Some(delta) = score_delta {
+        if delta < 0.0 {
             Some("raw_score_below_selected".to_string())
+        } else if delta == 0.0 {
+            Some("raw_score_tied_selected".to_string())
         } else {
-            Some("trace_only_low_progress".to_string())
+            Some("raw_score_above_selected_but_not_chosen".to_string())
         }
     } else if evaluation_failed.is_some() {
         Some("evaluation_failed".to_string())
     } else {
-        Some("trace_only_low_progress".to_string())
+        Some("not_compared_with_selected".to_string())
     };
 
     Some(ManufactureSystemCandidateTrace {
@@ -353,6 +358,8 @@ fn trace_system_manu_candidate(
         rejected: !selected && rejection_reason.is_some(),
         rejection_reason,
         raw_score,
+        selected_score,
+        score_delta,
         evaluation_failed,
         linked_producers: vec![linked],
         source_system: row.source_system.to_string(),
@@ -385,6 +392,48 @@ fn manu_hit_matches_names(hit: &ManuSearchHit, expected: &[String]) -> bool {
     names.len() == expected.len() && expected.iter().all(|name| names.contains(name))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn pick_debug_system_manu_hit(
+    room: &crate::layout::blueprint::RoomBlueprint,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    pool: &ManuPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    operbox: &OperBox,
+    ordinary_hit: &ManuSearchHit,
+) -> Option<ManuSearchHit> {
+    let row = ManufactureSystemCandidateRow::automation_gold_windflit();
+    if !room_matches_system_candidate(&row, room) || !assignment.operators_in(&room.id).is_empty() {
+        return None;
+    }
+    if !operbox
+        .elite_of(row.linked_power_operator)
+        .is_some_and(|elite| elite >= 2)
+    {
+        return None;
+    }
+    if !gongsun_gold_manu_anchors_ready(pool) || !dongshi_gold_manu_ready(pool) {
+        return None;
+    }
+
+    let entries: Vec<_> = row
+        .operators
+        .iter()
+        .map(|name| pool.entry(name))
+        .collect::<Option<Vec<_>>>()?
+        .into_iter()
+        .cloned()
+        .collect();
+    if entries.iter().any(|entry| used.contains(&entry.name)) {
+        return None;
+    }
+
+    let hit = score_manu_entries(&entries, table, layout, options, row.recipe, room.level)?;
+    (hit.composite_score > ordinary_hit.composite_score).then_some(hit)
+}
+
 pub(super) fn gongsun_gold_manu_anchors_ready(pool: &ManuPool) -> bool {
     pool.entry("清流").is_some_and(|entry| {
         entry
@@ -396,6 +445,15 @@ pub(super) fn gongsun_gold_manu_anchors_ready(pool: &ManuPool) -> bool {
             .buff_ids
             .iter()
             .any(|id| id == WENDY_BIONIC_SEADRAGON_BUFF)
+    })
+}
+
+fn dongshi_gold_manu_ready(pool: &ManuPool) -> bool {
+    pool.entry("冬时").is_some_and(|entry| {
+        entry
+            .buff_ids
+            .iter()
+            .any(|id| id == DONGSHI_FLOW_OPTIMIZATION_BUFF)
     })
 }
 
@@ -411,7 +469,9 @@ pub(super) fn assign_manufacture_lines(
     used: &mut HashSet<String>,
     mut trace_sink: Option<&mut Vec<ManufactureSystemCandidateTrace>>,
 ) -> Result<()> {
-    try_assign_gongsun_gold_manu_team(blueprint, assignment, pool, used)?;
+    if trace_sink.is_none() {
+        try_assign_gongsun_gold_manu_team(blueprint, assignment, pool, used)?;
+    }
     if let Some(trace_sink) = trace_sink.as_deref_mut() {
         let selected_gold_room = blueprint.rooms.iter().find(|room| {
             room.kind == FacilityKind::Factory
@@ -471,7 +531,7 @@ pub(super) fn assign_manufacture_lines(
         };
         let opts = manu_options(layout, options, recipe, room.level);
         let existing = assignment.operators_in(&room.id);
-        let hit = if existing.is_empty() {
+        let mut hit = if existing.is_empty() {
             pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
                 .or_else(|_| pick_manu_hit(pool, table, opts, used, options.top_k))
                 .or_else(|_| {
@@ -484,6 +544,13 @@ pub(super) fn assign_manufacture_lines(
             pick_manu_hit_with_anchor(pool, table, opts, used, options.top_k, &anchor, &forbidden)
         }
         .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
+        if trace_sink.is_some() {
+            if let Some(system_hit) = pick_debug_system_manu_hit(
+                room, assignment, used, pool, table, layout, options, operbox, &hit,
+            ) {
+                hit = system_hit;
+            }
+        }
         if matches!(recipe, RecipeKind::Gold) {
             if let Some(trace_sink) = trace_sink.as_deref_mut() {
                 if let Some(trace) = trace_gongsun_gold_windflit_candidate(
