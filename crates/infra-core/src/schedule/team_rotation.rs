@@ -9,7 +9,7 @@ use crate::layout::{
     assign_control, assign_manu_room_with_anchors, assign_shift_with_plan_skip,
     assign_team_gamma_half, pinned_assignment, resolve_base, ActivatedSystem, AssignBaseOptions,
     AssignShiftMode, AssignedOperator, AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind,
-    LayoutContext, RoomId, RoomProduct, SlotFill,
+    LayoutContext, RoomId, RoomProduct, SlotFill, TAG_RHINE,
 };
 use crate::operbox::OperBox;
 use crate::pool::{
@@ -215,6 +215,7 @@ const ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS: [&str; 3] = [
 ];
 const TAG_ABYSSAL: &str = "cc.g.abyssal";
 const DAIFEEN: &str = "戴菲恩";
+const NASTI: &str = "娜斯提";
 const VINA_TRADE_GROUP: [&str; 3] = ["推进之王", "摩根", "维娜·维多利亚"];
 const WARMUP_STICKY_TRADE_OPERATORS: [&str; 2] = ["巫恋", "龙舌兰"];
 const WARMUP_MANU_BUFF_PREFIX: &str = "manu_prod_spd_addition[";
@@ -509,6 +510,13 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
             continue;
         }
 
+        ensure_nasti_rhine_life_workforce(
+            &mut candidate,
+            ctx.blueprint,
+            ctx.operbox,
+            ctx.instances,
+        );
+
         let mut gamma_ops: Vec<String> = candidate
             .rooms
             .iter()
@@ -525,6 +533,86 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
     }
 
     out
+}
+
+fn assignment_contains_operator(assignment: &BaseAssignment, name: &str) -> bool {
+    assignment
+        .rooms
+        .iter()
+        .any(|room| room.operators.iter().any(|op| op.name == name))
+}
+
+fn assignment_rhine_life_count(
+    assignment: &BaseAssignment,
+    instances: &OperatorInstances,
+) -> usize {
+    let mut names = assignment.base_workforce.clone();
+    for room in &assignment.rooms {
+        for op in &room.operators {
+            if !names.iter().any(|name| name == &op.name) {
+                names.push(op.name.clone());
+            }
+        }
+    }
+    names
+        .iter()
+        .filter(|name| {
+            [PromotionTier::Tier0, PromotionTier::TierUp]
+                .into_iter()
+                .any(|tier| {
+                    instances
+                        .get(name, tier)
+                        .is_some_and(|inst| inst.tags.iter().any(|tag| tag == TAG_RHINE))
+                })
+        })
+        .take(5)
+        .count()
+}
+
+fn owned_rhine_life_candidates(operbox: &OperBox, instances: &OperatorInstances) -> Vec<String> {
+    let mut names: Vec<String> = instances
+        .iter()
+        .filter_map(|(_, inst)| {
+            inst.tags
+                .iter()
+                .any(|tag| tag == TAG_RHINE)
+                .then(|| inst.name.clone())
+        })
+        .filter(|name| operbox.owns(name))
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn ensure_nasti_rhine_life_workforce(
+    assignment: &mut BaseAssignment,
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+) {
+    if !assignment_contains_operator(assignment, NASTI) {
+        return;
+    }
+    let mut count = assignment_rhine_life_count(assignment, instances);
+    if count >= 5 {
+        return;
+    }
+    if assignment.base_workforce.is_empty() {
+        assignment.base_workforce = blueprint.scenario.base_workforce.clone();
+        count = assignment_rhine_life_count(assignment, instances);
+    }
+    let assigned = assignment.operator_names();
+    for name in owned_rhine_life_candidates(operbox, instances) {
+        if count >= 5 {
+            break;
+        }
+        if assigned.contains(&name) || assignment.base_workforce.iter().any(|n| n == &name) {
+            continue;
+        }
+        assignment.base_workforce.push(name);
+        count += 1;
+    }
 }
 
 fn enumerate_abyssal_counts(
@@ -1990,6 +2078,154 @@ mod tests {
                 "归溟幽灵鲨不能代替本体幽灵鲨进入深海候选"
             );
         }
+    }
+
+    #[test]
+    fn abyssal_candidate_with_nasti_fills_rhine_life_workforce() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let operbox = OperBox::from_entries(vec![
+            OperBoxEntry {
+                id: "gladiia".into(),
+                name: "歌蕾蒂娅".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ulpian".into(),
+                name: "乌尔比安".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "skadi".into(),
+                name: "斯卡蒂".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "ghost".into(),
+                name: "幽灵鲨".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+            OperBoxEntry {
+                id: "angel".into(),
+                name: "安哲拉".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+            OperBoxEntry {
+                id: "nasti".into(),
+                name: "娜斯提".into(),
+                elite: 2,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "muelsyse".into(),
+                name: "缪尔赛思".into(),
+                elite: 1,
+                level: 80,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "saria".into(),
+                name: "塞雷娅".into(),
+                elite: 2,
+                level: 90,
+                own: true,
+                potential: 1,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "silence".into(),
+                name: "赫默".into(),
+                elite: 2,
+                level: 50,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+            OperBoxEntry {
+                id: "ptilopsis".into(),
+                name: "白面鸮".into(),
+                elite: 2,
+                level: 60,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+            OperBoxEntry {
+                id: "stella".into(),
+                name: "星源".into(),
+                elite: 0,
+                level: 1,
+                own: true,
+                potential: 1,
+                rarity: 5,
+            },
+        ]);
+        let (layout, manu_pool, options) =
+            build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
+        let shared = BaseAssignment::default();
+        let beta = BaseAssignment::default();
+        let gamma_h1 = BaseAssignment::default();
+        let blocked_ops = HashSet::new();
+
+        let candidates = build_abyssal_s2_candidates(&AbyssalBuildCtx {
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            blueprint: &blueprint,
+            layout: &layout,
+            options: &options,
+            manu_pool: &manu_pool,
+            used_ab: &HashSet::new(),
+            blocked_ops: &blocked_ops,
+            shared: &shared,
+            beta: &beta,
+            gamma_h1: &gamma_h1,
+            mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+        });
+
+        let candidate = candidates
+            .iter()
+            .find(|candidate| operators_of(&candidate.assignment).contains(&NASTI.to_string()))
+            .expect("娜斯提应能作为深海短班制造补位");
+        let resolved = resolve_base(
+            &blueprint,
+            &candidate.assignment,
+            Some(&instances),
+            Some(&table),
+            6.0,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            resolved.layout.rhine_life_in_base, 5,
+            "娜斯提进 S2 制造房时应补满莱茵生命基建挂件"
+        );
     }
 
     #[test]
