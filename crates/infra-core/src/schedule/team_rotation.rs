@@ -200,10 +200,11 @@ fn clear_room_efficiency(assignment: &mut BaseAssignment, room_id: &RoomId) {
 
 const ABYSSAL_GLADIIA: &str = "歌蕾蒂娅";
 const ABYSSAL_HUNTERS: [&str; 4] = ["乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"];
-const ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS: [&str; 3] = [
+const ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS: [&str; 4] = [
     "manu_prod_spd&power[000]",
     "manu_prod_spd&power[010]",
     "manu_prod_spd&power[020]",
+    "manu_prod_spd_reduce[000]",
 ];
 const TAG_ABYSSAL: &str = "cc.g.abyssal";
 const DAIFEEN: &str = "戴菲恩";
@@ -211,6 +212,7 @@ const VINA_TRADE_GROUP: [&str; 3] = ["推进之王", "摩根", "维娜·维多�
 const WARMUP_STICKY_TRADE_OPERATORS: [&str; 2] = ["巫恋", "龙舌兰"];
 const WARMUP_MANU_BUFF_PREFIX: &str = "manu_prod_spd_addition[";
 const WARMUP_TRADE_BUFF_PREFIX: &str = "trade_ord_wt&cost[";
+const LONG_SHIFT_FRAGILE_MANU_BUFF_PREFIX: &str = "manu_prod_spd_reduce[";
 
 fn room_has_all(room: &RoomAssignment, names: &[&str]) -> bool {
     names
@@ -271,6 +273,35 @@ fn swap_room_assignments(assignment: &mut BaseAssignment, a: &RoomId, b: &RoomId
     true
 }
 
+fn swap_room_between_assignments(
+    a_assignment: &mut BaseAssignment,
+    a_room: &RoomId,
+    b_assignment: &mut BaseAssignment,
+    b_room: &RoomId,
+) -> bool {
+    let Some(ai) = a_assignment
+        .rooms
+        .iter()
+        .position(|room| &room.room_id == a_room)
+    else {
+        return false;
+    };
+    let Some(bi) = b_assignment
+        .rooms
+        .iter()
+        .position(|room| &room.room_id == b_room)
+    else {
+        return false;
+    };
+    let ops_a = a_assignment.rooms[ai].operators.clone();
+    let eff_a = a_assignment.rooms[ai].efficiency.clone();
+    a_assignment.rooms[ai].operators = b_assignment.rooms[bi].operators.clone();
+    a_assignment.rooms[ai].efficiency = b_assignment.rooms[bi].efficiency.clone();
+    b_assignment.rooms[bi].operators = ops_a;
+    b_assignment.rooms[bi].efficiency = eff_a;
+    true
+}
+
 fn room_containing_operator(
     assignment: &BaseAssignment,
     blueprint: &BaseBlueprint,
@@ -282,6 +313,101 @@ fn room_containing_operator(
         (bp_room.kind == kind && room.operators.iter().any(|op| op.name == name))
             .then(|| room.room_id.clone())
     })
+}
+
+fn is_long_shift_fragile_manu_operator(
+    name: &str,
+    tier: PromotionTier,
+    instances: &OperatorInstances,
+) -> bool {
+    instances
+        .resolve_manufacture_buff_ids(name, tier)
+        .iter()
+        .any(|buff_id| buff_id.starts_with(LONG_SHIFT_FRAGILE_MANU_BUFF_PREFIX))
+}
+
+fn room_has_long_shift_fragile_manu_operator(
+    room: &RoomAssignment,
+    instances: &OperatorInstances,
+) -> bool {
+    room.operators
+        .iter()
+        .any(|op| is_long_shift_fragile_manu_operator(&op.name, op.tier(), instances))
+}
+
+fn room_operator_names(room: &RoomAssignment) -> HashSet<String> {
+    room.operators.iter().map(|op| op.name.clone()).collect()
+}
+
+fn room_overlaps_assignment(room: &RoomAssignment, assignment: &BaseAssignment) -> bool {
+    let names = room_operator_names(room);
+    assignment
+        .rooms
+        .iter()
+        .flat_map(|other| other.operators.iter())
+        .any(|op| names.contains(&op.name))
+}
+
+fn swap_long_shift_fragile_manu_rooms(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    long_assignment: &mut BaseAssignment,
+    short_assignment: &mut BaseAssignment,
+    other_short_assignment: &BaseAssignment,
+) {
+    let fragile_rooms: Vec<RoomId> = long_assignment
+        .rooms
+        .iter()
+        .filter_map(|room| {
+            let bp_room = blueprint.room(&room.room_id)?;
+            (bp_room.kind == FacilityKind::Factory
+                && room_has_long_shift_fragile_manu_operator(room, instances))
+            .then(|| room.room_id.clone())
+        })
+        .collect();
+
+    for fragile_room in fragile_rooms {
+        let Some(replacement_room) = short_assignment.rooms.iter().find_map(|room| {
+            let fragile_source = long_assignment
+                .room_assignment(&fragile_room)
+                .filter(|source| room_has_long_shift_fragile_manu_operator(source, instances))?;
+            if room_has_long_shift_fragile_manu_operator(room, instances)
+                || room_overlaps_assignment(room, other_short_assignment)
+            {
+                return None;
+            }
+            rooms_compatible_for_swap(
+                blueprint,
+                &fragile_source.room_id,
+                &room.room_id,
+                FacilityKind::Factory,
+            )
+            .then(|| room.room_id.clone())
+        }) else {
+            continue;
+        };
+        if swap_room_between_assignments(
+            long_assignment,
+            &fragile_room,
+            short_assignment,
+            &replacement_room,
+        ) {
+            clear_room_efficiency(long_assignment, &fragile_room);
+            clear_room_efficiency(short_assignment, &replacement_room);
+        }
+    }
+}
+
+fn align_long_shift_fragile_manu_rooms(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    alpha: &mut BaseAssignment,
+    beta: &mut BaseAssignment,
+    gamma_h1: &mut BaseAssignment,
+    gamma_h2: &mut BaseAssignment,
+) {
+    swap_long_shift_fragile_manu_rooms(blueprint, instances, alpha, gamma_h1, gamma_h2);
+    swap_long_shift_fragile_manu_rooms(blueprint, instances, beta, gamma_h2, gamma_h1);
 }
 
 fn is_warmup_operator(
@@ -330,7 +456,8 @@ fn align_warmup_rooms(
         .collect();
 
     for (name, kind) in ops {
-        let Some(current_room) = room_containing_operator(assignment, blueprint, &name, kind) else {
+        let Some(current_room) = room_containing_operator(assignment, blueprint, &name, kind)
+        else {
             continue;
         };
         let Some(anchor_room) = sticky_rooms.get(&name).cloned() else {
@@ -991,8 +1118,8 @@ pub fn schedule_team_rotation(
     align_shift_binds_in_halves(&peak, &shift_binds, &mut h1, &mut h2);
 
     // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ 走贸易 role 替补。
-    let alpha = production_half_from_peak(&peak, &h1);
-    let beta = production_half_from_peak(&peak, &h2);
+    let mut alpha = production_half_from_peak(&peak, &h1);
+    let mut beta = production_half_from_peak(&peak, &h2);
     peak_plan
         .verify_registry_trade_in_alpha_beta(&alpha, &beta)
         .map_err(Error::msg)?;
@@ -1030,6 +1157,14 @@ pub fn schedule_team_rotation(
         &mut gamma_h2,
         &mut used_g2,
     )?;
+    align_long_shift_fragile_manu_rooms(
+        blueprint,
+        instances,
+        &mut alpha,
+        &mut beta,
+        &mut gamma_h1,
+        &mut gamma_h2,
+    );
     let t3 = Instant::now();
 
     // 中枢每班独立分配：体系绑定干员跟随生产队同上同下，散件均分三队，
@@ -1393,11 +1528,8 @@ pub fn schedule_team_rotation(
                 gamma_h1: &gamma_h1,
                 mutable_manu_rooms: &h1.manu,
             });
-            let mut best_abyssal: Option<(
-                AbyssalCandidate,
-                ShiftScores,
-                HashMap<String, RoomId>,
-            )> = None;
+            let mut best_abyssal: Option<(AbyssalCandidate, ShiftScores, HashMap<String, RoomId>)> =
+                None;
             for mut candidate in abyssal_candidates {
                 clear_room(&mut candidate.assignment, "control");
                 let mut aby_used = candidate.assignment.operator_names();
@@ -1594,6 +1726,19 @@ mod tests {
             build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)
                 .unwrap();
         (layout, manu_pool, AssignBaseOptions::default())
+    }
+
+    fn test_manu_pool_entry(name: &str, buff_ids: &[&str]) -> ManuPoolEntry {
+        ManuPoolEntry {
+            name: name.to_string(),
+            elite: 0,
+            progress: crate::roster::OperatorProgress::new(0, 1, 4),
+            buff_ids: buff_ids.iter().map(|id| (*id).to_string()).collect(),
+            tags: vec![],
+            flat_eff_hint: 0.0,
+            has_l2_delegate: false,
+            tier: crate::layout::OperatorTier::Standalone,
+        }
     }
 
     fn trade_room_contains(
@@ -2658,6 +2803,48 @@ mod tests {
     }
 
     #[test]
+    fn abyssal_anchor_fill_forbids_leadfoot_blurred_vision() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let layout = LayoutContext::default();
+        let options = AssignBaseOptions::default();
+        let pool = ManuPool {
+            entries: vec![
+                test_manu_pool_entry("铅踝", &["manu_prod_spd_reduce[000]"]),
+                test_manu_pool_entry("夜烟", &["manu_formula_spd[100]"]),
+                test_manu_pool_entry("替补制造", &[]),
+            ],
+            skipped: vec![],
+        };
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+
+        assign_manu_room_with_anchors(
+            &mut assignment,
+            &RoomId::from("manu_1"),
+            vec![test_manu_pool_entry("乌尔比安", &[])],
+            &pool,
+            &table,
+            &layout,
+            &options,
+            crate::types::RecipeKind::Gold,
+            3,
+            &mut used,
+            &ABYSSAL_FORBID_SAME_ROOM_MANU_BUFFS,
+        )
+        .unwrap();
+
+        let ops: Vec<_> = assignment
+            .operators_in(&RoomId::from("manu_1"))
+            .iter()
+            .map(|op| op.name.as_str())
+            .collect();
+        assert!(
+            !ops.contains(&"铅踝"),
+            "深海 S2 filler 不应选入长时衰减铅踝: {ops:?}"
+        );
+    }
+
+    #[test]
     fn team_rotation_feedback_000142_docus_lv2_prefers_higher_tool_over_vina() {
         use crate::operbox::default_operbox_full_e2_path;
 
@@ -2825,6 +3012,116 @@ mod tests {
         assert!(
             aroma_rooms.iter().all(|(_, room)| *room == first_room),
             "阿罗玛例行清扫跨班不应变更制造站: {aroma_rooms:?}"
+        );
+    }
+
+    #[test]
+    fn team_rotation_moves_leadfoot_to_short_factory_shift() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let mut alpha = BaseAssignment::default();
+        let mut beta = BaseAssignment::default();
+        let mut gamma_h1 = BaseAssignment::default();
+        let mut gamma_h2 = BaseAssignment::default();
+
+        beta.set_room(
+            "manu_2",
+            vec![
+                AssignedOperator::new("铅踝", 0),
+                AssignedOperator::new("夜烟", 0),
+                AssignedOperator::new("斑点", 1),
+            ],
+        );
+        gamma_h1.set_room(
+            "manu_1",
+            vec![
+                AssignedOperator::new("槐琥", 2),
+                AssignedOperator::new("清流", 1),
+                AssignedOperator::new("砾", 1),
+            ],
+        );
+        gamma_h2.set_room(
+            "manu_2",
+            vec![
+                AssignedOperator::new("蛇屠箱", 0),
+                AssignedOperator::new("刻俄柏", 2),
+                AssignedOperator::new("红云", 1),
+            ],
+        );
+
+        align_long_shift_fragile_manu_rooms(
+            &blueprint,
+            &instances,
+            &mut alpha,
+            &mut beta,
+            &mut gamma_h1,
+            &mut gamma_h2,
+        );
+
+        assert!(
+            !beta
+                .operators_in(&RoomId::from("manu_2"))
+                .iter()
+                .any(|op| op.name == "铅踝"),
+            "铅踝不应留在 β 长班房"
+        );
+        assert!(
+            gamma_h2
+                .operators_in(&RoomId::from("manu_2"))
+                .iter()
+                .any(|op| op.name == "铅踝"),
+            "铅踝应移动到 γ 的短班房"
+        );
+    }
+
+    #[test]
+    fn team_rotation_leadfoot_short_shift_swap_avoids_gamma_overlap() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let mut alpha = BaseAssignment::default();
+        let mut beta = BaseAssignment::default();
+        let mut gamma_h1 = BaseAssignment::default();
+        let mut gamma_h2 = BaseAssignment::default();
+
+        beta.set_room(
+            "manu_2",
+            vec![
+                AssignedOperator::new("铅踝", 0),
+                AssignedOperator::new("夜烟", 0),
+                AssignedOperator::new("斑点", 1),
+            ],
+        );
+        gamma_h1.set_room(
+            "manu_1",
+            vec![
+                AssignedOperator::new("蛇屠箱", 0),
+                AssignedOperator::new("白雪", 1),
+                AssignedOperator::new("红豆", 1),
+            ],
+        );
+        gamma_h2.set_room(
+            "manu_2",
+            vec![
+                AssignedOperator::new("蛇屠箱", 0),
+                AssignedOperator::new("刻俄柏", 2),
+                AssignedOperator::new("红云", 1),
+            ],
+        );
+
+        align_long_shift_fragile_manu_rooms(
+            &blueprint,
+            &instances,
+            &mut alpha,
+            &mut beta,
+            &mut gamma_h1,
+            &mut gamma_h2,
+        );
+
+        assert!(
+            beta.operators_in(&RoomId::from("manu_2"))
+                .iter()
+                .any(|op| op.name == "铅踝"),
+            "替换房会与另一 γ 半区重人时，不应交换"
         );
     }
 
