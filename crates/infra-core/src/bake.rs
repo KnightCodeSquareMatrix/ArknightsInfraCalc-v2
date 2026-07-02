@@ -1262,6 +1262,9 @@ fn baked_trade_compatible(
 
 fn baked_manufacture_compatible(pool: &ManuPool, options: &ManuSearchOptions) -> bool {
     (options.mood - 24.0).abs() < f64::EPSILON
+        && options
+            .shift_hours
+            .is_none_or(|hours| (hours - 24.0).abs() < f64::EPSILON)
         && baked_layout_search_compatible(&options.layout)
         && pool.entries.iter().all(|entry| entry.progress.elite >= 2)
 }

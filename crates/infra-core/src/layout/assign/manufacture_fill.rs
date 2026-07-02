@@ -9,8 +9,8 @@ use crate::layout::blueprint::{
     station_operator_capacity, BaseBlueprint, FacilityKind, RoomId, RoomProduct,
 };
 use crate::layout::context::LayoutContext;
-use crate::manufacture::input::ManuRoomInput;
-use crate::manufacture::input::ManuSearchRecipeMode;
+use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
+use crate::manufacture::solver::solve_manufacture_with_shift;
 use crate::operbox::OperBox;
 use crate::pool::{
     expand_manufacture_candidate_pool, filter_general_manufacture_search_pool,
@@ -782,7 +782,7 @@ fn score_manu_entries(
         mood: options.mood,
         layout: Arc::new(layout.clone()),
     };
-    let result = crate::manufacture::solve_manufacture(&input, table).ok()?;
+    let result = solve_manufacture_with_shift(&input, table, options.shift_hours).ok()?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
     let mut per_station = crate::manufacture::ManuProdBreakdown::default();
     let mut storage = crate::manufacture::ManuStorageBreakdown::default();
@@ -856,7 +856,7 @@ pub(super) fn pick_capacity_manu_hit(
         mood: options.mood,
         layout: Arc::new(layout.clone()),
     };
-    let result = crate::manufacture::solve_manufacture(&input, table)?;
+    let result = solve_manufacture_with_shift(&input, table, options.shift_hours)?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
     let mut per_station = crate::manufacture::ManuProdBreakdown::default();
     let mut storage = crate::manufacture::ManuStorageBreakdown::default();
@@ -942,6 +942,7 @@ pub(super) fn manu_options(
         operator_capacity: station_operator_capacity(room_level),
         top_k: options.top_k,
         mood: options.mood,
+        shift_hours: Some(options.shift_hours),
         layout: Arc::new(layout.clone()),
         recipe_mode: ManuSearchRecipeMode::Single(recipe),
         ..ManuSearchOptions::default()

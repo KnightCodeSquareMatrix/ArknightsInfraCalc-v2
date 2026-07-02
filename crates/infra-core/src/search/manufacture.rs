@@ -7,7 +7,9 @@ use serde::Serialize;
 use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
-use crate::manufacture::solver::{solve_manufacture, ManuProdBreakdown, ManuStorageBreakdown};
+use crate::manufacture::solver::{
+    solve_manufacture, solve_manufacture_with_shift, ManuProdBreakdown, ManuStorageBreakdown,
+};
 use crate::pool::{
     combinations_indices, combinations_indices_with_anchor, filter_general_manufacture_search_pool,
     filter_standalone_exact_with, ManuPool, StandaloneFilter,
@@ -81,6 +83,7 @@ pub struct ManuSearchOptions {
     pub mood: f64,
     pub top_k: usize,
     pub layout: SharedLayout,
+    pub shift_hours: Option<f64>,
     pub must_include_name: Option<String>,
     pub use_baked: bool,
     pub full_pool: bool,
@@ -95,6 +98,7 @@ impl Default for ManuSearchOptions {
             mood: 24.0,
             top_k: 5,
             layout: Arc::new(LayoutContext::search_baseline()),
+            shift_hours: None,
             must_include_name: None,
             use_baked: true,
             full_pool: false,
@@ -247,7 +251,7 @@ fn search_manufacture_single_recipe(
                 mood: options.mood,
                 layout: Arc::clone(&options.layout),
             };
-            eval_single_recipe_hit(&base, table, recipe)
+            eval_single_recipe_hit(&base, table, recipe, options.shift_hours)
         })
         .collect();
 
@@ -368,6 +372,7 @@ fn eval_single_recipe_hit(
     base: &ManuRoomInput,
     table: &SkillTable,
     recipe: RecipeKind,
+    shift_hours: Option<f64>,
 ) -> Option<ManuSearchHit> {
     let names = base
         .operator_names()
@@ -376,7 +381,11 @@ fn eval_single_recipe_hit(
         .collect();
     let mut room = base.clone();
     room.active_recipe = recipe;
-    let result = solve_manufacture(&room, table).ok()?;
+    let result = if let Some(hours) = shift_hours {
+        solve_manufacture_with_shift(&room, table, hours).ok()?
+    } else {
+        solve_manufacture(&room, table).ok()?
+    };
     let mut per_station = ManuProdBreakdown::default();
     let mut storage = ManuStorageBreakdown::default();
     let recipe_str = match recipe {

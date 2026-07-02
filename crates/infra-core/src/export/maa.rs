@@ -616,6 +616,7 @@ mod tests {
             shifts: vec![TeamShiftResult {
                 index: 0,
                 duration_hours: 12.0,
+                shift_duration: 12.0,
                 active_teams: vec![TeamLabel::Alpha, TeamLabel::Beta],
                 resting_team: TeamLabel::Gamma,
                 assignment,

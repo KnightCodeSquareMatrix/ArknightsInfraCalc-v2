@@ -11,7 +11,7 @@ use crate::layout::{
     AssignShiftMode, BaseAssignment, BaseBlueprint,
 };
 use crate::manufacture::input::ManuRoomInput;
-use crate::manufacture::solve_manufacture;
+use crate::manufacture::solve_manufacture_with_shift;
 use crate::operbox::OperBox;
 use crate::power::{solve_power, PowerRoomInput};
 use crate::skill_table::SkillTable;
@@ -181,7 +181,7 @@ pub fn score_base_assignment(
                 mood: 24.0,
                 layout: Arc::new(room.layout.clone()),
             };
-            let result = solve_manufacture(&input, table)?;
+            let result = solve_manufacture_with_shift(&input, table, shift_hours)?;
             let prod = result.prod_total;
             manu_prod_sum += prod;
             // 社区惯例：逐房展示只看技能面，不含人头与中枢全局注入。
