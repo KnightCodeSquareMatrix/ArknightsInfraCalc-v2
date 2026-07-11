@@ -3,6 +3,7 @@ mod layout;
 mod plan;
 mod profile;
 mod serve;
+mod shift_output;
 mod verify;
 
 pub use bake::bake_cmd;
