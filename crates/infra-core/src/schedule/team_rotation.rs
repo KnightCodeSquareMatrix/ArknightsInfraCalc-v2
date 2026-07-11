@@ -2090,6 +2090,19 @@ mod tests {
                     shift.index + 1,
                     room_id.0
                 );
+                let score = shift
+                    .scores
+                    .room_lines
+                    .iter()
+                    .find(|line| line.room_id == room_id.0)
+                    .unwrap_or_else(|| panic!("shift {} 缺少设施 {} 评分", shift.index + 1, room_id.0));
+                let room = blueprint.room(room_id).expect("production room");
+                match room.kind {
+                    FacilityKind::TradePost => assert!(score.trade_pct > 0.0),
+                    FacilityKind::Factory => assert!(score.manu_prod_total > 0.0),
+                    FacilityKind::PowerPlant => assert!(score.power_charge_speed_pct >= 0.0),
+                    _ => unreachable!(),
+                }
             }
             // 每班内部无重复干员。
             let mut seen = HashSet::new();

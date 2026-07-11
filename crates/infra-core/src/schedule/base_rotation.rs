@@ -38,12 +38,24 @@ pub struct RoomScoreLine {
     /// 仅贸易站填写：技能效率%（order_eff_skill，不含人头/全局）
     #[serde(default, skip_serializing_if = "is_zero_f64")]
     pub trade_skill_pct: f64,
+    /// 仅贸易站填写：赤金侧等效效率%。
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub trade_gold_pct: f64,
+    /// 仅制造站填写：包含人头与全局注入的总生产效率%。
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manu_prod_total: f64,
+    /// 仅制造站填写：不含人头与全局注入的技能生产力%。
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manu_prod_skill: f64,
     /// 仅制造站填写：社区展示口径，即技能生产力 `prod_skill`（不含人头/全局注入）。
     #[serde(default, skip_serializing_if = "is_zero_f64")]
     pub manu_score: f64,
     /// 仅发电站填写：charge_speed_pct
     #[serde(default, skip_serializing_if = "is_zero_f64")]
     pub power_score: f64,
+    /// 仅发电站填写：充能速度%。
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub power_charge_speed_pct: f64,
 }
 
 fn is_zero_f64(v: &f64) -> bool {
@@ -140,6 +152,7 @@ pub fn score_base_assignment(
             line.trade_score = snapshot.trade_score;
             line.trade_pct = snapshot.trade_pct;
             line.trade_skill_pct = snapshot.trade_skill_pct;
+            line.trade_gold_pct = snapshot.trade_gold_pct;
         } else if !room.operators.is_empty() {
             let input = TradeRoomInput {
                 level: room.level,
@@ -173,6 +186,8 @@ pub fn score_base_assignment(
         {
             manu_prod_sum += snapshot.manu_prod_total;
             line.manu_score = snapshot.manu_prod_skill;
+            line.manu_prod_total = snapshot.manu_prod_total;
+            line.manu_prod_skill = snapshot.manu_prod_skill;
         } else if !room.operators.is_empty() {
             let input = ManuRoomInput {
                 level: room.level,
@@ -186,6 +201,8 @@ pub fn score_base_assignment(
             manu_prod_sum += prod;
             // 社区惯例：逐房展示只看技能面，不含人头与中枢全局注入。
             line.manu_score = result.prod_skill;
+            line.manu_prod_total = result.prod_total;
+            line.manu_prod_skill = result.prod_skill;
         }
         room_lines.push(line);
     }
@@ -209,6 +226,7 @@ pub fn score_base_assignment(
             };
         power_charge_sum += score;
         line.power_score = score;
+        line.power_charge_speed_pct = score;
         room_lines.push(line);
     }
 
@@ -420,5 +438,7 @@ mod tests {
             .expect("manu_1 line");
         assert_eq!(scores.manu_prod_sum, 333.0);
         assert_eq!(line.manu_score, 30.0);
+        assert_eq!(line.manu_prod_total, 333.0);
+        assert_eq!(line.manu_prod_skill, 30.0);
     }
 }
