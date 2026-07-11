@@ -273,7 +273,7 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
         fs::create_dir_all(&dir)?;
         for shift in &report.shifts {
             let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
-            shift.assignment.save(&path)?;
+            super::shift_output::write_team_shift(&path, shift)?;
             eprintln!("wrote {}", path.display());
         }
     }

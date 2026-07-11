@@ -272,7 +272,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
         fs::create_dir_all(dir)?;
         for shift in &current.rotation.shifts {
             let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
-            shift.assignment.save(&path)?;
+            super::shift_output::write_team_shift(&path, shift)?;
         }
     }
 

@@ -73,7 +73,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         fs::create_dir_all(&dir)?;
         for shift in &rotation.shifts {
             let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
-            shift.assignment.save(&path)?;
+            super::shift_output::write_team_shift(&path, shift)?;
             eprintln!("排班 assignment → {}", path.display());
         }
     }
