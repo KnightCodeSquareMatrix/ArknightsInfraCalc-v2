@@ -23,7 +23,7 @@
 
 `layout` 和 `operbox` 是内联对象，不接受 caller 文件路径。`options` 可省略；rotation 默认为 ABC，top 默认为 20。layout 为 1 至 64 个房间，operbox 为 1 至 1000 项，top 为 1 至 100，两个 label 均为非空且不超过 200 UTF-8 bytes；request/response 单个 NDJSON frame 均不超过 8 MiB。
 
-完整参数契约位于 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)。Worker 在反序列化前执行该 schema，所有 wire 对象拒绝未知字段；重复 ID、kind/product 跨字段一致性等继续由 Rust 领域校验。v1 schema 发布后不可原地扩展，参数变化必须使用新版本。
+机器参数契约位于 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)，人类可读版本见 [`contracts/plan-compute-v1.md`](../contracts/plan-compute-v1.md)。Worker 在反序列化前执行该 schema，所有 wire 对象拒绝未知字段；重复 ID、kind/product 跨字段一致性等继续由 Rust 领域校验。v1 schema 发布后不可原地扩展，参数变化必须使用新版本。
 
 成功响应：
 

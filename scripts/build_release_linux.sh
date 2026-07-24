@@ -12,9 +12,10 @@ mkdir -p "$DIST"/{contracts,data,docs,fixtures,layout-gen,plans}
 
 cp target/release/infra-cli "$DIST/infra-cli"
 cp contracts/plan-compute-v1.schema.json "$DIST/contracts/plan-compute-v1.schema.json"
+cp contracts/plan-compute-v1.md "$DIST/contracts/plan-compute-v1.md"
 (
   cd "$DIST"
-  sha256sum contracts/plan-compute-v1.schema.json > contracts/SHA256SUMS
+  sha256sum contracts/plan-compute-v1.schema.json contracts/plan-compute-v1.md > contracts/SHA256SUMS
 )
 while IFS= read -r -d '' file; do
   target="$DIST/$file"

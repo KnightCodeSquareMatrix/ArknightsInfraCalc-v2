@@ -1,0 +1,202 @@
+# `plan.compute` 参数契约 v1
+
+> 状态：已发布、不可变  
+> 机器契约：[plan-compute-v1.schema.json](plan-compute-v1.schema.json)  
+> JSON Schema 方言：Draft 2020-12  
+> 实现入口：`infra-cli serve` / `method: "plan.compute"`
+
+## 1. 契约范围
+
+本文解释 `plan.compute` 请求中的 `params` 对象。JSON Schema 是结构 admission 的机器真源；本文不得定义与 schema 不同的字段、类型或范围。
+
+本契约不覆盖：
+
+- NDJSON 请求 envelope 的 `id`、`method`；
+- 成功响应中的 profile、rotation 和 MAA；
+- 错误 envelope；
+- legacy `method: "plan"` 路径协议。
+
+上述协议见 [前端对接说明](../docs/FRONTEND_CLI.md) 和 [Serve 指南](../docs/FRONTEND_SERVE_GUIDE.md)。
+
+## 2. 参数结构
+
+```json
+{
+  "schema_version": 1,
+  "layout": {
+    "template": "243",
+    "drone_cap": 235,
+    "scenario": {},
+    "rooms": [
+      {
+        "id": "control",
+        "kind": "control_center",
+        "level": 3
+      }
+    ]
+  },
+  "operbox": [
+    {
+      "id": "char_009_12fce",
+      "name": "12F",
+      "elite": 2,
+      "level": 30,
+      "own": true,
+      "potential": 6,
+      "rarity": 2
+    }
+  ],
+  "labels": {
+    "layout": "243",
+    "operbox": "Full E2"
+  },
+  "options": {
+    "rotation": "abc_12_6_6",
+    "top": 20,
+    "system_preferences": {},
+    "maa_title": "My schedule"
+  }
+}
+```
+
+该示例只展示通过结构 schema 的最小形状，不保证单房布局可求解。真实请求应提交完整 layout 和 operbox，例如 `data/fixtures/243/` 中的标准输入。
+
+### 顶层字段
+
+| 字段 | 类型 | 必填 | 约束 |
+|---|---|---|---|
+| `schema_version` | integer | 是 | 固定为 `1` |
+| `layout` | object | 是 | 见 BaseBlueprint |
+| `operbox` | array | 是 | 1 至 1000 项 |
+| `labels` | object | 否 | 省略时使用内联输入的默认标签 |
+| `options` | object | 否 | 省略时使用默认求解选项 |
+
+顶层及所有具名 wire 对象均设置 `additionalProperties: false`。未知字段会在 Serde 反序列化前被拒绝。
+
+## 3. BaseBlueprint
+
+| 字段 | 类型 | 必填 | 默认值 / 约束 |
+|---|---|---|---|
+| `template` | string 或 null | 否 | 展示标签，不参与路径解析 |
+| `drone_cap` | integer | 否 | 默认 `135`，范围 `0..=4294967295` |
+| `scenario` | object | 否 | 默认 `{}` |
+| `rooms` | array | 是 | 1 至 64 间 |
+
+### `scenario`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `elite_facility_count` | integer 或 null | `u8` 范围 |
+| `sui_facility_count` | integer 或 null | `u8` 范围 |
+| `dorm_occupant_count` | integer 或 null | `u8` 范围 |
+| `base_workforce` | string[] | 默认空数组 |
+| `initial_global` | object | key 必须是 schema 列出的全局资源 ID，value 为 number |
+
+### `rooms[]`
+
+| 字段 | 类型 | 必填 | 约束 |
+|---|---|---|---|
+| `id` | string | 是 | 同一 layout 内必须唯一 |
+| `kind` | enum | 是 | 见下方设施枚举 |
+| `level` | integer | 是 | JSON 结构为 `u8`；领域校验要求至少为 1 |
+| `product` | object 或 null | 否 | 贸易站和制造站必须提供匹配类型 |
+| `dorm_beds` | integer 或 null | 否 | `u8`；宿舍提供时不得为 0 |
+| `dorm_ambience_level` | integer 或 null | 否 | `u8`；宿舍提供时不得为 0 |
+
+设施枚举：
+
+```text
+control_center | trade_post | factory | power_plant | dormitory |
+office | meeting_room | training_room | workshop
+```
+
+生产配置：
+
+```json
+{ "trade": { "order": "gold" } }
+```
+
+贸易订单为 `gold | originium`。
+
+```json
+{ "factory": { "recipe": "gold" } }
+```
+
+制造配方为 `all | battle_record | gold | originium`。
+
+## 4. OperBox
+
+每项必须包含全部字段：
+
+| 字段 | 类型 | 约束 |
+|---|---|---|
+| `id` | string | 非空；数组内唯一 |
+| `name` | string | 非空；数组内唯一 |
+| `elite` | integer | `0..=2` |
+| `level` | integer | `1..=90` |
+| `own` | boolean | `false` 时不参与排班 |
+| `potential` | integer | `1..=6` |
+| `rarity` | integer | `1..=6` |
+
+Worker 会先 trim `id` 和 `name`，再检查空值及重复项。
+
+## 5. Labels 与 Options
+
+### `labels`
+
+`layout` 和 `operbox` 均为 string 或 null。有效非空标签最多 200 UTF-8 bytes；该字节约束由 Rust 校验，schema 使用 `x-maxUtf8Bytes: 200` 记录。
+
+### `options`
+
+| 字段 | 类型 | 默认值 / 约束 |
+|---|---|---|
+| `rotation` | enum | 默认 `abc_12_6_6` |
+| `top` | integer | 默认 `20`，范围 `1..=100` |
+| `system_preferences` | object | 默认 `{}`；value 必须为 string |
+| `maa_title` | string 或 null | 可选 MAA 标题 |
+
+rotation 枚举：
+
+```text
+abc_12_6_6 | main_backup_12_12 |
+fiammetta_8_8_4_4 | abyssal_7_5_7_5
+```
+
+JSON Schema 中的 `default` 是契约注解；实际默认值由 Worker 的 Serde DTO 提供。
+
+## 6. 校验顺序
+
+Worker 按以下顺序处理：
+
+1. NDJSON frame、UTF-8 和 8 MiB 上限；
+2. 请求 envelope 与 method 分发；
+3. 本契约的 JSON Schema admission；
+4. Serde 反序列化；
+5. layout、operbox、label 和编排偏好的领域校验；
+6. 求解与结果序列化。
+
+JSON Schema 负责字段集合、基础类型、枚举、externally-tagged product 结构及数值范围。以下规则由领域校验负责：
+
+- room ID、operator ID 和 operator name 唯一性；
+- room kind 与 product 的跨字段一致性；
+- office / meeting room 数量上限；
+- trim 后非空和 UTF-8 字节上限；
+- `system_preferences` 中 rule / alternative 是否存在。
+
+当前 schema admission 或领域校验失败均返回 `PLAN_FAILED`，stage 为 `plan.compute`。错误码细分不属于本契约。
+
+## 7. 版本与发布
+
+v1 发布后不可原地增加、删除或改变请求字段及其语义。任何变化必须发布新的 schema 版本，并使用新的 `schema_version`。
+
+Worker 的 `ping` result 包含：
+
+```json
+{
+  "protocol_version": 1,
+  "plan_schema_version": 1,
+  "plan_contract_sha256": "<64 lowercase hex characters>"
+}
+```
+
+`plan_contract_sha256` 是 Worker 内嵌 JSON Schema 原始 bytes 的 SHA-256。Linux 发布包在 `contracts/SHA256SUMS` 中记录同一 schema 和本文档的校验值。

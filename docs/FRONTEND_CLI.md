@@ -274,7 +274,7 @@ infra-cli layout team-rotation \
 
 响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）和 `maa`。`rotation.shifts[]` 承载 index、duration、active/resting teams、weighted 指标和 `efficiencies.room_lines`，不承载完整 assignment。`rotation` 取值为 `abc_12_6_6`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5`；省略时为默认 ABC，非法值明确失败。
 
-`plan.compute` v1 参数的机器契约是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)。Worker 在 Serde 反序列化前执行该 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 发布后不可原地增加、删除或改变请求字段，任何结构或语义扩展必须使用新版本。
+`plan.compute` v1 参数的机器契约是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)，人类可读契约见 [`contracts/plan-compute-v1.md`](../contracts/plan-compute-v1.md)。Worker 在 Serde 反序列化前执行该 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 发布后不可原地增加、删除或改变请求字段，任何结构或语义扩展必须使用新版本。
 
 协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。重复 room/operator ID、房间 kind 与 product 的跨字段一致性等不能由结构 schema 完整表达的规则，仍由 Rust 领域校验拒绝。
 
