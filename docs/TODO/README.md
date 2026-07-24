@@ -18,6 +18,7 @@
 | [动态 Producer A+：设施无关候选列 + 精确索引 Join](DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) | `ready-on-request` | 动态 producer 候选列、精确索引 Join 和 winner dependency 任务 |
 | [Worker 内联 JSON 集成与部署验收](Worker内联JSON集成与部署验收.md) | `ready-on-request` | 将已验证的 plan.compute v1 集成到目标分支和部署环境并完成浏览器验收 |
 | [Worker 旧路径协议清理](Worker旧路径协议清理.md) | `blocked` | 等待 plan.compute v1 集成部署和 inventory 后删除 legacy plan 路径协议与兼容说明 |
+| [下一版本简化 Worker 契约校验](下一版本简化Worker契约校验.md) | `ready-on-request` | 下一版本移除运行时契约 hash 验证，仅对不符合 JSON Schema 的参数输出错误报告 |
 | [体系注册表后续缺口](体系注册表后续缺口.md) | `ready-on-request` | 承接旧组合体系规范化报告中仍有效但未获当前授权的开放项 |
 | [练卡推荐规则来源精修](练卡推荐规则来源精修.md) | `ready-on-request` | 逐步补齐已确认练卡规则的具体来源、收益标签和技能元数据 |
 | [罗德岛基建管家 — 网站页面结构设计](网站页面结构设计.md) | `proposal` | 网站页面结构和前端线框图提案，尚未获得实施授权 |
