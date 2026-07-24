@@ -8,9 +8,14 @@ cd "$ROOT"
 cargo build --release -p infra-cli
 
 rm -rf "$DIST"
-mkdir -p "$DIST"/{data,docs,fixtures,layout-gen,plans}
+mkdir -p "$DIST"/{contracts,data,docs,fixtures,layout-gen,plans}
 
 cp target/release/infra-cli "$DIST/infra-cli"
+cp contracts/plan-compute-v1.schema.json "$DIST/contracts/plan-compute-v1.schema.json"
+(
+  cd "$DIST"
+  sha256sum contracts/plan-compute-v1.schema.json > contracts/SHA256SUMS
+)
 while IFS= read -r -d '' file; do
   target="$DIST/$file"
   mkdir -p "$(dirname "$target")"

@@ -12,3 +12,5 @@ infra-core = { path = "../infra-core" }
 serde.workspace = true
 serde_json.workspace = true
 csv.workspace = true
+jsonschema = { version = "0.18", default-features = false, features = ["draft202012"] }
+sha2 = "0.10"

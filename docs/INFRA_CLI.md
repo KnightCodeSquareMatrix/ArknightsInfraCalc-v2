@@ -76,7 +76,7 @@ crates/infra-cli/src/
 | `bake.rs` | `bake`：并行生成 schema v12 的整数效率 `combo_table.bin`、`operators.json`、`manifest.json`；贸易行显式保存首批 room-local 机制签名，manifest 保存 table hash/count；`bake validate` 校验当前 CLI 指纹和完整贸易 row universe | 贸易/制造效率公式；手写搜索排序 |
 | `plan_compute.rs` | `plan` 与 `serve` 共用的唯一 Plan 编排：一次 user rotation，再按调用方请求派生 profile/MAA | argv、文件写出、wire envelope、机制公式 |
 | `plan.rs` | **`plan`**：解析 argv/文件，调用共享 Plan 编排，再写 profile/MAA 和人类输出 | 画像算法（`box_profile/`）；排班逻辑（`schedule/`） |
-| `serve.rs` | `serve`：常驻读取 stdin JSON line；`plan.compute` 内联收发，legacy `plan` 暂时保留路径适配 | 新业务公式；第二套 Plan 编排 |
+| `serve.rs` | `serve`：常驻读取 stdin JSON line；按发布的 JSON Schema 校验 `plan.compute` 内联参数，legacy `plan` 暂时保留路径适配 | 新业务公式；第二套 Plan 编排 |
 | `layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval`：蓝图 JSON + operbox → `assign_shift` 宏观落位（或自定义 `--assignment`）→ `resolve_base` → 搜索/效率结算 | 蓝图格式定义（`infra-core::layout::blueprint`）；求解公式（在 `infra-core`） |
 | `profile.rs` | `profile layout-full` / `profile analyze-compare`：采集 CLI 热路径、搜索规模和分析链路耗时 | 业务求解公式；用户主流程输出契约 |
 | `verify.rs` | `verify_cmd`：遍历 `REGRESSION_CASES.csv`；按 `rule_id` 选夹具；对比三位小数最终效率、机制等效效率与规则 ID；再跑 `UNIT_OUTPUT_ANCHORS.csv` | 夹具定义（在 `verify/fixtures.rs`）；CSV 列定义（在 `verify/cases.rs`） |

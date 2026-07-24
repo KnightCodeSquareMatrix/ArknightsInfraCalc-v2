@@ -14,7 +14,7 @@
 ## 阻塞项
 
 - [Worker 内联 JSON 集成与部署验收](Worker内联JSON集成与部署验收.md) 尚未完成。
-- 删除前必须消费该任务保存的 deployment inventory：全部目标环境均支持 `protocol_version=1`、`plan_schema_version=1`，method 遥测覆盖已声明观测窗口，legacy `plan` 调用量为零且没有未知调用方。
+- 删除前必须消费该任务保存的 deployment inventory：全部目标环境均支持 `protocol_version=1`、`plan_schema_version=1` 和目标发布契约 hash，method 遥测覆盖已声明观测窗口，legacy `plan` 调用量为零且没有未知调用方。
 - 任一环境缺少 method 遥测、观测窗口不足或仍有旧调用方时，本任务继续保持 `blocked`。
 
 ## 责任边界

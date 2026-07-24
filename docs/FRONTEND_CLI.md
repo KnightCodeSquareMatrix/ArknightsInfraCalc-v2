@@ -8,7 +8,7 @@
 
 > 面向前端 / 排班 UI。**Layout 蓝图**用静态页 `layout-gen` 编辑；**排班求解 + MAA JSON** 用 `infra-cli`（子进程或后续 WASM）。
 > **Beta Release 构建**：2026-06-25 · backend commit `9e52de9` · frontend beta source `3259eaa` · 见 `release/VERSION.txt`
-> **Worker v1 落地状态（2026-07-23）**：后端与 Next BFF 的 `plan.compute` 实现及本地证据已完成；目标分支集成、发布部署和真实浏览器验收仍由 [Worker 内联 JSON 集成与部署验收](TODO/Worker内联JSON集成与部署验收.md) 跟踪。上述 Beta Release 不包含本轮迁移；已安装 Worker 是否支持 v1 以 `ping` 版本字段为准。
+> **Worker v1 落地状态（2026-07-23）**：后端与 Next BFF 的 `plan.compute` 实现及本地证据已完成；目标分支集成、发布部署和真实浏览器验收仍由 [Worker 内联 JSON 集成与部署验收](TODO/Worker内联JSON集成与部署验收.md) 跟踪。上述 Beta Release 不包含本轮迁移；已安装 Worker 是否支持 v1 以 `ping` 版本字段和契约 hash 为准。
 
 ---
 
@@ -266,15 +266,21 @@ infra-cli layout team-rotation \
 
 `serve` 的机器主入口是 `method: "plan.compute"`：
 
+下面只展示通过结构 schema 的最小形状，不承诺该单房布局可求解；真实调用必须内联提交完整 layout 和 operbox。
+
 ```json
-{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{},"operbox":[],"labels":{"layout":"243","operbox":"Full E2"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
+{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":2,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
 响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）和 `maa`。`rotation.shifts[]` 承载 index、duration、active/resting teams、weighted 指标和 `efficiencies.room_lines`，不承载完整 assignment。`rotation` 取值为 `abc_12_6_6`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5`；省略时为默认 ABC，非法值明确失败。
 
-协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。
+`plan.compute` v1 参数的机器契约是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)。Worker 在 Serde 反序列化前执行该 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 发布后不可原地增加、删除或改变请求字段，任何结构或语义扩展必须使用新版本。
 
-旧 `method: "plan"` 仅作为已发布前端的兼容入口，继续接收路径并按请求写 profile/MAA/shift 文件；它与 `plan.compute` 共用一次 Plan 编排，不是第二套 solver。新前端遇到 ping 缺少 `protocol_version=1` 时要求升级，不回退旧路径协议。
+协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。重复 room/operator ID、房间 kind 与 product 的跨字段一致性等不能由结构 schema 完整表达的规则，仍由 Rust 领域校验拒绝。
+
+`ping` 的 result 返回 `protocol_version=1`、`plan_schema_version=1` 和 `plan_contract_sha256`。hash 是 Worker 内嵌 schema 原始 bytes 的 SHA-256，可与发布包 `contracts/SHA256SUMS` 对账；它不替代 schema version。
+
+旧 `method: "plan"` 仅作为已发布前端的兼容入口，继续接收路径并按请求写 profile/MAA/shift 文件；它与 `plan.compute` 共用一次 Plan 编排，不是第二套 solver。新前端遇到 ping 缺少要求的版本字段或契约 hash 时要求升级，不回退旧路径协议。
 
 在 [集成与部署验收](TODO/Worker内联JSON集成与部署验收.md) 完成且部署 inventory 证明旧调用方已退出前，不得删除该兼容入口；退役工作单独由 [Worker 旧路径协议清理](TODO/Worker旧路径协议清理.md) 跟踪。
 

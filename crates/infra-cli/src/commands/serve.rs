@@ -22,10 +22,14 @@ use infra_core::schedule::{
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::Error;
+use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
+const PLAN_COMPUTE_SCHEMA_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v1.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OPERBOX_ENTRIES: usize = 1000;
 const MAX_LAYOUT_ROOMS: usize = 64;
@@ -41,6 +45,8 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
     let state = ServeState {
         instances: OperatorInstances::load(&default_instances_path()?)?,
         table: SkillTable::load(&default_skill_table_path()?)?,
+        plan_schema: compile_plan_compute_schema()?,
+        plan_contract_sha256: plan_contract_sha256(),
     };
 
     let _bake_handle = spawn_background_bake();
@@ -173,6 +179,42 @@ fn write_response(
 struct ServeState {
     instances: OperatorInstances,
     table: SkillTable,
+    plan_schema: JSONSchema,
+    plan_contract_sha256: String,
+}
+
+fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
+    let schema: serde_json::Value = serde_json::from_str(PLAN_COMPUTE_SCHEMA_JSON)
+        .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))?;
+    JSONSchema::options()
+        .with_draft(Draft::Draft202012)
+        .compile(&schema)
+        .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))
+}
+
+fn plan_contract_sha256() -> String {
+    format!("{:x}", Sha256::digest(PLAN_COMPUTE_SCHEMA_JSON.as_bytes()))
+}
+
+fn validate_plan_compute_params(
+    schema: &JSONSchema,
+    params: &serde_json::Value,
+) -> Result<(), Error> {
+    let Err(errors) = schema.validate(params) else {
+        return Ok(());
+    };
+    let details = errors
+        .take(3)
+        .map(|error| {
+            let path = error.instance_path.to_string();
+            let path = if path.is_empty() { "/" } else { &path };
+            format!("{path}: {error}")
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    Err(Error::msg(format!(
+        "plan.compute params do not match schema v{PLAN_SCHEMA_VERSION}: {details}"
+    )))
 }
 
 fn spawn_background_bake() -> Option<thread::JoinHandle<()>> {
@@ -434,6 +476,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": PLAN_SCHEMA_VERSION,
+                "plan_contract_sha256": state.plan_contract_sha256,
             })),
             None,
             None,
@@ -507,6 +550,7 @@ fn handle_plan_compute(
     state: &ServeState,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, Error> {
+    validate_plan_compute_params(&state.plan_schema, &params)?;
     let params: PlanComputeParams = serde_json::from_value(params)?;
     if params.schema_version != PLAN_SCHEMA_VERSION {
         return Err(Error::msg(format!(
@@ -753,6 +797,41 @@ mod tests {
         }
     }
 
+    fn valid_compute_params() -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": 1,
+            "layout": {
+                "template": "contract-test",
+                "drone_cap": 135,
+                "scenario": {},
+                "rooms": [
+                    { "id": "control", "kind": "control_center", "level": 3 }
+                ]
+            },
+            "operbox": [
+                {
+                    "id": "char_009_12fce",
+                    "name": "12F",
+                    "elite": 2,
+                    "level": 30,
+                    "own": true,
+                    "potential": 6,
+                    "rarity": 2
+                }
+            ],
+            "labels": {
+                "layout": "contract-test",
+                "operbox": "contract-test"
+            },
+            "options": {
+                "rotation": "abc_12_6_6",
+                "top": 20,
+                "system_preferences": {},
+                "maa_title": "Contract test"
+            }
+        })
+    }
+
     #[test]
     fn bounded_reader_drains_oversized_frame_and_reads_next_line() {
         let mut input = Cursor::new(b"12345\n{}\n".to_vec());
@@ -785,5 +864,69 @@ mod tests {
             "unexpected": true,
         });
         assert!(serde_json::from_value::<PlanComputeParams>(value).is_err());
+    }
+
+    #[test]
+    fn plan_compute_schema_accepts_the_v1_contract() {
+        let schema = compile_plan_compute_schema().unwrap();
+        let value = valid_compute_params();
+        validate_plan_compute_params(&schema, &value).unwrap();
+        serde_json::from_value::<PlanComputeParams>(value).unwrap();
+        assert_eq!(plan_contract_sha256().len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_schema_rejects_structural_mutations() {
+        let schema = compile_plan_compute_schema().unwrap();
+
+        let mut unknown_room_field = valid_compute_params();
+        unknown_room_field["layout"]["rooms"][0]["unexpected"] = serde_json::json!(true);
+
+        let mut invalid_rotation = valid_compute_params();
+        invalid_rotation["options"]["rotation"] = serde_json::json!("4");
+
+        let mut invalid_product_shape = valid_compute_params();
+        invalid_product_shape["layout"]["rooms"][0]["product"] =
+            serde_json::json!({ "trade": { "recipe": "gold" } });
+
+        let mut invalid_level = valid_compute_params();
+        invalid_level["operbox"][0]["level"] = serde_json::json!(91);
+
+        let mut invalid_top = valid_compute_params();
+        invalid_top["options"]["top"] = serde_json::json!(0);
+
+        for value in [
+            unknown_room_field,
+            invalid_rotation,
+            invalid_product_shape,
+            invalid_level,
+            invalid_top,
+        ] {
+            assert!(validate_plan_compute_params(&schema, &value).is_err());
+        }
+    }
+
+    #[test]
+    fn semantic_validation_remains_after_schema_admission() {
+        let schema = compile_plan_compute_schema().unwrap();
+        let mut duplicate_rooms = valid_compute_params();
+        duplicate_rooms["layout"]["rooms"] = serde_json::json!([
+            { "id": "control", "kind": "control_center", "level": 3 },
+            { "id": "control", "kind": "power_plant", "level": 3 }
+        ]);
+        validate_plan_compute_params(&schema, &duplicate_rooms).unwrap();
+        let params: PlanComputeParams = serde_json::from_value(duplicate_rooms).unwrap();
+        assert!(params.layout.validate().is_err());
+
+        let mut mismatched_product = valid_compute_params();
+        mismatched_product["layout"]["rooms"][0] = serde_json::json!({
+            "id": "trade_1",
+            "kind": "trade_post",
+            "level": 3,
+            "product": { "factory": { "recipe": "gold" } }
+        });
+        validate_plan_compute_params(&schema, &mismatched_product).unwrap();
+        let params: PlanComputeParams = serde_json::from_value(mismatched_product).unwrap();
+        assert!(params.layout.validate().is_err());
     }
 }
