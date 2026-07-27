@@ -139,6 +139,7 @@
 | `DailyTotals` | 贸易、制造、发电分别保存的 24 小时加权汇总；不存在匿名跨域总计。 | [评分模型](SCORING_MODEL.md#2-排班汇总) |
 | scoring policy | 对非生产或局部混合分量排序的具名规则，必须有稳定 ID 和 breakdown。 | [评分模型](SCORING_MODEL.md) |
 | `ControlInjectRawSumV0` | 当前中枢普通候选的局部注入 policy；不是生产效率。 | [评分模型](SCORING_MODEL.md#3-非生产-heuristic) |
+| `TradeManufactureWeightedEfficiencyV1` | 动态 producer 完整联合候选的具名贸易/制造加权 policy；当前默认 `1:1`，权重可显式调整，不改变分域效率字段。 | [评分模型](SCORING_MODEL.md#21-动态-producer-联合候选的具名加权-policy) |
 
 ## Bake 与验证
 

@@ -9,7 +9,7 @@
 > **状态**：**2026-07-15 通用规则编译器主路径已落地**；旧专用 evaluator 已删除，不再扩展“一体系一个函数”
 > **目标**：把业务体系写成角色、备选方案、关系和资源门槛，由同一个规则编译器产出完全解析的 **Rule → Candidate → Plan → Execute**；普通制造软同房仍由全合法候选池 + L1 solver 按实际效率发现。
 > **背景讨论**：同房组合、跨房体系、global effect 三套入口搅在 `assign_shift` 里是乱源，不是机制太多。
-> **历史旧稿**：[orchestration_engine_design.md](ARCHIVE/plans/orchestration_engine_design.md)。当前规则只枚举每条声明的有限 alternatives，并用显式同域 objective 或 policy 顺序裁决；仍不采用全编制笛卡尔积或匿名跨域总分。
+> **历史旧稿**：[orchestration_engine_design.md](ARCHIVE/plans/orchestration_engine_design.md)。当前规则只枚举每条声明的有限 alternatives，并用显式 objective 或 policy 顺序裁决；仍不采用全编制笛卡尔积或匿名跨域总分。动态 producer 后续使用评分 canonical 声明的具名、可分解跨域 policy。
 
 ---
 
@@ -52,7 +52,7 @@
 
 **原则**
 
-- **规则不重复机制公式**：候选需要比较时调用现有 room solver / `resolve_base` 读取正式结果，不在编排层手写效率公式；不同域之间不新增匿名综合权重。
+- **规则不重复机制公式**：候选需要比较时调用现有 room solver / `resolve_base` 读取正式结果，不在编排层手写效率公式；不同域只能使用评分 canonical 声明的具名、可分解权重，不能由编排层新增匿名综合分。
 - **硬体系与普通制造分界**：L3 / System 可承载已确认硬组合；普通制造软同房不表化，search 对全合法普通候选自然排序。
 - **global effect 不参与进编**：编制定完后再 `resolve` 写池。
 
@@ -179,9 +179,13 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 贸易金单余站按 `pick_trade_meta_then_plain` 尝试：
 
 1. 一贸龙门币布局由可露希尔 required anchor 先占位；多贸龙门币布局由但书 required anchor 先占位。核心所在房的其余位置按 `final_efficiency` 搜索；`gsl_docus_solo` / `gsl_docus_syracusa` 只结算实际组合。
-2. `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用三人组。
-3. `witch`：必须同时包含精二巫恋、精二龙舌兰和裁缝 β/α；blank shortcut 不进入自动 role。
+2. 默认多贸龙门币的第二核心是 `witch`：必须同时包含精二巫恋、精二龙舌兰和裁缝 β/α；blank shortcut 不进入自动 role。
+3. 默认第三核心是 `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用三人组。
 4. `witch_fallback` / `karlan` / `penguin` / plain：无龙舌兰巫恋兜底、灵知孑、企鹅、散件工具人三人组，且排除黑键与巫恋同房冲突。格拉斯哥成员作为普通合法候选参与实际 `final_efficiency` 搜索。
+
+Rosemary/黑键体系 alternative 激活时，在选定 alternative 的同一 Plan 决策中原子交换
+`witch` 与 `closure`：双贸易站 peak 使用但书 A + 可露希尔/黑键 B，完整龙巫进入 γ reserve。
+这不是永久提高 `closure` 默认优先级，也不能由已经填出的房间反推体系激活。
 
 这条顺序表达独立 core / fallback 策略，不是任意固定三人组优先级。八幡海铃、戴菲恩、凛御银灰都只作为可选中枢 producer；叙拉古、格拉斯哥、谢拉格 consumer 的实际组合由合法候选和 solver 决定。伺夜与贝洛内不要求同站，八幡与单个贸易消费者的极端组合同样合法。
 

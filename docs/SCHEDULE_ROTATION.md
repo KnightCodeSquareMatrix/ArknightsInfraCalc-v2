@@ -62,7 +62,10 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 原本休息的班次中放回原房间，并换下一个当前在岗干员。
 ```
 
-γ 替补贸易与 peak `assign_trade_remainder` 同路径：金单先尝试 `docus → closure → witch → witch_fallback → karlan → penguin`，再 plain；格拉斯哥是普通合法候选，不占固定 role；制造/发电仍站绑定贪心。
+γ 替补贸易与 peak `assign_trade_remainder` 同路径。当前代码的金单顺序仍是
+`docus → closure → witch → witch_fallback → karlan → penguin`，再 plain；格拉斯哥是普通合法
+候选，不占固定 role；制造/发电仍站绑定贪心。该顺序与下述最新核心 policy 的差异是待修复
+实现缺口，不能反向覆盖 canonical。
 
 实现：`crates/infra-core/src/schedule/team_rotation.rs`。
 
@@ -104,9 +107,15 @@ S2 有深海短班特例：运行时按稳定 control buff capability 找 produc
 
 八幡海铃、戴菲恩、凛御银灰由同一次 producer presence 枚举自然入选，并由 winner 的实际 consumer 派生 resolved dependency；不存在 `meta_vina` role。房内完整响应行 join 仍见 [A+ 实施 TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
+最新 canonical 是：多贸龙门币默认但书 > 龙巫 > 可露希尔；Rosemary/黑键 alternative 激活时，
+Plan 原子改为但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 γ reserve。下面编号继续记录当前
+代码入口和 required 条件，不表示 `closure` 永久高于 `witch`。
+
 1. `docus`：只在蓝图实际有至少 2 间贸易站且至少 1 间为龙门币订单时成为 required core；全源石单不启用。anchor 解析到实际龙门币站后，再从所有可用干员中按最终效率选择队友。叙拉古不注册固定体系：八幡海铃、伺夜、贝洛内均可不入选，伺夜与贝洛内可单走、同上且跨站、或自然同站；包含八幡海铃的中枢候选只有在最终实际贸易成员使其动态收益胜出时才采用。shortcut 仅按最终实际同房组合自然结算。
-2. `closure`：只在蓝图实际恰有 1 间贸易站且该站为龙门币订单时成为 required core；全源石单不启用。有黑键时可命中 `gsl_blackkey_closure`，缺黑键时仍上可露。
-3. `witch`：巫恋 + 龙舌兰 + 裁缝 β/α；普通白板不得进入自动龙巫站。
+2. `witch`：多贸龙门币默认第二核心；巫恋 + 龙舌兰 + 裁缝 β/α，普通白板不得进入自动龙巫站。
+3. `closure`：蓝图实际恰有 1 间贸易站且为龙门币订单时是 required core；完整 Rosemary/黑键
+   alternative 激活时则是该双贸 alternative 的条件 required core。有黑键时可命中
+   `gsl_blackkey_closure`，缺黑键时按既有降级路径处理。
 4. `witch_fallback`：无龙舌兰时的巫恋兜底。
 5. `karlan` / `penguin` / plain：灵知孑、企鹅、散件工具人；格拉斯哥成员在这些正常候选中按实际 `final_efficiency` 竞争。
 

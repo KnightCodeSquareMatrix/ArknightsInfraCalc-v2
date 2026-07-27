@@ -34,9 +34,35 @@
 `RoomEfficiencySnapshot` 保存 solver / search 的直接效率结果，避免 CLI 或排班层再次
 解释公式。手写 assignment 没有快照时才调用相应 solver 重算。
 
+### 2.1 动态 producer 联合候选的具名加权 policy
+
+用户于 2026-07-27 裁决：比较已经完整 resolve 的动态 producer 联合候选时，贸易与制造按显式
+`TradeManufactureWeightedEfficiencyV1` policy 合并排序：
+
+```text
+trade_total = Σr trade[r].final_efficiency
+manufacture_total = Σr manufacture[r].final_efficiency
+policy_sort_key = trade_weight × trade_total
+                + manufacture_weight × manufacture_total
+```
+
+当前默认 `trade_weight : manufacture_weight = 1 : 1`。该比值是可调整的产品 policy 参数，
+不是房间效率公式或永久常量；未来修改必须显式记录生效权重，并进入 policy/config 与 Bake
+指纹，不能散落在 solver、Plan 或 CLI 中。布局中的贸易/制造房间数量负责宏观产出结构，
+动态 producer 联合求解器只在给定布局内使用当前权重选最高加权总和。该裁决不自动扩张到
+其他 System / Rule alternative 的选型目标。
+
+此 policy 只消费分别结算的直接效率，不创建新的房间效率量纲，也不改变 `DailyTotals` 分域
+输出。发电效率不进入加权总和，只作为布局约束和生产 response 的支持状态。required anchor、
+体系原子性和人员互斥先作为 hard constraint 过滤；加权总和相等时再使用稳定 tie-break。
+
+当前代码中的 `ControlInjectRawSumV0` 仍是普通中枢补位和现有 producer prefix 的实现事实；
+将动态 producer 主路径迁移到上述 policy 是
+[动态 Producer A+](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 的开放项，文档裁决不冒充已实现。
+
 ## 3. 非生产 heuristic
 
-中枢普通排序仍使用具名 policy `ControlInjectRawSumV0`：
+中枢普通排序当前仍使用具名 policy `ControlInjectRawSumV0`：
 
 ```text
 trade_inject + manu_gold + manu_br
@@ -56,10 +82,11 @@ trade_inject + manu_gold + manu_br
 daifeen_trade_inject_sum = Σr (10 × n_g(r))
 ```
 
-该分量属于具名中枢 policy，不是生产效率。`(3,0)` 与 `(2,1)` 在此前缀分量上同为 30，
+该分量属于当前具名中枢 policy，不是生产效率。`(3,0)` 与 `(2,1)` 在此前缀分量上同为 30，
 但两者仍是不同的逐房 response signature；不得据此合并 CandidateRow、logical operator mask
-或跨房状态。每个 control prefix 内的完整贸易 tuple 仍由各房真实 `final_efficiency` 和既有
-贸易 comparator 选择，最终 winner 仍执行完整 live resolve。
+或跨房状态。迁移到 `TradeManufactureWeightedEfficiencyV1` 后，戴菲恩注入只通过各房真实
+`final_efficiency` 进入完整候选总和，不再作为跨 prefix 的最终 winner key；最终 winner 仍须
+执行完整 live resolve。
 
 ## 4. 输出约束
 

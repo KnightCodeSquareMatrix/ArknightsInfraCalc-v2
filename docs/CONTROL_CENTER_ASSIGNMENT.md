@@ -50,8 +50,8 @@ required 成员，可选 producer 由实际受影响设施的完整候选结果�
 solver 负责；编排规则只声明 admission 类别、需要联合的设施范围和排班关系，不复制公式。
 
 同房机制仍由单房 solver 一次选完。跨房、跨设施和全局资源机制只在互相改变分数或人员占用
-的影响闭包内联合比较，并使用调用方显式命名的 policy；不同设施百分比不得由 producer 层
-匿名相加。live 求值是正确性基线，Bake/cache miss 只能变慢，不能换候选或 winner。
+的影响闭包内联合比较，并使用调用方显式命名、可分解的 policy；producer 层不得自行匿名
+相加不同设施分量。live 求值是正确性基线，Bake/cache miss 只能变慢，不能换候选或 winner。
 
 winner 只输出最终结算中仍然有效的 producer 贡献及其最小充分 consumer 集合；同 family
 覆盖、上限截断或 shortcut 替代后无效的贡献不生成依赖。排班层只消费细粒度的同上同下、
@@ -80,6 +80,11 @@ Mujica 不设“未满五人即非法”的原子启用门禁。其完整五人�
 
 winner 只为实际贡献者派生同上同下关系：八幡海铃绑定实际叙拉古贸易成员；戴菲恩绑定各房实际格拉斯哥成员；凛御银灰只绑定达到三人阈值房内的谢拉格成员。不同贸易站不因此被强制搬到同房。完整实施交接见 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
+用户于 2026-07-27 裁决：动态 producer 的完整候选在 resolve 后使用
+`TradeManufactureWeightedEfficiencyV1` 比较，当前贸易与制造权重为 `1:1`。权重属于未来
+可调整的具名产品 policy；布局负责宏观贸易/制造房间配比，发电不进入该加权总和。具体公式
+和实现状态由 [SCORING_MODEL.md](SCORING_MODEL.md#21-动态-producer-联合候选的具名加权-policy) 统一拥有。
+
 ## 当前实现状态与已知缺口
 
 - 中枢搜索在合法候选足够时只生成 5 人组合；无技能普通角色可作为有界 fallback 补位。
@@ -91,6 +96,8 @@ winner 只为实际贡献者派生同上同下关系：八幡海铃绑定实际�
 - `vina_lungmen` fixed System、`meta_vina` role、按名字推断八幡/戴菲恩/灵知的 rotation 路径已删除；`gsl_vina_lungmen` 仅保留实际同房组合结算。
 - 涤火杰西卡关系为 `none`：每班按实际黑钢 workforce 重算，不与水月、香草、杰西卡或标准化组合固定 team / `shift_bind`。
 - 当前 producer presence 集合枚举对结构化候选全集是精确的。`must_include` 锁定和正收益上界属于 `safe_reduction`；测试会从同一 seed 分别启用、关闭剪枝，并核对最终 assignment、`ControlInjectRawSumV0` key 和 resolved dependency，平局不得剪枝，未完成 support 输入返回无穷上界。
+- `TradeManufactureWeightedEfficiencyV1` 尚未接入当前 prefix winner；旧 raw-inject 上界也不能
+  直接作为新 policy 的安全上界。exact joint 恢复时必须先禁用或证明新的同单位上界。
 - 贸易/制造多房内部仍使用既有有序填房，明确分类为 `policy_restriction`。当前结果只能在该具名 policy 限制空间内解释，不保证 canonical 完整空间的 exact joint 或全局最优；最终 refresh 不能补回前房依赖后房时已经错失的候选。
 - 完整条件响应行和 exact joint 仍是 correctness/conformance 开放项，Bake 是与其分开的性能工作。产品要求 exact 多房保证、撤销当前 policy restriction、出现错误 winner、新机制无法表达或用户重新授权时，应恢复 A+ TODO；不能把它降级成只有复现 bug 后才处理的性能优化。
 - 纯人间烟火不使用有序 `pick_one`：计划只声明重岳/令候选组最低命中数，

@@ -74,7 +74,8 @@ final_efficiency
 ```
 
 单配方搜索按 `final_efficiency` 排序。多产线结果是各产线直接效率之和，仍保持制造域
-量纲，不与贸易或发电相加。
+量纲，不写入贸易或发电的结果字段。具名编制 policy 可以显式消费各域分量做候选排序，
+但不改变这些分量的量纲或分域输出。
 
 ### 3.3 发电
 
@@ -105,7 +106,8 @@ L1 技能解释（原始机制数值）
 - `infra-cli` 只负责加载与格式化，不补基础 `1.000`，也不拼百分比公式。
 - `data/trade_shortcuts.json` 保存规则 ID、社区单位产出和机制等效效率。
 - `RoomEfficiencySnapshot` 只保存新直接效率字段；旧 assignment 必须迁移数据。
-- 贸易、制造、发电每日汇总分开输出，不存在匿名跨域总分。
+- 贸易、制造、发电每日汇总分开输出，不存在匿名跨域总分；具名、可分解且显式携带权重的
+  候选排序 policy 不写回这些汇总字段。
 
 ## 5. 对外字段
 
@@ -125,6 +127,9 @@ L1 技能解释（原始机制数值）
 生产候选若进入通用 `TeamCandidate`，最终值只写 `final_efficiency: Option<Efficiency>`；
 附加解释值写入 `metrics[].value`，不再存在 `raw_score` / `decision_score`。中枢的
 `ControlInjectRawSumV0` 通过 `policy` + `policy_sort_key` 单独表达，不冒充生产效率。
+动态 producer 联合候选使用的 `TradeManufactureWeightedEfficiencyV1` 只消费贸易与制造分域
+总和；当前默认权重为 `1:1`，未来调整权重不修改 `Efficiency`、房间快照或 `DailyTotals`
+schema，也不自动成为其他 System / Rule alternative 的 comparator。
 
 ## 6. 回归要求
 

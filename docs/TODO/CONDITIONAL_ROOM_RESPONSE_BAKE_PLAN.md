@@ -2,7 +2,7 @@
 
 > 文档角色：active-change
 > 生命周期状态：ready-on-request
-> 当前真源：docs/QUALITY_AND_AUDIT.md；docs/ORCHESTRATION_LAYER.md
+> 当前真源：docs/QUALITY_AND_AUDIT.md；docs/ORCHESTRATION_LAYER.md；docs/SCORING_MODEL.md
 > 摘要：设施无关条件化响应 Bake 的后续实施任务
 
 > 历史进度：2026-07-17 曾获用户授权并推进；当前没有活跃 writer，等待用户重新授权，或
@@ -37,7 +37,8 @@ required admission。
 4. [x] 将技能分为“单人可独立结算”和“必须联合确定”；只对后者列最小机制闭包。
 5. [x] 对每个闭包列出响应不同的有效子集或阈值、作用域、仍需运行时提供的状态，
    以及普通队友是否可留到运行时 Join。
-6. [x] 用户确认首批组合和戴菲恩跨中枢前缀 comparator；进入首批实施。
+6. [x] 用户确认首批组合和戴菲恩逐房作用域；2026-07-27 又裁决完整 prefix 使用可参数化的
+   贸易/制造加权效率 comparator，当前权重 `1:1`。
 
 建议输出表：
 
@@ -124,9 +125,10 @@ inject；八幡海铃仍保留全贸易站总数 scope。2026-07-19 后 `meta_vi
 4. 无语义冲突的动态 producer：凛御银灰逐房阈值、八幡海铃全贸易总数。
 5. 戴菲恩逐房效果修复通过后可纳入；全局资源链随后作为跨设施验收轴。
 
-用户于 2026-07-17 确认上述首批范围，并确认戴菲恩跨 control prefix 使用各贸易房动态注入
-百分点之和。首批实施不因此把常见满组、segment 或当前 winner 升级为 required admission；
-各房 response 仍保留逐房分布，完整 winner 仍按真实 solver 与既有 comparator 产生。
+用户于 2026-07-17 确认上述首批范围和戴菲恩逐房 response。2026-07-27 用户进一步裁决：
+完整 prefix winner 使用 `TradeManufactureWeightedEfficiencyV1`，当前权重 `1:1`；未来可通过
+显式 policy 参数修改。首批实施不因此把常见满组、segment 或当前 winner 升级为 required
+admission；各房 response 仍保留逐房分布，裸注入和不再决定最终 winner。
 
 #### 首批贸易 room-local 物化（2026-07-17）
 
@@ -430,8 +432,9 @@ breakdown_id
 八幡海铃和凛御银灰存在循环依赖：贸易成员决定摘要，摘要又改变各房排名。运行时按有限摘要
 枚举情景，选出 rows 后检查实际摘要是否等于假设；不自洽的候选直接作废。
 
-戴菲恩的跨 control prefix 比较按已确认口径使用各贸易房动态注入百分点之和。生产房内部
-仍由真实 `final_efficiency` 和既定 role comparator 排序，不新增匿名综合分。
+每个完整 prefix 的贸易与制造 response 分别汇总真实 `final_efficiency`，再由
+`TradeManufactureWeightedEfficiencyV1` 比较；当前权重 `1:1`，未来调整值必须进入 catalog
+semantic fingerprint。戴菲恩仍保留逐房 Glasgow signature，不因最终加权求和而先聚合 response。
 
 ## 6. 多线程与文件布局
 

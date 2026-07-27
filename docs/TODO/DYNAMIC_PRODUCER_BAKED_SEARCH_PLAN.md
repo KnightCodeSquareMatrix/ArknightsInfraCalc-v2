@@ -2,7 +2,7 @@
 
 > 文档角色：active-change
 > 生命周期状态：ready-on-request
-> 当前真源：docs/CONTROL_CENTER_ASSIGNMENT.md；docs/ORCHESTRATION_LAYER.md；docs/QUALITY_AND_AUDIT.md
+> 当前真源：docs/CONTROL_CENTER_ASSIGNMENT.md；docs/ORCHESTRATION_LAYER.md；docs/SCORING_MODEL.md；docs/QUALITY_AND_AUDIT.md
 > 摘要：动态 producer 候选列、精确索引 Join 和 winner dependency 任务
 
 > 当前进度：2026-07-19 已完成通用 rule catalog、producer presence 集合比较、完整有序生产
@@ -14,14 +14,19 @@
 > 无法表达、违反用户确认的性能预算，或用户重新授权。
 > 性能口径：当前 debug full-E2 样例约 8.4s 不是验收结论；尚无用户确认的当前性能预算。
 > 用户确认方向：凛御银灰、戴菲恩、八幡海铃进入同一套可选中枢 producer 生命周期。
-> 算法偏好：问题规模小，优先“多烘焙、按完全等价签名做小型精确 Join”的模型；不扫描原始全笛卡尔积，DP、Pareto 与 branch-and-bound 不作为首版前提。
+> 算法偏好：枚举会改变机制的有限充分状态，不 Bake 最终阵容；小状态先用 live 精确参考，
+> 实测后再选择穷举或有可证明上界的 Join，并决定是否物化条件响应。不得扫描原始全笛卡尔积
+> 或使用固定 top-K。
 > 本文用途：保留 exact joint 与 Bake 的可恢复 active change；当前实现事实以本文标记的完成
-> 状态和 canonical 为准。本文件继续负责 producer 语义、联合候选、winner commit 与 rotation
-> dependency，不再主导通用 catalog schema。
+> 状态和 canonical 为准。本文件继续负责 producer 联合候选、winner commit 与 rotation
+> dependency 的实施 delta；业务语义与 comparator 分别由对应 canonical 拥有，不再主导通用
+> catalog schema 或形成第二评分真源。
 > Bake 物化边界、并行生成、分片与运行时查询的当前方案见
-> [条件化单房响应 Bake 计划](CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md)；本文继续负责 producer
-> 业务不变量、联合候选合法性、comparator、winner commit 与 rotation dependency。
+> [条件化单房响应 Bake 计划](CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md)；本文只记录 canonical
+> 业务不变量与 comparator 在联合候选合法性、winner commit 和 rotation dependency 上的实施义务。
 
+> 评分裁决：2026-07-27 用户确认完整候选按具名贸易/制造加权效率比较，当前权重 `1:1`，
+> 比值未来允许通过显式 policy 参数调整；布局负责宏观产出结构。
 > 设计边界补充：三名动态贸易 producer 仍是首个数值回归面，但本次完成口径扩大为当前
 > 已建模跨设施 producer 的统一规则、既有 Plan admission 与 resolved dependency 迁移；
 > 同房机制继续复用正式单房 solver。尚无 canonical comparator 的机制必须显式 unsupported
@@ -267,24 +272,32 @@ join partition 必须保留 `siracusa_by_room`、`glasgow_by_room` 和 `karlan_q
 2. 执行该候选对应的 system/dorm producer 与 power 支持阶段，并对这个 control prefix resolve 一次。
 3. 对 trade tuple 用 baked row feature 推导完整 effect signature；精确 response 命中时直接读取同一 solver 离线生成的结果。
 4. response miss 时，把**所有**贸易房同时放入临时 assignment，调用一次 `resolve_base`，让每间贸易房都看到最终跨房 workforce，再用真实 solver / shortcut 结算；相同完整 signature 可在本轮 memo。
-5. 用项目当前具名 comparator 比较完整候选；生产房内部仍按 `final_efficiency`，不得加入公孙人工固定分或匿名跨域权重。
+5. 用 `TradeManufactureWeightedEfficiencyV1` 比较完整候选；当前贸易/制造权重为 `1:1`，
+   权重必须显式进入 policy 与 Bake 指纹，不得加入公孙人工固定分或未声明分量。
 6. 对暂定 winner 必须构造完整临时 assignment 再真实 resolve 一次，并核对 baked breakdown / `rule_id`。若不一致，整次查询拒绝该 catalog 并用 live reference 重跑，不能只修正 winner 分数。
 7. 由真实 winner 记录 `ResolvedProducerDependency`，然后一次 commit。
 
-本计划不授权重写评分。首期把当前过程式顺序显式命名为两个 comparator：
+当前评分契约已经由用户裁决为：
 
-1. `TradeFillLexicographicV0`：统一 `role_rank` 全序为 `docus → closure → witch → witch_fallback → karlan → penguin → plain`；一行同时命中多个 role 时取最先匹配者，源石单只允许 plain。房间顺序由唯一 `ordered_trade_rooms` 生成：保留现有但书二级金单站优先规则，其余按 blueprint 顺序 / 稳定 room id。逐房先比较 `role_rank`，再比较该房 `final_efficiency`，最后用稳定 row id 打破同分。`meta_vina` 不再占一个层级。
-2. `PeakPrefixComparatorV0`：每个 control prefix 先用上一个 comparator 选出自己的贸易 tuple；不同 prefix 仍只比较现有 `ControlInjectRawSumV0` / `policy_sort_key`。相等时先选当前普通 `assign_control` 候选宇宙本来就可达的 `ordinary_eligible` row，再按现有 control-search 稳定顺序和 logical operator id tuple 排序；producer 自然出现在 ordinary row 时仍保留 ordinary-first 资格。不偷偷加入贸易总和或匿名跨域权重。
+1. LMD 核心布局先满足 hard admission。多贸默认优先级为但书 > 龙巫 > 可露希尔；
+   Rosemary/黑键体系 alternative 激活时，Plan 原子对调后两者，peak 使用但书 + 可露希尔/黑键，
+   完整龙巫进入 γ reserve。叙拉古等普通队友不升级为 hard core。
+2. 每个完整 prefix 必须同时结算全部贸易和制造房；令 `T=Σ trade.final_efficiency`、
+   `M=Σ manufacture.final_efficiency`，使用
+   `TradeManufactureWeightedEfficiencyV1 = trade_weight×T + manufacture_weight×M` 比较。
+3. 当前默认 `trade_weight:manufacture_weight=1:1`。比值未来可调整，但必须由显式 policy/config
+   提供并进入输出解释与 Bake fingerprint；布局负责宏观贸易/制造房间配比。
+4. 发电不进入加权总和，只作为约束和 response 支持状态；`ControlInjectRawSumV0` 只保留为
+   普通中枢补位的当前 policy，不再决定动态 producer 的最终 prefix winner 或其平局。
 
-这精确复现当前评分契约，同时让 producer 的实际 full-layout 注入进入每房 solver。若未来希望不同 control prefix 直接比较贸易总 `final_efficiency`，必须另行请用户裁决并更新 `SCORING_MODEL.md`，不能借 A+ 偷换目标函数。
+该裁决改变目标函数但不改变房间 `final_efficiency`、`DailyTotals` 分域输出或 L1-L3 公式。
+当前代码仍使用旧 prefix comparator，因此本段是待实现 contract，不是当前实现快照。
 
-#### 已裁决的戴菲恩 comparator 口径
+#### 戴菲恩在新 comparator 中的口径
 
-用户于 2026-07-17 裁决：戴菲恩对不同贸易房的动态注入，在跨 control prefix 比较时使用
-各房注入百分点之和，即 `Σr (10 × n_g(r))`。例如 `(3,0)` 与 `(2,1)` 的该 policy 分量均为
-30；这只表示两个 control prefix 在戴菲恩注入总量上相等，不允许合并逐房 response signature。
-每个 prefix 内仍按各房真实 `final_efficiency` 和既有贸易 comparator 选择完整 tuple。该口径
-已同步到 `SCORING_MODEL.md`。
+戴菲恩仍按每房 `10 × n_g(r)` 生成真实 response，`(3,0)` 与 `(2,1)` 不能合并逐房
+signature。旧的注入百分点和只保留为解释分量；最终 winner 由这些 response 产生的各房
+`final_efficiency` 进入 `TradeManufactureWeightedEfficiencyV1`，不再单独比较裸注入和。
 
 同样，灵知的“效率下降、订单上限增加”不能进入裸注入百分点 comparator。灵知是否由
 单位产出、`final_efficiency` 或现有固定 role 决定选型，必须另行裁决；首期不得假借
@@ -311,25 +324,30 @@ best = None
 for control_effect_bucket in compatible_control_buckets:
     for reachable_trade_feature_state in indexed_feature_states(control_signature):
         sorted_views = baked_or_live_row_responses(control_signature, trade_feature_state)
-        rows = first_compatible_rows(
+        rows = exact_disjoint_join(
             control_effect_bucket.rows,
             sorted_views.room_rows,
             available_variant_mask,
             used_mask,
-            TradeFillLexicographicV0,
+            TradeManufactureWeightedEfficiencyV1,
         )
         if rows exist:
             candidate = materialize_exact_row_responses(rows, sorted_views)
-            best = PeakPrefixComparatorV0(best, candidate)
+            best = TradeManufactureWeightedEfficiencyV1(best, candidate)
 validate_best_on_full_live_assignment_or_rerun()
 commit(best) exactly once
 ```
 
-`first_compatible_rows` 对已排序的 3～N 个行列表做小型 best-first 索引 join。每个 `BakedRoomResponse(row_id, exact full signature)` 必须在入堆前可得；各列表在**同一个完整 control + feature signature** 下按对应房级 comparator 单调排序。最大堆 key 使用完整词典序 comparator，并维护 visited index-tuple 集；mask 冲突时只扩展相邻索引。只有满足这些前提，首个通过 operbox / tier / `used` / 局部分区一致性 / 跨房 disjoint 的 tuple 才是该签名组合内的精确最优。pop 后不得再出现会改变排序的 L3 分数或 row-specific response。
+`exact_disjoint_join` 只在完整充分 signature 下工作。每个
+`BakedRoomResponse(row_id, exact full signature)` 必须在排序或剪枝前可得；heap / branch-and-bound
+必须使用完整加权目标或已证明同单位的可采纳上界，维护 incumbent，并在剩余上界不能胜出时
+才停止。现有按 index vector 返回首个无冲突 tuple 的 helper 不满足总和最优性，不能直接接入。
+若 late resolve 仍会改变 row score，说明 signature 不充分，必须扩展闭包或穷举全部可行 tuple。
 
 同构贸易房可用稳定 row id 约束消除 `(A,B)` / `(B,A)` 对称重复；房级或订单不同则保留有序 bucket tuple。同一完整 signature 的 live solver 结果可在本轮 memo。cache miss 时现场构建相同 bucket / response，继续走同一个 indexed join，不能退回旧普通前缀或 per-producer pipeline。
 
-首期不需要通用 DP、Pareto frontier 或 branch-and-bound。若 effect bucket 数或 heap 扩展数经实测仍过大，再提交可与本节 live reference 做差分验证的优化；正确性基线始终是“完整行保留 + 完全等价分桶 + 首个兼容最优 tuple”的索引 join。
+首期不预设通用 DP 或 Pareto frontier。先测量充分状态、候选行和可行 tuple：小规模直接穷举，
+规模需要时才使用可与暴力 oracle 差分、具有证明上界的 exact branch-and-bound / heap。
 
 ## 7. A+ Bake 物化什么
 
@@ -449,9 +467,9 @@ catalog row/response 精确命中
 
 ### Phase 0：统一 Markdown 与保存基线
 
-状态（2026-07-19）：当前范围的 canonical、真实 CLI、性能样例和 full-suite 精确失败集合已保存；
-`ControlInjectRawSumV0` 保持具名，不新增目标函数。未来恢复 exact joint 时应重新保存当时基线，
-不能复用本次 8.4s 样例作为预算或性能验收。
+状态（2026-07-27）：用户已裁决 `TradeManufactureWeightedEfficiencyV1` 及当前 `1:1` 默认权重；
+实现前仍需保存新的旧 comparator 基线，并证明依赖闭包与候选行完整。不能复用 2026-07-19
+的 8.4s 样例作为预算或性能验收。
 
 ### Phase 1：正确的 rule 与逐房 scope
 
@@ -572,7 +590,8 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 ### 13.3 Role / shortcut
 
 - 删除 Vina fixed/meta role 后，格拉斯哥组合可因实际效率自然胜出，也可自然落败。
-- Docus、closure、witch 等独立 hard/core 规则保持；同一合法层内统一按 `final_efficiency`。
+- 多贸默认但书 > 龙巫 > 可露希尔；Rosemary alternative 激活时原子改为但书 + 可露希尔/黑键，
+  龙巫进入 γ reserve；同一核心布局内的普通队友按真实效率联合竞争。
 - Shortcut 只结算实际同房组合，不决定 producer 激活与进编。
 - `gsl_vina_lungmen` 若保留，只在实际成员和 resolved producer gate 同时满足时命中。
 
@@ -624,7 +643,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 1. live reference 与 Bake winner 完全一致；
 2. 不再随 producer 数量重复跑完整 prefix；
 3. cache miss 只增加耗时；
-4. 若签名索引 join 已满足实际使用，不引入 DP/Pareto/B&B；
+4. 若穷举或签名索引 join 已满足实际使用，不引入更复杂的 DP/Pareto/B&B；
 5. 只有实测证明仍慢，才单独提交可与 live reference 差分验证的优化提案。
 
 ## 15. 后续 producer 如何扩展
