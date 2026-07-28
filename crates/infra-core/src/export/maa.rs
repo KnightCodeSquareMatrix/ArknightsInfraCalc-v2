@@ -451,7 +451,7 @@ fn apply_dorm_rest(blueprint: &BaseBlueprint, rooms: &mut MaaRooms, rest: &DormR
     slot.operators = operators;
     // MAA must preserve manager -> target order for single-target recovery.
     slot.sort = false;
-    slot.autofill = false;
+    slot.autofill = slot.operators.len() < capacity;
 }
 
 fn production_slot(
@@ -534,21 +534,13 @@ fn build_dorm_slots(
                 let take = resting.len().min(spare);
                 operators.extend(resting.drain(..take));
             }
-            if !operators.is_empty() {
-                return MaaRoomSlot {
-                    skip: false,
-                    product: None,
-                    operators,
-                    sort: true,
-                    autofill: false,
-                };
-            }
+            let autofill = operators.len() < beds;
             MaaRoomSlot {
                 skip: false,
                 product: None,
-                operators: Vec::new(),
-                sort: false,
-                autofill: true,
+                sort: !operators.is_empty(),
+                operators,
+                autofill,
             }
         })
         .collect()
@@ -851,6 +843,26 @@ mod tests {
             rooms.dormitory[0].operators,
             vec!["宿管", "休息甲", "休息乙"]
         );
+        assert!(rooms.dormitory[0].autofill);
+    }
+
+    #[test]
+    fn full_dorm_does_not_request_autofill() {
+        let blueprint = sample_blueprint();
+        let rooms = build_rooms(
+            &blueprint,
+            &BaseAssignment::default(),
+            &[
+                "休息甲".to_string(),
+                "休息乙".to_string(),
+                "休息丙".to_string(),
+                "休息丁".to_string(),
+                "休息戊".to_string(),
+            ],
+            &[],
+        );
+        assert_eq!(rooms.dormitory[0].operators.len(), 5);
+        assert!(!rooms.dormitory[0].autofill);
     }
 
     #[test]
@@ -874,6 +886,7 @@ mod tests {
             vec!["单回宿管", "群回宿管", "歌蕾蒂娅", "原宿舍成员"]
         );
         assert!(!rooms.dormitory[0].sort);
+        assert!(rooms.dormitory[0].autofill);
     }
 
     #[test]
@@ -940,6 +953,7 @@ mod tests {
             schedule.plans[0].rooms.dormitory[0].operators,
             vec!["被换下干员", "休息干员"]
         );
+        assert!(schedule.plans[0].rooms.dormitory[0].autofill);
         assert_eq!(schedule.plans[0].drones.index, 1);
         assert!(schedule.plans[0].fiammetta.enable);
         assert_eq!(schedule.plans[0].fiammetta.target, "但书");
@@ -1008,6 +1022,7 @@ mod tests {
         assert!(schedule.plans[0].rooms.power[0].operators.is_empty());
         assert!(schedule.plans[0].rooms.dormitory[0].skip);
         assert!(schedule.plans[0].rooms.dormitory[0].operators.is_empty());
+        assert!(!schedule.plans[0].rooms.dormitory[0].autofill);
         assert!(!schedule.plans[0].drones.enable);
     }
 
