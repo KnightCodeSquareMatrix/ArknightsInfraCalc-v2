@@ -925,21 +925,21 @@ mod tests {
         )
         .unwrap();
 
-        // 全局感知 = 迷迭香20 + 黑键20 + 夕10(心情>12) + 爱丽丝3 + 车尔尼3（Lv3 宿舍每级+1）= 56。
+        // 全局感知 = 迷迭香20 + 黑键20 + 夕10(心情>12) + 爱丽丝5 + 车尔尼5（Lv5 宿舍每级+1）= 60。
         assert!(
-            (resolved.layout.global.get(GlobalResourceKey::Perception) - 56.0).abs() < f64::EPSILON,
-            "全基建共享感知应为 56, got {}",
+            (resolved.layout.global.get(GlobalResourceKey::Perception) - 60.0).abs() < f64::EPSILON,
+            "全基建共享感知应为 60, got {}",
             resolved.layout.global.get(GlobalResourceKey::Perception)
         );
 
-        // 迷迭香制造房：扣回自产 20 → 房内快照 36，atom 再产 20 → 全量 56；意识实体 /1 = +56%。
+        // 迷迭香制造房：扣回自产 20 → 房内快照 40，atom 再产 20 → 全量 60；意识实体 /1 = +60%。
         let manu = resolved
             .manu_rooms
             .iter()
             .find(|r| r.id.0 == "manu_4")
             .unwrap();
         assert!(
-            (manu.layout.global.get(GlobalResourceKey::Perception) - 36.0).abs() < f64::EPSILON,
+            (manu.layout.global.get(GlobalResourceKey::Perception) - 40.0).abs() < f64::EPSILON,
             "迷迭香房应扣回自产, got {}",
             manu.layout.global.get(GlobalResourceKey::Perception)
         );
@@ -952,19 +952,19 @@ mod tests {
         };
         let manu_result = solve_manufacture(&manu_input, &table).unwrap();
         assert!(
-            ((manu_result.skill_efficiency.as_f64() * 100.0) - 56.0).abs() < 0.01,
-            "迷迭香跨设施感知 → +56% 生产力, got {}",
+            ((manu_result.skill_efficiency.as_f64() * 100.0) - 60.0).abs() < 0.01,
+            "迷迭香跨设施感知 → +60% 生产力, got {}",
             (manu_result.skill_efficiency.as_f64() * 100.0)
         );
 
-        // 黑键贸易房同样扣回自产 → 读全量 56；怅惘和声 /2 = +28%。
+        // 黑键贸易房同样扣回自产 → 房内快照 40，atom 再产 20 后读全量 60；怅惘和声 /2 = +30%。
         let trade = resolved
             .trade_rooms
             .iter()
             .find(|r| r.id.0 == "trade_1")
             .unwrap();
         assert!(
-            (trade.layout.global.get(GlobalResourceKey::Perception) - 36.0).abs() < f64::EPSILON,
+            (trade.layout.global.get(GlobalResourceKey::Perception) - 40.0).abs() < f64::EPSILON,
             "黑键房应扣回自产, got {}",
             trade.layout.global.get(GlobalResourceKey::Perception)
         );
@@ -1006,7 +1006,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(active.layout.global.get(GlobalResourceKey::Dream), 0.0);
-        assert_eq!(active.layout.global.get(GlobalResourceKey::Perception), 6.0);
+        assert_eq!(active.layout.global.get(GlobalResourceKey::Perception), 8.0);
     }
 
     #[test]
@@ -1068,14 +1068,14 @@ mod tests {
         )
         .unwrap();
 
-        // 三核心+夕+爱丽丝+车尔尼 = 56；絮雨办公室(Lv3 → (3-1)*10 = 20) → 76。
+        // 三核心+夕+爱丽丝+车尔尼 = 60；絮雨办公室(Lv3 → (3-1)*10 = 20) → 80。
         assert!(
-            (resolved.layout.global.get(GlobalResourceKey::Perception) - 76.0).abs() < f64::EPSILON,
-            "絮雨办公室应 +20 感知 → 76, got {}",
+            (resolved.layout.global.get(GlobalResourceKey::Perception) - 80.0).abs() < f64::EPSILON,
+            "絮雨办公室应 +20 感知 → 80, got {}",
             resolved.layout.global.get(GlobalResourceKey::Perception)
         );
 
-        // 迷迭香房扣回自产 → 读全量 76；意识实体 /1 = +76% 生产力（文档 §7.1「整十」满配上限 ~75-80%）。
+        // 迷迭香房扣回自产 → 房内快照 60，atom 再产 20 后读全量 80；意识实体 /1 = +80%。
         let manu = resolved
             .manu_rooms
             .iter()
@@ -1093,20 +1093,20 @@ mod tests {
         )
         .unwrap();
         assert!(
-            ((manu_result.skill_efficiency.as_f64() * 100.0) - 76.0).abs() < 0.01,
-            "迷迭香感知链 → +76% 生产力, got {}",
+            ((manu_result.skill_efficiency.as_f64() * 100.0) - 80.0).abs() < 0.01,
+            "迷迭香感知链 → +80% 生产力, got {}",
             (manu_result.skill_efficiency.as_f64() * 100.0)
         );
 
-        // 黑键房读全量 76；怅惘和声 /2 = +38% 贸易效率（文档 §7.2 ~37.5-40%）。
+        // 黑键房扣回自产 20 → 房内快照 60，atom 再产 20 后读全量 80；怅惘和声 /2 = +40%。
         let trade = resolved
             .trade_rooms
             .iter()
             .find(|r| r.id.0 == "trade_1")
             .unwrap();
         assert!(
-            (trade.layout.global.get(GlobalResourceKey::Perception) - 56.0).abs() < f64::EPSILON,
-            "黑键房应扣回自产 20 → 56, got {}",
+            (trade.layout.global.get(GlobalResourceKey::Perception) - 60.0).abs() < f64::EPSILON,
+            "黑键房应扣回自产 20 → 60, got {}",
             trade.layout.global.get(GlobalResourceKey::Perception)
         );
     }
@@ -1183,8 +1183,8 @@ mod tests {
         .unwrap()
         .layout;
         assert!(
-            (layout.global.get(GlobalResourceKey::MonsterCuisine) - 3.0).abs() < f64::EPSILON,
-            "Lv3 宿舍 + 森西精2 → 3 层魔物料理, got {}",
+            (layout.global.get(GlobalResourceKey::MonsterCuisine) - 5.0).abs() < f64::EPSILON,
+            "Lv5 宿舍 + 森西精2 → 5 层魔物料理, got {}",
             layout.global.get(GlobalResourceKey::MonsterCuisine)
         );
         assert_eq!(

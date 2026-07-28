@@ -1750,8 +1750,8 @@ mod tests {
         apply_trade_phases(&mut ctx, &table);
         let qie = ctx.operators.first().unwrap();
         assert!(
-            (qie.settled_eff - 3.0).abs() < 0.01,
-            "森西 Lv3 宿舍 → 3 魔物料理 → +3%, got {}",
+            (qie.settled_eff - 5.0).abs() < 0.01,
+            "森西 Lv5 宿舍 → 5 魔物料理 → +5%, got {}",
             qie.settled_eff
         );
     }
