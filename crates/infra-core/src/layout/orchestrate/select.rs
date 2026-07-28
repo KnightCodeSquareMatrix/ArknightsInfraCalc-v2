@@ -54,13 +54,42 @@ pub fn build_plan_with_runtime(
     seed: &BaseAssignment,
     skip_system_ids: &std::collections::HashSet<String>,
 ) -> Result<AssignmentPlan> {
+    let mut disabled_conditional_packs = std::collections::HashSet::new();
+    build_plan_with_runtime_and_disabled_packs(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        mood,
+        preferences,
+        mode,
+        seed,
+        skip_system_ids,
+        &mut disabled_conditional_packs,
+    )
+}
+
+/// 使用调用方持有的 conditional-pack 禁用集合构建计划；用于最终生产填充暴露新的
+/// exact-presence 关系后，事务性重编译同一个 Plan。
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn build_plan_with_runtime_and_disabled_packs(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    mood: f64,
+    preferences: &std::collections::HashMap<String, String>,
+    mode: AssignShiftMode,
+    seed: &BaseAssignment,
+    skip_system_ids: &std::collections::HashSet<String>,
+    disabled_conditional_packs: &mut std::collections::HashSet<String>,
+) -> Result<AssignmentPlan> {
     if mode != AssignShiftMode::Peak {
         return Ok(AssignmentPlan::recovery(mode));
     }
 
     let catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
     validate_rule_preferences(&catalog, preferences)?;
-    let mut disabled_conditional_packs = std::collections::HashSet::new();
     loop {
         let (plan, scratch) = compile_plan_once(
             &catalog,
@@ -73,9 +102,9 @@ pub fn build_plan_with_runtime(
             mode,
             seed,
             skip_system_ids,
-            &disabled_conditional_packs,
+            disabled_conditional_packs,
         )?;
-        let Some(pack_key) = pre_split_pack_violation(blueprint, &scratch, &plan)? else {
+        let Some(pack_key) = guarded_pack_violation(blueprint, &scratch, &plan)? else {
             return Ok(plan);
         };
         if !disabled_conditional_packs.insert(pack_key.clone()) {
@@ -204,7 +233,7 @@ fn compile_plan_once(
     Ok((plan, final_scratch))
 }
 
-fn pre_split_pack_violation(
+pub(crate) fn guarded_pack_violation(
     blueprint: &BaseBlueprint,
     scratch: &BaseAssignment,
     plan: &AssignmentPlan,
@@ -240,18 +269,7 @@ fn pre_split_pack_violation(
                 .iter()
                 .any(|component| eligible_count(component) > 0)
         };
-        let can_split_from_one_half = |components: &[Vec<crate::layout::RoomId>]| {
-            components
-                .iter()
-                .filter(|component| eligible_count(component) > 0)
-                .take(2)
-                .count()
-                >= 2
-        };
-        if (has_target(&halves[0]) && has_target(&halves[1]))
-            || can_split_from_one_half(&halves[0])
-            || can_split_from_one_half(&halves[1])
-        {
+        if has_target(&halves[0]) && has_target(&halves[1]) {
             continue;
         }
         let selected = plan
@@ -273,4 +291,81 @@ fn pre_split_pack_violation(
         return Ok(Some(format!("{}:{pack_id}", reserve.system_id)));
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::orchestrate::{
+        ReserveReusePolicy, ResolvedRoleReserve, SelectedRuleAlternative, ShiftBind,
+    };
+    use crate::layout::{AssignedOperator, RoomId};
+
+    #[test]
+    fn guarded_pack_rejects_two_targets_naturally_packed_into_one_half() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        let bound_rooms = ["manu_1", "manu_2", "manu_3", "manu_4", "power_1"];
+        let bound_operators: Vec<_> = bound_rooms
+            .iter()
+            .enumerate()
+            .map(|(index, room)| {
+                let name = format!("bound_{index}");
+                assignment.set_room(*room, vec![AssignedOperator::new(&name, 2)]);
+                name
+            })
+            .collect();
+
+        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        plan.selected_rules.push(SelectedRuleAlternative {
+            rule_id: "guarded_rule".to_string(),
+            alternative_id: "base".to_string(),
+            conditional_pack_id: Some("guarded_pack".to_string()),
+            priority: 1,
+            operators: Vec::new(),
+        });
+        plan.shift_binds.push(ShiftBind {
+            operators: bound_operators,
+            on_shifts: 2,
+            off_shifts: 1,
+        });
+        plan.rotation_reserves.push(ResolvedRoleReserve {
+            system_id: "guarded_rule".to_string(),
+            reserve_id: "reserve".to_string(),
+            role_id: "role".to_string(),
+            facility: crate::layout::FacilityKind::TradePost,
+            operators: Vec::new(),
+            eligible_rooms: vec![RoomId::from("trade_1"), RoomId::from("trade_2")],
+            reuse_policy: ReserveReusePolicy::EveryEligibleHalf,
+            require_pre_split_halves: true,
+        });
+
+        let halves = crate::layout::pack_production_components(
+            &blueprint,
+            &assignment,
+            plan.shift_binds
+                .iter()
+                .map(|bind| bind.operators.as_slice()),
+        )
+        .unwrap();
+        let trade_target_count = |components: &[Vec<RoomId>]| {
+            components
+                .iter()
+                .flatten()
+                .filter(|room| room.0 == "trade_1" || room.0 == "trade_2")
+                .count()
+        };
+        assert_eq!(
+            [
+                trade_target_count(&halves[0]),
+                trade_target_count(&halves[1])
+            ],
+            [0, 2],
+            "counterexample requires two independent trade targets in one natural half"
+        );
+        assert_eq!(
+            guarded_pack_violation(&blueprint, &assignment, &plan).unwrap(),
+            Some("guarded_rule:guarded_pack".to_string())
+        );
+    }
 }

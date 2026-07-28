@@ -586,6 +586,12 @@ fn split_production_facilities(
                 reserve.reserve_id
             )));
         }
+        if reserve.require_pre_split_halves {
+            return Err(Error::msg(format!(
+                "rotation reserve {} was not naturally pre-split across H1/H2 before schedule",
+                reserve.reserve_id
+            )));
+        }
         let source = usize::from(!has_h1);
         let target = 1 - source;
         let eligible_count = |component: &[RoomId]| {
@@ -7487,6 +7493,37 @@ mod tests {
             "multi-room bind was split: h1={:?}, h2={:?}",
             h1.manu,
             h2.manu
+        );
+    }
+
+    #[test]
+    fn split_does_not_move_guarded_reserve_targets_between_halves() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut peak = BaseAssignment::default();
+        let bound_rooms = ["manu_1", "manu_2", "manu_3", "manu_4", "power_1"];
+        let operators: Vec<_> = bound_rooms
+            .iter()
+            .enumerate()
+            .map(|(index, room)| {
+                let name = format!("bound_{index}");
+                peak.set_room(*room, vec![AssignedOperator::new(&name, 2)]);
+                name
+            })
+            .collect();
+        let bind = RuntimeShiftBind {
+            operators,
+            on_shifts: 2,
+            off_shifts: 1,
+        };
+        let reserve = witch_rotation_reserve();
+
+        let error = split_production_facilities(&blueprint, &peak, &[bind], &[reserve])
+            .expect_err("schedule must not rescue a guarded pack by moving components");
+        assert!(
+            error
+                .to_string()
+                .contains("was not naturally pre-split across H1/H2 before schedule"),
+            "unexpected error: {error}"
         );
     }
 

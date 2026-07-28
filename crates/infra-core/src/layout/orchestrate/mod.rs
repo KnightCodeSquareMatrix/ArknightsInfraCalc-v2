@@ -16,6 +16,7 @@ pub use plan::{
     SelectedRuleAlternative, ShiftBind, SlotFill, SystemAnchor, SystemConstraint,
 };
 pub use select::{build_plan, build_plan_with_runtime};
+pub(crate) use select::{build_plan_with_runtime_and_disabled_packs, guarded_pack_violation};
 
 #[cfg(test)]
 mod tests {
@@ -146,7 +147,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             rosemary.conditional_pack_id, None,
-            "感知烟火 bind 经中枢连通两座贸易房时，三 cohort pack 必须在 plan 阶段事务性降级"
+            "最终 exact-presence 依赖使两座贸易房不可分时，三 cohort pack 必须在 plan 阶段事务性降级"
         );
         assert!(
             plan.rotation_reserves.is_empty(),

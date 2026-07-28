@@ -275,40 +275,72 @@ pub(crate) fn assign_shift_with_preclaimed_plan<F>(
     planning_seed: &BaseAssignment,
     execution_seed: &BaseAssignment,
     skip_system_ids: &HashSet<String>,
-    augment_plan: F,
+    mut augment_plan: F,
 ) -> Result<AssignShiftResult>
 where
-    F: FnOnce(&mut AssignmentPlan) -> Result<()>,
+    F: FnMut(&mut AssignmentPlan) -> Result<()>,
 {
     blueprint.validate()?;
 
     let mut skip_system_ids = skip_system_ids.clone();
     skip_trade_core_registry_systems(&mut skip_system_ids);
-    let mut plan = crate::layout::orchestrate::build_plan_with_runtime(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options.mood,
-        &options.system_preferences,
-        mode,
-        planning_seed,
-        &skip_system_ids,
-    )?;
-    augment_plan(&mut plan)?;
+    let mut disabled_conditional_packs = HashSet::new();
+    loop {
+        let mut plan = crate::layout::orchestrate::build_plan_with_runtime_and_disabled_packs(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options.mood,
+            &options.system_preferences,
+            mode,
+            planning_seed,
+            &skip_system_ids,
+            &mut disabled_conditional_packs,
+        )?;
+        augment_plan(&mut plan)?;
 
-    let assignment = pipeline::run_shift_pipeline(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        mode,
-        execution_seed,
-        &plan,
-    )?;
+        let assignment = pipeline::run_shift_pipeline(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            mode,
+            execution_seed,
+            &plan,
+        )?;
 
-    Ok(AssignShiftResult { assignment, plan })
+        let requires_final_pack_check = plan.rotation_reserves.iter().any(|reserve| {
+            reserve.require_pre_split_halves
+                && reserve.reuse_policy
+                    == crate::layout::orchestrate::ReserveReusePolicy::EveryEligibleHalf
+        });
+        if !requires_final_pack_check {
+            return Ok(AssignShiftResult { assignment, plan });
+        }
+
+        let mut validation_plan = plan.clone();
+        validation_plan.resolve_actual_producer_dependencies(
+            blueprint,
+            &assignment,
+            instances,
+            table,
+        )?;
+        let Some(pack_key) = crate::layout::orchestrate::guarded_pack_violation(
+            blueprint,
+            &assignment,
+            &validation_plan,
+        )?
+        else {
+            return Ok(AssignShiftResult { assignment, plan });
+        };
+        if !disabled_conditional_packs.insert(pack_key.clone()) {
+            return Err(crate::error::Error::msg(format!(
+                "conditional pack {pack_key} remained rotation-infeasible after final assignment downgrade"
+            )));
+        }
+    }
 }
 
 /// 编制内所有上岗干员。
