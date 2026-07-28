@@ -10,14 +10,15 @@ use infra_core::box_profile::{baseline_path_or_default, build_box_profile, BoxPr
 use infra_core::export::{build_from_team_rotation, MaaExportOptions, MaaSchedule};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::{
-    assign_base_greedy, explain_assignment_systems, resolve_base, AssignBaseOptions,
-    AssignShiftMode, BaseAssignment, BaseBlueprint,
+    assign_base_greedy, explain_assignment_systems, resolve_base, resolve_base_with_trace,
+    AssignBaseOptions, AssignShiftMode, BaseAssignment, BaseBlueprint,
 };
 use infra_core::manufacture::input::ManuRoomInput;
 use infra_core::manufacture::solve_manufacture;
 use infra_core::manufacture::ManuSearchRecipeMode;
 use infra_core::operbox::OperBox;
 use infra_core::pool::{build_manufacture_pool, build_trade_pool};
+use infra_core::power::{solve_power, PowerRoomInput};
 use infra_core::schedule::schedule_timed_rotation;
 use infra_core::search::{
     search_manufacture_triples, search_trade_triples, ManuSearchOptions, TradeSearchOptions,
@@ -41,7 +42,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]"
             );
             eprintln!(
-                "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]"
+                "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
                 "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
@@ -463,6 +464,12 @@ fn print_system_explain_report(report: &infra_core::layout::SystemExplainReport)
 
 fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
     let text = args.iter().any(|a| a == "--text");
+    let explain_json = args.iter().any(|a| a == "--explain-json");
+    if text && explain_json {
+        return Err(Error::msg(
+            "--text and --explain-json are mutually exclusive",
+        ));
+    }
     let layout_path = layout_path_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
     let assignment_path = assignment_path_from_args(args)
@@ -475,14 +482,29 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
     let table = SkillTable::load(&default_skill_table_path()?)?;
     let durin_plan = operbox.durin_dorm_planning_count(&instances);
 
-    let resolved = resolve_base(
-        &blueprint,
-        &assignment,
-        Some(&instances),
-        Some(&table),
-        24.0,
-        Some(durin_plan),
-    )?;
+    let (resolved, settlement_trace) = if explain_json {
+        let (resolved, trace) = resolve_base_with_trace(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            Some(durin_plan),
+        )?;
+        (resolved, Some(trace))
+    } else {
+        (
+            resolve_base(
+                &blueprint,
+                &assignment,
+                Some(&instances),
+                Some(&table),
+                24.0,
+                Some(durin_plan),
+            )?,
+            None,
+        )
+    };
 
     if text {
         eprintln!(
@@ -495,8 +517,18 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
     }
 
     let mut trade_total = infra_core::Efficiency::ZERO;
+    let mut trade_explain = Vec::new();
     for room in &resolved.trade_rooms {
         if room.operators.is_empty() {
+            if explain_json {
+                trade_explain.push(serde_json::json!({
+                    "room_id": room.id.0.clone(),
+                    "status": "empty",
+                    "level": room.level,
+                    "order": room.order,
+                    "operators": [],
+                }));
+            }
             continue;
         }
         let input = TradeRoomInput {
@@ -512,6 +544,16 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         };
         let result = solve_trade_with_shift(&input, &table, 24.0)?;
         trade_total += result.efficiency.final_efficiency;
+        if explain_json {
+            trade_explain.push(serde_json::json!({
+                "room_id": room.id.0.clone(),
+                "status": "settled",
+                "level": room.level,
+                "order": room.order,
+                "operators": room.operators.iter().map(|operator| operator.name.as_str()).collect::<Vec<_>>(),
+                "result": &result,
+            }));
+        }
         if text {
             let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
             eprintln!(
@@ -528,8 +570,18 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
     }
 
     let mut manu_total = infra_core::Efficiency::ZERO;
+    let mut manu_explain = Vec::new();
     for room in &resolved.manu_rooms {
         if room.operators.is_empty() {
+            if explain_json {
+                manu_explain.push(serde_json::json!({
+                    "room_id": room.id.0.clone(),
+                    "status": "empty",
+                    "level": room.level,
+                    "recipe": room.recipe,
+                    "operators": [],
+                }));
+            }
             continue;
         }
         let input = ManuRoomInput {
@@ -541,12 +593,45 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         };
         let result = solve_manufacture(&input, &table)?;
         manu_total += result.final_efficiency;
+        if explain_json {
+            manu_explain.push(serde_json::json!({
+                "room_id": room.id.0.clone(),
+                "status": "settled",
+                "level": room.level,
+                "recipe": room.recipe,
+                "operators": room.operators.iter().map(|operator| operator.name.as_str()).collect::<Vec<_>>(),
+                "result": &result,
+            }));
+        }
         if text {
             let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
             eprintln!(
                 "  manu {} {:?} ops={:?} final_efficiency={} storage={}",
                 room.id.0, room.recipe, names, result.final_efficiency, result.storage_limit
             );
+        }
+    }
+
+    let mut power_total = infra_core::Efficiency::ZERO;
+    let mut power_explain = Vec::new();
+    if explain_json {
+        for room in &resolved.power_rooms {
+            let result = solve_power(
+                &PowerRoomInput {
+                    operator: room.operator.clone(),
+                    mood: room.operator.work_mood.unwrap_or(24.0),
+                    shift_hours: 24.0,
+                    layout: room.layout.clone(),
+                },
+                &table,
+            )?;
+            power_total += result.final_efficiency;
+            power_explain.push(serde_json::json!({
+                "room_id": room.id.0.clone(),
+                "status": "settled",
+                "operator": room.operator.name.clone(),
+                "result": result,
+            }));
         }
     }
 
@@ -568,7 +653,44 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         }
     }
 
-    if text {
+    if explain_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "schema_version": 1,
+                "mode": "fixed_assignment_settlement",
+                "inputs": {
+                    "layout": layout_path,
+                    "operbox": operbox_path,
+                    "assignment": assignment_path,
+                    "mood": 24.0,
+                    "shift_hours": 24.0,
+                },
+                "control_trace": settlement_trace.and_then(|trace| trace.control),
+                "rooms": {
+                    "trade": trade_explain,
+                    "manufacture": manu_explain,
+                    "power": power_explain,
+                    "office": resolved.office_rooms.iter().map(|room| serde_json::json!({
+                        "room_id": room.id.0.clone(),
+                        "result": &room.result,
+                        "autofill": room.autofill,
+                    })).collect::<Vec<_>>(),
+                    "meeting": resolved.meeting_rooms.iter().map(|room| serde_json::json!({
+                        "room_id": room.id.0.clone(),
+                        "result": &room.result,
+                        "autofill": room.autofill,
+                    })).collect::<Vec<_>>(),
+                },
+                "totals": {
+                    "trade_efficiency": trade_total,
+                    "manufacture_efficiency": manu_total,
+                    "power_efficiency": power_total,
+                },
+                "durin_in_base": resolved.layout.durin_in_base,
+            }))?
+        );
+    } else if text {
         eprintln!(
             "  total trade_efficiency={} manufacture_efficiency={}",
             trade_total, manu_total

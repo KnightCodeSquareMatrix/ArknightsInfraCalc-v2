@@ -1,4 +1,7 @@
-use crate::control::{apply_control_to_layout, ControlOperator};
+use crate::control::{
+    apply_control_to_layout, apply_control_to_layout_with_trace, ControlOperator,
+    ControlSettlementTrace,
+};
 use std::sync::Arc;
 
 use crate::error::Result;
@@ -59,6 +62,12 @@ pub struct ResolvedBase {
     pub meeting_rooms: Vec<ResolvedSupportRoom>,
 }
 
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct ResolveTrace {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub control: Option<ControlSettlementTrace>,
+}
+
 impl ResolvedBase {
     pub fn gold_manu_line_count(&self) -> u32 {
         self.manu_rooms
@@ -80,7 +89,49 @@ pub fn resolve_base(
     mood: f64,
     durin_dorm_planning: Option<u8>,
 ) -> Result<ResolvedBase> {
+    Ok(resolve_base_inner(
+        blueprint,
+        assignment,
+        instances,
+        table,
+        mood,
+        durin_dorm_planning,
+        false,
+    )?
+    .0)
+}
+
+pub fn resolve_base_with_trace(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: Option<&OperatorInstances>,
+    table: Option<&SkillTable>,
+    mood: f64,
+    durin_dorm_planning: Option<u8>,
+) -> Result<(ResolvedBase, ResolveTrace)> {
+    resolve_base_inner(
+        blueprint,
+        assignment,
+        instances,
+        table,
+        mood,
+        durin_dorm_planning,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_base_inner(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: Option<&OperatorInstances>,
+    table: Option<&SkillTable>,
+    mood: f64,
+    durin_dorm_planning: Option<u8>,
+    trace_enabled: bool,
+) -> Result<(ResolvedBase, ResolveTrace)> {
     blueprint.validate()?;
+    let mut trace = ResolveTrace::default();
 
     let workforce = WorkforceIndex::build(blueprint, assignment, instances);
 
@@ -139,7 +190,13 @@ pub fn resolve_base(
             .map(|op| to_control_operator(instances, op))
             .collect::<Result<Vec<_>>>()?;
         if !control_ops.is_empty() {
-            apply_control_to_layout(&mut layout, &control_ops, table, mood);
+            if trace_enabled {
+                let (_, control_trace) =
+                    apply_control_to_layout_with_trace(&mut layout, &control_ops, table, mood);
+                trace.control = Some(control_trace);
+            } else {
+                apply_control_to_layout(&mut layout, &control_ops, table, mood);
+            }
             layout.control_buffs = control_ops
                 .iter()
                 .flat_map(|op| {
@@ -188,16 +245,19 @@ pub fn resolve_base(
     let manu_rooms = build_manu_rooms(blueprint, assignment, instances, table, &layout);
     let power_rooms = build_power_rooms(&workforce, instances, &layout);
 
-    Ok(ResolvedBase {
-        blueprint: blueprint.clone(),
-        assignment: assignment.clone(),
-        layout,
-        trade_rooms,
-        manu_rooms,
-        power_rooms,
-        office_rooms,
-        meeting_rooms,
-    })
+    Ok((
+        ResolvedBase {
+            blueprint: blueprint.clone(),
+            assignment: assignment.clone(),
+            layout,
+            trade_rooms,
+            manu_rooms,
+            power_rooms,
+            office_rooms,
+            meeting_rooms,
+        },
+        trace,
+    ))
 }
 
 fn build_support_rooms(
@@ -668,6 +728,43 @@ mod tests {
         let table =
             SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
         (instances, table)
+    }
+
+    #[test]
+    fn traced_resolve_matches_normal_resolve() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            "control",
+            vec![
+                AssignedOperator::new("若叶睦", 2),
+                AssignedOperator::new("丰川祥子", 2),
+                AssignedOperator::new("三角初华", 2),
+            ],
+        );
+        let normal = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let (traced, trace) = resolve_base_with_trace(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        assert_eq!(normal.layout, traced.layout);
+        assert_eq!(normal.trade_rooms.len(), traced.trade_rooms.len());
+        assert_eq!(normal.manu_rooms.len(), traced.manu_rooms.len());
+        assert!(trace.control.is_some());
     }
 
     #[test]

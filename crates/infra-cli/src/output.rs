@@ -11,6 +11,7 @@ use infra_core::schedule::{TeamLabel, TeamRotationReport};
 use infra_core::search::{ManuSearchHit, ManuSearchReport, TradeSearchHit, TradeSearchReport};
 use infra_core::Efficiency;
 use infra_core::Error;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -51,6 +52,15 @@ fn arg_value(args: &[String], flag: &str) -> Option<String> {
 
 pub fn join_ops(names: &[String]) -> String {
     names.join("+")
+}
+
+pub fn emit_debug_json(value: &impl Serialize, pretty: bool) -> Result<(), Error> {
+    if pretty {
+        println!("{}", serde_json::to_string_pretty(value)?);
+    } else {
+        println!("{}", serde_json::to_string(value)?);
+    }
+    Ok(())
 }
 
 fn csv_writer(path: Option<&Path>) -> Result<Writer<Box<dyn Write>>, Error> {

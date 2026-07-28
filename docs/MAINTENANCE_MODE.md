@@ -58,14 +58,25 @@ Debug 任务按以下原则处理：
 | 场景 | 命令 |
 |------|------|
 | 用户说“跑一遍模拟” | `cargo run -q -p infra-cli -- plan --operbox data/fixtures/243/operbox_full_e2.json --profile-out out/<task>-profile.json --maa-out out/<task>-maa.json` |
+| 已有成功的 legacy 生产 bundle | `cargo run -q -p infra-cli -- debug rerun --bundle <debug-bundle.json> [--room <id> \| --operator <name>] [--output-dir <private-dir>] --pretty` |
 | 只验证当前定时换班与 MAA | `cargo run -q -p infra-cli -- layout team-rotation --layout <layout> --operbox <operbox> [--rotation <profile>] --maa-out <out>` |
 | 单班布局搜索 | `cargo run -q -p infra-cli -- layout test --layout <layout> --operbox <operbox> --text` |
-| 指定编制结算 | `cargo run -q -p infra-cli -- layout eval --layout <layout> --operbox <operbox> --assignment <assignment> --text` |
+| 指定编制结算 | `cargo run -q -p infra-cli -- layout eval --layout <layout> --operbox <operbox> --assignment <assignment> --text`；需要来源级中枢注入时改用 `--explain-json > <private.json>` |
 | 贸易 shortcut / 产量 | `cargo run -q -p infra-cli -- verify --case <case>` 或 `trade yield <fixture>` |
 | 贸易 / 制造池缺人 | `cargo run -q -p infra-cli -- pool --trade --manufacture --operbox <operbox> --text` |
 | 性能回退 | `cargo run -q -p infra-cli -- profile layout-full --layout <layout> --operbox <operbox>` |
 
 A-B-A 的 `layout rotation` / `schedule rotation` 已移除；当前默认 ABC、二班和具名四班 bug 都只走 `plan` 或 `layout team-rotation` 复现，并显式记录 `--rotation`。
+
+`debug rerun` 是当前运行时重跑，不证明与线上旧二进制等价。它不会执行 bundle 中的线上命令或
+绝对路径；原结果可转换时只比较排除 elapsed/路径的稳定 assignment 投影。写出的 layout、
+operbox 和 assignment 均为私有 evidence，保留在任务专属 `target/codex-runs/` 或 `out/`，不得
+提交；stdout 只有脱敏 hash/状态摘要，完整编制只在显式私有目录。显式覆盖 top/rotation 后不再
+与 recorded result 宣称可比。`plan.compute` bundle、失败调用和 selection reject trace 尚未进入该入口。
+
+固定编制的 `layout eval --explain-json` 只解释已选结果的结算：贸易/制造/发电使用正式 solver
+分量，中枢 EffectAtom 使用同一 apply loop 记录 condition、state write 与 GlobalInject merge。
+它不回答未选候选为何落败；输出含私人编制，必须重定向到任务专属私有 evidence。
 
 ### 2.3 验证证据硬门禁
 

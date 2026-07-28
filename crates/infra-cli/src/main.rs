@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use std::path::PathBuf;
 
-use commands::{advice_cmd, bake_cmd, layout_cmd, plan_cmd, profile_cmd, serve_cmd, verify_cmd};
+use commands::{
+    advice_cmd, bake_cmd, debug_cmd, layout_cmd, plan_cmd, profile_cmd, serve_cmd, verify_cmd,
+};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::LayoutContext;
 use infra_core::manufacture::ManuSearchRecipeMode;
@@ -55,6 +57,7 @@ fn run() -> Result<(), Error> {
         "trade" => trade_cmd(&args[2..])?,
         "bench" => bench_cmd(&args[2..])?,
         "bake" => bake_cmd(&args[2..])?,
+        "debug" => debug_cmd(&args[2..])?,
         "serve" => serve_cmd(&args[2..])?,
         "layout" => layout_cmd(&args[2..])?,
         "profile" => profile_cmd(&args[2..])?,
@@ -83,11 +86,12 @@ fn print_usage() {
     eprintln!("  infra-cli bake [all|trade|manufacture] [--out <dir>] [--limit-per-signature <n>]");
     eprintln!("  infra-cli bake validate [--out <dir>]");
     eprintln!("  infra-cli bake verify [--out <dir>]");
+    eprintln!("  infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <profile>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]");
     eprintln!("  infra-cli serve");
     eprintln!("  infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]");
     eprintln!("  infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]");
     eprintln!(
-        "  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text]"
+        "  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
     );
     eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]");

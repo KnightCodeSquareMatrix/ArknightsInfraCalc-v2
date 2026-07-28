@@ -1,5 +1,6 @@
 mod advice;
 mod bake;
+mod debug;
 mod layout;
 mod plan;
 mod plan_compute;
@@ -9,6 +10,7 @@ pub(crate) mod verify;
 
 pub use advice::advice_cmd;
 pub use bake::bake_cmd;
+pub use debug::debug_cmd;
 pub use layout::layout_cmd;
 pub use plan::plan_cmd;
 pub use profile::profile_cmd;

@@ -43,6 +43,7 @@ crates/infra-cli/src/
 │   ├── mod.rs           # 子命令模块聚合；对外 re-export
 │   ├── advice.rs        # `advice`：练卡推荐（operbox + training_recommendations v2）
 │   ├── bake.rs          # `bake`：生成贸易/制造 3/2/1 人单房候选索引表（运行时验证后优先读取）
+│   ├── debug.rs         # `debug rerun`：从生产 bundle 对当前运行时做可追溯重跑
 │   ├── plan.rs          # `plan`：box profile + αβγ 排班 + MAA
 │   ├── plan_compute.rs  # `plan` / `serve` 共用的一次 Plan 编排
 │   ├── serve.rs         # `serve`：前端常驻 worker；stdin/stdout JSON line 协议
@@ -74,10 +75,11 @@ crates/infra-cli/src/
 |------|------|--------|
 | `advice.rs` | **`advice`**：加载规则 + operbox；默认输出结构化 JSON，`--answer` 输出 core 生成的确定性中文答卷，`--explain` 输出 report + 事实骨架/仓库内 Markdown 片段 | 规则语义真源（见 [练卡推荐规则](练卡推荐规则.md)）；自由生成文案；solver 候选池 |
 | `bake.rs` | `bake`：并行生成 schema v12 的整数效率 `combo_table.bin`、`operators.json`、`manifest.json`；贸易行显式保存首批 room-local 机制签名，manifest 保存 table hash/count；`bake validate` 校验当前 CLI 指纹和完整贸易 row universe | 贸易/制造效率公式；手写搜索排序 |
+| `debug.rs` | `debug rerun`：读取 legacy `method=plan` 生产 bundle 的内联快照，以当前 CLI / data 重跑正式 rotation，输出稳定 assignment 投影、原结果对照和运行时指纹 | 冒充线上 bit-identical replay；执行 bundle 中的路径/命令；修改求解或候选 |
 | `plan_compute.rs` | `plan` 与 `serve` 共用的唯一 Plan 编排：一次 user rotation，再按调用方请求派生 profile/MAA | argv、文件写出、wire envelope、机制公式 |
 | `plan.rs` | **`plan`**：解析 argv/文件，调用共享 Plan 编排，再写 profile/MAA 和人类输出 | 画像算法（`box_profile/`）；排班逻辑（`schedule/`） |
 | `serve.rs` | `serve`：常驻读取 stdin JSON line；按发布的 JSON Schema 校验 `plan.compute` 内联参数，legacy `plan` 暂时保留路径适配 | 新业务公式；第二套 Plan 编排 |
-| `layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval`：蓝图 JSON + operbox → `assign_shift` 宏观落位（或自定义 `--assignment`）→ `resolve_base` → 搜索/效率结算 | 蓝图格式定义（`infra-core::layout::blueprint`）；求解公式（在 `infra-core`） |
+| `layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval`：蓝图 JSON + operbox → `assign_shift` 宏观落位（或自定义 `--assignment`）→ `resolve_base` → 搜索/效率结算；`eval --explain-json` 只投影 core settlement trace | 蓝图格式定义（`infra-core::layout::blueprint`）；求解公式或注入聚合解释（在 `infra-core`） |
 | `profile.rs` | `profile layout-full` / `profile analyze-compare`：采集 CLI 热路径、搜索规模和分析链路耗时 | 业务求解公式；用户主流程输出契约 |
 | `verify.rs` | `verify_cmd`：遍历 `REGRESSION_CASES.csv`；按 `rule_id` 选夹具；对比三位小数最终效率、机制等效效率与规则 ID；再跑 `UNIT_OUTPUT_ANCHORS.csv` | 夹具定义（在 `verify/fixtures.rs`）；CSV 列定义（在 `verify/cases.rs`） |
 
@@ -132,6 +134,7 @@ crates/infra-cli/src/
 |----------|--------------|------|-------------|
 | **`plan`** | `commands/plan.rs` -> `commands/plan_compute.rs` | profile JSON 文件 + stdout 分析/排班表；可选 MAA | 必选 `--operbox`（JSON/xlsx）；布局默认 `data/fixtures/243/layout.json` |
 | `serve` | `commands/serve.rs` -> `commands/plan_compute.rs` | `plan.compute` 内联 profile/rotation/MAA；legacy `plan` 可写文件 | 常驻 worker；stdout 仅 JSON response line，stderr 仅日志 |
+| `debug rerun` | `commands/debug.rs` -> `schedule_timed_rotation` | stdout 脱敏 hash/状态摘要；显式私有目录保存稳定行为投影、原结果比较和完整 rotation | 当前只支持成功的 `beta-test-bundle-v2-next-serve` legacy `method=plan` bundle；不消费线上绝对路径 |
 | `bake` | `commands/bake.rs` | 本地 `data/baked` catalog + stderr progress/summary | `infra-core::bake`；生成后自动校验 signature/row，并抽样用 live solver 对账 response；`bake verify` 可对既有 catalog 重跑门禁 |
 | `verify` | `commands/verify.rs` | stdout/stderr 行文本 | `verify/cases.rs` + `verify/fixtures.rs` + `data/*.csv` |
 | `pool` | `main.rs` | `output::emit_pool` | operbox / roster → `infra-core::pool` |
@@ -140,7 +143,7 @@ crates/infra-cli/src/
 | **`layout test`** | `commands/layout.rs` | `output::emit_bench` | 必选 `--layout` + `--operbox`；默认调用 `assign_base_greedy` |
 | **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation` | 必选 `--layout` + `--operbox`；支持默认 ABC、二班与两个具名四班；仅排班时用 |
 | **`layout analyze`** | `commands/layout.rs` | `print_box_profile_report` | 必选 `--layout` + `--operbox`；练度概况分析 |
-| **`layout eval`** | `commands/layout.rs` | stderr 文本 / JSON | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
+| **`layout eval`** | `commands/layout.rs` | stderr 文本 / 默认汇总 JSON；`--explain-json` 输出 versioned 结算诊断 | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
 | `profile layout-full` | `commands/profile.rs` | stderr 性能报告 | 开发辅助；默认路径为历史性能夹具，用户模拟不要用 |
 | `profile analyze-compare` | `commands/profile.rs` | stderr 对比报告 | 开发辅助；对比 hybrid profile 与旧 probe 链路耗时 |
 | `profile bake-dependencies` | `commands/profile.rs` | JSON 依赖报告 | 只读扫描 skill table，穷举分类房内、同设施、跨设施、全局布局和运行时依赖；可选 `--layout <path>` 编译该蓝图的 L2 外部场景域；为条件化 Bake 规模设计提供输入 |
@@ -158,6 +161,7 @@ Rust `#[test]` harness，因此 CLI 内门禁与仓库完整测试门禁分层�
 | 你想做的事 | 改哪里 | 不要改 |
 |------------|--------|--------|
 | 新增回归 case | `data/REGRESSION_CASES.csv`；必要时 `fixtures.rs` + `commands/verify.rs` 分支 | `interpreter.rs`（除非机制真错了） |
+| 重跑生产 debug bundle | `debug rerun --bundle ...`；需要固定编制结算时再用写出的 `team_shift_*.json` 调 `layout eval` | 手工执行 bundle 的 `command` / `savedFiles` 路径 |
 | 新 shortcut 族夹具 | `verify/fixtures.rs` | `main.rs` |
 | 单位产出锚点 | `data/UNIT_OUTPUT_ANCHORS.csv` + `unit_fixture` 名 | `unit_output.rs`（除非公式错） |
 | 新子命令 | 新建 `commands/foo.rs` + `output` emit + `main` 分发 | 在 `output` 里写求解 |
@@ -165,6 +169,80 @@ Rust `#[test]` harness，因此 CLI 内门禁与仓库完整测试门禁分层�
 | 表格列或中文标签 | `output.rs` | `infra-core` |
 | 搜索/排班行为 | `infra-core` | `infra-cli`（最多改传参） |
 | 自定义基建布局 + 练度盒探测 | `layout test`（见下节）；**不要**手写 `LayoutContext` / 搜索上下文或改 `bench` 硬编码 | 在 CLI 里复制搜索公式 |
+
+---
+
+## 生产反馈 current-runtime rerun
+
+`debug rerun` 从生产 `debug-bundle.json` 读取内联 layout / operbox，并调用当前正式
+`schedule_timed_rotation`。它用于判断“当前工作树对同一输入得到什么结果”，不是线上二进制的
+bit-identical replay：旧 bundle 没有记录线上可执行文件与 runtime data 哈希，报告会把原运行时
+明确标为 `unknown`。
+
+```bash
+cargo run -q -p infra-cli -- debug rerun \
+  --bundle feedback/<date>/<case>/debug-bundle.json \
+  --room trade_1 \
+  --shift 1 \
+  --output-dir target/codex-runs/<task>/private-rerun \
+  --pretty
+```
+
+| 参数 | 说明 |
+|---|---|
+| `--bundle` | 必填；当前只支持 `version=beta-test-bundle-v2-next-serve`、`serveRequest.method=plan` 且线上调用成功的 bundle |
+| `--top` / `--rotation` | 可选显式覆盖；未提供时优先读取 recorded request，否则记录为 historical default |
+| `--room` / `--operator` | 互斥的结果聚焦投影；只过滤结果、不改变求解输入；因包含私人编制，必须同时使用 `--output-dir` |
+| `--shift` | 1-based；必须与 `--room` 或 `--operator` 一起使用 |
+| `--output-dir` | 可选的新目录；拒绝覆盖，只写固定文件名的 layout、operbox、各班 assignment 和报告 |
+| `--pretty` | pretty JSON；默认单行 JSON |
+
+输入选择规则：bundle 内联快照为主；同目录存在 `layout.json` / `operbox.json` 时必须与内联
+canonical hash 一致，缺失内联值时才回退 sibling。bundle 中的 `command`、`savedFiles`、request
+路径和用户标签永不作为本地执行目标或输出路径。
+
+私有报告中的 `comparison` 只比较稳定行为投影：rotation、三类 daily、班次时长/transition、
+房间和有序干员名单；排除 elapsed、线上路径和标题。显式覆盖 `--top` 或 `--rotation` 后，比较
+固定标记为 `not_comparable`。`current_runtime` 在重跑前对当前二进制和明确列出的运行时 catalog
+计算 SHA-256；它不能补造旧线上环境。
+
+stdout 只输出不含 source name、排班名单、focus 或 recorded projection 的脱敏摘要。完整 rotation、
+focus、原结果投影和 operbox 只进入 `--output-dir`；该目录固定以私有 evidence 处理，不提交。
+当前不支持 `plan.compute` bundle、失败调用重跑、全候选日志或“未选中候选为什么失败”的解释。
+
+---
+
+## 固定编制 settlement explain
+
+`layout eval --explain-json` 对指定 assignment 运行与默认入口相同的 `resolve_base` 和各房正式
+solver，但额外打开 call-scoped 中枢 L1 trace。默认 `layout eval` JSON / `--text` 契约不变；
+`--text` 与 `--explain-json` 互斥。
+
+```bash
+cargo run -q -p infra-cli -- layout eval \
+  --layout target/codex-runs/<task>/private-rerun/layout.json \
+  --operbox target/codex-runs/<task>/private-rerun/operbox.json \
+  --assignment target/codex-runs/<task>/private-rerun/team_shift_2.json \
+  --explain-json > target/codex-runs/<task>/private-explain.json
+```
+
+诊断 envelope 当前为 `schema_version=1`，包含：
+
+- `rooms.trade/manufacture/power`：干员和正式 `TradeResult` / `ManuResult` / `PowerResult` 分量；空贸易/制造房显式为 `status=empty`。
+- `control_trace.events`：operator、`buff_id`、phase、condition/selector/action 与实际 outcome。
+- `control_trace.final_state`：中枢执行完后的非零状态池，例如 Passion。
+- `totals`：本次固定编制三设施域的效率和。
+
+GlobalInject 的 merge 由 `infra-core::global_resource` 按真实顺序解释：制造 static 候选先执行正值
+max / 负值累加，再执行 count-scaled max；只有实际影响最终累加值的调整标为 `accumulated`，较小
+正候选仍为 `suppressed`，selector 结果为 0 固定为 `no_effect`。其余 max 槽使用 `winner`、
+`tied_winner`、`suppressed`。当前贸易房计数、制造房标签和灵知精密计算分别输出
+`deferred_to_trade_room`、`deferred_to_manufacture_room`、`special_rule`，不会伪装成 max loser。
+未被中枢 interpreter 建模的 condition 保持现有 assumed-true 行为，同时明确标记为
+`unhandled_assumed_true`。
+
+该输出解释“已选 assignment 如何结算”，不解释未选候选为何落败；贸易/制造房内 EffectAtom
+仍只提供聚合 solver breakdown。输出含私人编制和干员名单，必须重定向到私有 evidence，不提交。
 
 ---
 

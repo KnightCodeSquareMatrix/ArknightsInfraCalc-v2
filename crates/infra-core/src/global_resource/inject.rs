@@ -2,6 +2,35 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::types::RecipeKind;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InjectMergeStatus {
+    Winner,
+    TiedWinner,
+    Suppressed,
+    Accumulated,
+    NoEffect,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct InjectMergeExplanation {
+    pub status: InjectMergeStatus,
+    pub effective_value: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManuInjectCandidateKind {
+    Static,
+    CountScaled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ManuInjectCandidate {
+    pub kind: ManuInjectCandidateKind,
+    pub value: f64,
+}
+
 /// 灵知·精密计算：每名同贸易房谢拉格干员的订单效率/上限增量规则。
 /// 控制域只携带系数；最终值在贸易域按房间内 `cc.g.karlan` 计数结算。
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -69,7 +98,7 @@ pub struct TaggedManuCountInject {
     pub resolved_count: u8,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ManuInjectSlot {
     All,
     Gold,
@@ -118,6 +147,27 @@ impl GlobalInjectManifest {
         by_family.values().sum()
     }
 
+    pub fn explain_resolved_trade_candidate(
+        &self,
+        family: &str,
+        candidate_value: f64,
+        tied: bool,
+    ) -> InjectMergeExplanation {
+        let mut effective_value = self.trade_by_family.get(family).copied().unwrap_or(0.0);
+        for rule in self
+            .trade_tagged
+            .iter()
+            .filter(|rule| rule.family == family)
+        {
+            effective_value =
+                effective_value.max(f64::from(rule.resolved_count) * rule.value_per_operator);
+        }
+        InjectMergeExplanation {
+            status: max_merge_status(candidate_value, effective_value, tied),
+            effective_value,
+        }
+    }
+
     pub fn trade_global_flat_eff_pct(&self) -> f64 {
         self.trade_by_family
             .get(INJECT_FAMILY_TRADE_GLOBAL_FLAT)
@@ -162,6 +212,98 @@ impl GlobalInjectManifest {
             *entry = entry.max(value);
         }
         all_by_family.values().sum::<f64>() + recipe_by_family.values().sum::<f64>()
+    }
+
+    pub fn explain_manu_candidates(
+        candidates: &[ManuInjectCandidate],
+    ) -> Vec<InjectMergeExplanation> {
+        let effective_value = settle_manu_candidates(candidates, &[]);
+        let static_value = settle_static_candidates(candidates, &[]);
+        candidates
+            .iter()
+            .enumerate()
+            .map(|(index, candidate)| {
+                let status = if candidate.value == 0.0 {
+                    InjectMergeStatus::NoEffect
+                } else {
+                    match candidate.kind {
+                        ManuInjectCandidateKind::Static if candidate.value < 0.0 => {
+                            if (settle_manu_candidates(candidates, &[index]) - effective_value)
+                                .abs()
+                                >= f64::EPSILON
+                            {
+                                InjectMergeStatus::Accumulated
+                            } else {
+                                InjectMergeStatus::Suppressed
+                            }
+                        }
+                        ManuInjectCandidateKind::Static => {
+                            if (settle_manu_candidates(candidates, &[index]) - effective_value)
+                                .abs()
+                                >= f64::EPSILON
+                            {
+                                InjectMergeStatus::Winner
+                            } else {
+                                let tie_group = candidates
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(other_index, other)| {
+                                        (other.kind == ManuInjectCandidateKind::Static
+                                            && (other.value - candidate.value).abs() < f64::EPSILON)
+                                            .then_some(other_index)
+                                    })
+                                    .collect::<Vec<_>>();
+                                if tie_group.len() > 1
+                                    && tie_group.iter().all(|member_index| {
+                                        (settle_manu_candidates(candidates, &[*member_index])
+                                            - effective_value)
+                                            .abs()
+                                            < f64::EPSILON
+                                    })
+                                    && (settle_manu_candidates(candidates, &tie_group)
+                                        - effective_value)
+                                        .abs()
+                                        >= f64::EPSILON
+                                {
+                                    InjectMergeStatus::TiedWinner
+                                } else {
+                                    InjectMergeStatus::Suppressed
+                                }
+                            }
+                        }
+                        ManuInjectCandidateKind::CountScaled => {
+                            let max_count_scaled = candidates
+                                .iter()
+                                .filter(|other| other.kind == ManuInjectCandidateKind::CountScaled)
+                                .map(|other| other.value)
+                                .fold(static_value, f64::max);
+                            if candidate.value >= static_value
+                                && (candidate.value - max_count_scaled).abs() < f64::EPSILON
+                            {
+                                let ties = candidates
+                                    .iter()
+                                    .filter(|other| {
+                                        other.kind == ManuInjectCandidateKind::CountScaled
+                                            && (other.value - candidate.value).abs() < f64::EPSILON
+                                    })
+                                    .count();
+                                if ties > 1 {
+                                    InjectMergeStatus::TiedWinner
+                                } else {
+                                    InjectMergeStatus::Winner
+                                }
+                            } else {
+                                InjectMergeStatus::Suppressed
+                            }
+                        }
+                    }
+                };
+                InjectMergeExplanation {
+                    status,
+                    effective_value,
+                }
+            })
+            .collect()
     }
 
     pub fn record_trade(&mut self, family: &str, value: f64) {
@@ -219,13 +361,7 @@ impl GlobalInjectManifest {
     }
 
     pub fn record_manu(&mut self, family: &str, recipe: Option<RecipeKind>, value: f64) {
-        let slot = match recipe {
-            None | Some(RecipeKind::All) => ManuInjectSlot::All,
-            Some(RecipeKind::Gold) => ManuInjectSlot::Gold,
-            Some(RecipeKind::BattleRecord) => ManuInjectSlot::BattleRecord,
-            Some(RecipeKind::Originium) => ManuInjectSlot::Originium,
-        };
-        let map = match slot {
+        let map = match manu_inject_slot(recipe) {
             ManuInjectSlot::All => &mut self.manu_all_by_family,
             ManuInjectSlot::Gold => &mut self.manu_gold_by_family,
             ManuInjectSlot::BattleRecord => &mut self.manu_battle_record_by_family,
@@ -325,6 +461,56 @@ impl GlobalInjectManifest {
     pub fn active_source_buffs(&self) -> impl Iterator<Item = &str> {
         self.active_source_buffs.iter().map(String::as_str)
     }
+}
+
+fn manu_inject_slot(recipe: Option<RecipeKind>) -> ManuInjectSlot {
+    match recipe {
+        None | Some(RecipeKind::All) => ManuInjectSlot::All,
+        Some(RecipeKind::Gold) => ManuInjectSlot::Gold,
+        Some(RecipeKind::BattleRecord) => ManuInjectSlot::BattleRecord,
+        Some(RecipeKind::Originium) => ManuInjectSlot::Originium,
+    }
+}
+
+fn max_merge_status(candidate_value: f64, effective_value: f64, tied: bool) -> InjectMergeStatus {
+    if candidate_value == 0.0 {
+        return InjectMergeStatus::NoEffect;
+    }
+    if (candidate_value - effective_value).abs() < f64::EPSILON {
+        if tied {
+            InjectMergeStatus::TiedWinner
+        } else {
+            InjectMergeStatus::Winner
+        }
+    } else {
+        InjectMergeStatus::Suppressed
+    }
+}
+
+fn settle_manu_candidates(candidates: &[ManuInjectCandidate], skipped: &[usize]) -> f64 {
+    let mut effective = settle_static_candidates(candidates, skipped);
+    for (index, candidate) in candidates.iter().enumerate() {
+        if skipped.contains(&index) || candidate.kind != ManuInjectCandidateKind::CountScaled {
+            continue;
+        }
+        effective = effective.max(candidate.value);
+    }
+    effective
+}
+
+fn settle_static_candidates(candidates: &[ManuInjectCandidate], skipped: &[usize]) -> f64 {
+    let mut effective = 0.0_f64;
+    for (index, candidate) in candidates.iter().enumerate() {
+        if skipped.contains(&index) || candidate.kind != ManuInjectCandidateKind::Static {
+            continue;
+        }
+        if candidate.value >= 0.0 {
+            effective = effective.max(candidate.value);
+        } else {
+            effective += candidate.value;
+        }
+    }
+    effective
 }
 
 #[cfg(test)]
@@ -447,6 +633,143 @@ mod tests {
             inject.trade_eff_pct_with_scoped_tag_counts(&HashMap::new(), &HashMap::new()),
             20.0
         );
+    }
+
+    #[test]
+    fn explanation_uses_the_same_max_and_accumulation_semantics() {
+        let mut inject = GlobalInjectManifest::default();
+        inject.record_trade("shared", 2.0);
+        inject.record_trade("shared", 3.0);
+        assert_eq!(
+            inject
+                .explain_resolved_trade_candidate("shared", 2.0, false)
+                .status,
+            InjectMergeStatus::Suppressed
+        );
+        assert_eq!(
+            inject
+                .explain_resolved_trade_candidate("shared", 3.0, true)
+                .status,
+            InjectMergeStatus::TiedWinner
+        );
+        assert_eq!(
+            inject
+                .explain_resolved_trade_candidate("shared", 0.0, false)
+                .status,
+            InjectMergeStatus::NoEffect
+        );
+
+        let explanations = GlobalInjectManifest::explain_manu_candidates(&[
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 3.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: -1.0,
+            },
+        ]);
+        assert_eq!(explanations[0].status, InjectMergeStatus::Winner);
+        assert_eq!(explanations[1].status, InjectMergeStatus::Suppressed);
+        assert_eq!(explanations[2].status, InjectMergeStatus::Accumulated);
+        assert!(explanations
+            .iter()
+            .all(|explanation| explanation.effective_value == 4.0));
+
+        let count_scaled = GlobalInjectManifest::explain_manu_candidates(&[
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: -1.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::CountScaled,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::CountScaled,
+                value: 0.0,
+            },
+        ]);
+        assert_eq!(count_scaled[0].status, InjectMergeStatus::Suppressed);
+        assert_eq!(count_scaled[1].status, InjectMergeStatus::Suppressed);
+        assert_eq!(count_scaled[2].status, InjectMergeStatus::Winner);
+        assert_eq!(count_scaled[3].status, InjectMergeStatus::NoEffect);
+        assert!(count_scaled
+            .iter()
+            .all(|explanation| explanation.effective_value == 5.0));
+
+        let tied_adjusted = GlobalInjectManifest::explain_manu_candidates(&[
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: -1.0,
+            },
+        ]);
+        assert_eq!(tied_adjusted[0].status, InjectMergeStatus::TiedWinner);
+        assert_eq!(tied_adjusted[1].status, InjectMergeStatus::TiedWinner);
+        assert_eq!(tied_adjusted[2].status, InjectMergeStatus::Accumulated);
+
+        let later_count_winner = GlobalInjectManifest::explain_manu_candidates(&[
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: -1.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::CountScaled,
+                value: 5.0,
+            },
+        ]);
+        assert_eq!(later_count_winner[0].status, InjectMergeStatus::Suppressed);
+        assert_eq!(later_count_winner[1].status, InjectMergeStatus::Suppressed);
+        assert_eq!(later_count_winner[2].status, InjectMergeStatus::Suppressed);
+        assert_eq!(later_count_winner[3].status, InjectMergeStatus::Winner);
+
+        let asymmetric_same_value = GlobalInjectManifest::explain_manu_candidates(&[
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: -1.0,
+            },
+            ManuInjectCandidate {
+                kind: ManuInjectCandidateKind::Static,
+                value: 5.0,
+            },
+        ]);
+        assert_eq!(
+            asymmetric_same_value[0].status,
+            InjectMergeStatus::Suppressed
+        );
+        assert_eq!(
+            asymmetric_same_value[1].status,
+            InjectMergeStatus::Suppressed
+        );
+        assert_eq!(asymmetric_same_value[2].status, InjectMergeStatus::Winner);
     }
 }
 

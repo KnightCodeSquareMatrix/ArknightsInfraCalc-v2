@@ -34,10 +34,11 @@ pub use orchestrate::{
     SystemAnchor,
 };
 pub use resolve::{
-    resolve_automation_group_1_layout, resolve_base, resolve_search_baseline_layout,
-    resolve_snhunt_baseline_layout, resolve_snhunt_elite2_baseline_layout,
-    snhunt_control_assignment, snhunt_default_assignment, ResolvedBase, ResolvedManuRoom,
-    ResolvedPowerRoom, ResolvedSupportRoom, ResolvedTradeRoom,
+    resolve_automation_group_1_layout, resolve_base, resolve_base_with_trace,
+    resolve_search_baseline_layout, resolve_snhunt_baseline_layout,
+    resolve_snhunt_elite2_baseline_layout, snhunt_control_assignment, snhunt_default_assignment,
+    ResolveTrace, ResolvedBase, ResolvedManuRoom, ResolvedPowerRoom, ResolvedSupportRoom,
+    ResolvedTradeRoom,
 };
 pub use shift::AssignShiftMode;
 pub use system::{

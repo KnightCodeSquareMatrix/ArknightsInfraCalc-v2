@@ -22,6 +22,29 @@ Each case normally contains:
 | `debug-bundle.json` | Online run context: layout, operbox summary, command, exit code, and result payload when available |
 | `operbox.json` | The submitted operator box for local reproduction |
 
+## Current-runtime rerun
+
+For a successful `version=beta-test-bundle-v2-next-serve`, legacy `method=plan` bundle, use the
+repository adapter instead of executing the recorded online command or paths:
+
+```bash
+cargo run -q -p infra-cli -- debug rerun \
+  --bundle feedback/<date>/<case>/debug-bundle.json \
+  --output-dir target/codex-runs/<task>/private-rerun \
+  --pretty
+```
+
+This is a rerun against the current executable and resolved data catalogs, not proof of the original
+online runtime: historical bundles do not contain its binary/data fingerprints. The command compares
+stable rotation/assignment fields when the recorded response is available and marks the original
+runtime as unknown. It never executes `command`, `savedFiles`, request paths, or user-controlled labels.
+
+The output directory must not already exist. Extracted layout, operbox, assignments, and reports remain
+private local evidence and must not be committed. Stdout contains only a sanitized hash/status summary;
+the complete rotation, focused room/operator projection, source name, and recorded projection are written
+only to the explicit private output directory. Explicit `--top` or `--rotation` overrides disable recorded
+result comparison.
+
 ## Status Values
 
 | Status | Meaning |

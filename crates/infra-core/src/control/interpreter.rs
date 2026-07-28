@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use crate::control::input::ControlRoomInput;
 use crate::global_resource::GlobalResourcePool;
 use crate::global_resource::{
-    GlobalInjectManifest, TradeTaggedCountScope, INJECT_FAMILY_MANU_GLOBAL_ALL,
-    INJECT_FAMILY_TRADE_GLOBAL_FLAT,
+    GlobalInjectManifest, InjectMergeExplanation, ManuInjectCandidate, ManuInjectCandidateKind,
+    TradeTaggedCountScope, INJECT_FAMILY_MANU_GLOBAL_ALL, INJECT_FAMILY_TRADE_GLOBAL_FLAT,
 };
 use crate::layout::trade_station_tagged_gte_key;
 use crate::skill_table::SkillTable;
-use crate::types::{Action, Condition, EffectAtom, Phase, Selector, StateKey};
+use crate::types::{Action, Condition, EffectAtom, Phase, RecipeKind, Selector, StateKey};
 
 #[derive(Debug, Clone, Default)]
 struct ControlOperatorRuntime {
@@ -35,7 +35,102 @@ pub struct ControlCenterResult {
     pub operator_mood_drains: HashMap<String, f64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlConditionStatus {
+    Passed,
+    Failed,
+    UnhandledAssumedTrue,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct ControlTraceEvent {
+    pub source_operator: String,
+    pub source_buff_id: String,
+    pub phase: Phase,
+    pub phase_order: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<Condition>,
+    pub condition_status: ControlConditionStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<Selector>,
+    pub action: Action,
+    pub outcome: ControlTraceOutcome,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ControlTraceOutcome {
+    ConditionNotMet,
+    StateWrite {
+        key: StateKey,
+        delta: f64,
+        before: f64,
+        after: f64,
+    },
+    TradeInject {
+        family: String,
+        candidate_value: f64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        merge: Option<InjectMergeExplanation>,
+    },
+    ManufactureInject {
+        family: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        recipe: Option<RecipeKind>,
+        candidate_value: f64,
+        candidate_kind: ManuInjectCandidateKind,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        merge: Option<InjectMergeExplanation>,
+    },
+    DeferredToTradeRoom {
+        family: String,
+        target_tag: String,
+        value_per_operator: f64,
+        count_scope: String,
+    },
+    DeferredToManufactureRoom {
+        target_tag: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        recipe: Option<RecipeKind>,
+        value: f64,
+    },
+    SpecialRule {
+        rule: String,
+    },
+    MoodApplied,
+    Ignored,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct ControlStateValue {
+    pub key: StateKey,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct ControlSettlementTrace {
+    pub events: Vec<ControlTraceEvent>,
+    pub final_state: Vec<ControlStateValue>,
+}
+
 pub fn solve_control(input: &ControlRoomInput, table: &SkillTable) -> ControlCenterResult {
+    solve_control_inner(input, table, false).0
+}
+
+pub fn solve_control_with_trace(
+    input: &ControlRoomInput,
+    table: &SkillTable,
+) -> (ControlCenterResult, ControlSettlementTrace) {
+    let (result, trace) = solve_control_inner(input, table, true);
+    (result, trace.expect("trace requested"))
+}
+
+fn solve_control_inner(
+    input: &ControlRoomInput,
+    table: &SkillTable,
+    trace_enabled: bool,
+) -> (ControlCenterResult, Option<ControlSettlementTrace>) {
     let mut ctx = ControlContext {
         operators: input
             .operators
@@ -59,12 +154,53 @@ pub fn solve_control(input: &ControlRoomInput, table: &SkillTable) -> ControlCen
     }
 
     let atoms = collect_control_atoms(&ctx.operators, table);
+    let mut trace_events = trace_enabled.then(Vec::new);
     for (atom, owner, source_buff_id) in atoms {
-        if !condition_met(&atom.condition, &ctx, &owner) {
+        let condition_status = evaluate_condition(&atom.condition, &ctx, &owner);
+        if condition_status == ControlConditionStatus::Failed {
+            if let Some(events) = &mut trace_events {
+                events.push(ControlTraceEvent {
+                    source_operator: owner,
+                    source_buff_id,
+                    phase: atom.phase,
+                    phase_order: atom.phase_order,
+                    condition: atom.condition.clone(),
+                    condition_status,
+                    selector: atom.selector.clone(),
+                    action: atom.action.clone(),
+                    outcome: ControlTraceOutcome::ConditionNotMet,
+                });
+            }
             continue;
         }
-        apply_atom(&mut ctx, &atom, &owner, &source_buff_id);
+        let outcome = apply_atom(&mut ctx, &atom, &owner, &source_buff_id, trace_enabled);
+        if let Some(events) = &mut trace_events {
+            events.push(ControlTraceEvent {
+                source_operator: owner,
+                source_buff_id,
+                phase: atom.phase,
+                phase_order: atom.phase_order,
+                condition: atom.condition.clone(),
+                condition_status,
+                selector: atom.selector.clone(),
+                action: atom.action.clone(),
+                outcome: outcome.unwrap_or(ControlTraceOutcome::Ignored),
+            });
+        }
     }
+
+    if let Some(events) = &mut trace_events {
+        finalize_inject_trace(events, &ctx.inject);
+    }
+    let final_state = trace_enabled.then(|| {
+        crate::global_resource::GlobalResourceKey::ALL
+            .iter()
+            .filter_map(|key| {
+                let value = ctx.state_pool.get(key).copied().unwrap_or(0.0);
+                (value != 0.0).then_some(ControlStateValue { key: *key, value })
+            })
+            .collect::<Vec<_>>()
+    });
 
     let mut global = input.layout.global.clone();
     for (key, value) in ctx.state_pool {
@@ -79,11 +215,17 @@ pub fn solve_control(input: &ControlRoomInput, table: &SkillTable) -> ControlCen
         .map(|o| (o.name.clone(), o.mood_drain_delta))
         .collect();
 
-    ControlCenterResult {
-        global,
-        inject: ctx.inject,
-        operator_mood_drains,
-    }
+    (
+        ControlCenterResult {
+            global,
+            inject: ctx.inject,
+            operator_mood_drains,
+        },
+        trace_events.map(|events| ControlSettlementTrace {
+            events,
+            final_state: final_state.unwrap_or_default(),
+        }),
+    )
 }
 
 fn collect_control_atoms<'a>(
@@ -112,38 +254,55 @@ fn collect_control_atoms<'a>(
     atoms
 }
 
-fn condition_met(cond: &Option<Condition>, ctx: &ControlContext, owner: &str) -> bool {
-    let Some(cond) = cond else { return true };
-    match cond {
-        Condition::MoodAbove { n } => ctx.mood > *n as f64,
-        Condition::MoodAboveOrEq { n } => ctx.mood >= *n as f64,
-        Condition::MoodBelow { n } => ctx.mood < *n as f64,
-        Condition::MoodBelowOrEq { n } => ctx.mood <= *n as f64,
-        Condition::OperatorInBase { name } => ctx.layout.base_workforce.iter().any(|n| n == name),
-        Condition::OperatorInPower { name } => ctx.layout.power_workforce.iter().any(|n| n == name),
-        Condition::OperatorInTraining { name } => {
-            ctx.layout.training_assist.iter().any(|n| n == name)
+fn evaluate_condition(
+    cond: &Option<Condition>,
+    ctx: &ControlContext,
+    owner: &str,
+) -> ControlConditionStatus {
+    let Some(cond) = cond else {
+        return ControlConditionStatus::Passed;
+    };
+    let matched = match cond {
+        Condition::MoodAbove { n } => Some(ctx.mood > *n as f64),
+        Condition::MoodAboveOrEq { n } => Some(ctx.mood >= *n as f64),
+        Condition::MoodBelow { n } => Some(ctx.mood < *n as f64),
+        Condition::MoodBelowOrEq { n } => Some(ctx.mood <= *n as f64),
+        Condition::OperatorInBase { name } => {
+            Some(ctx.layout.base_workforce.iter().any(|n| n == name))
         }
-        Condition::NoPlatformInOtherPower {} => !ctx.layout.other_power_has_platform,
-        Condition::OtherPlatformInPower {} => ctx.layout.other_platform_in_power,
-        Condition::OtherLateranoInPower {} => ctx.layout.other_laterano_in_power,
-        Condition::PartnerInRoom { name } => ctx.operators.iter().any(|o| o.name == *name),
-        Condition::TagPresentInRoom { tag } => ctx
-            .operators
-            .iter()
-            .any(|o| o.tags.iter().any(|t| t == tag)),
-        Condition::PeerTagInRoom { tag } => ctx
-            .operators
-            .iter()
-            .any(|o| o.name != owner && o.tags.iter().any(|t| t == tag)),
+        Condition::OperatorInPower { name } => {
+            Some(ctx.layout.power_workforce.iter().any(|n| n == name))
+        }
+        Condition::OperatorInTraining { name } => {
+            Some(ctx.layout.training_assist.iter().any(|n| n == name))
+        }
+        Condition::NoPlatformInOtherPower {} => Some(!ctx.layout.other_power_has_platform),
+        Condition::OtherPlatformInPower {} => Some(ctx.layout.other_platform_in_power),
+        Condition::OtherLateranoInPower {} => Some(ctx.layout.other_laterano_in_power),
+        Condition::PartnerInRoom { name } => Some(ctx.operators.iter().any(|o| o.name == *name)),
+        Condition::TagPresentInRoom { tag } => Some(
+            ctx.operators
+                .iter()
+                .any(|o| o.tags.iter().any(|t| t == tag)),
+        ),
+        Condition::PeerTagInRoom { tag } => Some(
+            ctx.operators
+                .iter()
+                .any(|o| o.name != owner && o.tags.iter().any(|t| t == tag)),
+        ),
         Condition::ExternalMomentumGteField {} => {
-            ctx.layout.external_momentum() >= ctx.layout.field_momentum()
+            Some(ctx.layout.external_momentum() >= ctx.layout.field_momentum())
         }
         Condition::FieldMomentumGtExternal {} => {
-            ctx.layout.field_momentum() > ctx.layout.external_momentum()
+            Some(ctx.layout.field_momentum() > ctx.layout.external_momentum())
         }
-        Condition::PlatformCountGte { min } => ctx.layout.platform_count_in_power >= *min,
-        _ => true,
+        Condition::PlatformCountGte { min } => Some(ctx.layout.platform_count_in_power >= *min),
+        _ => None,
+    };
+    match matched {
+        Some(true) => ControlConditionStatus::Passed,
+        Some(false) => ControlConditionStatus::Failed,
+        None => ControlConditionStatus::UnhandledAssumedTrue,
     }
 }
 
@@ -155,12 +314,21 @@ fn scaled_inject_value(ctx: &ControlContext, atom: &EffectAtom, base: f64) -> f6
     }
 }
 
-fn apply_atom(ctx: &mut ControlContext, atom: &EffectAtom, owner: &str, source_buff_id: &str) {
+fn apply_atom(
+    ctx: &mut ControlContext,
+    atom: &EffectAtom,
+    owner: &str,
+    source_buff_id: &str,
+    trace_enabled: bool,
+) -> Option<ControlTraceOutcome> {
     match atom.phase {
-        Phase::StateWrite => apply_state_write(ctx, atom),
-        Phase::GlobalInject => apply_global_inject(ctx, atom, owner, source_buff_id),
-        Phase::Mood => apply_mood_action(ctx, &atom.action, owner),
-        _ => {}
+        Phase::StateWrite => apply_state_write(ctx, atom, trace_enabled),
+        Phase::GlobalInject => apply_global_inject(ctx, atom, owner, source_buff_id, trace_enabled),
+        Phase::Mood => {
+            apply_mood_action(ctx, &atom.action, owner);
+            trace_enabled.then_some(ControlTraceOutcome::MoodApplied)
+        }
+        _ => trace_enabled.then_some(ControlTraceOutcome::Ignored),
     }
 }
 
@@ -211,11 +379,15 @@ fn apply_mood_action(ctx: &mut ControlContext, action: &Action, owner: &str) {
     }
 }
 
-fn apply_state_write(ctx: &mut ControlContext, atom: &EffectAtom) {
+fn apply_state_write(
+    ctx: &mut ControlContext,
+    atom: &EffectAtom,
+    trace_enabled: bool,
+) -> Option<ControlTraceOutcome> {
     match &atom.action {
         Action::StateProduce { key, amount } => {
             let Some(sk) = StateKey::parse(key) else {
-                return;
+                return trace_enabled.then_some(ControlTraceOutcome::Ignored);
             };
             let scale = resolve_selector_value(ctx, atom.selector.as_ref());
             let add = if atom.selector.is_some() {
@@ -223,9 +395,17 @@ fn apply_state_write(ctx: &mut ControlContext, atom: &EffectAtom) {
             } else {
                 *amount
             };
-            *ctx.state_pool.entry(sk).or_insert(0.0) += add;
+            let before = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let after = before + add;
+            ctx.state_pool.insert(sk, after);
+            trace_enabled.then_some(ControlTraceOutcome::StateWrite {
+                key: sk,
+                delta: add,
+                before,
+                after,
+            })
         }
-        _ => {}
+        _ => trace_enabled.then_some(ControlTraceOutcome::Ignored),
     }
 }
 
@@ -234,7 +414,8 @@ fn apply_global_inject(
     atom: &EffectAtom,
     owner: &str,
     source_buff_id: &str,
-) {
+    trace_enabled: bool,
+) -> Option<ControlTraceOutcome> {
     ctx.inject.record_active_source_buff(source_buff_id);
     let family = atom.tag.as_deref().unwrap_or(match &atom.action {
         Action::GlobalInjectTradeEff { .. } => INJECT_FAMILY_TRADE_GLOBAL_FLAT,
@@ -278,11 +459,32 @@ fn apply_global_inject(
                     resolved_count,
                     count_scope,
                 );
+                if !trace_enabled {
+                    return None;
+                }
+                if matches!(count_scope, TradeTaggedCountScope::CurrentTradeRoom) {
+                    return Some(ControlTraceOutcome::DeferredToTradeRoom {
+                        family: family.to_string(),
+                        target_tag: tag.to_string(),
+                        value_per_operator: *value,
+                        count_scope: "current_trade_room".to_string(),
+                    });
+                }
+                return Some(ControlTraceOutcome::TradeInject {
+                    family: family.to_string(),
+                    candidate_value: f64::from(resolved_count) * *value,
+                    merge: None,
+                });
             } else {
                 let v = scaled_inject_value(ctx, atom, *value);
                 if v != 0.0 {
                     ctx.inject.record_trade(family, v);
                 }
+                return trace_enabled.then_some(ControlTraceOutcome::TradeInject {
+                    family: family.to_string(),
+                    candidate_value: v,
+                    merge: None,
+                });
             }
         }
         Action::GlobalInjectManuEff { value, recipe } => {
@@ -302,11 +504,25 @@ fn apply_global_inject(
                     *value,
                     resolved_count,
                 );
+                return trace_enabled.then_some(ControlTraceOutcome::ManufactureInject {
+                    family: family.to_string(),
+                    recipe: *recipe,
+                    candidate_value: f64::from(resolved_count) * *value,
+                    candidate_kind: ManuInjectCandidateKind::CountScaled,
+                    merge: None,
+                });
             } else {
                 let v = scaled_inject_value(ctx, atom, *value);
                 if v != 0.0 {
                     ctx.inject.record_manu(family, *recipe, v);
                 }
+                return trace_enabled.then_some(ControlTraceOutcome::ManufactureInject {
+                    family: family.to_string(),
+                    recipe: *recipe,
+                    candidate_value: v,
+                    candidate_kind: ManuInjectCandidateKind::Static,
+                    merge: None,
+                });
             }
         }
         Action::GlobalInjectManuTaggedEff {
@@ -319,6 +535,11 @@ fn apply_global_inject(
                 ctx.inject
                     .record_manu_tagged(source_buff_id, target_tag, *recipe, v);
             }
+            return trace_enabled.then_some(ControlTraceOutcome::DeferredToManufactureRoom {
+                target_tag: target_tag.clone(),
+                recipe: *recipe,
+                value: v,
+            });
         }
         Action::GlobalInjectKarlanPrecision {
             eff_per_karlan,
@@ -326,8 +547,121 @@ fn apply_global_inject(
         } => {
             ctx.inject
                 .record_karlan_precision(*eff_per_karlan, *limit_per_karlan);
+            return trace_enabled.then_some(ControlTraceOutcome::SpecialRule {
+                rule: "karlan_precision".to_string(),
+            });
         }
         _ => {}
+    }
+    trace_enabled.then_some(ControlTraceOutcome::Ignored)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TraceInjectTarget {
+    Trade,
+    Manufacture(Option<RecipeKind>),
+}
+
+#[derive(Debug, Clone)]
+struct TraceInjectCandidate {
+    target: TraceInjectTarget,
+    family: String,
+    value: f64,
+    manu_kind: Option<ManuInjectCandidateKind>,
+}
+
+fn finalize_inject_trace(events: &mut [ControlTraceEvent], inject: &GlobalInjectManifest) {
+    // Atom events are captured in execution order; family classification waits until every
+    // candidate is known so max, ties and additive adjustments use the complete set.
+    let candidates = events
+        .iter()
+        .map(|event| trace_inject_candidate(&event.outcome))
+        .collect::<Vec<_>>();
+    for (index, event) in events.iter_mut().enumerate() {
+        let Some(candidate) = candidates[index].as_ref() else {
+            continue;
+        };
+        let explanation = match candidate.target {
+            TraceInjectTarget::Trade => {
+                let tied = candidates.iter().enumerate().any(|(other_index, other)| {
+                    other_index != index
+                        && other.as_ref().is_some_and(|other| {
+                            other.target == candidate.target
+                                && other.family == candidate.family
+                                && (other.value - candidate.value).abs() < f64::EPSILON
+                        })
+                });
+                inject.explain_resolved_trade_candidate(&candidate.family, candidate.value, tied)
+            }
+            TraceInjectTarget::Manufacture(recipe) => {
+                let group = candidates
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(event_index, other)| {
+                        let other = other.as_ref()?;
+                        if other.target == TraceInjectTarget::Manufacture(recipe)
+                            && other.family == candidate.family
+                        {
+                            Some((
+                                event_index,
+                                ManuInjectCandidate {
+                                    kind: other.manu_kind?,
+                                    value: other.value,
+                                },
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let position = group
+                    .iter()
+                    .position(|(event_index, _)| *event_index == index)
+                    .expect("current manufacture candidate in group");
+                GlobalInjectManifest::explain_manu_candidates(
+                    &group
+                        .iter()
+                        .map(|(_, candidate)| *candidate)
+                        .collect::<Vec<_>>(),
+                )[position]
+                    .clone()
+            }
+        };
+        match &mut event.outcome {
+            ControlTraceOutcome::TradeInject { merge, .. }
+            | ControlTraceOutcome::ManufactureInject { merge, .. } => {
+                *merge = Some(explanation);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn trace_inject_candidate(outcome: &ControlTraceOutcome) -> Option<TraceInjectCandidate> {
+    match outcome {
+        ControlTraceOutcome::TradeInject {
+            family,
+            candidate_value,
+            ..
+        } => Some(TraceInjectCandidate {
+            target: TraceInjectTarget::Trade,
+            family: family.clone(),
+            value: *candidate_value,
+            manu_kind: None,
+        }),
+        ControlTraceOutcome::ManufactureInject {
+            family,
+            recipe,
+            candidate_value,
+            candidate_kind,
+            ..
+        } => Some(TraceInjectCandidate {
+            target: TraceInjectTarget::Manufacture(*recipe),
+            family: family.clone(),
+            value: *candidate_value,
+            manu_kind: Some(*candidate_kind),
+        }),
+        _ => None,
     }
 }
 
@@ -893,5 +1227,167 @@ mod tests {
             "got {}",
             result.inject.manu_eff_for(crate::types::RecipeKind::Gold)
         );
+    }
+
+    #[test]
+    fn trace_is_behavior_neutral_and_exposes_passion_state_and_inject() {
+        let mut layout = LayoutContext::default();
+        layout.global.set(StateKey::Passion, 40.0);
+        let input = ControlRoomInput {
+            operators: vec![
+                control_op("若叶睦", 2),
+                control_op("丰川祥子", 2),
+                control_op("三角初华", 2),
+            ],
+            mood: 24.0,
+            layout,
+        };
+        let normal = solve_control(&input, &table());
+        let (traced, trace) = solve_control_with_trace(&input, &table());
+        assert_eq!(normal, traced);
+        assert!(trace
+            .final_state
+            .iter()
+            .any(|state| state.key == StateKey::Passion && state.value == 80.0));
+        assert!(trace.events.iter().any(|event| {
+            event.source_operator == "丰川祥子"
+                && matches!(
+                    &event.outcome,
+                    ControlTraceOutcome::ManufactureInject {
+                        family,
+                        recipe: Some(RecipeKind::Gold),
+                        candidate_value,
+                        merge: Some(InjectMergeExplanation {
+                            status: crate::global_resource::InjectMergeStatus::Winner,
+                            ..
+                        }),
+                        ..
+                    } if family == "manu_gold_passion" && *candidate_value == 4.0
+                )
+        }));
+    }
+
+    #[test]
+    fn trace_marks_max_family_winner_tie_and_suppression() {
+        let tied_input = ControlRoomInput::with_operators(vec![
+            control_op("阿米娅", 0),
+            control_op("诗怀雅", 0),
+        ]);
+        let (_, tied_trace) = solve_control_with_trace(&tied_input, &table());
+        let tied_count = tied_trace
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    &event.outcome,
+                    ControlTraceOutcome::TradeInject {
+                        merge: Some(InjectMergeExplanation {
+                            status: crate::global_resource::InjectMergeStatus::TiedWinner,
+                            ..
+                        }),
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(tied_count, 2);
+
+        let max_input = ControlRoomInput::with_operators(vec![
+            control_op("斩业星熊", 2),
+            control_op("Mon3tr", 2),
+            control_op("诗怀雅", 0),
+        ]);
+        let (_, max_trace) = solve_control_with_trace(&max_input, &table());
+        let status_for = |name: &str| {
+            max_trace.events.iter().find_map(|event| {
+                if event.source_operator != name {
+                    return None;
+                }
+                match &event.outcome {
+                    ControlTraceOutcome::ManufactureInject {
+                        family,
+                        merge: Some(merge),
+                        ..
+                    } if family == INJECT_FAMILY_MANU_GLOBAL_ALL => Some(merge.status),
+                    _ => None,
+                }
+            })
+        };
+        assert_eq!(
+            status_for("斩业星熊"),
+            Some(crate::global_resource::InjectMergeStatus::Winner)
+        );
+        assert_eq!(
+            status_for("Mon3tr"),
+            Some(crate::global_resource::InjectMergeStatus::Suppressed)
+        );
+    }
+
+    #[test]
+    fn trace_distinguishes_failed_condition_and_room_deferred_inject() {
+        let hoshiguma = ControlRoomInput::with_operators(vec![control_op("斩业星熊", 2)]);
+        let (_, failed_trace) = solve_control_with_trace(&hoshiguma, &table());
+        assert!(failed_trace.events.iter().any(|event| {
+            event.source_operator == "斩业星熊"
+                && event.condition_status == ControlConditionStatus::Failed
+                && matches!(event.outcome, ControlTraceOutcome::ConditionNotMet)
+        }));
+
+        let daifeen = ControlRoomInput::with_operators(vec![control_op("戴菲恩", 2)]);
+        let (_, deferred_trace) = solve_control_with_trace(&daifeen, &table());
+        assert!(deferred_trace.events.iter().any(|event| {
+            matches!(
+                event.outcome,
+                ControlTraceOutcome::DeferredToTradeRoom { .. }
+            )
+        }));
+    }
+
+    #[test]
+    fn trace_marks_unhandled_condition_assumed_true_without_changing_behavior() {
+        let path = std::env::temp_dir().join(format!(
+            "infra-control-unhandled-condition-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&serde_json::json!({
+                "version": 1,
+                "skills": [{
+                    "id": "control_debug_unhandled[000]",
+                    "skill_name": "debug unhandled condition",
+                    "facility": "control",
+                    "tier": "tier_0",
+                    "atoms": [{
+                        "condition": {"gold_delivery_below": {"n": 1}},
+                        "action": {
+                            "kind": "state_produce",
+                            "params": {"key": "Passion", "amount": 7.0}
+                        },
+                        "phase": "state_write",
+                        "phase_order": 10
+                    }]
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let custom_table = SkillTable::load(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let input = ControlRoomInput::with_operators(vec![ControlOperator {
+            name: "debug operator".to_string(),
+            elite: 0,
+            buff_ids: vec!["control_debug_unhandled[000]".to_string()],
+            tags: vec![],
+        }]);
+        let (result, trace) = solve_control_with_trace(&input, &custom_table);
+        assert_eq!(result.global.get(StateKey::Passion), 7.0);
+        assert!(trace.events.iter().any(|event| {
+            event.condition_status == ControlConditionStatus::UnhandledAssumedTrue
+                && matches!(
+                    event.outcome,
+                    ControlTraceOutcome::StateWrite { delta: 7.0, .. }
+                )
+        }));
     }
 }
