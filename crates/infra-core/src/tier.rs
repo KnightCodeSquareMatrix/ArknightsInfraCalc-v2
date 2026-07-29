@@ -15,14 +15,14 @@ impl PromotionTier {
         Self::from_elite_rarity_level(progress.elite, progress.rarity, progress.level)
     }
 
-    /// Game rules: 1–2★ lv30, 3–4★ E1, 5–6★ E2; rarity 0 = unknown → 5–6★ rule.
+    /// Game rules: E2 is always tier_up; otherwise 1–2★ lv30, 3–4★ E1, 5–6★ E2.
     pub fn from_elite_rarity_level(elite: u8, rarity: u8, level: u32) -> Self {
-        let use_tier_up = match rarity {
-            1 | 2 => level >= 30,
-            3 | 4 => elite >= 1,
-            0 => elite >= 2,
-            _ => elite >= 2,
-        };
+        let use_tier_up = elite >= 2
+            || match rarity {
+                1 | 2 => level >= 30,
+                3 | 4 => elite >= 1,
+                _ => false,
+            };
         if use_tier_up {
             Self::TierUp
         } else {
@@ -102,6 +102,14 @@ mod tests {
         assert_eq!(
             PromotionTier::from_elite_rarity_level(1, 6, 80),
             PromotionTier::Tier0
+        );
+    }
+
+    #[test]
+    fn tier_e2_overrides_inconsistent_low_rarity() {
+        assert_eq!(
+            PromotionTier::from_elite_rarity_level(2, 1, 1),
+            PromotionTier::TierUp
         );
     }
 

@@ -311,4 +311,34 @@ mod tests {
             .iter()
             .any(|id| id.contains("manu_prod_spd&trade")));
     }
+
+    #[test]
+    fn elite_two_with_low_rarity_enters_tier_up_manufacture_pool() {
+        let entries = vec![OperBoxEntry {
+            id: "test".into(),
+            name: "弑君者".into(),
+            elite: 2,
+            level: 1,
+            own: true,
+            potential: 1,
+            rarity: 1,
+        }];
+        let operbox = OperBox::from_entries(entries);
+        assert_eq!(
+            operbox.tier_of("弑君者"),
+            Some(crate::tier::PromotionTier::TierUp)
+        );
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let table = crate::skill_table::SkillTable::load(
+            &crate::skill_table::default_skill_table_path().unwrap(),
+        )
+        .unwrap();
+        let roster = operbox.manufacture_roster(&instances);
+        let pool = crate::pool::build_manufacture_pool(&roster, &instances, &table).unwrap();
+        assert!(
+            pool.entry("弑君者").is_some(),
+            "E2 progress should enter the tier_up manufacture pool despite inconsistent rarity"
+        );
+    }
 }
