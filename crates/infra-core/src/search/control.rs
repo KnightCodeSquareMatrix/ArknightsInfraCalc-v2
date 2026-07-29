@@ -4,9 +4,15 @@ use std::time::Instant;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::control::{solve_control, ControlOperator, ControlRoomInput};
+use crate::control::{
+    solve_control, solve_control_with_trace, ControlOperator, ControlRoomInput,
+    ControlSettlementTrace, ControlTraceOutcome,
+};
 use crate::error::Result;
-use crate::global_resource::GlobalResourceKey;
+use crate::global_resource::{
+    GlobalResourceKey, InjectMergeStatus, INJECT_FAMILY_MANU_GLOBAL_ALL,
+    INJECT_FAMILY_TRADE_GLOBAL_FLAT,
+};
 use crate::layout::LayoutContext;
 use crate::pool::{combinations_indices, ControlPool};
 use crate::scoring::{
@@ -178,25 +184,119 @@ fn control_inject_sort_key(hit: &ControlSearchHit) -> f64 {
     hit.breakdown.policy_sort_key
 }
 
-fn prefer_control_name_pair(a: &ControlSearchHit, b: &ControlSearchHit) -> std::cmp::Ordering {
-    control_replacement_preference(b).cmp(&control_replacement_preference(a))
+#[derive(Debug)]
+struct RankedControlSearchHit {
+    hit: ControlSearchHit,
+    replacement_preference: i32,
+    suppressed_replacement_sources: usize,
 }
 
-fn control_replacement_preference(hit: &ControlSearchHit) -> i32 {
-    let mut score = 0;
-    if hit.names.iter().any(|name| name == "Mon3tr") {
-        score += 2;
+#[derive(Debug, Clone, Copy)]
+struct ControlReplacementRule {
+    source_buff_id: &'static str,
+    family: &'static str,
+    preference: i32,
+}
+
+const CONTROL_REPLACEMENT_RULES: [ControlReplacementRule; 4] = [
+    ControlReplacementRule {
+        source_buff_id: "control_prod_spd[1000]",
+        family: INJECT_FAMILY_MANU_GLOBAL_ALL,
+        preference: 2,
+    },
+    ControlReplacementRule {
+        source_buff_id: "control_prod_spd[000]",
+        family: INJECT_FAMILY_MANU_GLOBAL_ALL,
+        preference: -2,
+    },
+    ControlReplacementRule {
+        source_buff_id: "control_tra_spd[030]",
+        family: INJECT_FAMILY_TRADE_GLOBAL_FLAT,
+        preference: 1,
+    },
+    ControlReplacementRule {
+        source_buff_id: "control_tra_spd[020]",
+        family: INJECT_FAMILY_TRADE_GLOBAL_FLAT,
+        preference: -1,
+    },
+];
+
+fn control_replacement_candidate(operator: &ControlOperator) -> bool {
+    CONTROL_REPLACEMENT_RULES.iter().any(|replacement| {
+        operator
+            .buff_ids
+            .iter()
+            .any(|buff_id| buff_id == replacement.source_buff_id)
+    })
+}
+
+fn control_replacement_status(
+    trace: &ControlSettlementTrace,
+    replacement: ControlReplacementRule,
+) -> (bool, bool) {
+    let mut effective = false;
+    let mut suppressed = false;
+    for event in &trace.events {
+        if event.source_buff_id != replacement.source_buff_id {
+            continue;
+        }
+        let merge = match &event.outcome {
+            ControlTraceOutcome::TradeInject {
+                family,
+                merge: Some(merge),
+                ..
+            }
+            | ControlTraceOutcome::ManufactureInject {
+                family,
+                merge: Some(merge),
+                ..
+            } if family == replacement.family => merge,
+            _ => continue,
+        };
+        match merge.status {
+            InjectMergeStatus::Winner | InjectMergeStatus::TiedWinner => effective = true,
+            InjectMergeStatus::Suppressed => suppressed = true,
+            _ => {}
+        }
     }
-    if hit.names.iter().any(|name| name == "凯尔希") {
-        score -= 2;
-    }
-    if hit.names.iter().any(|name| name == "阿斯卡纶") {
-        score += 1;
-    }
-    if hit.names.iter().any(|name| name == "明椒") {
-        score -= 1;
-    }
-    score
+    (effective, suppressed)
+}
+
+fn control_replacement_rank(trace: &ControlSettlementTrace) -> (i32, usize) {
+    let preference = CONTROL_REPLACEMENT_RULES
+        .iter()
+        .filter_map(|replacement| {
+            let (effective, suppressed) = control_replacement_status(trace, *replacement);
+            (effective && !suppressed).then_some(replacement.preference)
+        })
+        .sum();
+    let suppressed_sources = CONTROL_REPLACEMENT_RULES
+        .iter()
+        .filter(|replacement| control_replacement_status(trace, **replacement).1)
+        .count();
+    (preference, suppressed_sources)
+}
+
+fn compare_ranked_control_hits(
+    a: &RankedControlSearchHit,
+    b: &RankedControlSearchHit,
+) -> std::cmp::Ordering {
+    let key = |hit: &RankedControlSearchHit| {
+        let value = control_inject_sort_key(&hit.hit);
+        if value.is_nan() {
+            f64::NEG_INFINITY
+        } else {
+            value
+        }
+    };
+    key(b)
+        .total_cmp(&key(a))
+        .then_with(|| b.replacement_preference.cmp(&a.replacement_preference))
+        .then_with(|| {
+            a.suppressed_replacement_sources
+                .cmp(&b.suppressed_replacement_sources)
+        })
+        .then_with(|| a.hit.names.cmp(&b.hit.names))
 }
 
 pub fn control_entry_core_inject_fill(entry: &crate::pool::ControlPoolEntry) -> bool {
@@ -788,7 +888,7 @@ pub fn search_control_combos(
     let layout = options.layout.clone();
     let mood = options.mood;
 
-    let mut hits: Vec<ControlSearchHit> = combos
+    let mut hits: Vec<RankedControlSearchHit> = combos
         .par_iter()
         .filter_map(|idxs| {
             let operators: Vec<_> = idxs
@@ -802,15 +902,26 @@ pub fn search_control_combos(
                 mood,
                 layout: layout.clone(),
             };
-            let result = solve_control(&input, table);
+            let (result, replacement_preference, suppressed_replacement_sources) =
+                if operators.iter().any(control_replacement_candidate) {
+                    let (result, trace) = solve_control_with_trace(&input, table);
+                    let (preference, suppressed_sources) = control_replacement_rank(&trace);
+                    (result, preference, suppressed_sources)
+                } else {
+                    (solve_control(&input, table), 0, 0)
+                };
             let breakdown = evaluate_control_policy(&result, &operators, table, options);
-            Some(ControlSearchHit {
-                trade_inject_pct: result
-                    .inject
-                    .trade_eff_pct_with_tag_counts(&layout.trade_tagged_count_sum),
-                manu_gold_inject_pct: result.inject.manu_eff_for(RecipeKind::Gold),
-                names,
-                breakdown,
+            Some(RankedControlSearchHit {
+                hit: ControlSearchHit {
+                    trade_inject_pct: result
+                        .inject
+                        .trade_eff_pct_with_tag_counts(&layout.trade_tagged_count_sum),
+                    manu_gold_inject_pct: result.inject.manu_eff_for(RecipeKind::Gold),
+                    names,
+                    breakdown,
+                },
+                replacement_preference,
+                suppressed_replacement_sources,
             })
         })
         .collect();
@@ -821,7 +932,8 @@ pub fn search_control_combos(
                 .candidate_requirements
                 .iter()
                 .all(|(candidates, min_count)| {
-                    hit.names
+                    hit.hit
+                        .names
                         .iter()
                         .filter(|name| candidates.contains(*name))
                         .count()
@@ -830,22 +942,16 @@ pub fn search_control_combos(
         });
     }
 
-    hits.sort_by(|a, b| {
-        control_inject_sort_key(b)
-            .partial_cmp(&control_inject_sort_key(a))
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| prefer_control_name_pair(a, b))
-            .then_with(|| a.names.cmp(&b.names))
-    });
+    hits.sort_by(compare_ranked_control_hits);
     hits.truncate(options.top_k);
     let _elapsed = start.elapsed();
-    Ok(hits)
+    Ok(hits.into_iter().map(|ranked| ranked.hit).collect())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::control::{ControlOperator, ControlRoomInput};
+    use crate::control::{ControlOperator, ControlRoomInput, ControlTraceEvent};
     use crate::instances::{default_instances_path, OperatorInstances};
     use crate::pool::build_control_pool;
     use crate::roster::Roster;
@@ -1172,6 +1278,201 @@ mod tests {
             hits[0].names,
             vec!["Mon3tr".to_string(), "阿斯卡纶".to_string()]
         );
+    }
+
+    #[test]
+    fn control_replacement_preference_requires_effective_family_representatives() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let preference_for = |operators: &[(&str, u8)]| {
+            let roster = Roster::from_elite_map(
+                operators
+                    .iter()
+                    .map(|(name, elite)| ((*name).to_string(), *elite))
+                    .collect(),
+            );
+            let pool = build_control_pool(&roster, &instances, &table).unwrap();
+            let input = ControlRoomInput::with_operators(
+                operators
+                    .iter()
+                    .map(|(name, _)| pool.entry(name).unwrap().to_control_operator())
+                    .collect(),
+            );
+            let (_, trace) = solve_control_with_trace(&input, &table);
+            control_replacement_rank(&trace)
+        };
+
+        assert_eq!(preference_for(&[("Mon3tr", 2)]), (2, 0));
+        assert_eq!(preference_for(&[("Mon3tr", 0)]), (0, 0));
+        assert_eq!(
+            preference_for(&[("斩业星熊", 2), ("Mon3tr", 2), ("诗怀雅", 0)]),
+            (0, 1),
+            "suppressed Mon3tr inject must not receive replacement preference"
+        );
+        assert_eq!(
+            preference_for(&[("Mon3tr", 2), ("凯尔希", 2)]),
+            (0, 0),
+            "tied family representatives retain their opposing stable preferences"
+        );
+        assert_eq!(
+            preference_for(&[("阿斯卡纶", 2), ("明椒", 2)]),
+            (0, 0),
+            "equal trade-family representatives retain their opposing stable preferences"
+        );
+    }
+
+    #[test]
+    fn control_search_excludes_a_replacement_source_suppressed_by_a_stronger_family_winner() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            ["Mon3tr", "斩业星熊", "诗怀雅", "玛恩纳", "维什戴尔"]
+                .into_iter()
+                .map(|name| (name.to_string(), 2))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 4,
+                top_k: 1,
+                fill_policy: ControlFillPolicy::LayeredFill,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(hits[0].manu_gold_inject_pct, 3.0);
+        assert!(hits[0].names.iter().any(|name| name == "斩业星熊"));
+        assert!(hits[0].names.iter().any(|name| name == "诗怀雅"));
+        assert!(!hits[0].names.iter().any(|name| name == "Mon3tr"));
+    }
+
+    fn ranked_hit_for_test(
+        name: &str,
+        policy_sort_key: f64,
+        replacement_preference: i32,
+        suppressed_replacement_sources: usize,
+    ) -> RankedControlSearchHit {
+        RankedControlSearchHit {
+            hit: ControlSearchHit {
+                names: vec![name.to_string()],
+                trade_inject_pct: 0.0,
+                manu_gold_inject_pct: 0.0,
+                breakdown: ControlPolicyBreakdown {
+                    policy_sort_key,
+                    ..Default::default()
+                },
+            },
+            replacement_preference,
+            suppressed_replacement_sources,
+        }
+    }
+
+    #[test]
+    fn control_comparator_is_total_and_puts_nan_in_the_lowest_score_tier() {
+        let high = ranked_hit_for_test("high", 10.0, 0, 0);
+        let low = ranked_hit_for_test("low", 1.0, 0, 0);
+        let nan = ranked_hit_for_test("nan", f64::NAN, 0, 0);
+
+        assert_eq!(
+            compare_ranked_control_hits(&high, &low),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_ranked_control_hits(&low, &nan),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_ranked_control_hits(&high, &nan),
+            std::cmp::Ordering::Less
+        );
+        for (left, right) in [(&high, &low), (&low, &nan), (&high, &nan)] {
+            assert_eq!(
+                compare_ranked_control_hits(left, right),
+                compare_ranked_control_hits(right, left).reverse()
+            );
+        }
+
+        let mut hits = vec![nan, high, low];
+        hits.sort_by(compare_ranked_control_hits);
+        assert_eq!(
+            hits.into_iter()
+                .map(|hit| hit.hit.names[0].clone())
+                .collect::<Vec<_>>(),
+            vec!["high".to_string(), "low".to_string(), "nan".to_string()]
+        );
+    }
+
+    #[test]
+    fn control_comparator_secondary_keys_are_transitive() {
+        let candidates = vec![
+            ranked_hit_for_test("a", 10.0, 2, 0),
+            ranked_hit_for_test("b", 10.0, 0, 0),
+            ranked_hit_for_test("c", 10.0, 0, 1),
+            ranked_hit_for_test("d", 10.0, 0, 1),
+            ranked_hit_for_test("e", 9.0, 2, 0),
+            ranked_hit_for_test("f", f64::NAN, 99, 0),
+        ];
+        for a in &candidates {
+            for b in &candidates {
+                for c in &candidates {
+                    let ab = compare_ranked_control_hits(a, b);
+                    let bc = compare_ranked_control_hits(b, c);
+                    if ab != std::cmp::Ordering::Greater && bc != std::cmp::Ordering::Greater {
+                        assert_ne!(
+                            compare_ranked_control_hits(a, c),
+                            std::cmp::Ordering::Greater,
+                            "comparator must be transitive"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn control_replacement_provenance_does_not_mix_winner_and_suppressed_atoms() {
+        let replacement = CONTROL_REPLACEMENT_RULES[0];
+        let event = |status| ControlTraceEvent {
+            source_operator: "Mon3tr".to_string(),
+            source_buff_id: replacement.source_buff_id.to_string(),
+            phase: Phase::GlobalInject,
+            phase_order: 10,
+            condition: None,
+            condition_status: crate::control::ControlConditionStatus::Passed,
+            selector: None,
+            action: Action::GlobalInjectManuEff {
+                value: 2.0,
+                recipe: None,
+            },
+            outcome: ControlTraceOutcome::ManufactureInject {
+                family: replacement.family.to_string(),
+                recipe: None,
+                candidate_value: 2.0,
+                candidate_kind: crate::global_resource::ManuInjectCandidateKind::Static,
+                merge: Some(crate::global_resource::InjectMergeExplanation {
+                    status,
+                    effective_value: 2.0,
+                }),
+            },
+        };
+        let trace = ControlSettlementTrace {
+            events: vec![
+                event(InjectMergeStatus::Winner),
+                event(InjectMergeStatus::Suppressed),
+            ],
+            final_state: Vec::new(),
+        };
+
+        assert_eq!(
+            control_replacement_status(&trace, replacement),
+            (true, true)
+        );
+        assert_eq!(control_replacement_rank(&trace), (0, 1));
     }
 
     #[test]
