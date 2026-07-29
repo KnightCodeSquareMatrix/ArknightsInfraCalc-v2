@@ -7,7 +7,7 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint};
 use crate::manufacture::input::ManuRoomInput;
-use crate::manufacture::solve_manufacture;
+use crate::manufacture::solve_manufacture_with_shift;
 use crate::power::{solve_power, PowerRoomInput};
 use crate::skill_table::SkillTable;
 use crate::trade::input::TradeRoomInput;
@@ -149,7 +149,7 @@ pub fn evaluate_base_assignment_efficiencies(
                 mood: 24.0,
                 layout: Arc::new(room.layout.clone()),
             };
-            let result = solve_manufacture(&input, table)?;
+            let result = solve_manufacture_with_shift(&input, table, shift_hours)?;
             manufacture_efficiency += result.final_efficiency;
             line.manufacture_efficiency = result.final_efficiency;
             line.manufacture_skill_efficiency = result.skill_efficiency;

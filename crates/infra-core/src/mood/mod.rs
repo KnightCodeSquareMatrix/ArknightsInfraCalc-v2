@@ -1,7 +1,7 @@
 //! 心情消耗 / 宿舍回复 / 班次 ETA 建模。
 //!
 //! 数据源 `data/mood_model.json`（人工从 `MECHANICS_REGISTRY.csv` 整理，常量来自公孙长乐规范文档）。
-//! 心情**不影响生产速率**（阿克机制：满/非满同产率，红脸才掉 1%/5%）；本模块只算工作可持续时长与回复。
+//! 心情通常不影响生产速率；明确读取心情落差的技能（如铅踝）由设施求解器消费本模块的净消耗结果。
 //!
 //! 净消耗 `x = base − 满中枢减免 − 设施进驻减免 − 中枢回复 + 自身技能 + 同设施技能`，可工作时长 `= mood_cap / x`。
 
@@ -15,6 +15,7 @@ pub use recovery::{dorm_recovery_rates, DormOccupant};
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use serde::Deserialize;
 
@@ -285,6 +286,14 @@ impl MoodModel {
         let mut skills: Vec<_> = best.into_values().collect();
         skills.sort_by(|a, b| a.kind.cmp(&b.kind));
         skills
+    }
+}
+
+pub fn default_mood_model() -> Result<&'static MoodModel> {
+    static MODEL: OnceLock<std::result::Result<MoodModel, String>> = OnceLock::new();
+    match MODEL.get_or_init(|| MoodModel::load_default().map_err(|error| error.to_string())) {
+        Ok(model) => Ok(model),
+        Err(error) => Err(Error::msg(error.clone())),
     }
 }
 

@@ -34,6 +34,8 @@ pub struct LayoutContext {
     pub power_workforce: Vec<String>,
     /// 控制中枢进驻名单（红松林等体系专属房内结算读取）。
     pub control_workforce: Vec<String>,
+    /// 控制中枢进驻干员及精英等级（制造班内心情消耗结算读取）。
+    pub control_operators: Vec<(String, u8)>,
     /// 控制中枢运行时 buff，格式为 `(operator_name, buff_id)`。
     pub control_buffs: Vec<(String, String)>,
     /// 无人机上限（承曦·巡线框架；满清理 235）。
@@ -90,6 +92,7 @@ impl Default for LayoutContext {
             global_inject: GlobalInjectManifest::default(),
             power_workforce: Vec::new(),
             control_workforce: Vec::new(),
+            control_operators: Vec::new(),
             control_buffs: Vec::new(),
             drone_cap: 135,
             platform_count_in_power: 0,

@@ -1,11 +1,13 @@
 use serde::Serialize;
 
 use crate::efficiency::Efficiency;
-use crate::error::Result;
+use crate::error::{Error, Result};
+use crate::layout::FacilityKind;
 use crate::manufacture::input::{ManuLineScenario, ManuRoomInput};
 use crate::manufacture::interpreter::{apply_manu_phases, ManuContext};
+use crate::mood::{default_mood_model, operator_net_drain, DrainInputs};
 use crate::skill_table::SkillTable;
-use crate::types::RecipeKind;
+use crate::types::{Action, Condition, RecipeKind, Selector};
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct ManuProdBreakdown {
@@ -47,7 +49,139 @@ pub struct ManuResult {
 }
 
 pub fn solve_manufacture(input: &ManuRoomInput, table: &SkillTable) -> Result<ManuResult> {
+    solve_manufacture_at_gaps(input, table, &[])
+}
+
+pub fn solve_manufacture_with_shift(
+    input: &ManuRoomInput,
+    table: &SkillTable,
+    shift_hours: f64,
+) -> Result<ManuResult> {
+    if !shift_hours.is_finite() {
+        return Err(Error::msg("manufacture shift duration must be finite"));
+    }
+    if shift_hours <= 0.0 || !room_has_mood_gap_effect(input, table) {
+        return solve_manufacture(input, table);
+    }
+
+    let model = default_mood_model()?;
+    let start_gap = (model.mood_cap - input.mood).clamp(0.0, model.mood_cap);
+    let room_ops: Vec<_> = input
+        .operators
+        .iter()
+        .map(|operator| (operator.name.clone(), operator.elite))
+        .collect();
+    let control_ops = &input.layout.control_operators;
+    let full_control = control_ops.len().max(input.layout.control_workforce.len()) >= 5;
+    let recipe = match input.active_recipe {
+        RecipeKind::Gold => Some("gold"),
+        RecipeKind::BattleRecord => Some("battle_record"),
+        RecipeKind::Originium => Some("originium"),
+        RecipeKind::All => None,
+    };
+    let drains: Vec<_> = input
+        .operators
+        .iter()
+        .map(|operator| {
+            let drain = operator_net_drain(
+                model,
+                &DrainInputs {
+                    name: &operator.name,
+                    elite: operator.elite,
+                    facility: FacilityKind::Factory,
+                    room_ops: &room_ops,
+                    full_control,
+                    control_ops,
+                    recipe,
+                },
+            );
+            (operator.name.as_str(), drain)
+        })
+        .collect();
+
+    let mut boundaries = vec![0.0, shift_hours];
+    for (operator, (_, drain)) in input.operators.iter().zip(&drains) {
+        if *drain <= 0.0 {
+            continue;
+        }
+        for threshold in operator_mood_gap_thresholds(operator, table, model.mood_cap) {
+            let elapsed = (threshold - start_gap) / drain;
+            if elapsed > 0.0 && elapsed < shift_hours {
+                boundaries.push(elapsed);
+            }
+        }
+    }
+    boundaries.sort_by(f64::total_cmp);
+    boundaries.dedup_by(|left, right| (*left - *right).abs() < 1e-9);
+
+    let mut base = 0.0;
+    let mut occupancy = 0.0;
+    let mut skill = 0.0;
+    let mut global = 0.0;
+    let mut mood_drain = Vec::new();
+    for window in boundaries.windows(2) {
+        let duration = window[1] - window[0];
+        if duration <= 0.0 {
+            continue;
+        }
+        let elapsed = (window[0] + window[1]) / 2.0;
+        let gaps: Vec<_> = drains
+            .iter()
+            .map(|(name, drain)| {
+                (
+                    *name,
+                    (start_gap + drain * elapsed).clamp(0.0, model.mood_cap),
+                )
+            })
+            .collect();
+        let result = solve_manufacture_at_gaps(input, table, &gaps)?;
+        base += result.base_efficiency.as_f64() * duration;
+        occupancy += result.occupancy_efficiency.as_f64() * duration;
+        skill += result.skill_efficiency.as_f64() * duration;
+        global += result.global_efficiency.as_f64() * duration;
+        mood_drain = result.mood_drain;
+    }
+
+    let end_gaps: Vec<_> = drains
+        .iter()
+        .map(|(name, drain)| {
+            (
+                *name,
+                (start_gap + drain * shift_hours).clamp(0.0, model.mood_cap),
+            )
+        })
+        .collect();
+    let end = solve_manufacture_at_gaps(input, table, &end_gaps)?;
+    let base_efficiency = Efficiency::from_decimal(base / shift_hours);
+    let occupancy_efficiency = Efficiency::from_decimal(occupancy / shift_hours);
+    let skill_efficiency = Efficiency::from_decimal(skill / shift_hours);
+    let global_efficiency = Efficiency::from_decimal(global / shift_hours);
+    Ok(ManuResult {
+        active_recipe: input.active_recipe,
+        base_efficiency,
+        occupancy_efficiency,
+        skill_efficiency,
+        global_efficiency,
+        final_efficiency: base_efficiency
+            + occupancy_efficiency
+            + skill_efficiency
+            + global_efficiency,
+        storage_limit: end.storage_limit,
+        mood_drain,
+    })
+}
+
+fn solve_manufacture_at_gaps(
+    input: &ManuRoomInput,
+    table: &SkillTable,
+    mood_gaps: &[(&str, f64)],
+) -> Result<ManuResult> {
     let mut ctx = ManuContext::from_room(input);
+    for operator in &mut ctx.operators {
+        if let Some((_, gap)) = mood_gaps.iter().find(|(name, _)| *name == operator.name) {
+            operator.mood_gap = *gap;
+        }
+    }
     apply_manu_phases(&mut ctx, table);
 
     let recipe = input.active_recipe;
@@ -76,6 +210,49 @@ pub fn solve_manufacture(input: &ManuRoomInput, table: &SkillTable) -> Result<Ma
             })
             .collect(),
     })
+}
+
+fn room_has_mood_gap_effect(input: &ManuRoomInput, table: &SkillTable) -> bool {
+    input.operators.iter().any(|operator| {
+        operator.buff_ids.iter().any(|buff_id| {
+            table.get(buff_id).is_some_and(|skill| {
+                skill.atoms.iter().any(|atom| {
+                    atom.selector == Some(Selector::OwnerMoodGap)
+                        || matches!(&atom.condition, Some(Condition::OwnerMoodGapAbove { .. }))
+                })
+            })
+        })
+    })
+}
+
+fn operator_mood_gap_thresholds(
+    operator: &crate::manufacture::input::ManuOperator,
+    table: &SkillTable,
+    mood_cap: f64,
+) -> Vec<f64> {
+    let mut thresholds = Vec::new();
+    for buff_id in &operator.buff_ids {
+        let Some(skill) = table.get(buff_id) else {
+            continue;
+        };
+        for atom in &skill.atoms {
+            if let Some(Condition::OwnerMoodGapAbove { n }) = &atom.condition {
+                thresholds.push(f64::from(*n));
+            }
+            if atom.selector == Some(Selector::OwnerMoodGap) {
+                if let Action::AddBucketEffFromSelector { step, .. } = &atom.action {
+                    if *step > 0.0 {
+                        let mut threshold = *step;
+                        while threshold <= mood_cap {
+                            thresholds.push(threshold);
+                            threshold += *step;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    thresholds
 }
 
 /// 按 `ManuLineScenario` 对同一三人组在各配方产线上求值并加权求和。
@@ -121,8 +298,10 @@ pub fn evaluate_manufacture_lines(
 mod tests {
     use super::*;
     use crate::instances::{default_instances_path, OperatorInstances};
+    use crate::layout::LayoutContext;
     use crate::manufacture::input::ManuOperator;
     use crate::tier::PromotionTier;
+    use std::sync::Arc;
 
     fn table() -> SkillTable {
         SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap()
@@ -145,5 +324,60 @@ mod tests {
         assert!(((result.occupancy_efficiency.as_f64() * 100.0) - 3.0).abs() < 0.01);
         assert!((result.skill_efficiency.as_f64() * 100.0) > 20.0);
         assert!(result.storage_limit >= 26);
+    }
+
+    fn leadfoot(elite: u8) -> ManuOperator {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        ManuOperator::new(
+            "铅踝",
+            elite,
+            instances.resolve_manufacture_buff_ids(
+                "铅踝",
+                PromotionTier::from_elite_rarity_level(elite, 4, 60),
+            ),
+        )
+    }
+
+    #[test]
+    fn leadfoot_window_snow_uses_strict_mood_gap_threshold() {
+        let table = table();
+        let mut input = ManuRoomInput::with_operators(2, RecipeKind::Gold, vec![leadfoot(1)]);
+        input.mood = 12.0;
+        let at_threshold = solve_manufacture(&input, &table).unwrap();
+        assert_eq!(
+            at_threshold.skill_efficiency,
+            Efficiency::from_decimal(0.150)
+        );
+        assert_eq!(at_threshold.storage_limit, 15);
+
+        input.mood = 11.9;
+        let above_threshold = solve_manufacture(&input, &table).unwrap();
+        assert_eq!(
+            above_threshold.skill_efficiency,
+            Efficiency::from_decimal(0.250)
+        );
+        assert_eq!(above_threshold.storage_limit, 21);
+    }
+
+    #[test]
+    fn leadfoot_shift_average_uses_actual_net_mood_drain() {
+        let table = table();
+        let mut input = ManuRoomInput::with_operators(
+            2,
+            RecipeKind::Gold,
+            vec![leadfoot(1), ManuOperator::new("斑点", 1, vec![])],
+        );
+        let mut layout = LayoutContext::default();
+        layout.control_operators = (0..5)
+            .map(|index| (format!("中枢填充{index}"), 0))
+            .collect();
+        input.layout = Arc::new(layout);
+
+        let short = solve_manufacture_with_shift(&input, &table, 6.0).unwrap();
+        let long = solve_manufacture_with_shift(&input, &table, 18.0).unwrap();
+        assert_eq!(short.skill_efficiency, Efficiency::from_decimal(0.298));
+        assert_eq!(long.skill_efficiency, Efficiency::from_decimal(0.250));
+        assert_eq!(short.storage_limit, 15);
+        assert_eq!(long.storage_limit, 21);
     }
 }

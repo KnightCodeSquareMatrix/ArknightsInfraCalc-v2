@@ -117,6 +117,8 @@ pub enum Selector {
     /// 训练室最高等级（维伊·手艺人；cap 通常 30%）。
     TrainingRoomLevel,
     Mood,
+    /// 持有者从满心情起已消耗的心情值（铅踝·模糊视线）。
+    OwnerMoodGap,
     /// 各贸易站同房 `tag` 干员数之和（八幡海铃等中枢跨设施注入）。
     TaggedCountInTradeSum {
         tag: String,
@@ -167,6 +169,10 @@ pub enum Condition {
         n: u8,
     },
     MoodBelowOrEq {
+        n: u8,
+    },
+    /// 持有者心情落差严格大于 `n`（铅踝·窗外雪啸）。
+    OwnerMoodGapAbove {
         n: u8,
     },
     OwnerEliteGte {

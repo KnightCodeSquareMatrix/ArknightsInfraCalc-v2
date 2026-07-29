@@ -4117,10 +4117,41 @@
     },
     {
       "id": "manu_prod_spd_addition&cost[000]",
-      "skill_name": "模糊视线",
+      "skill_name": "窗外雪啸",
       "facility": "manufacture",
       "tier": "tier_up",
-      "atoms": []
+      "atoms": [
+        {
+          "condition": {
+            "owner_mood_gap_above": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 21
+        },
+        {
+          "condition": {
+            "owner_mood_gap_above": {
+              "n": 12
+            }
+          },
+          "action": {
+            "kind": "add_limit_delta",
+            "params": {
+              "delta": 6
+            }
+          },
+          "phase": "limit",
+          "phase_order": 21
+        }
+      ]
     },
     {
       "id": "manu_prod_spd_addition[030]",
@@ -4474,6 +4505,19 @@
             }
           },
           "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "selector": "owner_mood_gap",
+          "action": {
+            "kind": "add_bucket_eff_from_selector",
+            "params": {
+              "step": 4.0,
+              "ret_per_step": -5.0,
+              "cap": 0.0
+            }
+          },
+          "phase": "eff_var",
           "phase_order": 20
         }
       ]

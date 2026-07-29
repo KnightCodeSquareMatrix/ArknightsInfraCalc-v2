@@ -13,7 +13,10 @@ use crate::operbox::OperBox;
 use crate::pool::{
     filter_general_manufacture_search_pool, filter_manufacture_pool, ManuPool, ManuPoolEntry,
 };
-use crate::search::{search_manufacture_triples, ManuSearchHit, ManuSearchOptions};
+use crate::search::{
+    manufacture_combo_allowed_for_shift, search_manufacture_triples, ManuSearchHit,
+    ManuSearchOptions,
+};
 use crate::skill_table::SkillTable;
 use crate::types::RecipeKind;
 
@@ -133,7 +136,7 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
     assignment: &mut BaseAssignment,
     instances: &crate::instances::OperatorInstances,
     table: &SkillTable,
-    mood: f64,
+    options: &AssignBaseOptions,
     durin_dorm_planning: Option<u8>,
 ) -> Result<()> {
     let final_resolved = crate::layout::resolve_base(
@@ -141,7 +144,7 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
         assignment,
         Some(instances),
         Some(table),
-        mood,
+        options.mood,
         durin_dorm_planning,
     )?;
     for room in final_resolved.manu_rooms {
@@ -152,10 +155,11 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
             level: room.level,
             operators: room.operators,
             active_recipe: room.recipe,
-            mood,
+            mood: options.mood,
             layout: Arc::new(room.layout),
         };
-        let solved = crate::manufacture::solve_manufacture(&input, table)?;
+        let solved =
+            crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
         assignment.set_room_with_efficiency(
             room.id,
@@ -357,17 +361,23 @@ fn score_manu_entries(
     recipe: RecipeKind,
     room_level: u8,
 ) -> Option<ManuSearchHit> {
+    let operators = entries
+        .iter()
+        .map(ManuPoolEntry::to_manu_operator)
+        .collect::<Vec<_>>();
+    if !manufacture_combo_allowed_for_shift(&operators, table, Some(options.shift_hours)) {
+        return None;
+    }
     let input = ManuRoomInput {
         level: room_level,
-        operators: entries
-            .iter()
-            .map(ManuPoolEntry::to_manu_operator)
-            .collect(),
+        operators,
         active_recipe: recipe,
         mood: options.mood,
         layout: Arc::new(layout.clone()),
     };
-    let result = crate::manufacture::solve_manufacture(&input, table).ok()?;
+    let result =
+        crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)
+            .ok()?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
     let mut per_station = crate::manufacture::ManuProdBreakdown::default();
     let mut storage = crate::manufacture::ManuStorageBreakdown::default();
@@ -423,6 +433,13 @@ pub(super) fn pick_capacity_manu_hit(
         .entries
         .iter()
         .filter(|entry| !used.contains(&entry.name))
+        .filter(|entry| {
+            manufacture_combo_allowed_for_shift(
+                &[entry.to_manu_operator()],
+                table,
+                Some(options.shift_hours),
+            )
+        })
         .take(capacity)
         .cloned()
         .collect();
@@ -443,7 +460,8 @@ pub(super) fn pick_capacity_manu_hit(
         mood: options.mood,
         layout: Arc::new(layout.clone()),
     };
-    let result = crate::manufacture::solve_manufacture(&input, table)?;
+    let result =
+        crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
     let mut per_station = crate::manufacture::ManuProdBreakdown::default();
     let mut storage = crate::manufacture::ManuStorageBreakdown::default();
@@ -530,6 +548,7 @@ pub(super) fn manu_options(
         operator_capacity: station_operator_capacity(room_level),
         top_k: options.top_k,
         mood: options.mood,
+        shift_hours: Some(options.shift_hours),
         layout: Arc::new(layout.clone()),
         recipe_mode: ManuSearchRecipeMode::Single(recipe),
         full_pool: true,
@@ -541,6 +560,19 @@ pub(super) fn manu_options(
 mod tests {
     use super::*;
     use crate::layout::assignment::AssignedOperator;
+
+    fn test_entry(name: &str, buff_ids: &[&str]) -> ManuPoolEntry {
+        ManuPoolEntry {
+            name: name.to_string(),
+            elite: 1,
+            progress: crate::roster::OperatorProgress::new(1, 60, 4),
+            buff_ids: buff_ids.iter().map(|id| (*id).to_string()).collect(),
+            tags: vec![],
+            flat_eff_hint: 0.0,
+            has_l2_delegate: false,
+            tier: crate::layout::tier::OperatorTier::Standalone,
+        }
+    }
 
     fn solve_resolved_manu_room(
         resolved: &crate::layout::ResolvedBase,
@@ -629,7 +661,7 @@ mod tests {
             &mut assignment,
             &instances,
             &table,
-            24.0,
+            &AssignBaseOptions::default(),
             Some(2),
         )
         .unwrap();
@@ -686,5 +718,93 @@ mod tests {
         assert!(f2.contains("迷迭香"));
         // 无关 anchor 不受影响。
         assert!(forbidden_teammates("砾", &pairs).is_empty());
+    }
+
+    #[test]
+    fn anchored_long_shift_skips_mood_gap_decay_filler() {
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
+        let anchor = test_entry("固定锚点", &["manu_prod_spd[000]"]);
+        let pool = ManuPool {
+            entries: vec![
+                anchor.clone(),
+                test_entry(
+                    "铅踝",
+                    &[
+                        "manu_prod_spd_addition&cost[000]",
+                        "manu_prod_spd_reduce[000]",
+                    ],
+                ),
+                test_entry("合法补位", &["manu_prod_spd[010]"]),
+            ],
+            skipped: vec![],
+        };
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        let options = AssignBaseOptions {
+            shift_hours: 12.0,
+            ..AssignBaseOptions::default()
+        };
+
+        assign_manu_room_with_anchors(
+            &mut assignment,
+            &RoomId::from("manu_test"),
+            vec![anchor],
+            &pool,
+            &table,
+            &LayoutContext::default(),
+            &options,
+            RecipeKind::Gold,
+            2,
+            &mut used,
+            &[],
+        )
+        .unwrap();
+
+        let names: HashSet<_> = assignment
+            .operators_in(&RoomId::from("manu_test"))
+            .iter()
+            .map(|operator| operator.name.as_str())
+            .collect();
+        assert!(names.contains("固定锚点"));
+        assert!(names.contains("合法补位"));
+        assert!(!names.contains("铅踝"));
+    }
+
+    #[test]
+    fn capacity_long_shift_skips_mood_gap_decay_entry() {
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
+        let pool = ManuPool {
+            entries: vec![
+                test_entry(
+                    "铅踝",
+                    &[
+                        "manu_prod_spd_addition&cost[000]",
+                        "manu_prod_spd_reduce[000]",
+                    ],
+                ),
+                test_entry("合法甲", &["manu_prod_spd[000]"]),
+                test_entry("合法乙", &["manu_prod_spd[010]"]),
+            ],
+            skipped: vec![],
+        };
+        let options = AssignBaseOptions {
+            shift_hours: 12.0,
+            ..AssignBaseOptions::default()
+        };
+
+        let hit = pick_capacity_manu_hit(
+            &pool,
+            &table,
+            &LayoutContext::default(),
+            &options,
+            RecipeKind::Gold,
+            &HashSet::new(),
+            2,
+        )
+        .unwrap();
+
+        assert_eq!(hit.names, vec!["合法甲", "合法乙"]);
     }
 }

@@ -2213,6 +2213,7 @@ fn trade_incompatibility_reason(
 fn baked_manufacture_compatible(pool: &ManuPool, options: &ManuSearchOptions) -> bool {
     !options.full_pool
         && (options.mood - 24.0).abs() < f64::EPSILON
+        && options.shift_hours.is_none()
         && baked_manufacture_layout_compatible(&options.layout)
         && pool.entries.iter().all(|entry| entry.progress.elite >= 2)
 }
@@ -2225,6 +2226,8 @@ fn manufacture_incompatibility_reason(
         "full manufacture pool is not represented"
     } else if (options.mood - 24.0).abs() >= f64::EPSILON {
         "mood is not 24"
+    } else if options.shift_hours.is_some() {
+        "timed manufacture settlement is not represented"
     } else if !baked_manufacture_layout_compatible(&options.layout) {
         "layout or manufacture inject differs from the baked baseline"
     } else if pool.entries.iter().any(|entry| entry.progress.elite < 2) {
@@ -3138,6 +3141,13 @@ mod tests {
             &pool,
             &ManuSearchOptions {
                 full_pool: true,
+                ..Default::default()
+            }
+        ));
+        assert!(!baked_manufacture_compatible(
+            &pool,
+            &ManuSearchOptions {
+                shift_hours: Some(24.0),
                 ..Default::default()
             }
         ));

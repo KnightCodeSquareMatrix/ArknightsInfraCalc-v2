@@ -66,6 +66,7 @@ pub struct WorkforceIndex {
     pub power_stations: Vec<PowerStationEntry>,
     pub power_workforce: Vec<String>,
     pub control_workforce: Vec<String>,
+    pub control_operators: Vec<(String, u8)>,
     pub platform_rooms: Vec<RoomId>,
     pub all_base_names: Vec<String>,
     pub rhine_life_in_base: u8,
@@ -86,6 +87,7 @@ impl WorkforceIndex {
         let mut power_stations = Vec::new();
         let mut power_workforce = Vec::new();
         let mut control_workforce = Vec::new();
+        let mut control_operators = Vec::new();
         let mut platform_rooms = Vec::new();
         let mut trade_workforce = Vec::new();
         let mut manu_workforce = Vec::new();
@@ -108,6 +110,7 @@ impl WorkforceIndex {
             if room.kind == FacilityKind::ControlCenter {
                 for op in ops {
                     control_workforce.push(op.name.clone());
+                    control_operators.push((op.name.clone(), op.elite));
                 }
             }
             if room.kind == FacilityKind::PowerPlant {
@@ -171,6 +174,7 @@ impl WorkforceIndex {
             power_stations,
             power_workforce,
             control_workforce,
+            control_operators,
             platform_rooms,
             all_base_names,
             rhine_life_in_base,
@@ -238,6 +242,7 @@ impl WorkforceIndex {
     pub fn apply_to_layout(&self, layout: &mut LayoutContext) {
         layout.power_workforce = self.power_workforce.clone();
         layout.control_workforce = self.control_workforce.clone();
+        layout.control_operators = self.control_operators.clone();
         layout.base_workforce = self.all_base_names.clone();
         layout.training_assist = self.training_assist.clone();
         layout.rhine_life_in_base = self.rhine_life_in_base;

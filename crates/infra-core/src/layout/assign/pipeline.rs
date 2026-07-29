@@ -232,7 +232,7 @@ fn run_shift_pipeline_with_producer_pruning(
         &mut run.assignment,
         instances,
         table,
-        options.mood,
+        options,
         Some(run.durin_plan),
     )?;
     refresh_trade_efficiency_snapshots(

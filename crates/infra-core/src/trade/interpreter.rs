@@ -383,6 +383,7 @@ fn condition_met(
         Condition::MoodAboveOrEq { n } => ctx.mood >= *n as f64,
         Condition::MoodBelow { n } => ctx.mood < *n as f64,
         Condition::MoodBelowOrEq { n } => ctx.mood <= *n as f64,
+        Condition::OwnerMoodGapAbove { .. } => false,
         Condition::OwnerEliteGte { n } => ctx
             .operators
             .iter()
@@ -703,6 +704,7 @@ fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner
         }
         Some(Selector::RoomOperatorCount) => ctx.operators.len() as f64,
         Some(Selector::Mood) => ctx.mood,
+        Some(Selector::OwnerMoodGap) => 0.0,
         Some(Selector::TradeStationCount) => f64::from(ctx.layout.trade_station_count),
         Some(Selector::PowerStationCount) => f64::from(ctx.layout.effective_power_station_count()),
         Some(Selector::PlatformCountInPower) => f64::from(ctx.layout.platform_count_in_power),

@@ -93,7 +93,7 @@ All 27 imported feedback cases are treated as closed or covered by a sibling cas
 | FB-20260628-171219 | closed | dormitory/layout levels | `local-evidence:2026-06-28/171219-252-32贸易-33222制造的四间宿舍-等级应当是2级-1级-1级-1级` | Dorm layout semantics normalized by `16bf4bd`; keep 252 layout metadata in smoke. |
 | FB-20260628-171254 | closed | dormitory/synergy guard | `local-evidence:2026-06-28/171254-乌尔比安此时完全无用-没有用深巡或者深海-宿舍不用塞乌尔比安` | Unused Ulpian dorm anchor fixed by `af77f6a`. |
 | FB-20260629-031259 | closed | trade/filler exclusion | `local-evidence:2026-06-29/031259-载入全精二样例-不应该会出现尤里卡-u-official` | Eureka/U-Official excluded from trade scheduling by `c357377`. |
-| FB-20260630-052233 | closed | manufacture/schedule duration | `local-evidence:2026-06-30/052233-铅踝工作时间过长` | Covered by current schedule policy smoke; no separate open item remains. |
+| FB-20260630-052233 | closed | manufacture/schedule duration | `local-evidence:2026-06-30/052233-铅踝工作时间过长` | Re-reported by `local-evidence:2026-07-28/194234-铅踝避免上12h班次-平均效率会逐步降低`; closed with capability-based `>=12h` continuous-work admission, net-mood shift averaging, ordinary/anchor/capacity regressions, and current-runtime bundle replay. |
 | FB-20260630-052353 | closed | manufacture/system completeness | `local-evidence:2026-06-30/052353-那斯提挂件没满` | Covered by current manufacture/system smoke; no separate open item remains. |
 | FB-20260630-052442 | closed | manufacture/gold | `local-evidence:2026-06-30/052442-蛇屠箱可以换成豆苗` | Covered by current manufacture search smoke; no separate open item remains. |
 | FB-20260630-052525 | duplicate-covered | control/same-effect conflict | `local-evidence:2026-06-30/052525-望和诗怀雅技能冲突-都是-7` | Same control stacking family as FB-20260628-131551; covered by control inject/fill smoke. |
@@ -128,6 +128,7 @@ Targeted tests worth naming in PR notes:
 | Control filler quality | `control_plugin_fill_excludes_unclaimed_system_producers`, `control_layered_fill_prefers_efficiency_piece_over_mood` |
 | Purestream/Weedy/Windflit trace | `manufacture_trace_sink_reports_operator_used_for_later_gold_room`, `data/feedback_regression_seeds/purestream_weedy_windflit_gold_automation.json` |
 | Waai Fu pairing | Huaihu manufacture pairing test added by `82a1001` |
+| Leadfoot long manufacture shift | `leadfoot_shift_average_uses_actual_net_mood_drain`, `long_shift_excludes_mood_gap_decay_but_short_shift_keeps_it`, `mood_gap_decay_validator_rejects_adjacent_short_shifts` |
 | Vina / witch / U-Official trade regressions | Trade role and schedule binding tests around `meta_vina`, `witch`, and Eureka exclusion |
 
 ## Reopen Rule

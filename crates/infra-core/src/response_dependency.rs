@@ -1179,6 +1179,7 @@ fn selector_dependency(selector: &Selector) -> (&'static str, DependencyScope) {
         Selector::FacilityLevelSumExclMeeting => ("facility_level_sum_excl_meeting", GlobalLayout),
         Selector::TrainingRoomLevel => ("training_room_level", CrossFacility),
         Selector::Mood => ("mood", RuntimeState),
+        Selector::OwnerMoodGap => ("owner_mood_gap", RuntimeState),
         Selector::TaggedCountInTradeSum { .. } => ("tagged_count_in_trade_sum", SameFacility),
         Selector::TaggedCountInCurrentTradeRoom { .. } => {
             ("tagged_count_in_current_trade_room", RoomLocal)
@@ -1203,6 +1204,7 @@ fn condition_dependency(condition: &Condition) -> (&'static str, DependencyScope
         Condition::MoodAboveOrEq { .. } => ("mood_above_or_eq", RuntimeState),
         Condition::MoodBelow { .. } => ("mood_below", RuntimeState),
         Condition::MoodBelowOrEq { .. } => ("mood_below_or_eq", RuntimeState),
+        Condition::OwnerMoodGapAbove { .. } => ("owner_mood_gap_above", RuntimeState),
         Condition::OwnerEliteGte { .. } => ("owner_elite_gte", RoomLocal),
         Condition::OwnerEliteBelow { .. } => ("owner_elite_below", RoomLocal),
         Condition::PartnerInRoom { .. } => ("partner_in_room", RoomLocal),

@@ -16,7 +16,10 @@ pub(crate) use control::{
     control_inject_components_for_assignment, control_inject_policy_sort_key_for_assignment,
     control_inject_policy_sort_key_upper_bound,
 };
-pub(crate) use manufacture::{compare_manufacture_hits, evaluate_manufacture_room};
+pub(crate) use manufacture::{
+    compare_manufacture_hits, evaluate_manufacture_room, manufacture_combo_allowed_for_shift,
+    manufacture_operator_has_mood_gap_decay, MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS,
+};
 pub use manufacture::{
     search_manufacture_triples, ManuEfficiencyBreakdown, ManuSearchHit, ManuSearchOptions,
     ManuSearchReport,

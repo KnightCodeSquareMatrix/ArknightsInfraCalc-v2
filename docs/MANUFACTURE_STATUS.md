@@ -18,7 +18,7 @@
 | L3 组合表 | `trade_shortcuts.json` | **无** |
 | 池 | `pool/trade.rs` | `pool/manufacture.rs` |
 | 搜索 | `search/trade.rs` | `search/manufacture.rs` |
-| 求解 | `solve_trade_with_shift` | `solve_manufacture` |
+| 求解 | `solve_trade_with_shift` | `solve_manufacture`、`solve_manufacture_with_shift` |
 | 排班 | `layout/assign.rs` / `schedule/team_rotation.rs` | ✅ `assign_shift`（高峰/恢复班覆盖）与 αβγ ABC |
 | CLI 回归 | `verify` + CSV | **无** dedicated verify case |
 
@@ -28,7 +28,7 @@
 |------|------|
 | `manufacture/input.rs` | `ManuOperator`、`ManuRoomInput`、`ManuLineScenario`、`ManuSearchRecipeMode` |
 | `manufacture/interpreter.rs` | `apply_manu_phases`；`ManuContext` / `RecipeEff` / `RecipeLimit` |
-| `manufacture/solver.rs` | `solve_manufacture`、`evaluate_manufacture_lines`；按 `RecipeKind` 输出直接效率与仓库 |
+| `manufacture/solver.rs` | `solve_manufacture`、`solve_manufacture_with_shift`、`evaluate_manufacture_lines`；按 `RecipeKind` 输出直接效率与仓库 |
 | `pool/manufacture.rs` | 从 operbox 制造 roster 建池；跳过未建模 buff |
 | `search/manufacture.rs` | C(n,3) 穷举；支持单配方 / 多产线 split（2 金 + 2 经验默认） |
 
@@ -39,7 +39,8 @@
 - 无 `PeerAbsorb` 后的 `gold_flow` 挂钩。
 - 共享同一 `skill_table.json`（制造 buff 与贸易 buff 同表不同 id）。
 - **时间爬升**（芬/克洛丝/稀音/阿罗玛等）：`Action::AddEffRamp` → 纸面取 **20h 逐时效率算术平均**（见 `eff_ramp.rs`）；发电空构仍用 `shift_hours` 单点。
-- 排班层 `assign_shift` 在体系落位后直接使用全部合法普通制造干员做 C(n,k)，由 solver 按 `final_efficiency` 自然排序；不按 atom、buff id、干员名或当前配方预判谁“值得搜索”。排班以 `full_pool=true` 标记完整候选范围，结构上禁止使用仅由 standalone 组合烘焙的制造表。`standalone_roster.json` 与对应 baked 表只服务独立 bench/探索入口，不裁剪排班候选。这样标准化、红云/泡泡仓容耦合、莱茵同房机制以及 `atoms: []` 的同房催化角色都能参与真实组合结算。
+- **心情落差**（铅踝）：`OwnerMoodGap` 按制造房人数、中枢减免、同房技能和配方计算真实净心情消耗，再按技能阈值分段求班次平均效率；`OwnerMoodGapAbove` 是严格大于。显式班长必须走 live 结算，不使用静态 Bake。
+- 排班层 `assign_shift` 在体系落位后直接使用全部合法普通制造干员做 C(n,k)，由 solver 按 `final_efficiency` 自然排序；不按干员名或当前 top hit 预判谁“值得搜索”。唯一的班长 admission 例外是当前明确的 hard constraint：技能含 `OwnerMoodGap` selector，且 `AddBucketEffFromSelector.ret_per_step < 0` 的候选连续制造工作达到 `12h` 时排除；单个短班仍可参与。普通搜索、anchor 补位和 capacity fallback 共用该 atom capability 判定。排班以 `full_pool=true` 标记完整候选范围，结构上禁止使用仅由 standalone 组合烘焙的制造表。`standalone_roster.json` 与对应 baked 表只服务独立 bench/探索入口，不裁剪排班候选。这样标准化、红云/泡泡仓容耦合、莱茵同房机制以及 `atoms: []` 的同房催化角色都能参与真实组合结算。
 - `standardization_mizuki` 不是体系，不进入 `base_systems`、不产生 anchor 或特殊 fallback。水月只读取同房标准化技能；红云/泡泡只按同房仓库贡献结算；莱茵同房技能与全基建计数继续服从既有机制。搜索结果可以自然形成高效组合，但不得固定成员、房间、队伍或班次。
 - 体系专用制造干员仍留在原始制造池供编排显式认领，但普通制造池通过 `filter_general_manufacture_search_pool()` 排除冬时、温蒂、迷迭香。显式 required anchor 搜索会从原池只加回该 anchor；自动化组继续显式处理冬时/温蒂，迷迭香仍服从与黑键共同激活的硬核心。卡达等其余合法制造干员不会因零直接生产力被规则删除，只由 solver 自然淘汰。
 - 独立 bench / 探索在 `full_pool=false` 时可使用 `data/standalone_roster.json` 的结构化白名单：每个工具人可以声明 `min_tier`，并按 `recipes` / `order_types` 限定适用配方。该入口的制造搜索按当前房间 `RecipeKind` 再裁候选池，贸易搜索按 `TradeOrderKind` 再裁候选池；此规则不适用于排班 `full_pool=true`。

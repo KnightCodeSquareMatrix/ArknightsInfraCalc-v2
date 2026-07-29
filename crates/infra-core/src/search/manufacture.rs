@@ -10,7 +10,9 @@ use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
-use crate::manufacture::solver::{solve_manufacture, ManuProdBreakdown, ManuStorageBreakdown};
+use crate::manufacture::solver::{
+    solve_manufacture, solve_manufacture_with_shift, ManuProdBreakdown, ManuStorageBreakdown,
+};
 use crate::pool::{
     combinations_indices, combinations_indices_with_anchor, filter_general_manufacture_search_pool,
     filter_standalone_exact_with, ManuPool, StandaloneFilter,
@@ -95,6 +97,8 @@ pub struct ManuSearchReport {
     pub battle_record_line: Option<ManuSearchHit>,
 }
 
+pub(crate) const MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS: f64 = 12.0;
+
 #[derive(Debug, Clone)]
 pub struct ManuSearchOptions {
     pub level: u8,
@@ -103,6 +107,8 @@ pub struct ManuSearchOptions {
     pub mood: f64,
     pub top_k: usize,
     pub layout: SharedLayout,
+    /// 定时班次平均效率窗口；`None` 保持独立探索的静态纸面口径。
+    pub shift_hours: Option<f64>,
     pub must_include_name: Option<String>,
     pub bake_mode: crate::bake::BakeMode,
     pub full_pool: bool,
@@ -117,6 +123,7 @@ impl Default for ManuSearchOptions {
             mood: 24.0,
             top_k: 5,
             layout: Arc::new(LayoutContext::search_baseline()),
+            shift_hours: None,
             must_include_name: None,
             bake_mode: crate::bake::BakeMode::Auto,
             full_pool: false,
@@ -281,6 +288,9 @@ fn search_manufacture_single_recipe(
                 .iter()
                 .map(|i| sub.entries[*i].to_manu_operator())
                 .collect();
+            if !manufacture_combo_allowed_for_shift(&ops, table, options.shift_hours) {
+                return None;
+            }
             let layout = manufacture_combo_layout(&options.layout, &ops);
             let base = ManuRoomInput {
                 level: options.level,
@@ -289,7 +299,7 @@ fn search_manufacture_single_recipe(
                 mood: options.mood,
                 layout,
             };
-            evaluate_manufacture_room(&base, table, recipe)
+            evaluate_manufacture_room_with_shift(&base, table, recipe, options.shift_hours)
         })
         .collect();
 
@@ -309,6 +319,37 @@ fn search_manufacture_single_recipe(
         elapsed: start.elapsed(),
         gold_line: None,
         battle_record_line: None,
+    })
+}
+
+pub(crate) fn manufacture_combo_allowed_for_shift(
+    operators: &[crate::manufacture::ManuOperator],
+    table: &SkillTable,
+    shift_hours: Option<f64>,
+) -> bool {
+    if !shift_hours.is_some_and(|hours| hours >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS) {
+        return true;
+    }
+    !operators
+        .iter()
+        .any(|operator| manufacture_operator_has_mood_gap_decay(operator, table))
+}
+
+pub(crate) fn manufacture_operator_has_mood_gap_decay(
+    operator: &crate::manufacture::ManuOperator,
+    table: &SkillTable,
+) -> bool {
+    operator.buff_ids.iter().any(|buff_id| {
+        table.get(buff_id).is_some_and(|skill| {
+            skill.atoms.iter().any(|atom| {
+                atom.selector == Some(crate::types::Selector::OwnerMoodGap)
+                    && matches!(
+                        &atom.action,
+                        Action::AddBucketEffFromSelector { ret_per_step, .. }
+                            if *ret_per_step < 0.0
+                    )
+            })
+        })
     })
 }
 
@@ -449,6 +490,15 @@ pub(crate) fn evaluate_manufacture_room(
     table: &SkillTable,
     recipe: RecipeKind,
 ) -> Option<ManuSearchHit> {
+    evaluate_manufacture_room_with_shift(base, table, recipe, None)
+}
+
+fn evaluate_manufacture_room_with_shift(
+    base: &ManuRoomInput,
+    table: &SkillTable,
+    recipe: RecipeKind,
+    shift_hours: Option<f64>,
+) -> Option<ManuSearchHit> {
     let names = base
         .operator_names()
         .into_iter()
@@ -456,7 +506,10 @@ pub(crate) fn evaluate_manufacture_room(
         .collect();
     let mut room = base.clone();
     room.active_recipe = recipe;
-    let result = solve_manufacture(&room, table).ok()?;
+    let result = match shift_hours {
+        Some(hours) => solve_manufacture_with_shift(&room, table, hours).ok()?,
+        None => solve_manufacture(&room, table).ok()?,
+    };
     let mut per_station = ManuProdBreakdown::default();
     let mut storage = ManuStorageBreakdown::default();
     let recipe_str = match recipe {
@@ -561,6 +614,44 @@ mod tests {
         let projected = manufacture_combo_layout(&Arc::new(layout), &[operator]);
         assert_eq!(projected.manu_tagged_count_sum["cc.g.blacksteel"], 1);
         assert_eq!(projected.global_inject.manu_eff_for(RecipeKind::Gold), 5.0);
+    }
+
+    #[test]
+    fn long_shift_excludes_mood_gap_decay_but_short_shift_keeps_it() {
+        let table = table();
+        let pool = ManuPool {
+            entries: vec![
+                test_entry(
+                    "铅踝",
+                    &[
+                        "manu_prod_spd_addition&cost[000]",
+                        "manu_prod_spd_reduce[000]",
+                    ],
+                ),
+                test_entry("斑点", &["manu_formula_spd[100]"]),
+                test_entry("芬", &["manu_prod_spd_addition[030]"]),
+            ],
+            skipped: vec![],
+        };
+        let options = |shift_hours| ManuSearchOptions {
+            level: 2,
+            operator_capacity: 2,
+            recipe_mode: ManuSearchRecipeMode::Single(RecipeKind::Gold),
+            shift_hours: Some(shift_hours),
+            full_pool: true,
+            bake_mode: crate::bake::BakeMode::Disabled,
+            ..ManuSearchOptions::default()
+        };
+
+        let short = search_manufacture_triples(&pool, &table, &options(6.0)).unwrap();
+        assert!(short.best.names.contains(&"铅踝".to_string()));
+
+        let long = search_manufacture_triples(&pool, &table, &options(12.0)).unwrap();
+        assert!(!long.best.names.contains(&"铅踝".to_string()));
+        assert!(long
+            .top
+            .iter()
+            .all(|hit| !hit.names.contains(&"铅踝".to_string())));
     }
 
     #[test]

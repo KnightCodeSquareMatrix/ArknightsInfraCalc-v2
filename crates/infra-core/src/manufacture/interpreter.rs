@@ -82,6 +82,8 @@ pub struct ManuOperatorRuntime {
     /// 技能面仓库贡献（赤金/源石/战斗记录共用；分段仓库→% 只看此项）。
     pub limit_contrib: i32,
     pub mood_drain_delta: f64,
+    /// 从满心情起已消耗的心情值。
+    pub mood_gap: f64,
 }
 
 impl ManuOperatorRuntime {
@@ -113,6 +115,7 @@ impl ManuContext {
                 elite: o.elite,
                 buff_ids: o.buff_ids.clone(),
                 tags: o.tags.clone(),
+                mood_gap: (24.0 - input.mood).clamp(0.0, 24.0),
                 ..Default::default()
             })
             .collect();
@@ -309,6 +312,11 @@ fn condition_met(cond: &Option<Condition>, ctx: &ManuContext, owner: &str) -> bo
         Condition::MoodAboveOrEq { n } => ctx.mood >= *n as f64,
         Condition::MoodBelow { n } => ctx.mood < *n as f64,
         Condition::MoodBelowOrEq { n } => ctx.mood <= *n as f64,
+        Condition::OwnerMoodGapAbove { n } => ctx
+            .operators
+            .iter()
+            .find(|operator| operator.name == owner)
+            .is_some_and(|operator| operator.mood_gap > f64::from(*n)),
         Condition::OwnerLacksBuff { buff_id } => ctx
             .operators
             .iter()
@@ -682,6 +690,11 @@ fn resolve_selector_value(ctx: &ManuContext, selector: Option<&Selector>, owner:
             .map(|o| o.skill_eff.for_recipe(ctx.active_recipe))
             .sum(),
         Some(Selector::Mood) => ctx.mood,
+        Some(Selector::OwnerMoodGap) => ctx
+            .operators
+            .iter()
+            .find(|operator| operator.name == owner)
+            .map_or(0.0, |operator| operator.mood_gap),
         Some(Selector::DroneCap) => ctx.layout.drone_cap as f64,
         Some(Selector::RhineLifeInBase) => f64::from(ctx.effective_rhine_life_in_base()),
         Some(Selector::MetalFormulaSkillCountInRoom) => metal_formula_skill_count_in_room(ctx),

@@ -28,6 +28,7 @@ use crate::pool::{
 use crate::search::{
     control_efficiency_fill_sort_weight, control_entry_deferred_trade_tags,
     control_entry_plugin_fill, control_inject_components_for_assignment,
+    manufacture_operator_has_mood_gap_decay, MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS,
 };
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
@@ -2373,6 +2374,12 @@ fn schedule_abc_rotation(
     blueprint.validate()?;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let mut peak_options = options.clone();
+    peak_options.shift_hours = shift_hours[0] + shift_hours[1].max(shift_hours[2]);
+    let mut gamma_h1_options = options.clone();
+    gamma_h1_options.shift_hours = shift_hours[1];
+    let mut gamma_h2_options = options.clone();
+    gamma_h2_options.shift_hours = shift_hours[2];
 
     // 1) 参考高峰班 + 编排计划 → 取宿舍/办公室作为三班共享脚手架。
     // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
@@ -2383,7 +2390,7 @@ fn schedule_abc_rotation(
         operbox,
         instances,
         table,
-        options,
+        &peak_options,
         AssignShiftMode::Peak,
         &BaseAssignment::default(),
         &HashSet::new(),
@@ -2500,7 +2507,7 @@ fn schedule_abc_rotation(
         &gamma_h1_context.blocked_trade_tags,
         &pools,
         table,
-        options,
+        &gamma_h1_options,
         &h1,
         &mut gamma_h1,
         &mut used_g1,
@@ -2517,6 +2524,18 @@ fn schedule_abc_rotation(
     )?
     .layout_snapshot();
 
+    if shift_hours[1] + shift_hours[2] >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS {
+        for room_id in &h1.manu {
+            for operator in gamma_h1.operators_in(room_id) {
+                if pools.manu.entry(&operator.name).is_some_and(|entry| {
+                    manufacture_operator_has_mood_gap_decay(&entry.to_manu_operator(), table)
+                }) {
+                    used_g2.insert(operator.name.clone());
+                }
+            }
+        }
+    }
+
     assign_gamma_half(
         blueprint,
         instances,
@@ -2525,7 +2544,7 @@ fn schedule_abc_rotation(
         &gamma_h2_context.blocked_trade_tags,
         &pools,
         table,
-        options,
+        &gamma_h2_options,
         &h2,
         &mut gamma_h2,
         &mut used_g2,
@@ -3291,6 +3310,13 @@ fn schedule_abc_rotation(
         &peak_plan.active_dependencies,
         &optional_dynamic_tags_by_producer,
         instances,
+    )?;
+    validate_mood_gap_decay_work_spans(
+        blueprint,
+        instances,
+        table,
+        TimedRotationProfile::Abc12_6_6,
+        &shifts,
     )?;
     let daily = DailyTotals {
         trade: shifts.iter().map(|shift| shift.weighted_trade).sum(),
@@ -4280,7 +4306,80 @@ fn finalize_profile_rotation(
     };
     validate_profile_rotation(blueprint, instances, &report)?;
     validate_continuous_work_spans(blueprint, instances, &report)?;
+    validate_mood_gap_decay_work_spans(
+        blueprint,
+        instances,
+        table,
+        report.profile,
+        &report.shifts,
+    )?;
     Ok(report)
+}
+
+fn validate_mood_gap_decay_work_spans(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    profile: TimedRotationProfile,
+    shifts: &[TeamShiftResult],
+) -> Result<()> {
+    let sensitive_names: HashSet<String> = shifts
+        .iter()
+        .flat_map(|shift| &shift.assignment.rooms)
+        .filter(|room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|room| room.kind == FacilityKind::Factory)
+        })
+        .flat_map(|room| &room.operators)
+        .filter_map(|operator| {
+            let manu_operator = crate::manufacture::ManuOperator {
+                name: operator.name.clone(),
+                elite: operator.elite,
+                buff_ids: instances.resolve_manufacture_buff_ids(&operator.name, operator.tier()),
+                tags: Vec::new(),
+            };
+            manufacture_operator_has_mood_gap_decay(&manu_operator, table)
+                .then(|| operator.name.clone())
+        })
+        .collect();
+    let works_in_factory = |shift: &TeamShiftResult, name: &str| {
+        shift.assignment.rooms.iter().any(|room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|room| room.kind == FacilityKind::Factory)
+                && room.operators.iter().any(|operator| operator.name == name)
+        })
+    };
+
+    for name in sensitive_names {
+        for start in 0..shifts.len() {
+            let mut continuous_hours = 0.0;
+            for offset in 0..shifts.len() {
+                let shift = &shifts[(start + offset) % shifts.len()];
+                if shift
+                    .fiammetta
+                    .as_ref()
+                    .is_some_and(|action| action.target == name)
+                {
+                    continuous_hours = 0.0;
+                }
+                if !works_in_factory(shift, &name) {
+                    continuous_hours = 0.0;
+                    continue;
+                }
+                continuous_hours += shift.duration_hours;
+                if continuous_hours >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS - 1e-9 {
+                    return Err(Error::msg(format!(
+                        "{name} is ineligible for {}: continuous manufacture work reaches {:.1}h",
+                        profile.display_name(),
+                        continuous_hours
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_profile_rotation(
@@ -7893,6 +7992,71 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("appears in multiple room slots"));
+    }
+
+    #[test]
+    fn mood_gap_decay_validator_rejects_adjacent_short_shifts() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let make_shift = |index: usize, duration_hours: f64, has_leadfoot: bool| {
+            let mut assignment = BaseAssignment::default();
+            if has_leadfoot {
+                assignment.set_room(
+                    "manu_1",
+                    vec![AssignedOperator::from_progress(
+                        "铅踝",
+                        crate::roster::OperatorProgress::new(1, 60, 4),
+                    )],
+                );
+            }
+            TeamShiftResult {
+                index,
+                plan_index: 0,
+                duration_hours,
+                active_teams: vec![TeamLabel::Alpha, TeamLabel::Beta],
+                resting_team: TeamLabel::Gamma,
+                assignment,
+                fiammetta: None,
+                dorm_rest: None,
+                transition: ShiftTransition::ReplaceRooms,
+                efficiencies: ShiftEfficiencies::default(),
+                weighted_trade: Efficiency::default(),
+                weighted_manufacture: Efficiency::default(),
+                weighted_power: Efficiency::default(),
+            }
+        };
+
+        let one_short_shift = vec![
+            make_shift(0, 12.0, false),
+            make_shift(1, 6.0, true),
+            make_shift(2, 6.0, false),
+        ];
+        assert!(validate_mood_gap_decay_work_spans(
+            &blueprint,
+            &instances,
+            &table,
+            TimedRotationProfile::Abc12_6_6,
+            &one_short_shift,
+        )
+        .is_ok());
+
+        let adjacent_short_shifts = vec![
+            make_shift(0, 12.0, false),
+            make_shift(1, 6.0, true),
+            make_shift(2, 6.0, true),
+        ];
+        let error = validate_mood_gap_decay_work_spans(
+            &blueprint,
+            &instances,
+            &table,
+            TimedRotationProfile::Abc12_6_6,
+            &adjacent_short_shifts,
+        )
+        .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("continuous manufacture work reaches 12.0h"));
     }
 
     #[test]

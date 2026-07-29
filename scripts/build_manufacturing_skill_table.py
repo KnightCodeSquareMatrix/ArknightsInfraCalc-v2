@@ -15,7 +15,6 @@ DATA = ROOT / "data"
 L2_DELEGATE = {
     "manu_bd_to_bd[000]",
     "manu_cost_all[000]",
-    "manu_prod_spd_addition&cost[000]",
     "manu_prod_spd_bd[400]",
     "manu_prod_spd_variable2[000]",
     "manu_prod_spd_variable3[000]",
@@ -112,6 +111,7 @@ MANUAL_SKILL: dict[str, tuple[str, str]] = {
     "manu_prod_spd_bd[300]": ("稻禾厚，顺秋收", "tier_up"),
     "manu_prod_spd_bd_n1[000]": ("超感", "tier_0"),
     "manu_prod_spd_reduce[000]": ("模糊视线", "tier_0"),
+    "manu_prod_spd_addition&cost[000]": ("窗外雪啸", "tier_up"),
     "manu_prod_bd[000]": ("实干的寡言者", "tier_up"),
 }
 
@@ -193,6 +193,41 @@ def resolve_skill_name(buff_id: str, op: str, op_buffs: dict[str, dict]) -> tupl
 def parse_atoms(description: str, buff_id: str) -> list[dict]:
     atoms: list[dict] = []
     order = 20
+
+    if buff_id == "manu_prod_spd_reduce[000]":
+        return [
+            {
+                "action": {"kind": "add_flat_eff", "params": {"value": 30.0}},
+                "phase": "constant",
+                "phase_order": 20,
+            },
+            {
+                "selector": "owner_mood_gap",
+                "action": {
+                    "kind": "add_bucket_eff_from_selector",
+                    "params": {"step": 4.0, "ret_per_step": -5.0, "cap": 0.0},
+                },
+                "phase": "eff_var",
+                "phase_order": 20,
+            },
+        ]
+
+    if buff_id == "manu_prod_spd_addition&cost[000]":
+        condition = {"owner_mood_gap_above": {"n": 12}}
+        return [
+            {
+                "condition": condition,
+                "action": {"kind": "add_flat_eff", "params": {"value": 10.0}},
+                "phase": "constant",
+                "phase_order": 21,
+            },
+            {
+                "condition": condition,
+                "action": {"kind": "add_limit_delta", "params": {"delta": 6}},
+                "phase": "limit",
+                "phase_order": 21,
+            },
+        ]
 
     def add_prod(value: float, recipe: str | None = None) -> None:
         nonlocal order
