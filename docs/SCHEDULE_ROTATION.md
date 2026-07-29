@@ -62,10 +62,10 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 原本休息的班次中放回原房间，并换下一个当前在岗干员。
 ```
 
-γ 替补贸易与 peak `assign_trade_remainder` 同路径。当前代码的金单顺序仍是
+γ 替补贸易与 peak `assign_trade_remainder` 同路径。金单顺序是
 `docus → closure → witch → witch_fallback → karlan → penguin`，再 plain；格拉斯哥是普通合法
-候选，不占固定 role；制造/发电仍站绑定贪心。该顺序与下述最新核心 policy 的差异是待修复
-实现缺口，不能反向覆盖 canonical。
+候选，不占固定 role；制造/发电仍站绑定贪心。但书优先低等级金单站，可露希尔优先剩余
+高等级金单站，完整龙巫只进入三级站。
 
 实现：`crates/infra-core/src/schedule/team_rotation.rs`。
 
@@ -107,15 +107,13 @@ S2 有深海短班特例：运行时按稳定 control buff capability 找 produc
 
 八幡海铃、戴菲恩、凛御银灰由同一次 producer presence 枚举自然入选，并由 winner 的实际 consumer 派生 resolved dependency；不存在 `meta_vina` role。房内完整响应行 join 仍见 [A+ 实施 TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
-最新 canonical 是：多贸龙门币默认但书 > 龙巫 > 可露希尔；Rosemary/黑键 alternative 激活时，
-Plan 原子改为但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 γ reserve。下面编号继续记录当前
-代码入口和 required 条件，不表示 `closure` 永久高于 `witch`。
+最新 canonical 是：多贸龙门币默认但书 > 可露希尔 > 完整龙巫；Rosemary/黑键 alternative 激活时，
+Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 γ reserve。下面编号记录当前
+代码入口、房间等级偏好和 required 条件。
 
-1. `docus`：只在蓝图实际有至少 2 间贸易站且至少 1 间为龙门币订单时成为 required core；全源石单不启用。anchor 解析到实际龙门币站后，再从所有可用干员中按最终效率选择队友。叙拉古不注册固定体系：八幡海铃、伺夜、贝洛内均可不入选，伺夜与贝洛内可单走、同上且跨站、或自然同站；包含八幡海铃的中枢候选只有在最终实际贸易成员使其动态收益胜出时才采用。shortcut 仅按最终实际同房组合自然结算。
-2. `witch`：多贸龙门币默认第二核心；巫恋 + 龙舌兰 + 裁缝 β/α，普通白板不得进入自动龙巫站。
-3. `closure`：蓝图实际恰有 1 间贸易站且为龙门币订单时是 required core；完整 Rosemary/黑键
-   alternative 激活时则是该双贸 alternative 的条件 required core。有黑键时可命中
-   `gsl_blackkey_closure`，缺黑键时按既有降级路径处理。
+1. `docus`：只在蓝图实际有至少 2 间贸易站且至少 1 间为龙门币订单时成为首个 required core；全源石单不启用。anchor 优先解析到最低等级的可用金单站，再从所有可用干员中按最终效率选择队友。叙拉古不注册固定体系：八幡海铃、伺夜、贝洛内均可不入选，伺夜与贝洛内可单走、同上且跨站、或自然同站；包含八幡海铃的中枢候选只有在最终实际贸易成员使其动态收益胜出时才采用。shortcut 仅按最终实际同房组合自然结算。
+2. `closure`：蓝图实际恰有 1 间贸易站且为龙门币订单时是 required core；多贸时排在但书之后、完整龙巫之前，并优先剩余的最高等级金单站。完整 Rosemary/黑键 alternative 激活时则是该双贸 alternative 的条件 required core。有黑键时可命中 `gsl_blackkey_closure`，缺黑键时仍保留可露希尔。
+3. `witch`：多贸龙门币默认第三核心；必须由巫恋 + 龙舌兰 + 裁缝 β/α 组成并进入三级金单站，普通白板和二人组不得进入自动龙巫站。
 4. `witch_fallback`：无龙舌兰时的巫恋兜底。
 5. `karlan` / `penguin` / plain：灵知孑、企鹅、散件工具人；格拉斯哥成员在这些正常候选中按实际 `final_efficiency` 竞争。
 
@@ -130,7 +128,7 @@ Plan 原子改为但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 
 菲亚后处理之前的基础 rotation 必须容纳三组，组合为 `A+B → B+C → C+A`；房号、H1/H2、αβγ 标签不固定。可露希尔与黑键同组是该完整 Rosemary alternative 的声明式 packing 结果，不是全局“黑键固定可露”；B 的第三人和 A 的叙拉古成员仍由正式搜索决定，C 仍只接受合法裁缝。A/B 若被已有 exact bind 连成不可分分量，或自然 H1/H2 打包不能让两边各有目标，计划阶段事务性降级，不得到 schedule 再搬房或报错。缺可露、缺完整龙巫或 Rosemary 未激活时同样分别降级，不得把降级态伪报成完整三组。单测：
 
 - `team_rotation_binds_only_actual_syracusa_members`
-- `team_rotation_partial_trade_meta_keeps_docus_closure_and_witch`
+- `team_rotation_partial_trade_meta_keeps_docus_closure_and_complete_witch`
 - `team_rotation_full_e2_resolves_gamma_cohort_before_postprocess`
 
 `ResolvedRoleReserve.reuse_policy` 是基础 rotation 的通用轮换语义：`once` 只在 H1/H2 中首个可行目标房使用一次；`every_eligible_half` 则要求两个 half 都存在 eligible room，并在 `apply_fiammetta_return` 前把同一组已解析成员分别写入两个 γ half。带 `require_pre_split_halves` 的 pack 在 plan 提交前先验证自然切半，失败即整包降级；schedule 只校验已经提交的 reserve 未缺目标、未被基础 fill 覆盖。reserve 不保护菲亚后处理后的最终房间成员。

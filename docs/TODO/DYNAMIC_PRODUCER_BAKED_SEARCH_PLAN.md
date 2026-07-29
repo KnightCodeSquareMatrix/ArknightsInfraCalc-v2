@@ -279,7 +279,7 @@ join partition 必须保留 `siracusa_by_room`、`glasgow_by_room` 和 `karlan_q
 
 当前评分契约已经由用户裁决为：
 
-1. LMD 核心布局先满足 hard admission。多贸默认优先级为但书 > 龙巫 > 可露希尔；
+1. LMD 核心布局先满足 hard admission。多贸默认优先级为但书 > 可露希尔 > 完整龙巫；
    Rosemary/黑键体系 alternative 激活时，Plan 原子对调后两者，peak 使用但书 + 可露希尔/黑键，
    完整龙巫进入 γ reserve。叙拉古等普通队友不升级为 hard core。
 2. 每个完整 prefix 必须同时结算全部贸易和制造房；令 `T=Σ trade.final_efficiency`、
@@ -590,7 +590,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 ### 13.3 Role / shortcut
 
 - 删除 Vina fixed/meta role 后，格拉斯哥组合可因实际效率自然胜出，也可自然落败。
-- 多贸默认但书 > 龙巫 > 可露希尔；Rosemary alternative 激活时原子改为但书 + 可露希尔/黑键，
+- 多贸默认但书 > 可露希尔 > 完整龙巫；Rosemary alternative 激活时进一步固定但书 + 可露希尔/黑键，
   龙巫进入 γ reserve；同一核心布局内的普通队友按真实效率联合竞争。
 - Shortcut 只结算实际同房组合，不决定 producer 激活与进编。
 - `gsl_vina_lungmen` 若保留，只在实际成员和 resolved producer gate 同时满足时命中。

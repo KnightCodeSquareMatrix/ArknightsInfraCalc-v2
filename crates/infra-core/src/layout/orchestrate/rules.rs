@@ -182,6 +182,15 @@ pub(super) enum RoleSelection {
     ManufactureObjective,
 }
 
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum RoomLevelPreference {
+    #[default]
+    BlueprintOrder,
+    LowestLevel,
+    HighestLevel,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(super) struct RoleSpec {
     pub id: String,
@@ -192,6 +201,8 @@ pub(super) struct RoleSpec {
     pub recipe: Option<RecipeKind>,
     #[serde(default)]
     pub trade_order: Option<TradeOrderKind>,
+    #[serde(default)]
+    pub room_level_preference: RoomLevelPreference,
     pub candidates: Vec<CandidateSpec>,
     #[serde(default = "one")]
     pub min_count: u8,
@@ -1165,7 +1176,17 @@ fn matching_rooms<'a>(
                 && role_matches_room(role, room)
         })
         .collect();
-    rooms.sort_by(|left, right| left.id.0.cmp(&right.id.0));
+    rooms.sort_by(|left, right| match role.room_level_preference {
+        RoomLevelPreference::BlueprintOrder => left.id.0.cmp(&right.id.0),
+        RoomLevelPreference::LowestLevel => left
+            .level
+            .cmp(&right.level)
+            .then_with(|| left.id.0.cmp(&right.id.0)),
+        RoomLevelPreference::HighestLevel => right
+            .level
+            .cmp(&left.level)
+            .then_with(|| left.id.0.cmp(&right.id.0)),
+    });
     rooms
 }
 
@@ -2077,6 +2098,47 @@ mod tests {
         )]);
         let none = compile(&all_originium, &roster, &BaseAssignment::default());
         assert_eq!(selected(&none, "trade_core"), None);
+    }
+
+    #[test]
+    fn trade_core_room_level_preferences_ignore_blueprint_order() {
+        let mixed_levels = blueprint(vec![
+            room(
+                "high-first",
+                FacilityKind::TradePost,
+                3,
+                Some(RoomProduct::Trade {
+                    order: TradeOrderKind::Gold,
+                }),
+            ),
+            room(
+                "low-last",
+                FacilityKind::TradePost,
+                2,
+                Some(RoomProduct::Trade {
+                    order: TradeOrderKind::Gold,
+                }),
+            ),
+        ]);
+
+        let docus = compile(
+            &mixed_levels,
+            &operbox(&[("但书", 2), ("可露希尔", 2)]),
+            &BaseAssignment::default(),
+        );
+        assert_eq!(selected(&docus, "trade_core"), Some("multi_trade_docus"));
+        assert_eq!(docus.anchors[0].room_id.as_ref().unwrap().0, "low-last");
+
+        let closure = compile(
+            &mixed_levels,
+            &operbox(&[("可露希尔", 2)]),
+            &BaseAssignment::default(),
+        );
+        assert_eq!(
+            selected(&closure, "trade_core"),
+            Some("multi_trade_closure_fallback")
+        );
+        assert_eq!(closure.anchors[0].room_id.as_ref().unwrap().0, "high-first");
     }
 
     fn rosemary_blueprint() -> BaseBlueprint {

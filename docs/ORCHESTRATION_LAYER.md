@@ -110,7 +110,8 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 ### 4.1 贸易核心硬锚点
 
 - 实际贸易站总数为 1，且该站是龙门币订单：可露希尔为首个 required trade anchor。
-- 实际贸易站总数至少为 2，且存在龙门币订单：但书为首个 required trade anchor。
+- 实际贸易站总数至少为 2，且存在龙门币订单：但书为首个 required trade anchor，并优先解析到最低等级的可用龙门币站。
+- 多贸的后续金单 role 顺序为可露希尔、完整龙巫；可露希尔优先最高等级的可用龙门币站，完整龙巫必须由巫恋、龙舌兰和合法裁缝组成并进入三级站。
 - 全部贸易站均为源石订单：不生成上述 anchor。
 - 双贸易站的完整 Rosemary 三 cohort 条件成立时，声明式 packing 还必须把可露希尔与黑键解析到同一 B 房、与但书 A 房分离；C=巫恋+龙舌兰+合法裁缝由 γ 的正式 witch role 复用。A/B 还必须在全部 exact bind 的自然 H1/H2 打包中可分；不可分或需要 schedule 事后搬分量时整包降级。这里的同组关系只属于该可行 alternative，不是黑键全局固定可露希尔。
 - 只固定核心本人，不固定房号和队友；叙拉古成员继续按实际跨站收益搜索。
@@ -168,7 +169,7 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 | id / role | 类型 | L3 shortcut | 当前运行时 |
 |-----------|------|-------------|------------|
 | 多贸但书 required anchor + 叙拉古动态注入 | 条件硬锚点 + 自然中枢/贸易候选 | `gsl_docus_syracusa` / `gsl_docus_solo` | 多贸龙门币布局先预留但书本人；八幡海铃、伺夜、贝洛内均不固定，伺夜/贝洛内不要求同站，也不要求入编 |
-| `closure` | 可露希尔核心优先 | `gsl_blackkey_closure` / `gsl_closure_*` | 强制包含可露希尔；优先黑键可露锚点，缺黑键仍保留可露 |
+| `closure` | 可露希尔核心优先 | `gsl_blackkey_closure` / `gsl_closure_*` | 强制包含可露希尔；多贸中排在但书之后、完整龙巫之前，并优先可用的最高等级金单站；优先黑键可露锚点，缺黑键仍保留可露 |
 | `witch` / `witch_fallback` | 龙巫 / 巫恋兜底 | `gsl_witch_*` | `witch` 强制包含精二巫恋 + 龙舌兰；无龙舌兰时 `witch_fallback` 低于推王组，只做巫恋兜底 |
 | `ling_jie_karlan` | control producer + L1 自然搜索 | `gsl_ling_jie_yaxin` 仅参考 | 只认领灵知 E2 中枢；精1孑由贸易搜索注入 |
 | 格拉斯哥自然候选 / `penguin_*` | 普通贸易候选 / 企鹅 segment | `gsl_vina_lungmen` / `gsl_penguin_*` | Vina shortcut 只结算实际组合，不参与选型；企鹅仍按独立 role policy 处理 |
@@ -179,13 +180,14 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 贸易金单余站按 `pick_trade_meta_then_plain` 尝试：
 
 1. 一贸龙门币布局由可露希尔 required anchor 先占位；多贸龙门币布局由但书 required anchor 先占位。核心所在房的其余位置按 `final_efficiency` 搜索；`gsl_docus_solo` / `gsl_docus_syracusa` 只结算实际组合。
-2. 默认多贸龙门币的第二核心是 `witch`：必须同时包含精二巫恋、精二龙舌兰和裁缝 β/α；blank shortcut 不进入自动 role。
-3. 默认第三核心是 `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用三人组。
+2. 默认多贸龙门币的第二核心是 `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用组合。可露希尔优先进入剩余的最高等级金单站。
+3. 默认第三核心是 `witch`：必须同时包含精二巫恋、精二龙舌兰和裁缝 β/α，并进入三级金单站；blank shortcut 不进入自动 role。
 4. `witch_fallback` / `karlan` / `penguin` / plain：无龙舌兰巫恋兜底、灵知孑、企鹅、散件工具人三人组，且排除黑键与巫恋同房冲突。格拉斯哥成员作为普通合法候选参与实际 `final_efficiency` 搜索。
 
-Rosemary/黑键体系 alternative 激活时，在选定 alternative 的同一 Plan 决策中原子交换
-`witch` 与 `closure`：双贸易站 peak 使用但书 A + 可露希尔/黑键 B，完整龙巫进入 γ reserve。
-这不是永久提高 `closure` 默认优先级，也不能由已经填出的房间反推体系激活。
+Rosemary/黑键体系 alternative 激活时，在选定 alternative 的同一 Plan 决策中把双贸易站
+peak 固定为但书 A + 可露希尔/黑键 B，并让完整龙巫进入 γ reserve。该特殊 packing 增加
+黑键同房和 reserve 约束，但不改变默认 `docus → closure → witch` 顺序，也不能由已经填出的
+房间反推体系激活。
 
 这条顺序表达独立 core / fallback 策略，不是任意固定三人组优先级。八幡海铃、戴菲恩、凛御银灰都只作为可选中枢 producer；叙拉古、格拉斯哥、谢拉格 consumer 的实际组合由合法候选和 solver 决定。伺夜与贝洛内不要求同站，八幡与单个贸易消费者的极端组合同样合法。
 

@@ -134,7 +134,7 @@ fn assign_team_trade_meta_rooms(
     used: &mut HashSet<String>,
 ) -> Result<()> {
     let gold_lines = blueprint.gold_manu_line_count();
-    let rooms = trade_rooms
+    let mut rooms = trade_rooms
         .iter()
         .map(|room_id| {
             blueprint.room(room_id).ok_or_else(|| {
@@ -142,7 +142,9 @@ fn assign_team_trade_meta_rooms(
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    for room in rooms {
+    while let Some(room) =
+        super::trade_fill::take_next_trade_room(&mut rooms, trade_pool, assignment, used)
+    {
         if !assignment.operators_in(&room.id).is_empty() {
             continue;
         }
@@ -169,6 +171,7 @@ fn assign_team_trade_meta_rooms(
             order,
             room.level,
             used,
+            &[],
             &[],
         )
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;

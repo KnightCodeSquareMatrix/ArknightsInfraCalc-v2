@@ -35,7 +35,7 @@
 
 **Consumer**（Rust 匹配器）：`docus_syracusa`、`blackkey_closure`、`vina_lungmen`、`penguin_*`。
 
-**贸易 core role 消费边界**：总 core 顺序由声明式编排按实际贸易站数量与订单先解析：恰有 1 间贸易站且为龙门币订单时固定可露希尔；至少 2 间贸易站且任一为龙门币订单时固定但书；全源石订单时两者均不解析。`docus` / `closure` role 只为已解析 anchor 的房间补队友，L3 shortcut 只结算最终实际同房组合，两者都不再决定总 core 顺序。
+**贸易 core role 消费边界**：首个 core 由声明式编排按实际贸易站数量、等级与订单解析：恰有 1 间贸易站且为龙门币订单时固定可露希尔；至少 2 间贸易站且任一为龙门币订单时固定但书到最低等级的可用金单站；全源石订单时两者均不解析。后续余站由统一 role 顺序 `closure → witch → ...` 消费，可露希尔优先最高等级金单站，完整龙巫只进入三级站。L3 shortcut 只结算最终实际同房组合，不改变这些 admission 与房间选择规则。
 
 > `meta_vina` 自动 role 和 `vina_lungmen` fixed System 已删除。戴菲恩、八幡海铃、凛御银灰的选型真源见 [CONTROL_CENTER_ASSIGNMENT.md](../CONTROL_CENTER_ASSIGNMENT.md)；`gsl_vina_lungmen` 只结算最终实际组合。
 

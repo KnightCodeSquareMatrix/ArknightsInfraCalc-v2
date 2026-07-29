@@ -51,6 +51,7 @@
               "id": "core",
               "facility": "trade_post",
               "trade_order": "gold",
+              "room_level_preference": "lowest_level",
               "candidates": [{ "name": "但书", "elite": 2 }]
             }
           ],
@@ -68,6 +69,7 @@
               "id": "core",
               "facility": "trade_post",
               "trade_order": "gold",
+              "room_level_preference": "highest_level",
               "candidates": [{ "name": "可露希尔", "elite": 2 }]
             }
           ],

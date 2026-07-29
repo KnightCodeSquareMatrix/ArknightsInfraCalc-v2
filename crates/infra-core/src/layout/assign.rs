@@ -417,9 +417,7 @@ mod tests {
 
     use crate::instances::default_instances_path;
     use crate::layout::shift::AssignShiftMode;
-    use crate::layout::{
-        AssignedOperator, BaseBlueprint, BlueprintScenario, RoomBlueprint, RoomId, RoomProduct,
-    };
+    use crate::layout::{AssignedOperator, BaseBlueprint, RoomId, RoomProduct};
     use crate::manufacture::input::ManuSearchRecipeMode;
     use crate::operbox::{
         default_operbox_full_e2_path, default_operbox_gongsun_path, OperBox, OperBoxEntry,
@@ -1001,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    fn assign_252_puts_docus_in_actual_gold_trade_without_reserving_teammates() {
+    fn assign_252_puts_docus_in_lower_level_gold_trade_without_reserving_teammates() {
         let blueprint =
             BaseBlueprint::load(&crate::skill_table::data_path("layout/252.json").unwrap())
                 .unwrap();
@@ -1036,6 +1034,11 @@ mod tests {
             .expect("但书应被排入贸易站");
         let docus_blueprint = blueprint.room(&docus_room.room_id).unwrap();
         assert_eq!(docus_blueprint.kind, FacilityKind::TradePost);
+        assert_eq!(
+            docus_blueprint.level, 2,
+            "但书应优先进入可用的低级金单贸易站: {:?}",
+            docus_room
+        );
         assert!(matches!(
             docus_blueprint.product.as_ref(),
             Some(RoomProduct::Trade {
@@ -1164,7 +1167,7 @@ mod tests {
     }
 
     #[test]
-    fn team_rotation_partial_trade_meta_keeps_required_docus_and_witch_role() {
+    fn team_rotation_partial_trade_meta_keeps_docus_closure_and_complete_witch() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = operbox_from_names(&[
             ("但书", 2, 5),
@@ -1248,7 +1251,7 @@ mod tests {
         assert_eq!(
             trade_core_anchors,
             vec!["但书"],
-            "多贸只声明但书 required core；可露希尔只能自然竞争"
+            "多贸首个 required core 仍只由 Plan 声明但书；后续核心由贸易 role 顺序落位"
         );
 
         assert!(
@@ -1261,9 +1264,15 @@ mod tests {
         );
         assert!(
             report.shifts.iter().any(|shift| {
+                trade_room_contains(&shift.assignment, &blueprint, &["可露希尔"])
+            }),
+            "partial meta account should keep closure core in rotation"
+        );
+        assert!(
+            report.shifts.iter().any(|shift| {
                 trade_room_contains(&shift.assignment, &blueprint, &["巫恋", "龙舌兰"])
             }),
-            "partial meta account should keep witch + tequila fallback in rotation"
+            "完整龙巫可形成时仍应保留巫恋+龙舌兰组合"
         );
     }
 
@@ -1320,13 +1329,6 @@ mod tests {
             Some(durin),
         )
         .unwrap();
-
-        let room_ops = |room_id: &str| -> Vec<String> {
-            peak.operators_in(&RoomId::from(room_id))
-                .iter()
-                .map(|o| o.name.clone())
-                .collect()
-        };
 
         let gold_trio: HashSet<_> = GONGSUN_GOLD_MANU_TEAM.iter().map(|s| *s).collect();
         let gold_room = peak.rooms.iter().find(|r| {

@@ -79,12 +79,12 @@ operbox + blueprint
 2. **控制中枢补位** `control`（木天蓼 / 全局贸易·制造 % 等；不足 5 人时用 `search_control_combos` 补满）
 3. **宿舍 / 感知 producer**（如森西、爱丽丝/车尔尼的梦境/小节→感知源；塑心作为迷迭香/黑键链的宿舍无声共鸣可选插件；先落位再 `resolve_base`）
 4. **发电各站**（每站 1 人，`search_power_assignment` 同款 `used`）
-5. **贸易余站**（多贸龙门币默认核心顺序为 `docus → witch → closure`，再进入 `witch_fallback → karlan → penguin → plain`；格拉斯哥为普通候选，源石单走 plain）
+5. **贸易余站**（多贸龙门币默认核心顺序为 `docus → closure → witch`，再进入 `witch_fallback → karlan → penguin → plain`；格拉斯哥为普通候选，源石单走 plain）
 6. **制造各产线**（按蓝图 `manu_line_scenario`：各制造房按配方独立搜索 `C(n,k)`）
 
 同类型多房间：按蓝图 `rooms` 数组顺序或稳定 `room_id` 字典序。
 
-**贸易 core priority**：只看蓝图中的实际贸易站数量与实际订单。恰有 1 间贸易站且为龙门币订单时，可露希尔是 required core；至少 2 间贸易站且任一为龙门币订单时，但书是首个 required core；全部贸易站均为源石订单时两者都不上。多贸龙门币的默认核心优先级是但书 > 龙巫 > 可露希尔，但它不是无条件取前 N 个房间：“首个”也不表示排斥其他 cohort。双贸易站中 Rosemary/黑键体系 alternative 确认激活，且可露希尔与完整龙巫都可形成时，Plan 必须在选定该 alternative 的同时原子对调后两者，保留 A=但书核心站、B=可露希尔+黑键站，并把 C=巫恋+龙舌兰+合法裁缝留给 γ 替补；不能先按当前房间结果反推体系是否激活。A/B 队友仍由各房正式 `final_efficiency` 搜索决定。八幡海铃、伺夜、贝洛内都不是编排硬核心，也不通过 registry 强制进编：伺夜、贝洛内可上 0/1/2 人且不预设同房，full-E2 下 A 期望自然选中伺夜+贝洛内。`gsl_docus_solo` / `gsl_docus_syracusa` 只在求解实际同房候选时提供机制结算，不参与总 core 顺序或队友候选优先顺序。缺可露、缺完整龙巫或 Rosemary 未激活时分别按文档既有降级路径处理，不伪造完整三 cohort。自动龙巫的合法性仍要求巫恋 + 龙舌兰 + 裁缝 β/α，普通白板只保留单站结算兼容，不进入自动 role。
+**贸易 core priority**：只看蓝图中的实际贸易站数量、等级和订单。恰有 1 间贸易站且为龙门币订单时，可露希尔是 required core；至少 2 间贸易站且任一为龙门币订单时，但书是首个 required core。多贸龙门币默认顺序为但书 > 可露希尔 > 完整龙巫：但书优先进入可用的最低等级金单站，可露希尔随后优先进入可用的最高等级金单站，完整龙巫只进入能容纳巫恋 + 龙舌兰 + 合法裁缝 β/α 的三级金单站。全部贸易站均为源石订单时这些金单核心都不上，混合订单中的源石站也不被金单核心占用。双贸易站中 Rosemary/黑键体系 alternative 确认激活，且可露希尔与完整龙巫都可形成时，Plan 进一步把可露希尔+黑键固定为 B，并把完整龙巫 C 留给 γ 替补；不能先按当前房间结果反推体系是否激活。A/B 队友仍由各房正式 `final_efficiency` 搜索决定。八幡海铃、伺夜、贝洛内都不是编排硬核心，也不通过 registry 强制进编：伺夜、贝洛内可上 0/1/2 人且不预设同房，full-E2 下 A 期望自然选中伺夜+贝洛内。`gsl_docus_solo` / `gsl_docus_syracusa` 只在求解实际同房候选时提供机制结算，不参与总 core 顺序或队友候选优先顺序。缺可露或缺完整龙巫时分别沿后续 role 降级，不用巫恋+龙舌兰二人组伪造自动龙巫；普通白板组合只保留显式单站结算兼容，不进入自动 role。
 
 **动态 producer 当前边界**：八幡海铃、戴菲恩、凛御银灰和涤火杰西卡由一次 producer presence 子集枚举比较完整生产前缀；`vina_lungmen` / `meta_vina` 不再参与选型，灵知精密计算也不替代凛御银灰商业版图。贸易/制造多房内部仍是上述有序填房 policy；完整条件响应行 join 与 Bake/live 等价证明见 [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md) 和 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 

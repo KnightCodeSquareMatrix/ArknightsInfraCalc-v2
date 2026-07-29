@@ -56,10 +56,11 @@ pub fn pick_trade_role_hit_requiring(
     additional_required: &[String],
 ) -> Result<TradeSearchHit> {
     let sub = filter_trade_pool(pool, used);
-    if sub.entries.len() < 3 {
+    let operator_capacity = search_opts.operator_capacity.clamp(1, 3);
+    if sub.entries.len() < operator_capacity {
         return Err(crate::error::Error::msg(format!(
-            "trade pool has {} ready operators (need 3)",
-            sub.entries.len()
+            "trade pool has {} ready operators (need {operator_capacity})",
+            sub.entries.len(),
         )));
     }
     let mut opts = search_opts;
@@ -359,6 +360,27 @@ mod tests {
                 .is_none_or(|id| id.starts_with("gsl_closure")),
             "{hit:?}"
         );
+    }
+
+    #[test]
+    fn closure_role_uses_actual_lv1_capacity() {
+        let (pool, table, layout) = fixtures(&[("可露希尔", 2)]);
+        let mut options = gold_opts(&layout);
+        options.operator_capacity = 1;
+        options.trade_level = 1;
+
+        let hit = pick_trade_role_hit(
+            "closure",
+            &pool,
+            &table,
+            options,
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+
+        assert_eq!(trade_hit_names(&hit), ["可露希尔"]);
     }
 
     #[test]
