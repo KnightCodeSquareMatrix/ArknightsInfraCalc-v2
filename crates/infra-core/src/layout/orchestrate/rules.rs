@@ -1788,21 +1788,25 @@ mod tests {
             entries
                 .iter()
                 .enumerate()
-                .map(|(index, (name, elite))| OperBoxEntry {
-                    id: format!("test-{index}"),
-                    name: (*name).to_string(),
-                    elite: *elite,
-                    level: 90,
-                    own: true,
-                    potential: 0,
-                    rarity: match *name {
+                .map(|(index, (name, elite))| {
+                    let rarity = match *name {
                         "Lancet-2" => 1,
                         "清流" => 4,
                         _ => 6,
-                    },
+                    };
+                    OperBoxEntry {
+                        id: format!("test-{index}"),
+                        name: (*name).to_string(),
+                        elite: *elite,
+                        level: if rarity <= 2 { 30 } else { 1 },
+                        own: true,
+                        potential: 0,
+                        rarity,
+                    }
                 })
                 .collect(),
         )
+        .unwrap()
     }
 
     fn compile(

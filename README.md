@@ -58,7 +58,7 @@ runtime data + operbox + BaseBlueprint
 
 ## 直接运行一套真实方案
 
-日常运行只需要能构建本 workspace 的 Rust / Cargo 工具链；Python 仅用于 `scripts/` 下的数据维护。仓库自带全精二 243 夹具。下面的命令只计算一次用户 rotation，默认使用 αβγ ABC，并从同一结果生成账号画像和 MAA JSON：
+日常运行只需要能构建本 workspace 的 Rust / Cargo 工具链；Python 仅用于 `scripts/` 下的数据维护。仓库自带各星级最高合法练度的 243 夹具。下面的命令只计算一次用户 rotation，默认使用 αβγ ABC，并从同一结果生成账号画像和 MAA JSON：
 
 ```bash
 cargo run -q -p infra-cli -- plan \

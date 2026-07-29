@@ -281,7 +281,7 @@ cargo run -p infra-cli -- plan \
 | 项 | 路径 |
 |----|------|
 | 布局 | `data/fixtures/243/layout.json` |
-| 练度盒 | `data/fixtures/243/operbox_full_e2.json`（243 三班干员全精2 / 90） |
+| 练度盒 | `data/fixtures/243/operbox_full_e2.json`（243 三班干员合法最高练度，均解锁 `tier_up`） |
 | MAA 输出 | `out/243_maa.json` |
 
 ### 命令（Agent 默认）
@@ -310,6 +310,8 @@ cargo run -p infra-cli -- layout team-rotation \
 | `--prefer system=alternative` | 可重复；三个入口均透传到同一规则编译器。语义是“优先尝试、不可行则回退”，未知值报错 |
 | `--text` | 可选。带 `--maa-out` 时 stderr 默认已有人类可读排班表 |
 
+`OperBox` 中每个条目必须提供 `1..=6` 的星级；已拥有条目的精英阶段与等级必须在该星级可达范围内。未知星级或不可能练度会直接报错，不会降档或自动修正。
+
 ### 输出约定
 
 | 流 | 说明 |
@@ -327,7 +329,7 @@ cargo run -p infra-cli -- layout team-rotation \
 >
 > **无用户指定文件时，Agent 默认固定用：**
 > - 布局：`data/fixtures/243/layout.json`
-> - 练度盒：`data/fixtures/243/operbox_full_e2.json`（243 三班干员全精2 / 90）
+> - 练度盒：`data/fixtures/243/operbox_full_e2.json`（243 三班干员合法最高练度，均解锁 `tier_up`）
 
 ### 何时用
 
@@ -366,7 +368,7 @@ cargo run -p infra-cli -- layout test \
 | 参数 | 说明 |
 |------|------|
 | `--layout` | **必填**。任意路径的 `BaseBlueprint` JSON；**Agent 默认** `data/fixtures/243/layout.json` |
-| `--operbox` | **必填**。玩家练度盒 JSON（`OperBox`）；**Agent 默认** `data/fixtures/243/operbox_full_e2.json`（全精2）；用户自有练度或 `data/operbox_gongsun.json` 仅在用户指定时用 |
+| `--operbox` | **必填**。玩家练度盒 JSON（`OperBox`）；**Agent 默认** `data/fixtures/243/operbox_full_e2.json`（合法最高练度）；用户自有练度或 `data/operbox_gongsun.json` 仅在用户指定时用 |
 | `--top` | Top-K 条数，默认 3 |
 | `-o` / `--output` | 写 CSV（UTF-8 BOM）；缺省 stdout |
 | `--text` | 人类可读摘要写 stderr（**Agent 本地探测时推荐**） |

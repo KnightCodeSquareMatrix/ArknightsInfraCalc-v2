@@ -106,14 +106,6 @@ mod tests {
     }
 
     #[test]
-    fn tier_e2_overrides_inconsistent_low_rarity() {
-        assert_eq!(
-            PromotionTier::from_elite_rarity_level(2, 1, 1),
-            PromotionTier::TierUp
-        );
-    }
-
-    #[test]
     fn tier_2star_lv30_uses_tier_up() {
         assert_eq!(
             PromotionTier::from_elite_rarity_level(0, 2, 30),

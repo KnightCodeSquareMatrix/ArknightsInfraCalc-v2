@@ -420,14 +420,15 @@ mod tests {
                 .map(|(index, (name, rarity))| OperBoxEntry {
                     id: format!("gamma_{index}"),
                     name: name.into(),
-                    elite: 2,
-                    level: 60,
+                    elite: if rarity == 3 { 1 } else { 2 },
+                    level: 1,
                     own: true,
                     potential: 1,
                     rarity,
                 })
                 .collect(),
-        );
+        )
+        .unwrap();
         let pool = crate::pool::build_manufacture_pool(
             &operbox.manufacture_roster(&instances),
             &instances,
@@ -557,14 +558,15 @@ mod tests {
                 .map(|(index, (name, rarity))| OperBoxEntry {
                     id: format!("gamma_partial_{index}"),
                     name: name.into(),
-                    elite: 2,
-                    level: 60,
+                    elite: if rarity == 3 { 1 } else { 2 },
+                    level: 1,
                     own: true,
                     potential: 1,
                     rarity,
                 })
                 .collect(),
-        );
+        )
+        .unwrap();
         let pool = crate::pool::build_manufacture_pool(
             &operbox.manufacture_roster(&instances),
             &instances,

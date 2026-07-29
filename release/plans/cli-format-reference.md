@@ -94,7 +94,7 @@ infra-cli
 
 #### JSON 格式
 
-文件：`fixtures/operbox_full_e2.json`（418 名干员，全精二 90 级）
+文件：`fixtures/operbox_full_e2.json`（418 名干员，各星级合法最高练度；文件名为兼容保留）
 
 顶级为 **JSON 数组**，每项一名干员：
 
@@ -103,8 +103,8 @@ infra-cli
   {
     "id": "char_009_12fce",   // 游戏内部 ID
     "name": "12F",             // 中文名（必须与游戏/MAA 一致）
-    "elite": 2,                // 精英化阶段 0/1/2
-    "level": 90,               // 等级
+    "elite": 0,                // 精英化阶段 0/1/2
+    "level": 30,               // 等级
     "own": true,               // 是否拥有（false 则不参与排班）
     "potential": 6,            // 潜能 1-6
     "rarity": 2                // 稀有度 1-6（星级）
@@ -118,7 +118,7 @@ infra-cli
 
 ```csv
 序号,干员,精英化,等级,潜能,稀有度,拥有
-char_009_12fce,12F,2,90,6,2,TRUE
+char_009_12fce,12F,0,30,6,2,TRUE
 char_113_cqbw,W,2,90,5,6,TRUE
 ```
 

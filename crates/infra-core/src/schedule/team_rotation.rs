@@ -5835,7 +5835,8 @@ mod tests {
                 potential: 1,
                 rarity: 3,
             },
-        ]);
+        ])
+        .unwrap();
         let (layout, manu_pool, options) =
             build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
         let shared = BaseAssignment::default();
@@ -5916,7 +5917,8 @@ mod tests {
                 potential: 1,
                 rarity: 6,
             },
-        ]);
+        ])
+        .unwrap();
         let (layout, manu_pool, options) =
             build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
         let shared = BaseAssignment::default();
@@ -5994,7 +5996,8 @@ mod tests {
                 potential: 1,
                 rarity: 6,
             },
-        ]);
+        ])
+        .unwrap();
         let (layout, manu_pool, options) =
             build_test_manu_ctx(&blueprint, &operbox, &instances, &table);
         let shared = BaseAssignment::default();
@@ -6742,7 +6745,8 @@ mod tests {
                 .into_iter()
                 .filter(|entry| entry.name != "迷迭香")
                 .collect(),
-        );
+        )
+        .unwrap();
         let report = schedule_team_rotation(
             &blueprint,
             &operbox,
@@ -6968,7 +6972,8 @@ mod tests {
                 .into_iter()
                 .filter(|entry| entry.name != "野鬃")
                 .collect(),
-        );
+        )
+        .unwrap();
         let report = schedule_team_rotation(
             &blueprint,
             &operbox,

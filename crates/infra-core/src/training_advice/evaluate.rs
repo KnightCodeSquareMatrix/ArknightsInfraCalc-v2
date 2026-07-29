@@ -575,7 +575,7 @@ mod tests {
     }
 
     fn operbox(entries: Vec<OperBoxEntry>) -> OperBox {
-        OperBox::from_entries(entries)
+        OperBox::from_entries(entries).unwrap()
     }
 
     fn member(

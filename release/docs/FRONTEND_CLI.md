@@ -15,7 +15,7 @@ release/
 │   └── index.html             基建 Layout 生成器（浏览器打开，无构建）
 ├── fixtures/
 │   ├── layout.json            243 样例蓝图
-│   └── operbox_full_e2.json   243 样例练度（全精2）
+│   └── operbox_full_e2.json   243 样例练度（各星级合法最高练度）
 ├── docs/
 │   └── FRONTEND_CLI.md        本文件副本
 ├── plans/
@@ -326,8 +326,8 @@ JSON **数组**，每项一名干员：
   {
     "id": "char_009_12fce",
     "name": "12F",
-    "elite": 2,
-    "level": 90,
+    "elite": 0,
+    "level": 30,
     "own": true,
     "potential": 6,
     "rarity": 2
@@ -337,6 +337,7 @@ JSON **数组**，每项一名干员：
 
 - `name`：须与游戏/MAA **中文名**一致（OCR 换班用）。
 - `own: false` 的干员不参与排班。
+- `rarity` 必须已知；`elite` 与 `level` 必须是该星级可达的真实练度，否则直接报错。
 - 参考样例：`data/fixtures/243/operbox_full_e2.json`。
 
 ---
@@ -474,7 +475,7 @@ async function runTeamRotation({ cliPath, repoRoot, layout, operbox, maaOut, tit
 - 干员名必须为**客户端语言**（国服中文）。
 - 不建模心情曲线、宿管、菲亚梅塔自动放技能（菲亚梅塔字段默认关闭，可后续 UI 编辑 JSON）。
 - 会客室若 solver 未分配人，导出为 `autofill: true`。
-- 首次 243 全精2 operbox 排班约 **5–15 秒**（CPU 搜索）；前端应加 loading。
+- 首次 243 最高合法练度 operbox 排班约 **5–15 秒**（CPU 搜索）；前端应加 loading。
 
 ---
 

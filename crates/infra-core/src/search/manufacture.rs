@@ -718,7 +718,8 @@ mod tests {
                 potential: 1,
                 rarity: 4,
             },
-        ]);
+        ])
+        .unwrap();
         let pool =
             build_manufacture_pool(&operbox.manufacture_roster(&instances), &instances, &table)
                 .unwrap();
@@ -1048,7 +1049,7 @@ mod tests {
                 rarity: 5,
             },
         ];
-        let operbox = OperBox::from_entries(entries);
+        let operbox = OperBox::from_entries(entries).unwrap();
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = table();
         let pool =
@@ -1111,7 +1112,7 @@ mod tests {
                 rarity: 4,
             },
         ];
-        let operbox = OperBox::from_entries(entries);
+        let operbox = OperBox::from_entries(entries).unwrap();
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = table();
         let pool =
@@ -1244,7 +1245,8 @@ mod tests {
             own: true,
             potential: 1,
             rarity: 6,
-        }]);
+        }])
+        .unwrap();
         let sen_pool =
             build_manufacture_pool(&sen_e2.manufacture_roster(&instances), &instances, &table)
                 .unwrap();

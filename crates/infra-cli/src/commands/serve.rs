@@ -651,32 +651,14 @@ fn inline_operbox(mut entries: Vec<OperBoxEntry>) -> Result<OperBox, Error> {
         if !names.insert(entry.name.clone()) {
             return Err(Error::msg(format!("duplicate operbox name {}", entry.name)));
         }
-        if entry.elite > 2 {
-            return Err(Error::msg(format!(
-                "{} elite must be between 0 and 2",
-                entry.name
-            )));
-        }
-        if !(1..=90).contains(&entry.level) {
-            return Err(Error::msg(format!(
-                "{} level must be between 1 and 90",
-                entry.name
-            )));
-        }
         if !(1..=6).contains(&entry.potential) {
             return Err(Error::msg(format!(
                 "{} potential must be between 1 and 6",
                 entry.name
             )));
         }
-        if !(1..=6).contains(&entry.rarity) {
-            return Err(Error::msg(format!(
-                "{} rarity must be between 1 and 6",
-                entry.name
-            )));
-        }
     }
-    Ok(OperBox::from_entries(entries))
+    OperBox::from_entries(entries)
 }
 
 fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_json::Value, Error> {
@@ -812,7 +794,7 @@ mod tests {
                 {
                     "id": "char_009_12fce",
                     "name": "12F",
-                    "elite": 2,
+                    "elite": 0,
                     "level": 30,
                     "own": true,
                     "potential": 6,
@@ -853,6 +835,17 @@ mod tests {
         let error =
             inline_operbox(vec![operbox_entry("a", "甲"), operbox_entry("b", "甲")]).unwrap_err();
         assert!(error.to_string().contains("duplicate operbox name"));
+    }
+
+    #[test]
+    fn inline_operbox_rejects_impossible_progress() {
+        let mut entry = operbox_entry("test", "弑君者");
+        entry.rarity = 1;
+        let error = inline_operbox(vec![entry]).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "operbox entry 弑君者 has impossible progress: rarity 1 cannot reach elite 2"
+        );
     }
 
     #[test]

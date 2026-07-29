@@ -52,12 +52,13 @@ impl OperBox {
             json = json.trim_start_matches('\u{feff}').to_string();
         }
         let entries: Vec<OperBoxEntry> = serde_json::from_str(&json)?;
-        Ok(Self::from_entries(entries))
+        Self::from_entries(entries)
     }
 
-    pub fn from_entries(entries: Vec<OperBoxEntry>) -> Self {
+    pub fn from_entries(entries: Vec<OperBoxEntry>) -> Result<Self> {
         let mut owned = HashMap::new();
         for e in &entries {
+            validate_entry_progress(e)?;
             if !e.own {
                 continue;
             }
@@ -74,7 +75,7 @@ impl OperBox {
                 })
                 .or_insert(progress);
         }
-        Self { entries, owned }
+        Ok(Self { entries, owned })
     }
 
     pub fn owns(&self, name: &str) -> bool {
@@ -194,6 +195,54 @@ impl OperBox {
     }
 }
 
+fn validate_entry_progress(entry: &OperBoxEntry) -> Result<()> {
+    if !(1..=6).contains(&entry.rarity) {
+        return Err(Error::msg(format!(
+            "operbox entry {} has invalid rarity {}; expected 1..=6",
+            entry.name, entry.rarity
+        )));
+    }
+
+    let max_elite = match entry.rarity {
+        1 | 2 => 0,
+        3 => 1,
+        4..=6 => 2,
+        _ => unreachable!(),
+    };
+    if entry.elite > max_elite {
+        return Err(Error::msg(format!(
+            "operbox entry {} has impossible progress: rarity {} cannot reach elite {}",
+            entry.name, entry.rarity, entry.elite
+        )));
+    }
+    if !entry.own {
+        return Ok(());
+    }
+
+    let max_level = match (entry.rarity, entry.elite) {
+        (1 | 2, 0) => 30,
+        (3, 0) => 40,
+        (3, 1) => 55,
+        (4, 0) => 45,
+        (4, 1) => 60,
+        (4, 2) => 70,
+        (5, 0) => 50,
+        (5, 1) => 70,
+        (5, 2) => 80,
+        (6, 0) => 50,
+        (6, 1) => 80,
+        (6, 2) => 90,
+        _ => unreachable!(),
+    };
+    if !(1..=max_level).contains(&entry.level) {
+        return Err(Error::msg(format!(
+            "operbox entry {} has invalid level {} for rarity {} elite {}; expected 1..={max_level}",
+            entry.name, entry.level, entry.rarity, entry.elite
+        )));
+    }
+    Ok(())
+}
+
 fn is_xlsx_path(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -223,7 +272,7 @@ pub fn default_operbox_gongsun_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("operbox_gongsun.json")
 }
 
-/// 243 标准测试样例：全精2 operbox（`data/fixtures/243/operbox_full_e2.json`）。
+/// 243 标准测试样例：各星级最高合法练度（`data/fixtures/243/operbox_full_e2.json`）。
 pub fn default_operbox_full_e2_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("fixtures/243/operbox_full_e2.json")
 }
@@ -294,7 +343,7 @@ mod tests {
             potential: 1,
             rarity: 4,
         }];
-        let operbox = OperBox::from_entries(entries);
+        let operbox = OperBox::from_entries(entries).unwrap();
         let instances =
             OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let table = crate::skill_table::SkillTable::load(
@@ -313,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn elite_two_with_low_rarity_enters_tier_up_manufacture_pool() {
+    fn elite_two_with_low_rarity_is_rejected() {
         let entries = vec![OperBoxEntry {
             id: "test".into(),
             name: "弑君者".into(),
@@ -323,22 +372,110 @@ mod tests {
             potential: 1,
             rarity: 1,
         }];
-        let operbox = OperBox::from_entries(entries);
+        let error = OperBox::from_entries(entries).unwrap_err();
         assert_eq!(
-            operbox.tier_of("弑君者"),
-            Some(crate::tier::PromotionTier::TierUp)
+            error.to_string(),
+            "operbox entry 弑君者 has impossible progress: rarity 1 cannot reach elite 2"
         );
-        let instances =
-            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
-        let table = crate::skill_table::SkillTable::load(
-            &crate::skill_table::default_skill_table_path().unwrap(),
+    }
+
+    #[test]
+    fn unknown_rarity_is_rejected() {
+        let error = OperBox::from_json(
+            r#"[{"id":"test","name":"测试","elite":0,"level":1,"own":true,"potential":1}]"#,
         )
-        .unwrap();
-        let roster = operbox.manufacture_roster(&instances);
-        let pool = crate::pool::build_manufacture_pool(&roster, &instances, &table).unwrap();
-        assert!(
-            pool.entry("弑君者").is_some(),
-            "E2 progress should enter the tier_up manufacture pool despite inconsistent rarity"
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "operbox entry 测试 has invalid rarity 0; expected 1..=6"
         );
+    }
+
+    #[test]
+    fn level_above_progress_cap_is_rejected() {
+        let error = OperBox::from_entries(vec![OperBoxEntry {
+            id: "test".into(),
+            name: "清流".into(),
+            elite: 2,
+            level: 71,
+            own: true,
+            potential: 1,
+            rarity: 4,
+        }])
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "operbox entry 清流 has invalid level 71 for rarity 4 elite 2; expected 1..=70"
+        );
+    }
+
+    #[test]
+    fn every_legal_progress_boundary_is_accepted() {
+        let cases = [
+            (1, 0, 30),
+            (2, 0, 30),
+            (3, 0, 40),
+            (3, 1, 55),
+            (4, 0, 45),
+            (4, 1, 60),
+            (4, 2, 70),
+            (5, 0, 50),
+            (5, 1, 70),
+            (5, 2, 80),
+            (6, 0, 50),
+            (6, 1, 80),
+            (6, 2, 90),
+        ];
+        for (rarity, elite, max_level) in cases {
+            let entry = |level| OperBoxEntry {
+                id: "test".into(),
+                name: "测试".into(),
+                elite,
+                level,
+                own: true,
+                potential: 1,
+                rarity,
+            };
+            OperBox::from_entries(vec![entry(1)]).unwrap();
+            OperBox::from_entries(vec![entry(max_level)]).unwrap();
+            assert!(OperBox::from_entries(vec![entry(0)]).is_err());
+            assert!(OperBox::from_entries(vec![entry(max_level + 1)]).is_err());
+        }
+    }
+
+    #[test]
+    fn unowned_entry_ignores_level_but_not_identity_fields() {
+        let mut entry = OperBoxEntry {
+            id: "test".into(),
+            name: "测试".into(),
+            elite: 0,
+            level: 0,
+            own: false,
+            potential: 0,
+            rarity: 3,
+        };
+        OperBox::from_entries(vec![entry.clone()]).unwrap();
+
+        entry.elite = 2;
+        assert!(OperBox::from_entries(vec![entry.clone()]).is_err());
+        entry.elite = 0;
+        entry.rarity = 0;
+        assert!(OperBox::from_entries(vec![entry]).is_err());
+    }
+
+    #[test]
+    fn full_tier_fixture_uses_legal_progress() {
+        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
+        assert_eq!(operbox.owned_count(), 418);
+        assert_eq!(
+            operbox.progress_of("Castle-3"),
+            Some(OperatorProgress::new(0, 30, 1))
+        );
+        assert_eq!(
+            operbox.progress_of("克洛丝"),
+            Some(OperatorProgress::new(1, 55, 3))
+        );
+        assert_eq!(operbox.tier_of("Castle-3"), Some(PromotionTier::TierUp));
+        assert_eq!(operbox.tier_of("克洛丝"), Some(PromotionTier::TierUp));
     }
 }

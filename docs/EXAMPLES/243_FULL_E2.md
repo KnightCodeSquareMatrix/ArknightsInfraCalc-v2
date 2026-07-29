@@ -8,7 +8,7 @@
 > 用途：面向第一次运行项目的读者，完成输入、求解、结果阅读和产物检查。
 > 本页描述当前 CLI 能力和 fixture，不定义任何体系的业务不变量。
 
-本教程使用仓库自带的 243 布局和全精二练度盒，运行一次完整 `plan`，得到人类可读排班、账号画像 JSON 和 MAA 排班 JSON。无需先理解内部架构；完成后再按兴趣进入 [项目总览](../OVERVIEW.md) 或 [架构导览](../ARCHITECTURE_TOUR.md)。
+本教程使用仓库自带的 243 布局和最高合法练度盒，运行一次完整 `plan`，得到人类可读排班、账号画像 JSON 和 MAA 排班 JSON。历史文件名 `full_e2` 为兼容保留；低星干员使用可达的最高精英阶段，所有条目均解锁 `tier_up`。无需先理解内部架构；完成后再按兴趣进入 [项目总览](../OVERVIEW.md) 或 [架构导览](../ARCHITECTURE_TOUR.md)。
 
 ## 1. 运行前准备
 
@@ -17,7 +17,7 @@
 | 输入 | 路径 | 说明 |
 |------|------|------|
 | 243 layout | [data/fixtures/243/layout.json](../../data/fixtures/243/layout.json) | 默认 243 测试布局 |
-| 全精二 operbox | [data/fixtures/243/operbox_full_e2.json](../../data/fixtures/243/operbox_full_e2.json) | 仓库标准全精二练度盒 |
+| 最高合法练度 operbox | [data/fixtures/243/operbox_full_e2.json](../../data/fixtures/243/operbox_full_e2.json) | 仓库标准 `tier_up` 练度盒 |
 | 账号画像参考 | [data/fixtures/243/schedule_export.json](../../data/fixtures/243/schedule_export.json) | profile 对比参考，不是当前 solver 的强制排班 |
 
 先准备输出目录：

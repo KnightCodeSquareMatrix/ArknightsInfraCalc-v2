@@ -43,7 +43,7 @@ generation 重跑同一门禁。仓库发布入口再追加完整 release test s
 - 贸易每种订单：`C(77,1)+C(77,2)+C(77,3)=76,153`；
 - 制造每种配方：`C(90,1)+C(90,2)+C(90,3)=121,575`。
 
-标准全精二夹具 `data/fixtures/243/operbox_full_e2.json` 当日共有 418 个 operbox entry；实际 `plan` 画像报告的可建模池为贸易 75、制造 90。数据全集与运行池不同是正常的：OperBox、练度解析和池过滤仍会排除不适用 entry。
+标准最高合法练度夹具 `data/fixtures/243/operbox_full_e2.json` 当日共有 418 个 operbox entry；实际 `plan` 画像报告的可建模池为贸易 75、制造 90。数据全集与运行池不同是正常的：OperBox、练度解析和池过滤仍会排除不适用 entry。
 
 ### 快照生成口径
 

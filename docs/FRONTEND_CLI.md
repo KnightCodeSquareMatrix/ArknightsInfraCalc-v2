@@ -22,7 +22,7 @@ release/
 │   └── index.html             基建 Layout 生成器（浏览器打开，无构建）
 ├── fixtures/
 │   ├── layout.json            243 样例蓝图
-│   └── operbox_full_e2.json   243 样例练度（全精2）
+│   └── operbox_full_e2.json   243 样例练度（各星级合法最高练度）
 ├── docs/
 │   └── FRONTEND_CLI.md        本文件副本
 ├── plans/
@@ -269,7 +269,7 @@ infra-cli layout team-rotation \
 下面只展示通过结构 schema 的最小形状，不承诺该单房布局可求解；真实调用必须内联提交完整 layout 和 operbox。
 
 ```json
-{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":2,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
+{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
 响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）和 `maa`。`rotation.shifts[]` 承载 index、duration、active/resting teams、weighted 指标和 `efficiencies.room_lines`，不承载完整 assignment。`rotation` 取值为 `abc_12_6_6`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5`；省略时为默认 ABC，非法值明确失败。
@@ -351,8 +351,8 @@ JSON **数组**，每项一名干员：
   {
     "id": "char_009_12fce",
     "name": "12F",
-    "elite": 2,
-    "level": 90,
+    "elite": 0,
+    "level": 30,
     "own": true,
     "potential": 6,
     "rarity": 2
@@ -362,6 +362,7 @@ JSON **数组**，每项一名干员：
 
 - `name`：须与游戏/MAA **中文名**一致（OCR 换班用）。
 - `own: false` 的干员不参与排班。
+- `rarity` 必须已知；`elite` 与 `level` 必须是该星级可达的真实练度，否则直接报错。
 - 参考样例：`data/fixtures/243/operbox_full_e2.json`。
 
 ---
@@ -514,7 +515,7 @@ async function runTeamRotation({ cliPath, repoRoot, layout, operbox, rotation, m
 - 不建模完整心情曲线和宿管恢复。当前每个 ABC 周期只安排一次菲亚主力回岗；被换下者的具体宿舍操作由 MAA 自动处理，本项目不保证写入某个宿舍槽位。基础龙巫 reserve 已由 rotation 构造，但菲亚可改写最终房间成员。布局动态排序和跨周期就绪模拟尚未实现，详见 [Fiammetta.md](Fiammetta.md)。
 - 会客室若 solver 未分配人，导出为 `autofill: true`。
 - `layout eval --assignment ...` 会在 JSON 的 `office` / `meeting` 字段返回显式编制的静态技能速度、心情修正、贡献明细以及 `ignored` / `unsupported`。该结果不代表自动选人或线索概率模拟。
-- 首次 243 全精2 operbox 排班约 **5–15 秒**（CPU 搜索）；前端应加 loading。
+- 首次 243 最高合法练度 operbox 排班约 **5–15 秒**（CPU 搜索）；前端应加 loading。
 
 ---
 

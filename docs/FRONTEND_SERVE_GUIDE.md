@@ -18,7 +18,7 @@
 下面只展示通过结构 schema 的最小形状，不承诺该单房布局可求解；真实调用必须内联提交完整 layout 和 operbox。
 
 ```json
-{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":2,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
+{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
 `layout` 和 `operbox` 是内联对象，不接受 caller 文件路径。`options` 可省略；rotation 默认为 ABC，top 默认为 20。layout 为 1 至 64 个房间，operbox 为 1 至 1000 项，top 为 1 至 100，两个 label 均为非空且不超过 200 UTF-8 bytes；request/response 单个 NDJSON frame 均不超过 8 MiB。

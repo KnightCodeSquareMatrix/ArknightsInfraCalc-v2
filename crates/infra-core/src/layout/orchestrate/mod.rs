@@ -203,9 +203,12 @@ mod tests {
         low_wuyou_entries
             .iter_mut()
             .filter(|entry| entry.name == "乌有")
-            .for_each(|entry| entry.elite = 0);
+            .for_each(|entry| {
+                entry.elite = 0;
+                entry.level = 1;
+            });
         assert_closed(
-            &build(&OperBox::from_entries(low_wuyou_entries)),
+            &build(&OperBox::from_entries(low_wuyou_entries).unwrap()),
             "human_fireworks_pure",
         );
 
@@ -226,9 +229,12 @@ mod tests {
         low_wuyou_entries
             .iter_mut()
             .filter(|entry| entry.name == "乌有")
-            .for_each(|entry| entry.elite = 0);
+            .for_each(|entry| {
+                entry.elite = 0;
+                entry.level = 1;
+            });
         assert_closed(
-            &build(&OperBox::from_entries(low_wuyou_entries)),
+            &build(&OperBox::from_entries(low_wuyou_entries).unwrap()),
             "human_fireworks_perception",
         );
 
@@ -391,12 +397,13 @@ mod tests {
         let operbox = OperBox::from_entries(vec![OperBoxEntry {
             id: "f".into(),
             name: "芬".into(),
-            elite: 2,
+            elite: 1,
             level: 1,
             own: true,
             potential: 0,
             rarity: 3,
-        }]);
+        }])
+        .unwrap();
         let plan = build_plan(
             &blueprint,
             &operbox,
@@ -586,13 +593,14 @@ mod tests {
             OperBoxEntry {
                 id: "f".into(),
                 name: "芬".into(),
-                elite: 2,
+                elite: 1,
                 level: 1,
                 own: true,
                 potential: 0,
                 rarity: 3,
             },
-        ]);
+        ])
+        .unwrap();
         let plan = build_plan(
             &blueprint,
             &operbox,

@@ -247,7 +247,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
         .map_err(|error| Error::msg(format!("debug bundle layout parse: {error}")))?;
     let entries: Vec<OperBoxEntry> = serde_json::from_value(operbox_value.clone())
         .map_err(|error| Error::msg(format!("debug bundle operbox parse: {error}")))?;
-    let operbox = OperBox::from_entries(entries);
+    let operbox = OperBox::from_entries(entries)?;
 
     let top_k = rerun_top_k(args, &bundle)?;
     let rotation = rerun_rotation(args, &bundle)?;

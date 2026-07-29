@@ -453,6 +453,7 @@ mod tests {
                 })
                 .collect(),
         )
+        .unwrap()
     }
 
     fn manu_pool_entry_with_progress(
@@ -752,7 +753,8 @@ mod tests {
                 .into_iter()
                 .filter(|entry| entry.name != "黑键")
                 .collect(),
-        );
+        )
+        .unwrap();
         let result = assign_shift_with_plan(
             &blueprint,
             &without_blackkey,
@@ -1210,14 +1212,14 @@ mod tests {
             ("槐琥", 2, 5),
             ("铅踝", 2, 5),
             ("雪猎", 2, 5),
-            ("斑点", 2, 3),
+            ("斑点", 1, 3),
             ("乌尔比安", 2, 6),
             ("斯卡蒂", 1, 6),
             ("冬时", 2, 5),
             ("幽灵鲨", 2, 5),
             ("安哲拉", 0, 5),
             ("水月", 2, 6),
-            ("炎熔", 2, 3),
+            ("炎熔", 1, 3),
             ("艾雅法拉", 2, 6),
             ("阿罗玛", 0, 5),
             ("红云", 2, 4),

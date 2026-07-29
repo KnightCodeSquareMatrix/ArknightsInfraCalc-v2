@@ -39,7 +39,7 @@
     {
       "id": "char_009_12fce",
       "name": "12F",
-      "elite": 2,
+      "elite": 0,
       "level": 30,
       "own": true,
       "potential": 6,
@@ -48,7 +48,7 @@
   ],
   "labels": {
     "layout": "243",
-    "operbox": "Full E2"
+    "operbox": "Full tier"
   },
   "options": {
     "rotation": "abc_12_6_6",
@@ -139,6 +139,7 @@ office | meeting_room | training_room | workshop
 | `rarity` | integer | `1..=6` |
 
 Worker 会先 trim `id` 和 `name`，再检查空值及重复项。
+`rarity`、`elite` 与 `level` 还必须构成游戏中可达的练度：1–2 星最高精 0 / 30，3 星最高精 1 / 55，4 星最高精 2 / 70，5 星最高精 2 / 80，6 星最高精 2 / 90。未知星级或不可能练度直接失败，不会自动修正或降档。
 
 ## 5. Labels 与 Options
 

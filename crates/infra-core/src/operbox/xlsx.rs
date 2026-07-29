@@ -53,6 +53,7 @@ pub fn from_xlsx_path(path: &Path) -> Result<OperBox> {
 
     let mut entries = Vec::new();
     for (i, row) in rows.enumerate() {
+        let row_number = i + 2;
         let name = cell_string(row.get(cols.name)).unwrap_or_default();
         if name.is_empty() {
             continue;
@@ -60,11 +61,16 @@ pub fn from_xlsx_path(path: &Path) -> Result<OperBox> {
         entries.push(OperBoxEntry {
             id: format!("xlsx_{i:04}"),
             name,
-            elite: cell_u8(row.get(cols.elite)),
-            level: cell_u32(row.get(cols.level)),
-            own: cell_bool(row.get(cols.own)),
-            potential: cell_u8(row.get(cols.potential)),
-            rarity: cell_u8(row.get(cols.rarity)),
+            elite: cell_u8(row.get(cols.elite))
+                .map_err(|error| cell_parse_error(path, row_number, COL_ELITE, error))?,
+            level: cell_u32(row.get(cols.level))
+                .map_err(|error| cell_parse_error(path, row_number, COL_LEVEL, error))?,
+            own: cell_bool(row.get(cols.own))
+                .map_err(|error| cell_parse_error(path, row_number, COL_OWN, error))?,
+            potential: cell_u8(row.get(cols.potential))
+                .map_err(|error| cell_parse_error(path, row_number, COL_POTENTIAL, error))?,
+            rarity: cell_u8(row.get(cols.rarity))
+                .map_err(|error| cell_parse_error(path, row_number, COL_RARITY, error))?,
         });
     }
 
@@ -75,7 +81,15 @@ pub fn from_xlsx_path(path: &Path) -> Result<OperBox> {
         )));
     }
 
-    Ok(OperBox::from_entries(entries))
+    OperBox::from_entries(entries)
+        .map_err(|error| Error::msg(format!("xlsx {}: {error}", path.display())))
+}
+
+fn cell_parse_error(path: &Path, row: usize, field: &str, error: Error) -> Error {
+    Error::msg(format!(
+        "xlsx {} row {row} field {field}: {error}",
+        path.display()
+    ))
 }
 
 fn column_map(header: &[Data], sheet: &str) -> Result<ColumnMap> {
@@ -137,52 +151,68 @@ fn trim_float(f: f64) -> String {
     }
 }
 
-fn cell_u8(cell: Option<&Data>) -> u8 {
+fn cell_u8(cell: Option<&Data>) -> Result<u8> {
     match cell {
-        None | Some(Data::Empty) => 0,
-        Some(Data::Int(i)) => (*i).clamp(0, 255) as u8,
-        Some(Data::Float(f)) => f.round().clamp(0.0, 255.0) as u8,
-        Some(Data::Bool(b)) => u8::from(*b),
-        Some(Data::String(s)) => parse_u8_str(s.trim()),
-        _ => 0,
+        Some(Data::Int(value)) => u8::try_from(*value)
+            .map_err(|_| Error::msg(format!("expected integer 0..=255, got {value}"))),
+        Some(Data::Float(value))
+            if value.is_finite()
+                && value.fract() == 0.0
+                && (0.0..=u8::MAX as f64).contains(value) =>
+        {
+            Ok(*value as u8)
+        }
+        Some(Data::String(value)) => value
+            .trim()
+            .parse::<u8>()
+            .map_err(|_| Error::msg(format!("expected integer 0..=255, got {value:?}"))),
+        value => Err(Error::msg(format!(
+            "expected integer 0..=255, got {value:?}"
+        ))),
     }
 }
 
-fn cell_u32(cell: Option<&Data>) -> u32 {
+fn cell_u32(cell: Option<&Data>) -> Result<u32> {
     match cell {
-        None | Some(Data::Empty) => 0,
-        Some(Data::Int(i)) => (*i).max(0) as u32,
-        Some(Data::Float(f)) => f.round().max(0.0) as u32,
-        Some(Data::Bool(b)) => u32::from(*b),
-        Some(Data::String(s)) => parse_u32_str(s.trim()),
-        _ => 0,
+        Some(Data::Int(value)) => u32::try_from(*value)
+            .map_err(|_| Error::msg(format!("expected integer 0..={}, got {value}", u32::MAX))),
+        Some(Data::Float(value))
+            if value.is_finite()
+                && value.fract() == 0.0
+                && (0.0..=u32::MAX as f64).contains(value) =>
+        {
+            Ok(*value as u32)
+        }
+        Some(Data::String(value)) => value
+            .trim()
+            .parse::<u32>()
+            .map_err(|_| Error::msg(format!("expected integer 0..={}, got {value:?}", u32::MAX))),
+        value => Err(Error::msg(format!(
+            "expected integer 0..={}, got {value:?}",
+            u32::MAX
+        ))),
     }
 }
 
-fn cell_bool(cell: Option<&Data>) -> bool {
+fn cell_bool(cell: Option<&Data>) -> Result<bool> {
     match cell {
-        None | Some(Data::Empty) => false,
-        Some(Data::Bool(b)) => *b,
-        Some(Data::Int(i)) => *i != 0,
-        Some(Data::Float(f)) => *f != 0.0,
-        Some(Data::String(s)) => parse_bool_str(s.trim()),
-        _ => false,
+        Some(Data::Bool(value)) => Ok(*value),
+        Some(Data::Int(0)) => Ok(false),
+        Some(Data::Int(1)) => Ok(true),
+        Some(Data::Float(value)) if *value == 0.0 => Ok(false),
+        Some(Data::Float(value)) if *value == 1.0 => Ok(true),
+        Some(Data::String(value)) => parse_bool_str(value.trim())
+            .ok_or_else(|| Error::msg(format!("expected boolean, got {value:?}"))),
+        value => Err(Error::msg(format!("expected boolean, got {value:?}"))),
     }
 }
 
-fn parse_u8_str(s: &str) -> u8 {
-    s.parse::<u8>().unwrap_or(0)
-}
-
-fn parse_u32_str(s: &str) -> u32 {
-    s.parse::<u32>().unwrap_or(0)
-}
-
-fn parse_bool_str(s: &str) -> bool {
-    matches!(
-        s,
-        "1" | "true" | "True" | "TRUE" | "是" | "Y" | "y" | "yes" | "Yes" | "YES"
-    )
+fn parse_bool_str(s: &str) -> Option<bool> {
+    match s {
+        "1" | "true" | "True" | "TRUE" | "是" | "Y" | "y" | "yes" | "Yes" | "YES" => Some(true),
+        "0" | "false" | "False" | "FALSE" | "否" | "N" | "n" | "no" | "No" | "NO" => Some(false),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -196,13 +226,16 @@ mod tests {
     }
 
     #[test]
-    fn parse_bool_and_int_cells() {
-        assert!(!cell_bool(Some(&Data::Empty)));
-        assert!(cell_bool(Some(&Data::Bool(true))));
-        assert!(cell_bool(Some(&Data::Int(1))));
-        assert!(cell_bool(Some(&Data::String("是".into()))));
-        assert_eq!(cell_u8(Some(&Data::Float(2.0))), 2);
-        assert_eq!(cell_u32(Some(&Data::String("90".into()))), 90);
+    fn parse_bool_and_int_cells_strictly() {
+        assert!(cell_bool(Some(&Data::Empty)).is_err());
+        assert!(cell_bool(Some(&Data::Bool(true))).unwrap());
+        assert!(cell_bool(Some(&Data::Int(1))).unwrap());
+        assert!(!cell_bool(Some(&Data::String("否".into()))).unwrap());
+        assert!(cell_bool(Some(&Data::String("unknown".into()))).is_err());
+        assert_eq!(cell_u8(Some(&Data::Float(2.0))).unwrap(), 2);
+        assert!(cell_u8(Some(&Data::Float(2.4))).is_err());
+        assert_eq!(cell_u32(Some(&Data::String("90".into()))).unwrap(), 90);
+        assert!(cell_u32(Some(&Data::String("90.5".into()))).is_err());
     }
 
     #[test]

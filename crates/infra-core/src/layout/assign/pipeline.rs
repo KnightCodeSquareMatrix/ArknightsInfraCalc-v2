@@ -639,7 +639,7 @@ mod tests {
         if include_vigil {
             entries.push(e2("伺夜"));
         }
-        OperBox::from_entries(entries)
+        OperBox::from_entries(entries).unwrap()
     }
 
     fn plan_requiring_control_fillers(names: &[&str]) -> AssignmentPlan {
@@ -802,7 +802,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let mut seed = BaseAssignment::default();
         seed.set_room(
             "control",
@@ -857,7 +858,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let mut blueprint = control_blueprint(true);
         blueprint
             .rooms
@@ -928,7 +930,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let mut blueprint = control_blueprint(true);
         blueprint
             .rooms
@@ -984,7 +987,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let blueprint = BaseBlueprint {
             template: None,
             drone_cap: 135,
@@ -1066,7 +1070,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let mut blueprint = control_blueprint(true);
         blueprint
             .rooms
@@ -1147,7 +1152,8 @@ mod tests {
             .into_iter()
             .map(e2)
             .collect(),
-        );
+        )
+        .unwrap();
         let blueprint = control_blueprint(true);
         let options = AssignBaseOptions {
             top_k: 20,

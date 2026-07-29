@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从公孙 243 排班导出 JSON 生成全精2 operbox + 各班 BaseAssignment。"""
+"""从公孙 243 排班导出 JSON 生成最高合法练度 operbox + 各班 BaseAssignment。"""
 
 from __future__ import annotations
 
@@ -40,44 +40,43 @@ def index_operbox_by_name(entries: list[dict]) -> dict[str, dict]:
     return by_name
 
 
-def ideal_operbox(
-    schedule_names: set[str],
-    seed_entries: list[dict],
-    elite: int = 2,
-    level: int = 90,
-) -> list[dict]:
+def max_legal_progress(rarity: int) -> tuple[int, int]:
+    return {
+        1: (0, 30),
+        2: (0, 30),
+        3: (1, 55),
+        4: (2, 70),
+        5: (2, 80),
+        6: (2, 90),
+    }[rarity]
+
+
+def ideal_operbox(schedule_names: set[str], seed_entries: list[dict]) -> list[dict]:
     by_name = index_operbox_by_name(seed_entries)
     out: list[dict] = []
     seen: set[str] = set()
 
-    def add(name: str, fallback_id: str) -> None:
+    def add(name: str) -> None:
         if name in seen:
             return
         seen.add(name)
         base = by_name.get(name)
-        if base:
-            entry = dict(base)
-        else:
-            entry = {
-                "id": fallback_id,
-                "name": name,
-                "elite": 0,
-                "level": 1,
-                "own": True,
-                "potential": 6,
-                "rarity": 5,
-            }
+        if base is None:
+            raise ValueError(f"missing operbox metadata for {name}")
+        entry = dict(base)
+        rarity = entry.get("rarity")
+        if rarity not in range(1, 7):
+            raise ValueError(f"invalid rarity for {name}: {rarity!r}")
         entry["own"] = True
-        entry["elite"] = elite
-        entry["level"] = max(entry.get("level", 0), level)
+        entry["potential"] = 6
+        entry["elite"], entry["level"] = max_legal_progress(rarity)
         out.append(entry)
 
     for e in seed_entries:
-        if e.get("own"):
-            add(e["name"], e.get("id", f"seed_{e['name']}"))
+        add(e["name"])
 
-    for i, name in enumerate(sorted(schedule_names)):
-        add(name, f"schedule_{i:04d}")
+    for name in sorted(schedule_names):
+        add(name)
 
     out.sort(key=lambda x: x["name"])
     return out
@@ -133,7 +132,7 @@ def main() -> None:
         "--seed-operbox",
         type=Path,
         default=root / "data" / "operbox_gongsun.json",
-        help="用于 id/稀有度模板；缺干员时补条目",
+        help="提供完整 id/稀有度目录；缺干员或非法星级时直接报错",
     )
     parser.add_argument(
         "-o",
@@ -141,33 +140,52 @@ def main() -> None:
         type=Path,
         default=root / "data" / "schedule_243",
     )
+    parser.add_argument("--operbox-name", default="operbox_ideal_e2.json")
+    parser.add_argument("--operbox-only", action="store_true")
+    parser.add_argument(
+        "--sync-operbox-mirrors",
+        action="store_true",
+        help="同步写入 data 与 release 的三份标准 operbox",
+    )
     args = parser.parse_args()
 
     schedule = load_json(args.schedule)
     seed = json.loads(args.seed_operbox.read_text(encoding="utf-8-sig"))
     names = collect_schedule_names(schedule)
-    operbox = ideal_operbox(names, seed, elite=2, level=90)
+    operbox = ideal_operbox(names, seed)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    operbox_path = args.out_dir / "operbox_ideal_e2.json"
-    operbox_path.write_text(
-        json.dumps(operbox, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    for i, plan in enumerate(schedule.get("plans", [])):
-        plan_name = plan.get("name", f"shift_{i}")
-        safe = plan_name.replace(" ", "_").replace("/", "_")
-        assign_path = args.out_dir / f"assignment_{i}_{safe}.json"
-        assign_path.write_text(
-            json.dumps(plan_to_assignment(plan), ensure_ascii=False, indent=2) + "\n",
+    operbox_paths = [args.out_dir / args.operbox_name]
+    if args.sync_operbox_mirrors:
+        operbox_paths = [
+            root / "data" / "fixtures" / "243" / "operbox_full_e2.json",
+            root / "data" / "schedule_243" / "operbox_ideal_e2.json",
+            root / "release" / "fixtures" / "operbox_full_e2.json",
+        ]
+    for operbox_path in operbox_paths:
+        operbox_path.parent.mkdir(parents=True, exist_ok=True)
+        operbox_path.write_text(
+            json.dumps(operbox, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
+            newline="\r\n",
         )
 
+    if not args.operbox_only:
+        for i, plan in enumerate(schedule.get("plans", [])):
+            plan_name = plan.get("name", f"shift_{i}")
+            safe = plan_name.replace(" ", "_").replace("/", "_")
+            assign_path = args.out_dir / f"assignment_{i}_{safe}.json"
+            assign_path.write_text(
+                json.dumps(plan_to_assignment(plan), ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
     print(f"schedule_ops={len(names)} operbox={len(operbox)} -> {args.out_dir}")
-    print(f"  {operbox_path.name}")
-    for i, plan in enumerate(schedule.get("plans", [])):
-        print(f"  assignment_{i}_{plan.get('name', i)}")
+    for operbox_path in operbox_paths:
+        print(f"  {operbox_path}")
+    if not args.operbox_only:
+        for i, plan in enumerate(schedule.get("plans", [])):
+            print(f"  assignment_{i}_{plan.get('name', i)}")
 
 
 if __name__ == "__main__":
