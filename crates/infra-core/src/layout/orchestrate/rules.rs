@@ -3151,6 +3151,51 @@ mod tests {
     }
 
     #[test]
+    fn rhine_dual_receivers_share_actual_support() {
+        let bp = blueprint(vec![
+            room(
+                "gold",
+                FacilityKind::Factory,
+                1,
+                Some(RoomProduct::Factory {
+                    recipe: RecipeKind::Gold,
+                }),
+            ),
+            room("power", FacilityKind::PowerPlant, 3, None),
+            room("dorm", FacilityKind::Dormitory, 5, None),
+            room("meeting", FacilityKind::MeetingRoom, 3, None),
+            room("workshop", FacilityKind::Workshop, 3, None),
+            room("training", FacilityKind::TrainingRoom, 3, None),
+        ]);
+        let roster = operbox(&[
+            ("娜斯提", 2),
+            ("缪尔赛思", 2),
+            ("塞雷娅", 0),
+            ("麦哲伦", 0),
+            ("赫默", 0),
+            ("白面鸮", 0),
+        ]);
+        let compiled = compile(&bp, &roster, &BaseAssignment::default());
+
+        assert_eq!(
+            selected(&compiled, "rhine_receivers"),
+            Some("nasti_muelsyse_actual_support")
+        );
+        let dependency = compiled
+            .active_dependencies
+            .iter()
+            .find(|dependency| {
+                dependency.consumers.iter().any(|name| name == "娜斯提")
+                    && dependency.consumers.iter().any(|name| name == "缪尔赛思")
+            })
+            .expect("双 receiver 应共享实际支持 dependency");
+        assert_eq!(dependency.required.len(), 4);
+        assert!(dependency.required.iter().all(|name| {
+            ["塞雷娅", "麦哲伦", "赫默", "白面鸮"].contains(&name.as_str())
+        }));
+    }
+
+    #[test]
     fn every_compiled_anchor_has_a_resolved_room() {
         let bp = rosemary_blueprint();
         let roster = operbox(&[
