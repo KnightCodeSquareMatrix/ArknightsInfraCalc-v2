@@ -57,23 +57,12 @@ CURATED_SYSTEMS = [
     },
     {
         "id": "ling_jie_karlan",
-        "label": "喀兰组：孑+银灰+喀兰工具人（中枢灵知E2精密计算，125%贸）",
+        "label": "喀兰中枢：灵知 E2；贸易侧由 L1 自然搜索",
         "priority": 18,
-        "segment_id": "ling_jie",
         "exclusive_group": "meta_chain",
         "shift_modes": ["peak"],
-        "xlsx_hint": "孑 银灰+中枢灵知",
         "slots": [
             {"facility": "control", "operators": [{"name": "灵知", "elite": 2}]},
-            {
-                "facility": "trade_post",
-                "trade_role": "meta_ling_jie",
-                "operators": [
-                    {"name": "孑", "elite": 1},
-                    {"name": "银灰", "elite": 2},
-                    {"pick_one": ["琳琅诗怀雅", "崖心", "锏", "讯使"], "elite": 2},
-                ],
-            },
         ],
     },
     {

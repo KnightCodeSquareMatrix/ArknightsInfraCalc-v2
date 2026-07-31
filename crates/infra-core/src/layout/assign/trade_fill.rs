@@ -37,10 +37,9 @@ const KARLAN_JIE_TRADE_NAME: &str = "孑";
 /// 这些 `base_systems` 条目是 L3/兼容锚点或贸易 role 目录，不再由 registry fixed 早占岗位。
 /// 主路径的可露希尔/但书 required anchor 来自 `orchestration_rules.json`；
 /// 这里只跳过仍由贸易 role 搜索消费的旧 registry 条目，不声明跨体系总优先级。
-const TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS: [&str; 6] = [
+const TRADE_ROLE_MANAGED_REGISTRY_SYSTEMS: [&str; 5] = [
     "blackkey_closure",
     "witch_long_beta",
-    "ling_jie_karlan",
     "penguin_exusiai_lemuen",
     "penguin_texangel_e2",
     "penguin_texlap_e0",
