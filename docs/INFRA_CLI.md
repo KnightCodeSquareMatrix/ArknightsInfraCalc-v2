@@ -41,11 +41,12 @@ crates/infra-cli/src/
 ├── main.rs              # 进程入口 + 子命令路由（其余子命令暂留此处，见「待拆」）
 ├── commands/
 │   ├── mod.rs           # 子命令模块聚合；对外 re-export
-│   ├── advice.rs        # `advice`：练卡推荐（operbox + training_recommendations v2）
+│   ├── advice.rs        # `advice`：练卡推荐（玩家合同见 docs/练卡推荐相关/；运行时仍多 v2 JSON）
 │   ├── bake.rs          # `bake`：生成贸易/制造 3/2/1 人单房候选索引表（运行时验证后优先读取）
 │   ├── debug.rs         # `debug rerun`：从生产 bundle 对当前运行时做可追溯重跑
 │   ├── plan.rs          # `plan`：box profile + αβγ 排班 + MAA
 │   ├── plan_compute.rs  # `plan` / `serve` 共用的一次 Plan 编排
+│   ├── prefix_shadow.rs # 动态 producer V0/V1 同 Box shadow 差异 JSON
 │   ├── serve.rs         # `serve`：前端常驻 worker；stdin/stdout JSON line 协议
 │   ├── layout.rs        # `layout test` / `team-rotation` / `analyze` / `eval` 全部子命令
 │   ├── profile.rs       # `profile`：性能画像 / 分析链路对比辅助
@@ -73,7 +74,7 @@ crates/infra-cli/src/
 
 | 模块 | 职责 | 不负责 |
 |------|------|--------|
-| `advice.rs` | **`advice`**：加载规则 + operbox；默认输出结构化 JSON，`--answer` 输出 core 生成的确定性中文答卷，`--explain` 输出 report + 事实骨架/仓库内 Markdown 片段 | 规则语义真源（见 [练卡推荐规则](练卡推荐规则.md)）；自由生成文案；solver 候选池 |
+| `advice.rs` | **`advice`**：operbox +（当前）v2 规则；默认 JSON，`--answer` 旧五分区中文，`--explain` 伪 RAG | **玩家语义真源** [练卡推荐相关](练卡推荐相关/README.md)；旧 v2 合同已归档；自由生成文案；solver 候选池 |
 | `bake.rs` | `bake`：并行生成 schema v12 的整数效率 `combo_table.bin`、`operators.json`、`manifest.json`；贸易行显式保存首批 room-local 机制签名，manifest 保存 table hash/count；`bake validate` 校验当前 CLI 指纹和完整贸易 row universe | 贸易/制造效率公式；手写搜索排序 |
 | `debug.rs` | `debug rerun`：读取 legacy `method=plan` 生产 bundle 的内联快照，以当前 CLI / data 重跑正式 rotation，输出稳定 assignment 投影、原结果对照和运行时指纹 | 冒充线上 bit-identical replay；执行 bundle 中的路径/命令；修改求解或候选 |
 | `plan_compute.rs` | `plan` 与 `serve` 共用的唯一 Plan 编排：一次 user rotation，再按调用方请求派生 profile/MAA | argv、文件写出、wire envelope、机制公式 |
@@ -132,7 +133,7 @@ crates/infra-cli/src/
 
 | 用户命令 | 编排（当前） | 输出 | 数据 / 夹具 |
 |----------|--------------|------|-------------|
-| **`plan`** | `commands/plan.rs` -> `commands/plan_compute.rs` | profile JSON 文件 + stdout 分析/排班表；可选 MAA | 必选 `--operbox`（JSON/xlsx）；布局默认 `data/fixtures/243/layout.json` |
+| **`plan`** | `commands/plan.rs` -> `commands/plan_compute.rs` | profile JSON 文件 + stdout 分析/排班表；可选 MAA / prefix shadow JSON | 必选 `--operbox`（JSON/xlsx）；布局默认 `data/fixtures/243/layout.json` |
 | `serve` | `commands/serve.rs` -> `commands/plan_compute.rs` | `plan.compute` 内联 profile/rotation/MAA；legacy `plan` 可写文件 | 常驻 worker；stdout 仅 JSON response line，stderr 仅日志 |
 | `debug rerun` | `commands/debug.rs` -> `schedule_timed_rotation` | stdout 脱敏 hash/状态摘要；显式私有目录保存稳定行为投影、原结果比较和完整 rotation | 当前只支持成功的 `beta-test-bundle-v2-next-serve` legacy `method=plan` bundle；不消费线上绝对路径 |
 | `bake` | `commands/bake.rs` | 本地 `data/baked` catalog + stderr progress/summary | `infra-core::bake`；生成后自动校验 signature/row，并抽样用 live solver 对账 response；`bake verify` 可对既有 catalog 重跑门禁 |
@@ -141,7 +142,7 @@ crates/infra-cli/src/
 | `search trade` | `main.rs` | `output::emit_trade_search` | roster / operbox |
 | `bench` | `main.rs` | `output::emit_bench` | 必选 `--operbox`；布局固定 `search_baseline`（`243_use_this_.json`） |
 | **`layout test`** | `commands/layout.rs` | `output::emit_bench` | 必选 `--layout` + `--operbox`；默认调用 `assign_base_greedy` |
-| **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation` | 必选 `--layout` + `--operbox`；支持默认 ABC、二班与两个具名四班；仅排班时用 |
+| **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation`；可选 prefix shadow JSON | 必选 `--layout` + `--operbox`；支持默认 ABC、二班与两个具名四班；仅排班时用 |
 | **`layout analyze`** | `commands/layout.rs` | `print_box_profile_report` | 必选 `--layout` + `--operbox`；练度概况分析 |
 | **`layout eval`** | `commands/layout.rs` | stderr 文本 / 默认汇总 JSON；`--explain-json` 输出 versioned 结算诊断 | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
 | `profile layout-full` | `commands/profile.rs` | stderr 性能报告 | 开发辅助；默认路径为历史性能夹具，用户模拟不要用 |
@@ -308,6 +309,7 @@ cargo run -p infra-cli -- layout team-rotation \
 | `--maa-title` | 可选。覆盖 JSON 顶层 `title` |
 | `--top` | Top-K 搜索条数，默认 20 |
 | `--prefer system=alternative` | 可重复；三个入口均透传到同一规则编译器。语义是“优先尝试、不可行则回退”，未知值报错 |
+| `--prefix-shadow-out <json>` | `plan` / `layout team-rotation` 可选；保留默认 V0 结果，另跑 V1 `1:1` 候选并记录房间、效率、dependency、耗时与失败阶段。结果状态为 `BEST_FOUND`；shadow 不写 MAA，计算、比较或写出失败都不替换或中断公开结果 |
 | `--text` | 可选。带 `--maa-out` 时 stderr 默认已有人类可读排班表 |
 
 `OperBox` 中每个条目必须提供 `1..=6` 的星级；已拥有条目的精英阶段与等级必须在该星级可达范围内。未知星级或不可能练度会直接报错，不会降档或自动修正。

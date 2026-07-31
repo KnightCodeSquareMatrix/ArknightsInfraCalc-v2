@@ -71,7 +71,7 @@ fn run() -> Result<(), Error> {
 
 fn print_usage() {
     eprintln!("Usage:");
-    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>]");
+    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>] [--prefix-shadow-out <file.json>]");
     eprintln!(
         "      [--profile-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--json]"
     );
@@ -93,7 +93,7 @@ fn print_usage() {
     eprintln!(
         "  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
     );
-    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
+    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]");
     eprintln!("  infra-cli profile analyze-compare [--layout <path>] [--operbox <path>] [--schedule <path>] [--runs <n>]");
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");

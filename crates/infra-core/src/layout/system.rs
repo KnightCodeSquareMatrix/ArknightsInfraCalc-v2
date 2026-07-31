@@ -43,6 +43,10 @@ pub struct RegistrySystemClaim {
     pub bind_all: bool,
     pub on_shifts: u8,
     pub off_shifts: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_group: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub control_allowed_operators: Vec<String>,
     pub slots: Vec<RegistrySlotClaim>,
 }
 
@@ -149,6 +153,10 @@ pub struct BaseSystemDef {
     pub segment_id: Option<String>,
     #[serde(default)]
     pub exclusive_group: Option<String>,
+    #[serde(default)]
+    pub control_allowed_operators: Vec<String>,
+    #[serde(default)]
+    pub control_exclude_when_inactive: Vec<String>,
     #[serde(default)]
     pub shift_modes: Vec<String>,
     #[serde(default)]
@@ -576,6 +584,7 @@ pub fn select_registry_systems(
     assignment: &BaseAssignment,
     used: &HashSet<String>,
     skip_system_ids: &HashSet<String>,
+    inherited_exclusive_groups: &HashSet<String>,
 ) -> Vec<RegistrySystemClaim> {
     let Some(cache) = base_systems_cache() else {
         return Vec::new();
@@ -583,7 +592,7 @@ pub fn select_registry_systems(
 
     let mut scratch = assignment.clone();
     let mut scratch_used = used.clone();
-    let mut claimed_groups: HashSet<String> = HashSet::new();
+    let mut claimed_groups = inherited_exclusive_groups.clone();
     let mut selected = Vec::new();
 
     // Phase 1: 跨站体系优先
@@ -885,8 +894,15 @@ pub fn claim_base_systems(
     used: &mut HashSet<String>,
     skip_system_ids: &HashSet<String>,
 ) -> Result<()> {
-    let selected =
-        select_registry_systems(blueprint, operbox, mode, assignment, used, skip_system_ids);
+    let selected = select_registry_systems(
+        blueprint,
+        operbox,
+        mode,
+        assignment,
+        used,
+        skip_system_ids,
+        &HashSet::new(),
+    );
     for claim in selected {
         apply_registry_system_claim(blueprint, &claim, assignment, used)?;
     }
@@ -969,10 +985,27 @@ fn plan_registry_system_detailed(
             bind_all: system.bind_all,
             on_shifts: system.on_shifts,
             off_shifts: system.off_shifts,
+            exclusive_group: system.exclusive_group.clone(),
+            control_allowed_operators: system.control_allowed_operators.clone(),
             slots,
         },
         slots: slot_explains,
     })
+}
+
+/// Path-scoped control admission: an inactive registry path cannot leak its
+/// restricted candidates into generic control fill.
+pub fn control_exclusions_for_unclaimed_systems(claims: &[RegistrySystemClaim]) -> HashSet<String> {
+    let claimed: HashSet<_> = claims
+        .iter()
+        .map(|claim| claim.system_id.as_str())
+        .collect();
+    base_systems_cache()
+        .into_iter()
+        .flat_map(|cache| cache.systems.iter())
+        .filter(|system| !claimed.contains(system.id.as_str()))
+        .flat_map(|system| system.control_exclude_when_inactive.iter().cloned())
+        .collect()
 }
 
 fn plan_registry_slot(

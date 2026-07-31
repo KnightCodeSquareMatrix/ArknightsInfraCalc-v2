@@ -166,7 +166,7 @@ def render_rules(rules: dict[str, Any], source: str) -> str:
         "# 基建练卡推荐规则验收稿",
         "",
         f"> 来源：`{source}`",
-        "> `docs/练卡推荐规则.md` 与用户当前裁决仍是业务真源；不要直接编辑本文。",
+        "> 本文只投影旧 `training_recommendations.json`。玩家业务真源见 `docs/练卡推荐相关/`；v2 合同已归档。不要直接编辑本文或用本文覆盖玩家 canonical。",
         "",
         f"- schema version：{rules.get('version')}",
         f"- 规则数：{len(rules.get('rules') or [])}",

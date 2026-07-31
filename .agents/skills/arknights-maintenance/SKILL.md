@@ -10,7 +10,7 @@ Keep one observable invariant in scope. A small change is correct when the exist
 ## Route Progressively
 
 1. Read repository `AGENTS.md` and record the actual command/input, expected result, and current result.
-2. Read the canonical domain document for the affected rule. Use `docs/INDEX.md` only when that document is unknown.
+2. Read the canonical domain document for the affected rule. Use `docs/INDEX.md` only when that document is unknown. **练卡推荐玩家语义** → `docs/练卡推荐相关/`；旧 `training_recommendations` 行为仅作实现对照，不得覆盖玩家 canonical。
 3. Reproduce through the existing user entry. Read the relevant `docs/MAINTENANCE_MODE.md` section only when the reproduction or acceptance entry is unclear.
 4. Inspect `docs/PROJECT_MAP.md` only when the command, owner, or lifecycle location cannot be found directly from code/search.
 5. Use `arknights-evidence` whenever a command or artifact supports a conclusion.

@@ -92,15 +92,16 @@ winner 只为实际贡献者派生同上同下关系：八幡海铃绑定实际�
 
 - 中枢搜索在合法候选足够时只生成 5 人组合；无技能普通角色可作为有界 fallback 补位。
 - `data/producer_rules.json` 以稳定 `source_buff_id` 登记 admission、目标设施与排班关系，并与其他 solver runtime 数据一起嵌入独立二进制；加载时会与 `skill_table` 的全部动态 workforce 注入做覆盖校验，漏登记或错登记直接报错。
-- Peak 把拥有实际 consumer tag 的 deferred producer 作为一个 presence set 做幂集枚举；每个子集从相同 seed 求精确中枢组合，未被安全上界剪枝的候选重跑 `producer/dorm → power → trade → manufacture → resolve`，完整候选再由具名 `ControlInjectRawSumV0` policy 比较。人数不足只淘汰当前子集，真实 resolve 错误继续向上传播。
+- Peak 把拥有实际 consumer tag 的 deferred producer 作为一个 presence set 做幂集枚举；每个子集从相同 seed 求精确中枢组合，候选重跑 `producer/dorm → power → trade → manufacture → resolve`。公开默认由具名 `ControlInjectRawSumV0` 比较；shadow 候选会刷新每个完整候选的贸易/制造快照后改用 `TradeManufactureWeightedEfficiencyV1`。人数不足只淘汰当前子集，真实 resolve 错误继续向上传播。
 - `must_include` producer 在组合生成前锁定，只枚举剩余中枢席位。每个 presence set 先以目标设施满席命中的正收益上界排序；只有上界严格低于当前真实 winner 才剪枝，平局不剪。若 active control buff 读取尚未完成的发电/贸易/基建 presence，上界为无穷并自动退回完整 live 前缀比较。
 - 八幡海铃、戴菲恩、凛御银灰使用同一贸易响应规则路径；涤火杰西卡使用同一制造响应规则路径。戴菲恩按实际贸易房逐房统计，凛御银灰按实际达标房统计，涤火杰西卡按实际制造 workforce 统计。
 - winner 的 `resolved_producer_dependencies` 记录 rule、source buff、实际 producer、实际 consumer、目标房、关系和有效贡献；hard Plan relation 也先规范化为同一结构，`shift_binds` 和 αβγ 只消费这些 resolved facts。
 - `vina_lungmen` fixed System、`meta_vina` role、按名字推断八幡/戴菲恩/灵知的 rotation 路径已删除；`gsl_vina_lungmen` 仅保留实际同房组合结算。
 - 涤火杰西卡关系为 `none`：每班按实际黑钢 workforce 重算，不与水月、香草、杰西卡或标准化组合固定 team / `shift_bind`。
 - 当前 producer presence 集合枚举对结构化候选全集是精确的。`must_include` 锁定和正收益上界属于 `safe_reduction`；测试会从同一 seed 分别启用、关闭剪枝，并核对最终 assignment、`ControlInjectRawSumV0` key 和 resolved dependency，平局不得剪枝，未完成 support 输入返回无穷上界。
-- `TradeManufactureWeightedEfficiencyV1` 尚未接入当前 prefix winner；旧 raw-inject 上界也不能
-  直接作为新 policy 的安全上界。exact joint 恢复时必须先禁用或证明新的同单位上界。
+- `TradeManufactureWeightedEfficiencyV1` 已接入候选 prefix winner，但尚未晋升为公开默认；该
+  policy 自动禁用旧 raw-inject 剪枝，只保留其上界排序作为 `search_heuristic`。后续若要恢复
+  剪枝，必须证明新的同单位安全上界；exact joint 仍未实现。
 - 贸易/制造多房内部仍使用既有有序填房，明确分类为 `policy_restriction`。当前结果只能在该具名 policy 限制空间内解释，不保证 canonical 完整空间的 exact joint 或全局最优；最终 refresh 不能补回前房依赖后房时已经错失的候选。
 - 完整条件响应行和 exact joint 仍是 correctness/conformance 开放项，Bake 是与其分开的性能工作。产品要求 exact 多房保证、撤销当前 policy restriction、出现错误 winner、新机制无法表达或用户重新授权时，应恢复 A+ TODO；不能把它降级成只有复现 bug 后才处理的性能优化。
 - 纯人间烟火不使用有序 `pick_one`：计划只声明重岳/令候选组最低命中数，

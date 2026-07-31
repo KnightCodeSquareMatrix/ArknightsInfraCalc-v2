@@ -38,6 +38,9 @@ pub(super) struct RuleSpec {
     pub priority: i32,
     #[serde(default = "cross_station")]
     pub tier: OperatorTier,
+    /// Only one selected rule in the same group may enter the plan.
+    #[serde(default)]
+    pub exclusive_group: Option<String>,
     #[serde(default)]
     pub skip_registry_ids: Vec<String>,
     /// 本规则未选中任何 alternative 时仍需关闭的 legacy registry 路径。
@@ -70,6 +73,9 @@ pub(super) struct AlternativeSpec {
     /// alternative 激活后从本班所有普通候选中排除；用于表达路径级实际互斥。
     #[serde(default)]
     pub exclude_operators: Vec<String>,
+    /// These control candidates are unavailable unless this alternative is selected.
+    #[serde(default)]
+    pub exclude_control_when_inactive: Vec<String>,
     #[serde(default)]
     pub bind_all: bool,
     /// 只绑定这些 role 的实际入选成员；用于区分体系 producer 与非 producer 路径收益位。
@@ -254,11 +260,13 @@ pub(super) struct CompiledRules {
     pub anchors: Vec<SystemAnchor>,
     pub constraints: Vec<SystemConstraint>,
     pub excluded_operators: Vec<String>,
+    pub inactive_control_exclusions: Vec<String>,
     pub shift_binds: Vec<ShiftBind>,
     pub active_dependencies: Vec<ActiveDependency>,
     pub continuous_roles: Vec<ContinuousRole>,
     pub rotation_reserves: Vec<super::plan::ResolvedRoleReserve>,
     pub skip_registry_ids: HashSet<String>,
+    pub claimed_exclusive_groups: HashSet<String>,
     pub scratch: BaseAssignment,
 }
 
@@ -314,6 +322,7 @@ pub(super) fn compile_rules(
     ctx: &RuleCompileContext<'_>,
     seed: &BaseAssignment,
     inherited_excluded: &HashSet<String>,
+    inherited_exclusive_groups: &HashSet<String>,
     externally_skipped: &HashSet<String>,
     disabled_conditional_packs: &HashSet<String>,
     priority_range: std::ops::RangeInclusive<i32>,
@@ -327,11 +336,13 @@ pub(super) fn compile_rules(
         anchors: Vec::new(),
         constraints: Vec::new(),
         excluded_operators: Vec::new(),
+        inactive_control_exclusions: Vec::new(),
         shift_binds: Vec::new(),
         active_dependencies: Vec::new(),
         continuous_roles: Vec::new(),
         rotation_reserves: Vec::new(),
         skip_registry_ids: HashSet::new(),
+        claimed_exclusive_groups: inherited_exclusive_groups.clone(),
         scratch: seed.clone(),
     };
     // Keep actual placements separate from inherited exclusions. An alternative may repeat an
@@ -351,6 +362,13 @@ pub(super) fn compile_rules(
         if externally_skipped.contains(&rule.id) {
             out.skip_registry_ids
                 .extend(rule.skip_registry_ids_when_inactive.iter().cloned());
+            continue;
+        }
+        if rule
+            .exclusive_group
+            .as_ref()
+            .is_some_and(|group| out.claimed_exclusive_groups.contains(group))
+        {
             continue;
         }
         let mut alternatives: Vec<_> = rule.alternatives.iter().collect();
@@ -534,6 +552,9 @@ pub(super) fn compile_rules(
             out.constraints.extend(candidate_constraints);
             out.excluded_operators
                 .extend(alternative.exclude_operators.iter().cloned());
+            if let Some(group) = &rule.exclusive_group {
+                out.claimed_exclusive_groups.insert(group.clone());
+            }
             out.selected.push(SelectedRuleAlternative {
                 rule_id: rule.id.clone(),
                 alternative_id: alternative.id.clone(),
@@ -555,6 +576,11 @@ pub(super) fn compile_rules(
         if !selected_alternative {
             out.skip_registry_ids
                 .extend(rule.skip_registry_ids_when_inactive.iter().cloned());
+            out.inactive_control_exclusions.extend(
+                rule.alternatives.iter().flat_map(|alternative| {
+                    alternative.exclude_control_when_inactive.iter().cloned()
+                }),
+            );
         }
     }
 
@@ -1924,6 +1950,7 @@ mod tests {
             inherited_excluded,
             &HashSet::new(),
             &HashSet::new(),
+            &HashSet::new(),
             priority_range,
         )
         .unwrap()
@@ -2055,6 +2082,86 @@ mod tests {
         );
         assert_eq!(selected(&later, "later_candidate"), None);
         assert!(!later.scratch.operator_names().contains("桑葚"));
+    }
+
+    #[test]
+    fn inherited_exclusive_group_blocks_later_rule_generically() {
+        let bp = blueprint(vec![
+            room("control", FacilityKind::ControlCenter, 3, None),
+            room("office", FacilityKind::Office, 3, None),
+        ]);
+        let roster = operbox(&[("重岳", 0), ("桑葚", 2)]);
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
+        let catalog: RuleCatalog = serde_json::from_value(serde_json::json!({
+            "version": 1,
+            "rules": [
+                {
+                    "id": "high_group",
+                    "priority": 20,
+                    "exclusive_group": "shared_path",
+                    "alternatives": [{
+                        "id": "active",
+                        "roles": [{
+                            "id": "owner",
+                            "facility": "control_center",
+                            "candidates": [{"name": "重岳", "elite": 0}]
+                        }]
+                    }]
+                },
+                {
+                    "id": "late_group",
+                    "priority": 18,
+                    "exclusive_group": "shared_path",
+                    "alternatives": [{
+                        "id": "active",
+                        "roles": [{
+                            "id": "candidate",
+                            "facility": "office",
+                            "candidates": [{"name": "桑葚", "elite": 2}]
+                        }]
+                    }]
+                }
+            ]
+        }))
+        .unwrap();
+        let high = compile_catalog_range(
+            &catalog,
+            &bp,
+            &roster,
+            &instances,
+            &table,
+            &BaseAssignment::default(),
+            &HashSet::new(),
+            &HashMap::new(),
+            19..=i32::MAX,
+        );
+        assert_eq!(selected(&high, "high_group"), Some("active"));
+
+        let late = compile_rules(
+            &catalog,
+            &RuleCompileContext {
+                blueprint: &bp,
+                operbox: &roster,
+                instances: &instances,
+                table: &table,
+                mode: AssignShiftMode::Peak,
+                mood: 24.0,
+                preferences: &HashMap::new(),
+            },
+            &high.scratch,
+            &high.excluded_operators.iter().cloned().collect(),
+            &high.claimed_exclusive_groups,
+            &HashSet::new(),
+            &HashSet::new(),
+            i32::MIN..=18,
+        )
+        .unwrap();
+
+        assert_eq!(selected(&late, "late_group"), None);
+        assert!(late.claimed_exclusive_groups.contains("shared_path"));
     }
 
     #[test]
@@ -3005,6 +3112,42 @@ mod tests {
         assert!(forward_plan.activated.iter().any(|system| {
             system.system_id == "rhine_receivers" && system.tier == OperatorTier::CrossStation
         }));
+    }
+
+    #[test]
+    fn rhine_muelsyse_receiver_uses_actual_support_rooms() {
+        let bp = blueprint(vec![
+            room("power", FacilityKind::PowerPlant, 3, None),
+            room("dorm", FacilityKind::Dormitory, 5, None),
+            room("meeting", FacilityKind::MeetingRoom, 3, None),
+            room("workshop", FacilityKind::Workshop, 3, None),
+        ]);
+        let roster = operbox(&[("缪尔赛思", 2), ("塞雷娅", 0), ("麦哲伦", 0), ("赫默", 0)]);
+        let compiled = compile(&bp, &roster, &BaseAssignment::default());
+
+        assert_eq!(
+            selected(&compiled, "rhine_receivers"),
+            Some("muelsyse_actual_support")
+        );
+        let anchors: Vec<_> = compiled
+            .anchors
+            .iter()
+            .filter(|anchor| anchor.system_id == "rhine_receivers")
+            .collect();
+        assert_eq!(anchors.len(), 4, "receiver plus three real support rooms");
+        assert!(anchors.iter().any(|anchor| {
+            anchor.operator == "缪尔赛思" && anchor.facility == FacilityKind::PowerPlant
+        }));
+        let dependency = compiled
+            .active_dependencies
+            .iter()
+            .find(|dependency| dependency.consumers.iter().any(|name| name == "缪尔赛思"))
+            .unwrap();
+        assert_eq!(dependency.required.len(), 3);
+        assert!(dependency
+            .required
+            .iter()
+            .all(|name| { ["塞雷娅", "麦哲伦", "赫默"].contains(&name.as_str()) }));
     }
 
     #[test]

@@ -31,8 +31,9 @@
 | 独立授权的架构、性能、工作流、技术债或 solver assurance | `arknights-quality` |
 | 体系、跨设施、required anchor、scope、Team/Shift 绑定 | `arknights-system-audit` |
 | build、test、CLI、benchmark、格式、结构或产物结论 | `arknights-evidence` |
-| 练卡推荐语义、`advice` 结果不对、规则 schema / 过滤器 | `arknights-feature` 或 `arknights-maintenance` + 完整读取 `docs/练卡推荐规则.md` |
-| 公孙长乐验收、练卡推荐表复核、`training_recommendations.json` 审阅 | `gongsun-training-review` |
+| 练卡推荐**玩家**语义、名单、组合知识、输出口径、`--answer` 产品行为 | `arknights-feature` 或 `arknights-maintenance` + 先读 `docs/练卡推荐相关/README.md`，再完整读题面相关 canonical（新手/口径/组合/散件/审阅稿） |
+| 练卡推荐**旧 v2 机器诊断**（`training_recommendations.json`、旧 now/conditional 过滤） | 仅兼容/对照；真源已归档见 `docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md`；不得用其覆盖 `docs/练卡推荐相关/` |
+| 公孙长乐练卡知识/名单验收、与旧规则表对照 | `gongsun-training-review` |
 
 debug / feature / quality Skill 是任务意图的 primary owner；`arknights-system-audit` 和 `arknights-evidence` 在触发时作为附加审计 / 证据协议，不接管任务目标与 scope。
 

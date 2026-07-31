@@ -28,6 +28,8 @@ use infra_core::trade::input::{TradeOrderKind, TradeRoomInput, TradeSearchOrderM
 use infra_core::trade::solve_trade_with_shift;
 use infra_core::Error;
 
+use super::prefix_shadow::{prefix_shadow_out_from_args, run_prefix_shadow, PrefixShadowInput};
+
 pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
     match args.first().map(String::as_str) {
         Some("test") => layout_test_cmd(&args[1..]),
@@ -45,7 +47,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
-                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Err(Error::msg(format!(
                 "unknown layout command {:?}",
@@ -158,18 +160,34 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
     let instances = OperatorInstances::load(&default_instances_path()?)?;
     let table = SkillTable::load(&default_skill_table_path()?)?;
 
+    let options = AssignBaseOptions {
+        top_k,
+        system_preferences,
+        ..AssignBaseOptions::default()
+    };
     let report = schedule_timed_rotation(
         &blueprint,
         &operbox,
         &instances,
         &table,
-        &AssignBaseOptions {
-            top_k,
-            system_preferences,
-            ..AssignBaseOptions::default()
-        },
+        &options,
         rotation_profile,
     )?;
+
+    if let Some(path) = prefix_shadow_out_from_args(args)? {
+        run_prefix_shadow(PrefixShadowInput {
+            path: &path,
+            layout_label: &layout_path.to_string_lossy(),
+            operbox_label: &operbox_path.to_string_lossy(),
+            blueprint: &blueprint,
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            baseline_options: &options,
+            profile: rotation_profile,
+            baseline: &report,
+        });
+    }
 
     if let Some(dir) = output_dir_from_args(args) {
         fs::create_dir_all(&dir)?;

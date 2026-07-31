@@ -291,7 +291,8 @@ join partition 必须保留 `siracusa_by_room`、`glasgow_by_room` 和 `karlan_q
    普通中枢补位的当前 policy，不再决定动态 producer 的最终 prefix winner 或其平局。
 
 该裁决改变目标函数但不改变房间 `final_efficiency`、`DailyTotals` 分域输出或 L1-L3 公式。
-当前代码仍使用旧 prefix comparator，因此本段是待实现 contract，不是当前实现快照。
+当前代码已实现关闭旧 raw-inject 剪枝的 V1 shadow comparator；公开默认仍使用旧 comparator，
+exact joint 和候选 catalog 仍是本计划的开放工作。
 
 #### 戴菲恩在新 comparator 中的口径
 
@@ -467,9 +468,10 @@ catalog row/response 精确命中
 
 ### Phase 0：统一 Markdown 与保存基线
 
-状态（2026-07-27）：用户已裁决 `TradeManufactureWeightedEfficiencyV1` 及当前 `1:1` 默认权重；
-实现前仍需保存新的旧 comparator 基线，并证明依赖闭包与候选行完整。不能复用 2026-07-19
-的 8.4s 样例作为预算或性能验收。
+状态（2026-07-30）：用户已裁决 `TradeManufactureWeightedEfficiencyV1` 及当前 `1:1` 默认权重；
+旧 comparator 基线已冻结为 `1ced9b8`，V1 已通过 shadow 路径对同一 operbox 比较，尚未晋升为
+公开默认。exact joint 实现前仍须证明依赖闭包与候选行完整，不能复用 2026-07-19 的 8.4s
+样例作为预算或性能验收。
 
 ### Phase 1：正确的 rule 与逐房 scope
 

@@ -268,6 +268,9 @@ pub struct AssignmentPlan {
     /// 已选 alternative 明确排除的干员；fill / rotation 不得从普通候选重新引入。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub excluded_operators: Vec<String>,
+    /// 只作用于中枢普通补位的路径 admission；不占用其它设施的候选资格。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub control_exclusions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub degradations: Vec<DegradationLadder>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -476,6 +479,7 @@ impl AssignmentPlan {
             producers: Vec::new(),
             constraints: Vec::new(),
             excluded_operators: Vec::new(),
+            control_exclusions: Vec::new(),
             degradations: Vec::new(),
             shift_binds: Vec::new(),
             active_dependencies: Vec::new(),

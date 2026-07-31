@@ -2173,6 +2173,7 @@ fn ensure_control_inject_coverage(
     mood: f64,
     durin_plan: Option<u8>,
     final_pool: &crate::pool::ControlPool,
+    control_exclusions: &HashSet<String>,
     system_ctrl_names: &HashSet<String>,
     entry_by_name: &HashMap<String, crate::pool::ControlPoolEntry>,
 ) -> Result<()> {
@@ -2218,7 +2219,11 @@ fn ensure_control_inject_coverage(
         .filter(|value| *value > 0.0)
         .count();
         let mut best: Option<(Vec<AssignedOperator>, usize, f64, f64, String)> = None;
-        for candidate in final_pool.entries.iter().filter(|entry| class(entry)) {
+        for candidate in final_pool
+            .entries
+            .iter()
+            .filter(|entry| class(entry) && !control_exclusions.contains(&entry.name))
+        {
             if assigned.contains(&candidate.name)
                 || ops.iter().any(|operator| operator.name == candidate.name)
             {
@@ -3015,7 +3020,16 @@ fn schedule_abc_rotation(
                     tier: crate::layout::tier::OperatorTier::CrossStation,
                 });
             }
-            assign_control(a, &final_pool, table, &layout, &control_options, &[], used)?;
+            assign_control(
+                a,
+                &final_pool,
+                table,
+                &layout,
+                &control_options,
+                &[],
+                &peak_plan.control_exclusions.iter().cloned().collect(),
+                used,
+            )?;
             let mut protected_control = system_ctrl_names.clone();
             protected_control.extend(extra_control_pins.iter().map(|name| (*name).to_string()));
             ensure_control_inject_coverage(
@@ -3026,6 +3040,7 @@ fn schedule_abc_rotation(
                 control_options.mood,
                 Some(durin_plan),
                 &final_pool,
+                &peak_plan.control_exclusions.iter().cloned().collect(),
                 &protected_control,
                 &entry_by_name,
             )?;
@@ -3047,6 +3062,9 @@ fn schedule_abc_rotation(
                         break;
                     }
                     if names.contains(&entry.name) || assigned.contains(&entry.name) {
+                        continue;
+                    }
+                    if peak_plan.control_exclusions.contains(&entry.name) {
                         continue;
                     }
                     ops.push(AssignedOperator::from_progress(&entry.name, entry.progress));

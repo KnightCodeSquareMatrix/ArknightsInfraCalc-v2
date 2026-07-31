@@ -143,6 +143,7 @@ fn compile_plan_once(
         },
         seed,
         &std::collections::HashSet::new(),
+        &std::collections::HashSet::new(),
         skip_system_ids,
         disabled_conditional_packs,
         19..=i32::MAX,
@@ -157,8 +158,15 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let registry_claims =
-        select_registry_systems(blueprint, operbox, mode, &scratch, &used, &registry_skip);
+    let registry_claims = select_registry_systems(
+        blueprint,
+        operbox,
+        mode,
+        &scratch,
+        &used,
+        &registry_skip,
+        &compiled.claimed_exclusive_groups,
+    );
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(
             blueprint,
@@ -181,6 +189,16 @@ fn compile_plan_once(
         },
         &scratch,
         &inherited_excluded,
+        &compiled
+            .claimed_exclusive_groups
+            .iter()
+            .cloned()
+            .chain(
+                registry_claims
+                    .iter()
+                    .filter_map(|claim| claim.exclusive_group.clone()),
+            )
+            .collect(),
         &registry_skip,
         disabled_conditional_packs,
         i32::MIN..=18,
@@ -191,6 +209,9 @@ fn compile_plan_once(
     compiled.anchors.extend(late.anchors);
     compiled.constraints.extend(late.constraints);
     compiled.excluded_operators.extend(late.excluded_operators);
+    compiled
+        .inactive_control_exclusions
+        .extend(late.inactive_control_exclusions);
     compiled.shift_binds.extend(late.shift_binds);
     compiled
         .active_dependencies
@@ -213,6 +234,16 @@ fn compile_plan_once(
         })
         .collect();
 
+    let mut control_exclusions: std::collections::HashSet<_> =
+        compiled.inactive_control_exclusions.into_iter().collect();
+    control_exclusions
+        .extend(crate::layout::system::control_exclusions_for_unclaimed_systems(&registry_claims));
+    for claim in &registry_claims {
+        for operator in &claim.control_allowed_operators {
+            control_exclusions.remove(operator);
+        }
+    }
+    control_exclusions.extend(compiled.excluded_operators.iter().cloned());
     let plan = AssignmentPlan {
         mode,
         activated,
@@ -222,6 +253,7 @@ fn compile_plan_once(
         producers: Vec::new(),
         constraints: compiled.constraints,
         excluded_operators: compiled.excluded_operators,
+        control_exclusions: control_exclusions.into_iter().collect(),
         degradations: Vec::new(),
         shift_binds: compiled.shift_binds,
         active_dependencies: compiled.active_dependencies,

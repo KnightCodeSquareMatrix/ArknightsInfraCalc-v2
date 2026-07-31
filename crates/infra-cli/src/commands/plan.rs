@@ -7,10 +7,13 @@ use super::plan_compute::{compute_plan, PlanComputeInput, PlanResources, Request
 use crate::output::{print_box_profile_report, print_team_rotation_text};
 use infra_core::box_profile::baseline_path_or_default;
 use infra_core::instances::{default_instances_path, OperatorInstances};
+use infra_core::layout::AssignBaseOptions;
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::Error;
+
+use super::prefix_shadow::{prefix_shadow_out_from_args, run_prefix_shadow, PrefixShadowInput};
 
 pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
     let rotation_profile = super::timed_rotation_profile_from_args(args)?;
@@ -68,6 +71,26 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         .as_ref()
         .expect("profile was requested for plan command");
     let rotation = &computed.current.rotation;
+
+    if let Some(path) = prefix_shadow_out_from_args(args)? {
+        let shadow_options = AssignBaseOptions {
+            top_k,
+            system_preferences: system_preferences.clone(),
+            ..AssignBaseOptions::default()
+        };
+        run_prefix_shadow(PrefixShadowInput {
+            path: &path,
+            layout_label: &layout_label,
+            operbox_label: &operbox_label,
+            blueprint: &blueprint,
+            operbox: &operbox,
+            instances: &instances,
+            table: &table,
+            baseline_options: &shadow_options,
+            profile: rotation_profile,
+            baseline: rotation,
+        });
+    }
 
     let profile_out = profile_out_path(args, &operbox_path);
     let profile_json = serde_json::to_string_pretty(&profile)?;

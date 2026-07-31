@@ -11,7 +11,7 @@ Deliver one user-visible vertical capability without disguising it as a bug fix 
 
 1. Read repository `AGENTS.md`.
 2. State the user scenario, observable output, canonical domain rule, success evidence, and explicit non-goals.
-3. Read the target canonical domain document completely. Use `docs/INDEX.md` only when its location is unknown.
+3. Read the target canonical domain document completely. Use `docs/INDEX.md` only when its location is unknown. For **练卡推荐 / advice 玩家语义**, start at `docs/练卡推荐相关/README.md` (not the archived v2 机器诊断合同).
 4. Inspect existing extension points and callers directly; use the relevant `docs/PROJECT_MAP.md` section only when ownership is unclear.
 5. If restoring a TODO, treat it as an active change: reconcile it with current
    docs/code before implementation, then apply

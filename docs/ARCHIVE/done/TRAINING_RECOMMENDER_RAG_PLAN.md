@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 替代项：docs/练卡推荐规则.md；docs/TODO/练卡推荐规则来源精修.md
+> 替代项：docs/练卡推荐相关/README.md；docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md
 > 历史原因：v2 规则、确定性过滤与伪 RAG 输入已落地，剩余外部规则裁决已拆分
 > 快照日期：2026-07-20
 > 摘要：保存练卡推荐 v2 与伪 RAG 输入协议的完成记录

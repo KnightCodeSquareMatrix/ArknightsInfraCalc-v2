@@ -56,9 +56,14 @@ policy_sort_key = trade_weight × trade_total
 输出。发电效率不进入加权总和，只作为布局约束和生产 response 的支持状态。required anchor、
 体系原子性和人员互斥先作为 hard constraint 过滤；加权总和相等时再使用稳定 tie-break。
 
-当前代码中的 `ControlInjectRawSumV0` 仍是普通中枢补位和现有 producer prefix 的实现事实；
-将动态 producer 主路径迁移到上述 policy 是
-[动态 Producer A+](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 的开放项，文档裁决不冒充已实现。
+`TradeManufactureWeightedEfficiencyV1` 已作为动态 producer prefix 的候选 policy 接入
+`AssignBaseOptions`：每个完整候选刷新贸易/制造快照后按上述公式比较，旧 raw-inject 上界在该
+policy 下禁用。公开默认仍为 `ControlInjectRawSumV0`；`plan` 和 `layout team-rotation` 只有显式
+传入 `--prefix-shadow-out` 才会另跑 V1 并记录差异，不替换默认结果。普通中枢补位继续使用
+`ControlInjectRawSumV0`，因此当前 V1 保证范围是“每个 presence set 先由 V0 选一组普通补位，再
+在这些完整前缀之间比较”，不是全部中枢组合或多房 exact joint；shadow 结果状态为
+`BEST_FOUND`。exact joint 仍由
+[动态 Producer A+](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 跟踪。
 
 ## 3. 非生产 heuristic
 

@@ -18,6 +18,7 @@ use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
     build_power_pool, build_trade_pool, karlan_precision_active, ControlPool, PowerPool, TradePool,
 };
+use crate::scoring::{evaluate_trade_manufacture_weighted_efficiency, ScoringPolicyId};
 use crate::search::{
     control_entry_deferred_trade_tags, control_inject_policy_sort_key_for_assignment,
     control_inject_policy_sort_key_upper_bound,
@@ -68,6 +69,8 @@ fn run_shift_pipeline_with_producer_pruning(
     plan: &AssignmentPlan,
     enable_producer_pruning: bool,
 ) -> Result<BaseAssignment> {
+    let enable_producer_pruning =
+        producer_pruning_enabled(enable_producer_pruning, options.dynamic_producer_policy);
     let mut timer = StageTimer::new("单班");
 
     // 编排落位（execute_plan：fixed/anchor core → assignment + used）。
@@ -89,6 +92,7 @@ fn run_shift_pipeline_with_producer_pruning(
     let mut manu_pool =
         build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
     let mut power_pool = build_power_pool(&operbox.power_roster(instances), instances, table)?;
+    let control_exclusions: HashSet<_> = plan.control_exclusions.iter().cloned().collect();
     tag_pool_from_plan(plan, &mut control_pool);
     tag_pool_from_plan(plan, &mut trade_pool);
     tag_pool_from_plan(plan, &mut manu_pool);
@@ -131,6 +135,7 @@ fn run_shift_pipeline_with_producer_pruning(
                     plan,
                     &control_pool,
                     &producer_layout,
+                    &control_exclusions,
                     Some((&required, &excluded)),
                     mask,
                 )? {
@@ -248,6 +253,10 @@ fn run_shift_pipeline_with_producer_pruning(
     Ok(run.assignment)
 }
 
+fn producer_pruning_enabled(requested: bool, policy: ScoringPolicyId) -> bool {
+    requested && policy == ScoringPolicyId::ControlInjectRawSumV0
+}
+
 struct PeakPrefixCandidate<'a> {
     run: AssignmentRun<'a>,
     policy_sort_key: f64,
@@ -287,8 +296,16 @@ fn run_peak_prefix_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
 ) -> Result<Option<PeakPrefixCandidate<'a>>> {
     let producer_layout = run.resolve_snapshot(false)?;
-    let Some(prepared) =
-        prepare_peak_control_candidate(run, plan, control_pool, &producer_layout, dynamic_set, 0)?
+    let control_exclusions: HashSet<_> = plan.control_exclusions.iter().cloned().collect();
+    let Some(prepared) = prepare_peak_control_candidate(
+        run,
+        plan,
+        control_pool,
+        &producer_layout,
+        &control_exclusions,
+        dynamic_set,
+        0,
+    )?
     else {
         return Ok(None);
     };
@@ -341,6 +358,7 @@ fn prepare_peak_control_candidate<'a>(
     plan: &AssignmentPlan,
     control_pool: &ControlPool,
     producer_layout: &crate::layout::LayoutContext,
+    control_exclusions: &HashSet<String>,
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
@@ -355,6 +373,7 @@ fn prepare_peak_control_candidate<'a>(
                 &plan.control_candidate_requirements,
                 required,
                 excluded,
+                control_exclusions,
                 &mut run.used,
             )? {
                 return Ok(None);
@@ -367,6 +386,7 @@ fn prepare_peak_control_candidate<'a>(
                 producer_layout,
                 run.options,
                 &plan.control_candidate_requirements,
+                control_exclusions,
                 &mut run.used,
             )?;
         }
@@ -486,17 +506,65 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.used,
     )?;
 
-    let final_layout = run.resolve_snapshot(true)?;
+    let policy_sort_key = match run.options.dynamic_producer_policy {
+        ScoringPolicyId::ControlInjectRawSumV0 => {
+            let final_layout = run.resolve_snapshot(true)?;
+            control_inject_policy_sort_key_for_assignment(
+                &final_layout,
+                run.blueprint,
+                &run.assignment,
+                run.instances,
+            )
+        }
+        ScoringPolicyId::TradeManufactureWeightedEfficiencyV1 => {
+            refresh_manufacture_efficiency_snapshots(
+                run.blueprint,
+                &mut run.assignment,
+                run.instances,
+                run.table,
+                run.options,
+                Some(run.durin_plan),
+            )?;
+            refresh_trade_efficiency_snapshots(
+                run.blueprint,
+                &mut run.assignment,
+                run.instances,
+                run.table,
+                run.options,
+                Some(run.durin_plan),
+            )?;
+            let (trade_total, manufacture_total) =
+                trade_manufacture_efficiency_totals(&run.assignment);
+            evaluate_trade_manufacture_weighted_efficiency(
+                trade_total,
+                manufacture_total,
+                run.options.trade_manufacture_weights,
+            )
+            .sort_key_millis as f64
+        }
+    };
     Ok(Some(PeakPrefixCandidate {
-        policy_sort_key: control_inject_policy_sort_key_for_assignment(
-            &final_layout,
-            run.blueprint,
-            &run.assignment,
-            run.instances,
-        ),
+        policy_sort_key,
         stable_order,
         run,
     }))
+}
+
+fn trade_manufacture_efficiency_totals(
+    assignment: &BaseAssignment,
+) -> (crate::Efficiency, crate::Efficiency) {
+    assignment.rooms.iter().fold(
+        (crate::Efficiency::ZERO, crate::Efficiency::ZERO),
+        |(trade_total, manufacture_total), room| {
+            let Some(snapshot) = &room.efficiency else {
+                return (trade_total, manufacture_total);
+            };
+            (
+                trade_total + snapshot.trade_final_efficiency,
+                manufacture_total + snapshot.manufacture_final_efficiency,
+            )
+        },
+    )
 }
 
 /// 只为拥有实际贸易标签消费者的动态中枢 producer 建候选；按 atom 结构识别，
@@ -592,6 +660,63 @@ mod tests {
             potential: 0,
             rarity: 6,
         }
+    }
+
+    #[test]
+    fn weighted_policy_never_uses_raw_inject_pruning() {
+        assert_eq!(
+            AssignBaseOptions::default().dynamic_producer_policy,
+            ScoringPolicyId::ControlInjectRawSumV0
+        );
+        assert!(producer_pruning_enabled(
+            true,
+            ScoringPolicyId::ControlInjectRawSumV0
+        ));
+        assert!(!producer_pruning_enabled(
+            true,
+            ScoringPolicyId::TradeManufactureWeightedEfficiencyV1
+        ));
+        assert!(!producer_pruning_enabled(
+            false,
+            ScoringPolicyId::ControlInjectRawSumV0
+        ));
+    }
+
+    #[test]
+    fn weighted_policy_totals_only_consume_trade_and_manufacture_snapshots() {
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room_with_efficiency(
+            "trade_one",
+            vec![],
+            Some(crate::layout::RoomEfficiencySnapshot {
+                trade_final_efficiency: crate::Efficiency::from_decimal(2.125),
+                ..Default::default()
+            }),
+        );
+        assignment.set_room_with_efficiency(
+            "manu_one",
+            vec![],
+            Some(crate::layout::RoomEfficiencySnapshot {
+                manufacture_final_efficiency: crate::Efficiency::from_decimal(3.250),
+                ..Default::default()
+            }),
+        );
+        assignment.set_room_with_efficiency(
+            "power_one",
+            vec![],
+            Some(crate::layout::RoomEfficiencySnapshot {
+                power_final_efficiency: crate::Efficiency::from_decimal(1.500),
+                ..Default::default()
+            }),
+        );
+
+        assert_eq!(
+            trade_manufacture_efficiency_totals(&assignment),
+            (
+                crate::Efficiency::from_decimal(2.125),
+                crate::Efficiency::from_decimal(3.250)
+            )
+        );
     }
 
     fn control_blueprint(with_trade: bool) -> BaseBlueprint {

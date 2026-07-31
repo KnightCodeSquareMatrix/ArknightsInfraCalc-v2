@@ -27,6 +27,7 @@ pub(crate) fn assign_control(
     layout: &LayoutContext,
     options: &AssignBaseOptions,
     candidate_requirements: &[crate::layout::ControlCandidateRequirement],
+    excluded_control: &HashSet<String>,
     used: &mut HashSet<String>,
 ) -> Result<()> {
     assign_control_inner(
@@ -37,7 +38,7 @@ pub(crate) fn assign_control(
         options,
         candidate_requirements,
         None,
-        None,
+        Some(excluded_control),
         used,
     )?
     .then_some(())
@@ -52,9 +53,11 @@ pub(crate) fn assign_control_matching_dynamic_set(
     options: &AssignBaseOptions,
     candidate_requirements: &[crate::layout::ControlCandidateRequirement],
     required_all: &HashSet<String>,
-    excluded: &HashSet<String>,
+    dynamic_excluded: &HashSet<String>,
+    excluded_control: &HashSet<String>,
     used: &mut HashSet<String>,
 ) -> Result<bool> {
+    let excluded: HashSet<_> = dynamic_excluded.union(excluded_control).cloned().collect();
     assign_control_inner(
         assignment,
         pool,
@@ -63,7 +66,7 @@ pub(crate) fn assign_control_matching_dynamic_set(
         options,
         candidate_requirements,
         Some(required_all),
-        Some(excluded),
+        Some(&excluded),
         used,
     )
 }
@@ -92,10 +95,6 @@ fn assign_control_inner(
     if pinned.len() >= MAX_CONTROL {
         return Ok(required_all.is_none_or(|required| required.is_subset(&pinned)));
     }
-    if excluded.is_some_and(|excluded| !pinned.is_disjoint(excluded)) {
-        return Ok(false);
-    }
-
     let requirements: Vec<(HashSet<String>, u8)> = candidate_requirements
         .iter()
         .map(|requirement| {
@@ -175,7 +174,8 @@ fn filter_control_pool_for_fill(
             .entries
             .iter()
             .filter(|e| {
-                !excluded.contains(&e.name) && (!used.contains(&e.name) || pinned.contains(&e.name))
+                (pinned.contains(&e.name) || !excluded.contains(&e.name))
+                    && (!used.contains(&e.name) || pinned.contains(&e.name))
             })
             .cloned()
             .collect(),
@@ -254,6 +254,7 @@ mod tests {
             &LayoutContext::default(),
             &AssignBaseOptions::default(),
             &[],
+            &HashSet::new(),
             &mut used,
         )
         .unwrap();
@@ -278,5 +279,57 @@ mod tests {
 
         assert_eq!(filtered.entries.len(), 1);
         assert!(filtered.entries[0].buff_ids.is_empty());
+
+        let pinned = HashSet::from(["阿米娅".to_string()]);
+        let filtered = filter_control_pool_for_fill(&pool, &HashSet::new(), &pinned, &pinned);
+        assert_eq!(filtered.entries.len(), 1);
+    }
+
+    #[test]
+    fn excluded_control_operator_is_not_reintroduced_by_fill() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let entries: Vec<_> = [
+            "排除候选",
+            "合法候选01",
+            "合法候选02",
+            "合法候选03",
+            "合法候选04",
+            "合法候选05",
+        ]
+        .into_iter()
+        .map(|name| crate::pool::ControlPoolEntry {
+            name: name.to_string(),
+            elite: 0,
+            progress: crate::roster::OperatorProgress::default(),
+            buff_ids: Vec::new(),
+            tags: Vec::new(),
+            tier: crate::layout::tier::OperatorTier::Standalone,
+        })
+        .collect();
+        let pool = ControlPool {
+            entries,
+            skipped: Vec::new(),
+        };
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        let excluded = HashSet::from(["排除候选".to_string()]);
+
+        assign_control(
+            &mut assignment,
+            &pool,
+            &table,
+            &LayoutContext::default(),
+            &AssignBaseOptions::default(),
+            &[],
+            &excluded,
+            &mut used,
+        )
+        .unwrap();
+
+        assert_eq!(assignment.control_operators().len(), 5);
+        assert!(assignment
+            .control_operators()
+            .iter()
+            .all(|operator| operator.name != "排除候选"));
     }
 }

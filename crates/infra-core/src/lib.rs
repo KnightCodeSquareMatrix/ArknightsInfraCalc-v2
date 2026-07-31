@@ -133,8 +133,9 @@ pub use schedule::{
     TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
 };
 pub use scoring::{
-    evaluate_control_inject_policy, EffPct, PolicyEvaluation, ScoringPolicyId,
-    TradeManuEfficiencyComponents,
+    evaluate_control_inject_policy, evaluate_trade_manufacture_weighted_efficiency, EffPct,
+    PolicyEvaluation, ScoringPolicyId, TradeManuEfficiencyComponents,
+    TradeManufactureEfficiencyWeights, TradeManufactureWeightedEfficiencyEvaluation,
 };
 pub use search::{
     hit_closure_shortcut, hit_docus_solo_shortcut, hit_witch_shortcut, search_control_combos,

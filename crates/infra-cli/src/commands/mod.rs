@@ -4,6 +4,7 @@ mod debug;
 mod layout;
 mod plan;
 mod plan_compute;
+mod prefix_shadow;
 mod profile;
 mod serve;
 pub(crate) mod verify;

@@ -89,8 +89,9 @@ operbox + blueprint
 **动态 producer 当前边界**：八幡海铃、戴菲恩、凛御银灰和涤火杰西卡由一次 producer presence 子集枚举比较完整生产前缀；`vina_lungmen` / `meta_vina` 不再参与选型，灵知精密计算也不替代凛御银灰商业版图。贸易/制造多房内部仍是上述有序填房 policy；完整条件响应行 join 与 Bake/live 等价证明见 [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md) 和 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
 联合候选的目标 policy 已裁决为贸易、制造分域 `final_efficiency` 总和按显式权重比较，当前
-默认 `1:1`；未来可调整该 policy 权重，布局本身继续负责宏观产出结构。当前代码尚未完成
-该 comparator 与 exact joint，不能把本段当成实现事实。
+默认 `1:1`；未来可调整该 policy 权重，布局本身继续负责宏观产出结构。该 comparator 已在
+shadow 候选路径实现，公开默认仍使用旧 comparator；exact joint 尚未完成，当前结果仍只在
+有序填房 policy 限制空间内解释。
 
 ---
 

@@ -35,15 +35,15 @@
 
 **Consumer**（Rust 匹配器）：`docus_syracusa`、`blackkey_closure`、`vina_lungmen`、`penguin_*`。
 
-**贸易 core role 消费边界**：首个 core 由声明式编排按实际贸易站数量、等级与订单解析：恰有 1 间贸易站且为龙门币订单时固定可露希尔；至少 2 间贸易站且任一为龙门币订单时固定但书到最低等级的可用金单站；全源石订单时两者均不解析。后续余站由统一 role 顺序 `closure → witch → ...` 消费，可露希尔优先最高等级金单站，完整龙巫只进入三级站。L3 shortcut 只结算最终实际同房组合，不改变这些 admission 与房间选择规则。
+**贸易 core role 消费边界**：首个 core 由声明式编排按实际贸易站数量、等级与订单解析：恰有 1 间贸易站且为龙门币订单时固定可露希尔；至少 2 间贸易站且任一为龙门币订单时固定但书到最低等级的可用金单站；全源石订单时两者均不解析。完整候选只保留 `但书 > 可露希尔 > 完整龙巫` 三位核心 key：可露希尔优先最高等级金单站，完整龙巫只进入三级站。L3 shortcut 只结算最终实际同房组合，不改变 admission、核心 key 或 V1。
 
 > `meta_vina` 自动 role 和 `vina_lungmen` fixed System 已删除。戴菲恩、八幡海铃、凛御银灰的选型真源见 [CONTROL_CENTER_ASSIGNMENT.md](../CONTROL_CENTER_ASSIGNMENT.md)；`gsl_vina_lungmen` 只结算最终实际组合。
 
 - `docus`：只补已解析但书 anchor 所在房；执行 `unfiltered + must_include_name=但书`，全部候选统一按 `final_efficiency` 排序。`gsl_docus_syracusa` / `gsl_docus_solo` 由 shortcut matcher 对最终实际候选自然结算，不参与总 core 或 pick step 优先级。
-- `closure`：只补已解析可露希尔 anchor 所在房；`gsl_blackkey_closure` 优先，再 `closure` 分档，最后 `unfiltered + must_include_name=可露希尔`。黑键缺失不影响该 anchor 补位。
+- `closure`：只补已解析可露希尔 anchor 所在房；候选统一 `must_include_name=可露希尔`。`gsl_blackkey_closure` 与其他 closure shortcut 只结算实际组合，不提供同一核心 key 内的选型优先；仅 Rosemary Plan 明确绑定时要求黑键。
 - `witch`：`filtered hit_filter=witch + must_include_names=[巫恋, 龙舌兰]`，只接受 `gsl_witch_long_beta` / `gsl_witch_long_alpha`；blank 仅用于单站结算兼容。`witch_fallback` 使用独立过滤器，不与龙巫约束混用。
 - 格拉斯哥成员进入普通合法候选；`segment/vina_lungmen` 仅在实际组合与 source buff capability 同时存在时结算，不占 role 优先级。
-- `witch_fallback`：`filtered hit_filter=witch + must_include_name=巫恋`，只做无龙舌兰时的低优先兜底。
+- `witch_fallback`：`filtered hit_filter=witch + must_include_name=巫恋`，只作无完整龙巫时的合法候选，不形成第四层固定优先级。
 
 `resolve_trade_shortcut` 在巫恋/可露之前调用 `match_registered_trade_segment`（按 `priority`）。
 

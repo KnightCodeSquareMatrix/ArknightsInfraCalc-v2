@@ -1,65 +1,73 @@
 ---
 name: gongsun-training-review
-description: 验收 training_recommendations.json、公孙长乐练卡推荐、散件清单或组合核心规则时使用；先生成确定性中文验收稿，再逐条输出通过、修改或待裁决结论。
+description: 验收练卡推荐玩家知识（新手名单、组合、散件、输出口径）或对照旧 training_recommendations.json 时使用；先读 docs/练卡推荐相关，再逐条输出通过、修改或待裁决。
 ---
 
 # 公孙长乐练卡推荐验收
 
-只验收基建练卡**规则表**，不接管机制公式、搜索剪枝或排班选型。结构化规则决定当前规则层事实，`docs/练卡推荐规则.md` 与用户当前裁决决定规则应该是什么。
+玩家**产品语义**以 `docs/练卡推荐相关/` 为准，不接管机制公式、搜索剪枝或排班选型。
 
-账号过滤结果（`advice` CLI 的 `now`/`conditional`/`blocked`）验收走 `docs/练卡推荐规则.md` 的 Agent 入口与夹具，不在本 skill 内改写过滤器。
+旧 `data/training_recommendations.json` 与已归档的 v2 机器诊断合同**不得**反向裁决玩家名单、组合名、≤10 人或五章报告结构。
 
-## 生成验收稿
+## 必读来源（按任务选读，标 * 为默认）
 
-在仓库根目录运行：
+1. * `docs/练卡推荐相关/README.md`（索引与真源顺序）
+2. * 题面相关 canonical（可多份）：
+   - `新手必练与必收集名单.md`
+   - `玩家输出口径.md`（亦拥有领域键 `advice.training`）
+   - `组合知识库.md`
+   - `高效率散件与搓玉名单.md`
+3. * `组合成员练度审阅稿.md`（已批练度/层级）
+4. 实现计划（改代码时）：`玩家报告实现计划.md`
+5. 代码 owner：`docs/PROJECT_MAP.md` 的 `training_advice` / `advice`
+6. **仅当**对照旧运行时：归档 `docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md` + 可选 `python3 scripts/render_training_recommendations.py`
+
+## 验收对象分流
+
+| 对象 | 做法 |
+|---|---|
+| 玩家知识 / 口径 / 审阅稿 | 对照 canonical + 审阅稿；输出通过/修改/待裁决 |
+| 旧 JSON 28 条 | 只作 legacy 对照；冲突以 `练卡推荐相关` 为准，建议记「实现重建」而非改 JSON 冒充新产品 |
+| `advice --answer` 当前输出 | 实现未换 player 层前，允许判定为**相对产品合同不合格**；修代码走 feature 计划，不在本 skill 默认改 solver |
+
+## 账号结果（实现重建前）
 
 ```bash
-python3 scripts/render_training_recommendations.py \
-  --output out/training_recommendations_review.md
-```
-
-若用户提供另一份规则草稿，使用 `--input <path>`。生成稿是可丢弃产物，不提交，也不得直接编辑后反向覆盖 JSON。
-
-需要对照账号结果时另跑：
-
-```bash
+cargo run -p infra-cli -- advice --operbox <operbox.json> --answer
+# 旧机器包
 cargo run -p infra-cli -- advice --operbox <operbox.json> --pretty
-# 或夹具
-cargo run -p infra-cli -- advice --operbox data/fixtures/training_advice/witch_only_tequila.json --pretty
 ```
 
-## 必读来源
+夹具仍在 `data/fixtures/training_advice/`。验收玩家合同时以 `docs/练卡推荐相关/玩家输出口径.md` 的五章、≤10、C1–C10 等为准，**不要**要求输出必须匹配旧 `当前可练/获取后可练` 分区才算通过。
 
-1. 完整读取 `docs/练卡推荐规则.md`。
-2. 完整读取生成的验收稿。
-3. 只在具体条目需要时读取其 `evidence.path` / 对应体系 canonical 和技能数据，不默认通读全仓。
-4. `data/standalone_roster.json` 只证明候选进入搜索缩池，不证明值得培养。
-5. 开放规则项见 `docs/TODO/练卡推荐规则来源精修.md`；代码 owner 见 `docs/PROJECT_MAP.md` 的 `training_advice` / `advice`。
+## 逐条门禁（玩家知识）
 
-## 逐条门禁
+- 规范组合名、层级（核心/重要/次级/挂件）、目标练度以审阅稿 + 组合知识库为准。
+- 新手层、特殊获取、C1 截断、C2 缺核心催收、搓玉门闩等以对应 canonical 为准。
+- `standalone_roster.json` 不证明值得培养。
+- `review`/冲突未决项标待裁决，不猜测。
+- 不得为通过验收去改 solver 候选池。
 
-- 规则表是 v2 结构化索引：`kind` / `scope` / `admission` / `members` / `evidence` / `review`；不应再依赖面向用户的 `message`。
-- 核对目标是实际技能门槛，不按星级机械套精一或精二。
-- 核对 `system`/`combo` 的必需核心、`pick_one` 槽和 `required_core_groups` N-of-M 门槛；缺核心时该规则下核心、重要成员和挂件全部暂缓。
-- 2/3/4 星与指定赠送五星白名单可进入 `acquire_then_train`；其他未拥有干员不生成培养建议。
-- 同一干员可因独立散件或另一个完整组合获得建议，不能被残缺组合全局禁推。
-- 区分组合角色与 P0/P1/P2 行动优先级。
-- 第一版不根据设施、配方、布局做过滤；若规则写了这类条件，标记待裁决。
-- `review.status=needs_review` 或 `conflicts` 非空必须标记待裁决，不能自行猜测。
+## 旧规则表门禁（仅 legacy 对照时）
+
+- v2 结构：`kind` / `scope` / `admission` / `members`；无用户 `message`。
+- 与玩家合同冲突时结论写「应用 knowledge 重建替代」，禁止把旧 label（巫恋裁缝核等）写回产品文档。
 
 ## 输出格式
 
-先列 findings，再给统计摘要。每条使用：
-
 ```text
-[通过/修改/待裁决] rule_id 或 干员名
-当前规则：目标练度、优先级、组合角色
-依据：canonical 路径与具体规则
-意见：无，或一条可执行修改
+[通过/修改/待裁决] rule_id 或 干员名或 合同条款
+当前：…
+依据：docs/练卡推荐相关/… 路径
+意见：无，或一条可执行修改（文档或实现计划阶段）
 ```
 
-最终汇总：通过数、修改数、待裁决数，以及本轮明确不处理的 RAG、前端或 solver 项。
+汇总：通过/修改/待裁决数；本轮不处理的 solver/前端项。
 
 ## 修改边界
 
-默认只读验收。只有用户明确要求落实裁决后才修改 `data/training_recommendations.json`、canonical 和回归；不得为了让验收通过而修改 `data/standalone_roster.json` 或 solver 候选集合。
+默认只读。落实裁决时：
+
+- **产品语义** → 只改 `docs/练卡推荐相关/`（及用户授权的索引/路由）。
+- **运行时玩家层** → 按 `玩家报告实现计划.md`，白名单 `training_advice` / knowledge；不改 layout/search。
+- **旧 JSON** → 非默认；不得用其覆盖玩家 canonical。

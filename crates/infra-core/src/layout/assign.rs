@@ -26,6 +26,7 @@ use crate::layout::shift::AssignShiftMode;
 use crate::layout::system::{explain_registry_systems, SlotFillMode, SystemExplainReport};
 use crate::operbox::OperBox;
 use crate::pool::{compile_operator_atoms, ManuPoolEntry, TradePoolEntry};
+use crate::scoring::{ScoringPolicyId, TradeManufactureEfficiencyWeights};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
@@ -38,6 +39,10 @@ pub struct AssignBaseOptions {
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// Dynamic producer prefix comparator. The public baseline remains V0;
+    /// shadow runs opt into V1 explicitly.
+    pub dynamic_producer_policy: ScoringPolicyId,
+    pub trade_manufacture_weights: TradeManufactureEfficiencyWeights,
 }
 
 impl Default for AssignBaseOptions {
@@ -48,6 +53,8 @@ impl Default for AssignBaseOptions {
             shift_hours: 24.0,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
+            dynamic_producer_policy: ScoringPolicyId::ControlInjectRawSumV0,
+            trade_manufacture_weights: TradeManufactureEfficiencyWeights::default(),
         }
     }
 }
