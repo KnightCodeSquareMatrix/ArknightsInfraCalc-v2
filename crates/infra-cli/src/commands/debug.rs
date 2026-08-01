@@ -82,6 +82,7 @@ struct RerunInputSummary {
     layout_rooms: usize,
     operbox_entries: usize,
     owned_operators: usize,
+    legacy_progress_normalized_entries: usize,
     layout_sha256: String,
     operbox_sha256: String,
     top_k: OptionWithOrigin<usize>,
@@ -245,8 +246,9 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
     )?;
     let blueprint: BaseBlueprint = serde_json::from_value(layout_value.clone())
         .map_err(|error| Error::msg(format!("debug bundle layout parse: {error}")))?;
-    let entries: Vec<OperBoxEntry> = serde_json::from_value(operbox_value.clone())
+    let mut entries: Vec<OperBoxEntry> = serde_json::from_value(operbox_value.clone())
         .map_err(|error| Error::msg(format!("debug bundle operbox parse: {error}")))?;
+    let legacy_progress_normalized_entries = normalize_legacy_operbox_progress(&mut entries);
     let operbox = OperBox::from_entries(entries)?;
 
     let top_k = rerun_top_k(args, &bundle)?;
@@ -285,6 +287,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
         layout_rooms: blueprint.rooms.len(),
         operbox_entries: operbox.entries.len(),
         owned_operators: operbox.owned_count(),
+        legacy_progress_normalized_entries,
         layout_sha256: canonical_sha256(&layout_value)?,
         operbox_sha256: canonical_sha256(&operbox_value)?,
         top_k,
@@ -338,6 +341,42 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
         artifact_directory: rerun.artifact_directory.as_deref(),
     };
     emit_debug_json(&summary, args.iter().any(|arg| arg == "--pretty"))
+}
+
+fn normalize_legacy_operbox_progress(entries: &mut [OperBoxEntry]) -> usize {
+    let mut normalized = 0;
+    for entry in entries {
+        let max_elite = match entry.rarity {
+            1 | 2 => 0,
+            3 => 1,
+            4..=6 => 2,
+            _ => continue,
+        };
+        let old = (entry.elite, entry.level);
+        entry.elite = entry.elite.min(max_elite);
+        if !entry.own {
+            normalized += usize::from(old != (entry.elite, entry.level));
+            continue;
+        }
+        let max_level = match (entry.rarity, entry.elite) {
+            (1 | 2, 0) => 30,
+            (3, 0) => 40,
+            (3, 1) => 55,
+            (4, 0) => 45,
+            (4, 1) => 60,
+            (4, 2) => 70,
+            (5, 0) => 50,
+            (5, 1) => 70,
+            (5, 2) => 80,
+            (6, 0) => 50,
+            (6, 1) => 80,
+            (6, 2) => 90,
+            _ => unreachable!(),
+        };
+        entry.level = entry.level.clamp(1, max_level);
+        normalized += usize::from(old != (entry.elite, entry.level));
+    }
+    normalized
 }
 
 fn validate_legacy_bundle(bundle: &DebugBundleEnvelope) -> Result<(), Error> {
@@ -1010,6 +1049,44 @@ mod tests {
         assert!(comparison.reason.unwrap().contains("overrides"));
     }
 
+    #[test]
+    fn legacy_operbox_progress_is_normalized_only_for_invalid_entries() {
+        let mut entries = vec![
+            OperBoxEntry {
+                id: "12f".to_string(),
+                name: "12F".to_string(),
+                elite: 2,
+                level: 90,
+                own: true,
+                potential: 0,
+                rarity: 2,
+            },
+            OperBoxEntry {
+                id: "normal".to_string(),
+                name: "能天使".to_string(),
+                elite: 2,
+                level: 90,
+                own: true,
+                potential: 0,
+                rarity: 6,
+            },
+            OperBoxEntry {
+                id: "unowned".to_string(),
+                name: "未拥有".to_string(),
+                elite: 0,
+                level: 0,
+                own: false,
+                potential: 0,
+                rarity: 6,
+            },
+        ];
+
+        assert_eq!(normalize_legacy_operbox_progress(&mut entries), 1);
+        assert_eq!((entries[0].elite, entries[0].level), (0, 30));
+        assert_eq!((entries[1].elite, entries[1].level), (2, 90));
+        assert_eq!((entries[2].elite, entries[2].level), (0, 0));
+    }
+
     #[cfg(unix)]
     #[test]
     fn private_artifacts_use_restrictive_permissions() {
@@ -1051,6 +1128,7 @@ mod tests {
             layout_rooms: 1,
             operbox_entries: 1,
             owned_operators: 1,
+            legacy_progress_normalized_entries: 0,
             layout_sha256: "layout".to_string(),
             operbox_sha256: "operbox".to_string(),
             top_k: OptionWithOrigin {

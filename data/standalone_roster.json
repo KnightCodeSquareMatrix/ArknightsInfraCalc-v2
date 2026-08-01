@@ -454,7 +454,8 @@
         "min_tier": "tier_up"
       },
       {
-        "name": "清流"
+        "name": "清流",
+        "max_tier": "tier0"
       },
       {
         "name": "阿消"

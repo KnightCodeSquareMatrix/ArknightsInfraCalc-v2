@@ -63,6 +63,8 @@ struct StandaloneEntrySpec {
     #[serde(default)]
     min_tier: Option<PromotionTier>,
     #[serde(default)]
+    max_tier: Option<PromotionTier>,
+    #[serde(default)]
     recipes: Vec<RecipeKind>,
     #[serde(default)]
     order_types: Vec<TradeOrderKind>,
@@ -71,6 +73,7 @@ struct StandaloneEntrySpec {
 #[derive(Debug, Clone)]
 struct StandaloneEntry {
     min_tier: PromotionTier,
+    max_tier: PromotionTier,
     recipes: Vec<RecipeKind>,
     order_types: Vec<TradeOrderKind>,
 }
@@ -105,6 +108,7 @@ impl From<StandaloneEntryFile> for StandaloneEntrySpec {
             StandaloneEntryFile::Name(name) => Self {
                 name,
                 min_tier: None,
+                max_tier: None,
                 recipes: Vec::new(),
                 order_types: Vec::new(),
             },
@@ -119,6 +123,7 @@ impl From<StandaloneEntrySpec> for (String, StandaloneEntry) {
             value.name,
             StandaloneEntry {
                 min_tier: value.min_tier.unwrap_or(PromotionTier::Tier0),
+                max_tier: value.max_tier.unwrap_or(PromotionTier::TierUp),
                 recipes: value.recipes,
                 order_types: value.order_types,
             },
@@ -213,9 +218,8 @@ fn standalone_entry_matches<T: HasName + HasProgress>(
     spec: &StandaloneEntry,
     filter: StandaloneFilter,
 ) -> bool {
-    if PromotionTier::from_progress(e.progress()) != PromotionTier::TierUp
-        && spec.min_tier == PromotionTier::TierUp
-    {
+    let tier = PromotionTier::from_progress(e.progress());
+    if tier_rank(tier) < tier_rank(spec.min_tier) || tier_rank(tier) > tier_rank(spec.max_tier) {
         return false;
     }
     if let Some(recipe) = filter.recipe {
@@ -232,6 +236,13 @@ fn standalone_entry_matches<T: HasName + HasProgress>(
         }
     }
     true
+}
+
+fn tier_rank(tier: PromotionTier) -> u8 {
+    match tier {
+        PromotionTier::Tier0 => 0,
+        PromotionTier::TierUp => 1,
+    }
 }
 
 /// 尝试用工具人表白名单过滤池。
@@ -283,15 +294,29 @@ pub fn try_filter_standalone_with<T: HasName + HasProgress + Clone>(
         .collect();
     let after = filtered.len();
     if after < min_entries {
+        let fallback_entries: Vec<T> = pool
+            .entries
+            .iter()
+            .filter(|entry| {
+                entries.get(entry.pool_name()).is_none_or(|spec| {
+                    tier_rank(PromotionTier::from_progress(entry.progress()))
+                        <= tier_rank(spec.max_tier)
+                })
+            })
+            .cloned()
+            .collect();
         eprintln!(
-            "[工具人表] {}: 过滤后仅 {}/{} 人 (最低需要{}人)，回退全池 (n={})",
+            "[工具人表] {}: 过滤后仅 {}/{} 人 (最低需要{}人)，回退兼容全池 (n={})",
             facility_label(facility),
             after,
             before,
             min_entries,
-            before,
+            fallback_entries.len(),
         );
-        return pool.clone();
+        return PoolCore {
+            entries: fallback_entries,
+            skipped: pool.skipped.clone(),
+        };
     }
     eprintln!(
         "[工具人表] {}: 过滤 {before}→{after} 人 (最低需要{min_entries}人)",
@@ -434,6 +459,50 @@ mod tests {
             !roster.trade_post.contains_key("巫恋"),
             "巫恋是体系核，不应在工具人表"
         );
+    }
+
+    #[test]
+    fn purestream_is_reserved_for_gold_manufacture_in_automatic_assignment() {
+        let roster = load_standalone_roster().unwrap();
+        let purestream = roster
+            .factory
+            .get("清流")
+            .expect("Purestream factory policy");
+        let power_purestream = roster
+            .power_plant
+            .get("清流")
+            .expect("Purestream E0 power policy");
+
+        assert_eq!(purestream.recipes, vec![RecipeKind::Gold]);
+        assert_eq!(power_purestream.max_tier, PromotionTier::Tier0);
+
+        let pool = PoolCore {
+            entries: vec![
+                TestEntry {
+                    name: "清流".to_string(),
+                    progress: crate::roster::OperatorProgress::new(1, 60, 4),
+                },
+                TestEntry {
+                    name: "非白名单补位".to_string(),
+                    progress: crate::roster::OperatorProgress::new(0, 1, 4),
+                },
+            ],
+            skipped: vec![],
+        };
+        let fallback = try_filter_standalone(&pool, FacilityKind::PowerPlant, 2);
+        assert_eq!(fallback.entries.len(), 1);
+        assert_eq!(fallback.entries[0].name, "非白名单补位");
+
+        let e0_pool = PoolCore {
+            entries: vec![TestEntry {
+                name: "清流".to_string(),
+                progress: crate::roster::OperatorProgress::new(0, 1, 4),
+            }],
+            skipped: vec![],
+        };
+        let e0_filtered = try_filter_standalone(&e0_pool, FacilityKind::PowerPlant, 1);
+        assert_eq!(e0_filtered.entries.len(), 1);
+        assert_eq!(e0_filtered.entries[0].name, "清流");
     }
 
     #[test]
