@@ -189,7 +189,7 @@ L3 不是候选选型器。它只在真实三人组和 producer manifest 已确�
 
 1. 先通过完整单班 pipeline 得到 peak assignment 与 peak plan。
 2. 根据实际 peak 编制派生 shift binds。
-3. 提取宿舍/办公室共享脚手架，并重新 resolve 共享 layout。
+3. 提取宿舍共享脚手架；办公室不共享，按 αβγ cohort 重排后重新 resolve layout。
 4. 把 peak 生产设施切成 alpha/beta 两个半区。
 5. 从剩余池构建 gamma 对两个半区的替补。
 6. 按每班活跃队伍重建中枢和各生产房间。

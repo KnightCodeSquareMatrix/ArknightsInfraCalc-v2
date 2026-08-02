@@ -280,6 +280,18 @@ fn bound_office_operators(
         .collect()
 }
 
+fn peak_office_operators(blueprint: &BaseBlueprint, peak: &BaseAssignment) -> HashSet<String> {
+    peak.rooms
+        .iter()
+        .filter(|room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|bp| bp.kind == FacilityKind::Office)
+        })
+        .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
+        .collect()
+}
+
 /// exact bind 中已经实际落在 peak 中枢的成员属于其生产 cohort；γ 生产搜索必须
 /// 预留这些名字，避免后续中枢重建再次放入同一干员。
 fn bound_control_operators(
@@ -484,6 +496,7 @@ fn assign_rotating_offices(
     rotating_team: &HashMap<String, TeamLabel>,
     bound_names: &HashSet<String>,
     candidates: &[AssignedOperator],
+    preferred_team: Option<TeamLabel>,
 ) -> Result<()> {
     let mut used = assignment.operator_names();
     let mut active_rotating: Vec<&String> = rotating_team
@@ -501,7 +514,19 @@ fn assign_rotating_offices(
         while operators.len() < room.operator_capacity() {
             let rotating = active_rotating
                 .iter()
-                .find(|name| !used.contains(name.as_str()));
+                .find(|name| !used.contains(name.as_str()) && bound_names.contains(name.as_str()))
+                .or_else(|| {
+                    active_rotating.iter().find(|name| {
+                        !used.contains(name.as_str())
+                            && preferred_team
+                                .is_none_or(|team| rotating_team.get(name.as_str()) == Some(&team))
+                    })
+                })
+                .or_else(|| {
+                    active_rotating
+                        .iter()
+                        .find(|name| !used.contains(name.as_str()))
+                });
             let replacement = candidates
                 .iter()
                 .find(|op| !used.contains(&op.name) && !rotating_team.contains_key(&op.name));
@@ -519,6 +544,63 @@ fn assign_rotating_offices(
             operators.push(op);
         }
         assignment.set_room(room.id.clone(), operators);
+    }
+    Ok(())
+}
+
+fn complete_rotating_office_teams(
+    blueprint: &BaseBlueprint,
+    peak_office_names: &HashSet<String>,
+    rotating_team: &mut HashMap<String, TeamLabel>,
+    office_pool: &[AssignedOperator],
+    reserved: &mut HashSet<String>,
+) -> Result<()> {
+    let capacity = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+        .map(|room| room.operator_capacity())
+        .sum::<usize>();
+    if capacity == 0 {
+        return Ok(());
+    }
+
+    let mut unbound_peak: Vec<_> = peak_office_names
+        .iter()
+        .filter(|name| !rotating_team.contains_key(*name))
+        .cloned()
+        .collect();
+    unbound_peak.sort();
+    for name in unbound_peak {
+        let team = TeamLabel::ALL
+            .into_iter()
+            .min_by_key(|team| {
+                rotating_team
+                    .values()
+                    .filter(|assigned| *assigned == team)
+                    .count()
+            })
+            .expect("TeamLabel::ALL is non-empty");
+        rotating_team.insert(name, team);
+    }
+
+    for team in TeamLabel::ALL {
+        while rotating_team
+            .values()
+            .filter(|assigned| **assigned == team)
+            .count()
+            < capacity
+        {
+            let Some(operator) = office_pool.iter().find(|operator| {
+                !reserved.contains(&operator.name) && !rotating_team.contains_key(&operator.name)
+            }) else {
+                return Err(Error::msg(format!(
+                    "office cohort {team:?} has no legal rotating operator"
+                )));
+            };
+            rotating_team.insert(operator.name.clone(), team);
+            reserved.insert(operator.name.clone());
+        }
     }
     Ok(())
 }
@@ -2308,7 +2390,7 @@ fn move_control_operator_to_team(
 /// - **设施每班全部满编，绝不空转**：每班由当班两队合力铺满所有贸易/制造/发电站。
 /// - 生产设施切成两半 H1/H2：α 跑 H1、β 跑 H2；γ 作为轮换替补，第 2 班接 H1、第 3 班接 H2。
 /// - 班次结构 12h + 6h + 6h；每队休息一个班次（α 休 S2、β 休 S3、γ 休 S1）。
-/// - 宿舍与未绑定办公室成员共享；绑定办公室成员按消费方 cohort 上二休一。
+/// - 宿舍共享；所有办公室成员按 αβγ cohort 上二休一，绑定成员随消费方体系同上同下。
 /// - 中枢按 αβγ 队伍轮休重分配：每班只用活跃两队候选，体系中枢先 pin，再补满 5 人。
 pub fn schedule_team_rotation(
     blueprint: &BaseBlueprint,
@@ -2386,7 +2468,7 @@ fn schedule_abc_rotation(
     let mut gamma_h2_options = options.clone();
     gamma_h2_options.shift_hours = shift_hours[2];
 
-    // 1) 参考高峰班 + 编排计划 → 取宿舍/办公室作为三班共享脚手架。
+    // 1) 参考高峰班 + 编排计划 → 只取宿舍作为三班共享脚手架；办公室随后按 cohort 重排。
     // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
@@ -2404,7 +2486,8 @@ fn schedule_abc_rotation(
     let mut peak_plan = peak_result.plan;
     peak_plan.resolve_actual_producer_dependencies(blueprint, &peak, instances, table)?;
     let shift_binds = shift_binds_from_plan(&peak_plan);
-    let rotating_office_names = bound_office_operators(blueprint, &peak, &shift_binds);
+    let bound_office_names = bound_office_operators(blueprint, &peak, &shift_binds);
+    let rotating_office_names = peak_office_operators(blueprint, &peak);
     let rotating_anchor_names = bound_rotating_anchor_operators(blueprint, &peak, &shift_binds);
     let excluded_shared_names: HashSet<String> = rotating_office_names
         .iter()
@@ -2780,25 +2863,13 @@ fn schedule_abc_rotation(
         .chain(rotating_office_names.iter().cloned())
         .chain(rotating_anchor_names.iter().cloned())
         .collect();
-    let bound_office_teams: Vec<TeamLabel> = rotating_office_names
-        .iter()
-        .filter_map(|name| rotating_office_team.get(name).copied())
-        .collect();
-    for bound_team in bound_office_teams {
-        let replacement = office_pool.iter().find(|op| !reserved.contains(&op.name));
-        let replacement_team = TeamLabel::ALL.into_iter().find(|team| *team != bound_team);
-        match (replacement, replacement_team) {
-            (Some(op), Some(team)) => {
-                rotating_office_team.insert(op.name.clone(), team);
-                reserved.insert(op.name.clone());
-            }
-            _ => {
-                return Err(Error::msg(
-                    "rotating office has no legal replacement cohort",
-                ))
-            }
-        }
-    }
+    complete_rotating_office_teams(
+        blueprint,
+        &rotating_office_names,
+        &mut rotating_office_team,
+        &office_pool,
+        &mut reserved,
+    )?;
 
     // 队伍花名册（cohort）。生产干员 + 中枢归队干员共同构成轮休队伍。
     let mut alpha_ops = operators_of(&alpha);
@@ -3096,8 +3167,9 @@ fn schedule_abc_rotation(
                 blueprint,
                 &active,
                 &rotating_office_team,
-                &rotating_office_names,
+                &bound_office_names,
                 &office_pool,
+                Some(TeamLabel::ALL[index]),
             )?;
             clear_room(&mut base, "control");
             let mut base_used = base.operator_names();
@@ -3148,8 +3220,9 @@ fn schedule_abc_rotation(
                     blueprint,
                     &active,
                     &rotating_office_team,
-                    &rotating_office_names,
+                    &bound_office_names,
                     &office_pool,
+                    Some(TeamLabel::ALL[index]),
                 )?;
                 clear_room(&mut candidate.assignment, "control");
                 let mut aby_used = candidate.assignment.operator_names();
@@ -3251,8 +3324,9 @@ fn schedule_abc_rotation(
                 blueprint,
                 &active,
                 &rotating_office_team,
-                &rotating_office_names,
+                &bound_office_names,
                 &office_pool,
+                Some(TeamLabel::ALL[index]),
             )?;
             clear_room(&mut assignment, "control");
             let mut s13_used = assignment.operator_names();
@@ -4800,6 +4874,7 @@ mod tests {
             &teams,
             &bound,
             &candidates,
+            None,
         )
         .expect("active office");
         assert_eq!(
@@ -4815,6 +4890,7 @@ mod tests {
             &teams,
             &bound,
             &candidates,
+            None,
         )
         .expect("replacement office");
         assert_eq!(
@@ -6902,6 +6978,67 @@ mod tests {
             }
         }
         assert_eq!(active_count, 2, "纯烟火绑定组应上二休一");
+    }
+
+    #[test]
+    fn team_rotation_rotates_office_members_across_cohorts() {
+        use crate::schedule::shift_bind::team_of_operator;
+
+        let (blueprint, operbox, instances, table) = fixtures();
+        let report = schedule_team_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let office_names: Vec<_> = report
+            .shifts
+            .iter()
+            .flat_map(|shift| {
+                shift
+                    .assignment
+                    .rooms
+                    .iter()
+                    .filter(|room| {
+                        blueprint
+                            .room(&room.room_id)
+                            .is_some_and(|bp| bp.kind == FacilityKind::Office)
+                    })
+                    .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        assert_eq!(office_names.len(), 3, "单人办公室三班应准备三个轮换成员");
+        for shift in &report.shifts {
+            let office_operator = shift
+                .assignment
+                .rooms
+                .iter()
+                .filter(|room| {
+                    blueprint
+                        .room(&room.room_id)
+                        .is_some_and(|bp| bp.kind == FacilityKind::Office)
+                })
+                .flat_map(|room| room.operators.iter())
+                .next()
+                .expect("每个班次办公室必须满编");
+            let team = team_of_operator(&report, &office_operator.name)
+                .expect("办公室轮换成员必须归属一个 cohort");
+            assert!(
+                shift.active_teams.contains(&team),
+                "办公室成员 {} 所属 {:?} 在休息班仍上岗",
+                office_operator.name,
+                team
+            );
+        }
     }
 
     #[test]

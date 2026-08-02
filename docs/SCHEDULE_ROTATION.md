@@ -34,7 +34,7 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 | 核心 API | `schedule_team_rotation` |
 | 班次结构 | 12h + 6h + 6h；每班 **两队上岗、一队休息** |
 | 生产设施 | 切成 H1/H2 两半；α/β 来自 peak 切半，γ 替补 |
-| 中枢 / 宿舍 | 宿舍与非绑定办公室成员共享；绑定办公室成员按 cohort 轮换；中枢按 αβγ 轮休重分配，每班补满 5 人 |
+| 中枢 / 宿舍 / 办公室 | 办公室按 αβγ cohort 轮换，每班满编；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
 | 设施空转 | **禁止**（每班满编） |
 
 用户说「跑一遍模拟」「三班模拟」时，Agent 默认用 **`plan`** + `--maa-out`（账号分析 + αβγ 排班）；只有用户明确要求“仅排班”时才用 **`layout team-rotation`**。见 [INFRA_CLI.md](INFRA_CLI.md)。
@@ -45,8 +45,8 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 
 ```
 peak = assign_shift_with_plan(Peak) → { assignment, plan }
-shared = pinned_assignment_excluding(peak, bound_office_ops)
-                                       # 宿舍/非绑定办公室共享；中枢不钉死
+shared = pinned_assignment_excluding(peak, all_office_ops)
+                                       # 仅宿舍共享；办公室不钉死
 [h1, h2] = split_production_facilities
 align_shift_binds(h1, h2)            # 迷迭香+黑键等同队
 α = peak ∩ h1,  β = peak ∩ h2
@@ -201,9 +201,9 @@ cargo run -p infra-cli -- layout team-rotation \
 - **单班编制**（peak/recovery）：`assign_shift` → 编排 `System → Plan → Execute`（见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)）。
 - **多班轮换**：`AssignmentPlan` 只声明或从 peak 实际落位派生 `shift_bind`；schedule
   在 peak 编制之上切半 + γ 替补，并唯一负责执行 αβγ 归队与同上同下。
-- 宿舍与未绑定办公室成员：由 `pinned_assignment_excluding` 从 peak 拷贝并共享。
-- 绑定办公室成员：从 shared 排除，随其消费方 cohort 轮换；休息班由未占用的合法
-  办公室候选按实际办公室效率补位，不固定房号或班次。
+- 宿舍成员：由 `pinned_assignment_excluding` 从 peak 拷贝并共享。
+- 办公室成员：所有办公室岗位从 shared 排除，按 αβγ cohort 轮换；绑定成员随其消费方
+  体系同上同下，未绑定成员按办公室候选效率分配到三个 cohort，休息班由合法候选补位。
 - 中枢：不在 `pinned_assignment` 中钉死；每班按活跃两队重搜/补位，休息队不得上岗。
 - 迷迭香感知 producer：不作为完整 `rosemary_perception` System 进编；由 global effect + `assign_perception_producers` 处理（Phase 4）。
 - 黑键贸易站：`blackkey_closure` 仍是 L3 shortcut / segment 锚点；排班入口由 `closure` role 选择，不再作为 fixed registry 早占站。
