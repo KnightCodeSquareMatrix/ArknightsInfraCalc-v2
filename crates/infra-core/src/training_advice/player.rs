@@ -400,7 +400,32 @@ fn build_recommendations(
     context: &PlayerAdviceContext,
 ) -> Vec<PlayerRecommendation> {
     let mut candidates = Vec::new();
+    let tequila_group_enabled = operbox.owns("巫恋") && operbox.owns("龙舌兰");
+    let tequila_group_operators: HashSet<&str> = knowledge
+        .combinations
+        .iter()
+        .find(|entry| entry.id == "tequila_group")
+        .map(|entry| {
+            entry
+                .members
+                .iter()
+                .map(|member| member.operator.as_str())
+                .chain(
+                    entry
+                        .completion
+                        .choice_groups
+                        .iter()
+                        .flat_map(|group| group.members.iter().map(String::as_str)),
+                )
+                .collect()
+        })
+        .unwrap_or_else(|| HashSet::from(["巫恋", "龙舌兰"]));
+    let tequila_candidate_blocked =
+        |operator: &str| !tequila_group_enabled && tequila_group_operators.contains(operator);
     for (index, item) in incomplete_newbie.iter().enumerate() {
+        if tequila_candidate_blocked(&item.operator) {
+            continue;
+        }
         let entry = knowledge
             .newbie
             .iter()
@@ -446,6 +471,9 @@ fn build_recommendations(
         let core_ready = core_gaps == 0;
 
         for (member_index, member) in selected.into_iter().enumerate() {
+            if tequila_candidate_blocked(&member.operator) {
+                continue;
+            }
             if entry.id == "bubble_group"
                 && member.operator == "火神"
                 && context.has_originium_shard_factory != Some(true)
@@ -513,6 +541,9 @@ fn build_recommendations(
     }
 
     for (index, entry) in knowledge.standalone.iter().enumerate() {
+        if tequila_candidate_blocked(&entry.operator) {
+            continue;
+        }
         if entry.product == ProductBucket::OriginiumShards
             && context.has_originium_shard_factory != Some(true)
         {
@@ -705,7 +736,7 @@ mod tests {
         let mut knowledge = load_knowledge();
         knowledge.newbie.clear();
         let report = build_player_training_advice(
-            &operbox(&[("卡夫卡", 0, 1, 5)]),
+            &operbox(&[("巫恋", 2, 1, 5), ("龙舌兰", 2, 1, 5), ("卡夫卡", 0, 1, 5)]),
             &knowledge,
             &PlayerAdviceContext::default(),
         );
@@ -715,6 +746,75 @@ mod tests {
             .find(|item| item.operator == "卡夫卡")
             .unwrap();
         assert_eq!(tailor.priority, PlayerRecommendationPriority::OwnedTailor);
+    }
+
+    #[test]
+    fn tequila_group_recommendations_require_both_core_operators_owned() {
+        let mut knowledge = load_knowledge();
+        knowledge
+            .newbie
+            .retain(|entry| matches!(entry.operator.as_str(), "巫恋" | "龙舌兰"));
+        knowledge
+            .combinations
+            .retain(|combo| combo.id == "tequila_group");
+        knowledge.standalone.clear();
+
+        let one_core = build_player_training_advice(
+            &operbox(&[("巫恋", 0, 1, 5), ("卡夫卡", 0, 1, 5)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(one_core.recommendations.iter().all(|item| {
+            !matches!(item.operator.as_str(), "巫恋" | "龙舌兰" | "卡夫卡")
+        }));
+        assert!(one_core
+            .incomplete_newbie
+            .iter()
+            .any(|item| item.operator == "龙舌兰"));
+        let one_core_tequila = one_core
+            .combinations
+            .iter()
+            .find(|combo| combo.id == "tequila_group")
+            .expect("tequila group remains visible");
+        assert!(one_core_tequila.members.iter().any(
+            |member| member.operator == "龙舌兰" && member.progress == MemberProgress::Missing
+        ));
+
+        let other_core = build_player_training_advice(
+            &operbox(&[("龙舌兰", 0, 1, 5), ("卡夫卡", 0, 1, 5)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(other_core.recommendations.iter().all(|item| {
+            !matches!(item.operator.as_str(), "巫恋" | "龙舌兰" | "卡夫卡")
+        }));
+
+        let both_core = build_player_training_advice(
+            &operbox(&[
+                ("巫恋", 0, 1, 5),
+                ("龙舌兰", 0, 1, 5),
+                ("卡夫卡", 0, 1, 5),
+                ("柏喙", 0, 1, 5),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(both_core
+            .recommendations
+            .iter()
+            .any(|item| item.operator == "巫恋"));
+        assert!(both_core
+            .recommendations
+            .iter()
+            .any(|item| item.operator == "龙舌兰"));
+        assert_eq!(
+            both_core
+                .recommendations
+                .iter()
+                .filter(|item| matches!(item.operator.as_str(), "卡夫卡" | "柏喙"))
+                .count(),
+            1
+        );
     }
 
     #[test]
