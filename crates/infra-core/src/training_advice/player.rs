@@ -3,12 +3,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::{Error, Result};
 use crate::layout::BaseBlueprint;
 use crate::operbox::OperBox;
 
 use super::knowledge::{
     AcquisitionInfo, ChoiceGroup, CombinationKnowledgeEntry, CombinationScale, CombinationTier,
-    KnowledgeRole, KnowledgeTarget, ProductBucket, TargetKind, TrainingAdviceKnowledge,
+    EfficiencyFact, KnowledgeCondition, KnowledgeRole, KnowledgeTarget, ProductBucket, TargetKind,
+    TrainingAdviceKnowledge,
 };
 use super::types::OperatorTrainingState;
 
@@ -49,13 +51,58 @@ fn is_player_combination_visible(id: &str) -> bool {
 pub struct PlayerAdviceContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub has_originium_shard_factory: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meeting_room_max_level: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dormitory_level_sum: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engineering_robot_count: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trade_average_efficiency_percent: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manufacturing_average_efficiency_percent: Option<f64>,
 }
 
 impl PlayerAdviceContext {
     pub fn from_blueprint(blueprint: &BaseBlueprint) -> Self {
-        Self {
-            has_originium_shard_factory: Some(blueprint.manu_line_scenario().originium_lines > 0),
+        let mut context = Self::default();
+        context.apply_blueprint(blueprint);
+        context
+    }
+
+    pub fn apply_blueprint(&mut self, blueprint: &BaseBlueprint) {
+        self.has_originium_shard_factory = Some(blueprint.manu_line_scenario().originium_lines > 0);
+        self.meeting_room_max_level = Some(blueprint.meeting_max_level());
+        self.dormitory_level_sum = Some(blueprint.dorm_level_sum());
+        self.engineering_robot_count = Some(blueprint.facility_level_sum_excl_meeting().min(64));
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        for (label, value) in [
+            (
+                "trade_average_efficiency_percent",
+                self.trade_average_efficiency_percent,
+            ),
+            (
+                "manufacturing_average_efficiency_percent",
+                self.manufacturing_average_efficiency_percent,
+            ),
+        ] {
+            if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+                return Err(Error::msg(format!(
+                    "player advice context {label} must be finite and non-negative"
+                )));
+            }
         }
+        Ok(())
+    }
+
+    fn skips_newbie_by_efficiency(&self) -> bool {
+        self.trade_average_efficiency_percent
+            .is_some_and(|value| value > 30.0)
+            && self
+                .manufacturing_average_efficiency_percent
+                .is_some_and(|value| value > 25.0)
     }
 }
 
@@ -63,9 +110,18 @@ impl PlayerAdviceContext {
 pub struct PlayerTrainingAdviceReport {
     pub schema_version: u32,
     pub context: PlayerAdviceContext,
+    pub newbie_section_status: PlayerNewbieSectionStatus,
     pub incomplete_newbie: Vec<NewbieProgress>,
     pub combinations: Vec<CombinationProgress>,
     pub recommendations: Vec<PlayerRecommendation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayerNewbieSectionStatus {
+    Shown,
+    Complete,
+    SkippedByEfficiency,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,11 +240,31 @@ pub struct PlayerRecommendation {
     pub priority_rank: u16,
     pub reason: PlayerRecommendationReason,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product: Option<ProductBucket>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combination_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combination_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub efficiency: Option<EfficiencyFact>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<PlayerConditionEvaluation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acquisition: Option<AcquisitionInfo>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayerConditionStatus {
+    Satisfied,
+    Unsatisfied,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerConditionEvaluation {
+    pub condition: KnowledgeCondition,
+    pub status: PlayerConditionStatus,
 }
 
 pub fn build_player_training_advice(
@@ -197,6 +273,13 @@ pub fn build_player_training_advice(
     context: &PlayerAdviceContext,
 ) -> PlayerTrainingAdviceReport {
     let incomplete_newbie = build_incomplete_newbie(operbox, knowledge);
+    let newbie_section_status = if incomplete_newbie.is_empty() {
+        PlayerNewbieSectionStatus::Complete
+    } else if context.skips_newbie_by_efficiency() {
+        PlayerNewbieSectionStatus::SkippedByEfficiency
+    } else {
+        PlayerNewbieSectionStatus::Shown
+    };
     let mut visible_entries = knowledge
         .combinations
         .iter()
@@ -214,10 +297,12 @@ pub fn build_player_training_advice(
         &visible_entries,
         &combinations,
         context,
+        newbie_section_status,
     );
     PlayerTrainingAdviceReport {
-        schema_version: 1,
+        schema_version: 2,
         context: context.clone(),
+        newbie_section_status,
         incomplete_newbie,
         combinations,
         recommendations,
@@ -296,6 +381,11 @@ fn build_combination_progress(
     let has_review = selected_members.iter().any(|member| {
         status_by_name.get(member.operator.as_str()) == Some(&MemberProgress::NeedsReview)
     });
+    let has_untrained_core = selected_members.iter().any(|member| {
+        member.role == KnowledgeRole::Core
+            && status_by_name.get(member.operator.as_str())
+                == Some(&MemberProgress::OwnedNeedsTraining)
+    });
     let has_training_gap = selected_members.iter().any(|member| {
         status_by_name.get(member.operator.as_str()) == Some(&MemberProgress::OwnedNeedsTraining)
     });
@@ -303,6 +393,8 @@ fn build_combination_progress(
         CombinationProgressState::NeedsReview
     } else if has_missing_core {
         CombinationProgressState::MissingCore
+    } else if has_untrained_core {
+        CombinationProgressState::NeedsTraining
     } else if has_missing_important {
         CombinationProgressState::MissingImportant
     } else if has_training_gap {
@@ -438,6 +530,7 @@ fn build_recommendations(
     combination_entries: &[&CombinationKnowledgeEntry],
     combinations: &[CombinationProgress],
     context: &PlayerAdviceContext,
+    newbie_section_status: PlayerNewbieSectionStatus,
 ) -> Vec<PlayerRecommendation> {
     let mut candidates = Vec::new();
     let tequila_group_enabled = operbox.owns("巫恋") && operbox.owns("龙舌兰");
@@ -462,32 +555,37 @@ fn build_recommendations(
         .unwrap_or_else(|| HashSet::from(["巫恋", "龙舌兰"]));
     let tequila_candidate_blocked =
         |operator: &str| !tequila_group_enabled && tequila_group_operators.contains(operator);
-    for (index, item) in incomplete_newbie.iter().enumerate() {
-        if tequila_candidate_blocked(&item.operator) {
-            continue;
+    if newbie_section_status == PlayerNewbieSectionStatus::Shown {
+        for (index, item) in incomplete_newbie.iter().enumerate() {
+            if tequila_candidate_blocked(&item.operator) {
+                continue;
+            }
+            let entry = knowledge
+                .newbie
+                .iter()
+                .find(|entry| entry.operator == item.operator)
+                .expect("newbie progress comes from knowledge");
+            let (priority, base_rank) =
+                newbie_priority(entry.rarity, &item.operator, &item.target, item.action);
+            candidates.push(Candidate {
+                stable_order: index,
+                recommendation: PlayerRecommendation {
+                    operator: item.operator.clone(),
+                    action: item.action,
+                    current: item.current.clone(),
+                    target: item.target.clone(),
+                    priority,
+                    priority_rank: base_rank,
+                    reason: PlayerRecommendationReason::NewbieRequired,
+                    product: Some(item.product),
+                    combination_id: None,
+                    combination_name: None,
+                    efficiency: None,
+                    conditions: Vec::new(),
+                    acquisition: item.acquisition.clone(),
+                },
+            });
         }
-        let entry = knowledge
-            .newbie
-            .iter()
-            .find(|entry| entry.operator == item.operator)
-            .expect("newbie progress comes from knowledge");
-        let (priority, base_rank) =
-            newbie_priority(entry.rarity, &item.operator, &item.target, item.action);
-        candidates.push(Candidate {
-            stable_order: index,
-            recommendation: PlayerRecommendation {
-                operator: item.operator.clone(),
-                action: item.action,
-                current: item.current.clone(),
-                target: item.target.clone(),
-                priority,
-                priority_rank: base_rank,
-                reason: PlayerRecommendationReason::NewbieRequired,
-                combination_id: None,
-                combination_name: None,
-                acquisition: item.acquisition.clone(),
-            },
-        });
     }
 
     for (combo_index, (entry, progress)) in combination_entries.iter().zip(combinations).enumerate()
@@ -508,6 +606,9 @@ fn build_recommendations(
             })
             .count();
         let core_ready = core_gaps == 0;
+        let important_side_owned = selected
+            .iter()
+            .all(|member| member.role != KnowledgeRole::Important || member.owned);
 
         if entry.id == "automation" && progress.state == CombinationProgressState::Complete {
             if let Some(member) = progress
@@ -529,8 +630,11 @@ fn build_recommendations(
                             priority: PlayerRecommendationPriority::AutomationMustTrain,
                             priority_rank: 45,
                             reason: PlayerRecommendationReason::CombinationImportant,
+                            product: entry.product,
                             combination_id: Some(entry.id.clone()),
                             combination_name: Some(entry.name.clone()),
+                            efficiency: None,
+                            conditions: Vec::new(),
                             acquisition: None,
                         },
                     });
@@ -552,6 +656,12 @@ fn build_recommendations(
                 member.progress,
                 MemberProgress::Missing | MemberProgress::OwnedNeedsTraining
             ) {
+                continue;
+            }
+            if member.role == KnowledgeRole::Core
+                && member.progress == MemberProgress::Missing
+                && (!important_side_owned || core_gaps > 2)
+            {
                 continue;
             }
             let tailor = is_tailor(entry, &member.operator);
@@ -601,8 +711,11 @@ fn build_recommendations(
                     } else {
                         PlayerRecommendationReason::CombinationImportant
                     },
+                    product: entry.product,
                     combination_id: Some(entry.id.clone()),
                     combination_name: Some(entry.name.clone()),
+                    efficiency: None,
+                    conditions: Vec::new(),
                     acquisition: None,
                 },
             });
@@ -625,6 +738,20 @@ fn build_recommendations(
         ) {
             continue;
         }
+        let conditions = entry
+            .conditions
+            .iter()
+            .map(|condition| PlayerConditionEvaluation {
+                condition: condition.clone(),
+                status: evaluate_condition(context, condition),
+            })
+            .collect::<Vec<_>>();
+        if conditions
+            .iter()
+            .any(|condition| condition.status != PlayerConditionStatus::Satisfied)
+        {
+            continue;
+        }
         candidates.push(Candidate {
             stable_order: 20_000 + index,
             recommendation: PlayerRecommendation {
@@ -635,8 +762,11 @@ fn build_recommendations(
                 priority: PlayerRecommendationPriority::HighEfficiencyStandalone,
                 priority_rank: 80,
                 reason: PlayerRecommendationReason::Standalone,
+                product: Some(entry.product),
                 combination_id: None,
                 combination_name: None,
+                efficiency: entry.efficiency.clone(),
+                conditions,
                 acquisition: None,
             },
         });
@@ -684,6 +814,37 @@ fn build_recommendations(
         .into_iter()
         .filter_map(|operator| merged.remove(&operator))
         .collect()
+}
+
+fn evaluate_condition(
+    context: &PlayerAdviceContext,
+    condition: &KnowledgeCondition,
+) -> PlayerConditionStatus {
+    let satisfied = match condition.key.as_str() {
+        "has_originium_shard_factory" => context.has_originium_shard_factory,
+        "meeting_room_max_level_at_least" => compare_u64(
+            context.meeting_room_max_level.map(u64::from),
+            condition.value.as_ref(),
+        ),
+        "dormitory_level_sum_at_least" => compare_u64(
+            context.dormitory_level_sum.map(u64::from),
+            condition.value.as_ref(),
+        ),
+        "engineering_robot_count_at_least" => compare_u64(
+            context.engineering_robot_count.map(u64::from),
+            condition.value.as_ref(),
+        ),
+        _ => None,
+    };
+    match satisfied {
+        Some(true) => PlayerConditionStatus::Satisfied,
+        Some(false) => PlayerConditionStatus::Unsatisfied,
+        None => PlayerConditionStatus::Unknown,
+    }
+}
+
+fn compare_u64(actual: Option<u64>, expected: Option<&serde_json::Value>) -> Option<bool> {
+    Some(actual? >= expected?.as_u64()?)
 }
 
 struct Candidate {
@@ -961,7 +1122,11 @@ mod tests {
             .retain(|entry| matches!(entry.id.as_str(), "siracusa" | "human_fireworks"));
         knowledge.standalone.clear();
         let report = build_player_training_advice(
-            &operbox(&[("八幡海铃", 2, 1, 6), ("乌有", 0, 5, 6)]),
+            &operbox(&[
+                ("八幡海铃", 2, 1, 6),
+                ("贝洛内", 0, 1, 5),
+                ("乌有", 0, 5, 6),
+            ]),
             &knowledge,
             &PlayerAdviceContext::default(),
         );
@@ -1082,6 +1247,7 @@ mod tests {
             &knowledge,
             &PlayerAdviceContext {
                 has_originium_shard_factory: Some(false),
+                ..PlayerAdviceContext::default()
             },
         );
         let with = build_player_training_advice(
@@ -1089,6 +1255,7 @@ mod tests {
             &knowledge,
             &PlayerAdviceContext {
                 has_originium_shard_factory: Some(true),
+                ..PlayerAdviceContext::default()
             },
         );
         assert!(without
@@ -1124,5 +1291,154 @@ mod tests {
                 .progress,
             MemberProgress::Ready
         );
+    }
+
+    #[test]
+    fn t9_skips_newbie_actions_but_keeps_the_incomplete_inventory() {
+        let mut knowledge = load_knowledge();
+        knowledge.combinations.clear();
+        knowledge.standalone.clear();
+        let high_efficiency = PlayerAdviceContext {
+            trade_average_efficiency_percent: Some(30.1),
+            manufacturing_average_efficiency_percent: Some(25.1),
+            ..PlayerAdviceContext::default()
+        };
+        let report = build_player_training_advice(&operbox(&[]), &knowledge, &high_efficiency);
+
+        assert_eq!(
+            report.newbie_section_status,
+            PlayerNewbieSectionStatus::SkippedByEfficiency
+        );
+        assert!(!report.incomplete_newbie.is_empty());
+        assert!(report.recommendations.is_empty());
+
+        let at_threshold = build_player_training_advice(
+            &operbox(&[]),
+            &knowledge,
+            &PlayerAdviceContext {
+                trade_average_efficiency_percent: Some(30.0),
+                manufacturing_average_efficiency_percent: Some(25.0),
+                ..PlayerAdviceContext::default()
+            },
+        );
+        assert_eq!(
+            at_threshold.newbie_section_status,
+            PlayerNewbieSectionStatus::Shown
+        );
+        assert_eq!(
+            at_threshold.recommendations.len(),
+            MAX_PLAYER_RECOMMENDATIONS
+        );
+    }
+
+    #[test]
+    fn missing_system_core_requires_the_important_side_to_be_owned() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "siracusa");
+        knowledge.standalone.clear();
+
+        let important_missing = build_player_training_advice(
+            &operbox(&[("八幡海铃", 2, 1, 6)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(important_missing
+            .recommendations
+            .iter()
+            .all(|item| item.operator != "伺夜"));
+
+        let important_owned = build_player_training_advice(
+            &operbox(&[("八幡海铃", 2, 1, 6), ("贝洛内", 0, 1, 5)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(important_owned
+            .recommendations
+            .iter()
+            .any(|item| { item.operator == "伺夜" && item.action == PlayerAction::Acquire }));
+    }
+
+    #[test]
+    fn owned_untrained_core_takes_state_precedence_over_missing_important() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "siracusa");
+        knowledge.standalone.clear();
+        let report = build_player_training_advice(
+            &operbox(&[("伺夜", 0, 1, 6), ("八幡海铃", 2, 1, 6)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        let progress = &report.combinations[0];
+
+        assert_eq!(progress.state, CombinationProgressState::NeedsTraining);
+        assert_eq!(progress.untrained_core, vec!["伺夜"]);
+        assert_eq!(progress.missing_important, vec!["贝洛内"]);
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|item| { item.operator == "伺夜" && item.action == PlayerAction::Train }));
+    }
+
+    #[test]
+    fn standalone_conditions_require_known_satisfied_context() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge.combinations.clear();
+        knowledge.standalone.retain(|entry| {
+            matches!(
+                entry.id.as_str(),
+                "luck_trade" | "vigil_trade" | "archetto_trade" | "minimalist_general"
+            )
+        });
+        let unknown = build_player_training_advice(
+            &operbox(&[]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(unknown.recommendations.is_empty());
+
+        let known = build_player_training_advice(
+            &operbox(&[]),
+            &knowledge,
+            &PlayerAdviceContext {
+                meeting_room_max_level: Some(3),
+                dormitory_level_sum: Some(20),
+                engineering_robot_count: Some(64),
+                ..PlayerAdviceContext::default()
+            },
+        );
+        let names = known
+            .recommendations
+            .iter()
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, vec!["伺夜", "空弦", "至简"]);
+        assert!(known.recommendations.iter().all(|item| {
+            item.reason == PlayerRecommendationReason::Standalone
+                && item.product.is_some()
+                && item.efficiency.is_some()
+                && item
+                    .conditions
+                    .iter()
+                    .all(|condition| condition.status == PlayerConditionStatus::Satisfied)
+        }));
+        assert!(!names.contains(&"吉星"));
+    }
+
+    #[test]
+    fn context_rejects_invalid_efficiency_values() {
+        assert!(PlayerAdviceContext {
+            trade_average_efficiency_percent: Some(-0.1),
+            ..PlayerAdviceContext::default()
+        }
+        .validate()
+        .is_err());
     }
 }

@@ -20,14 +20,21 @@ pub fn advice_cmd(args: &[String]) -> Result<(), Error> {
     if options.player {
         let operbox = OperBox::load(&operbox_path)?;
         let knowledge = load_training_advice_knowledge(&default_training_advice_knowledge_path()?)?;
-        let context = options
+        let mut context = options
+            .player_context_path
+            .as_deref()
+            .map(load_player_context)
+            .transpose()?
+            .unwrap_or_default();
+        if let Some(blueprint) = options
             .layout_path
             .as_deref()
             .map(BaseBlueprint::load)
             .transpose()?
-            .as_ref()
-            .map(PlayerAdviceContext::from_blueprint)
-            .unwrap_or_default();
+        {
+            context.apply_blueprint(&blueprint);
+        }
+        context.validate()?;
         let report = build_player_training_advice(&operbox, &knowledge, &context);
         let json = if options.pretty {
             serde_json::to_string_pretty(&report)?
@@ -85,6 +92,7 @@ struct AdviceCommandOptions {
     answer: bool,
     player: bool,
     layout_path: Option<PathBuf>,
+    player_context_path: Option<PathBuf>,
 }
 
 fn parse_args(args: &[String]) -> Result<AdviceCommandOptions, Error> {
@@ -95,10 +103,11 @@ fn parse_args(args: &[String]) -> Result<AdviceCommandOptions, Error> {
     let mut answer = false;
     let mut player = false;
     let mut layout_path = None;
+    let mut player_context_path = None;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
-            "--operbox" | "--rules" | "--layout" => {
+            "--operbox" | "--rules" | "--layout" | "--player-context" => {
                 let flag = &args[index];
                 let value = args.get(index + 1).filter(|value| !value.starts_with("--"));
                 let Some(value) = value else {
@@ -119,6 +128,11 @@ fn parse_args(args: &[String]) -> Result<AdviceCommandOptions, Error> {
                     "--layout" => {
                         if layout_path.replace(path).is_some() {
                             return Err(Error::msg("duplicate --layout"));
+                        }
+                    }
+                    "--player-context" => {
+                        if player_context_path.replace(path).is_some() {
+                            return Err(Error::msg("duplicate --player-context"));
                         }
                     }
                     _ => unreachable!(),
@@ -158,6 +172,9 @@ fn parse_args(args: &[String]) -> Result<AdviceCommandOptions, Error> {
     if layout_path.is_some() && !player {
         return Err(Error::msg("--layout requires --player"));
     }
+    if player_context_path.is_some() && !player {
+        return Err(Error::msg("--player-context requires --player"));
+    }
     Ok(AdviceCommandOptions {
         operbox_path: operbox_path
             .ok_or_else(|| Error::msg("missing required --operbox <path>"))?,
@@ -167,7 +184,25 @@ fn parse_args(args: &[String]) -> Result<AdviceCommandOptions, Error> {
         answer,
         player,
         layout_path,
+        player_context_path,
     })
+}
+
+fn load_player_context(path: &std::path::Path) -> Result<PlayerAdviceContext, Error> {
+    let raw = std::fs::read_to_string(path).map_err(|error| {
+        Error::msg(format!(
+            "player advice context read {}: {error}",
+            path.display()
+        ))
+    })?;
+    let context: PlayerAdviceContext = serde_json::from_str(&raw).map_err(|error| {
+        Error::msg(format!(
+            "player advice context parse {}: {error}",
+            path.display()
+        ))
+    })?;
+    context.validate()?;
+    Ok(context)
 }
 
 #[cfg(test)]
@@ -196,6 +231,7 @@ mod tests {
         assert!(!options.answer);
         assert!(!options.player);
         assert!(options.layout_path.is_none());
+        assert!(options.player_context_path.is_none());
     }
 
     #[test]
@@ -221,6 +257,13 @@ mod tests {
         ]))
         .is_err());
         assert!(parse_args(&args(&["--operbox", "box.json", "--layout", "layout.json"])).is_err());
+        assert!(parse_args(&args(&[
+            "--operbox",
+            "box.json",
+            "--player-context",
+            "context.json"
+        ]))
+        .is_err());
     }
 
     #[test]
@@ -231,11 +274,17 @@ mod tests {
             "--player",
             "--layout",
             "layout.json",
+            "--player-context",
+            "context.json",
             "--pretty",
         ]))
         .unwrap();
         assert!(options.player);
         assert_eq!(options.layout_path, Some(PathBuf::from("layout.json")));
+        assert_eq!(
+            options.player_context_path,
+            Some(PathBuf::from("context.json"))
+        );
         assert!(options.pretty);
     }
 }

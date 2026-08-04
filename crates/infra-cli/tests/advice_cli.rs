@@ -101,7 +101,7 @@ fn run_default_json(explain: bool) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
-fn run_player_json(layout: Option<&str>) -> serde_json::Value {
+fn run_player_json_with_context(layout: Option<&str>, context: Option<&str>) -> serde_json::Value {
     let root = workspace_root();
     let mut command = Command::new(env!("CARGO_BIN_EXE_infra-cli"));
     command.current_dir(&root).args([
@@ -113,6 +113,9 @@ fn run_player_json(layout: Option<&str>) -> serde_json::Value {
     if let Some(layout) = layout {
         command.args(["--layout", layout]);
     }
+    if let Some(context) = context {
+        command.args(["--player-context", context]);
+    }
     let output = command.output().unwrap();
     assert!(
         output.status.success(),
@@ -120,6 +123,10 @@ fn run_player_json(layout: Option<&str>) -> serde_json::Value {
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn run_player_json(layout: Option<&str>) -> serde_json::Value {
+    run_player_json_with_context(layout, None)
 }
 
 #[test]
@@ -213,7 +220,8 @@ fn answer_mode_prints_deterministic_sections_without_changing_json_modes() {
 #[test]
 fn player_mode_exposes_three_sections_and_layout_gates_originium() {
     let unknown = run_player_json(None);
-    assert_eq!(unknown["schema_version"], 1);
+    assert_eq!(unknown["schema_version"], 2);
+    assert_eq!(unknown["newbie_section_status"], "shown");
     assert!(unknown["incomplete_newbie"].as_array().unwrap().len() > 10);
     assert!(!unknown["combinations"].as_array().unwrap().is_empty());
     assert_eq!(unknown["recommendations"].as_array().unwrap().len(), 10);
@@ -240,4 +248,33 @@ fn player_mode_exposes_three_sections_and_layout_gates_originium() {
         .unwrap()
         .iter()
         .any(|item| item["id"] == "bubble_group"));
+}
+
+#[test]
+fn player_context_applies_t9_without_hiding_the_incomplete_inventory() {
+    let context_path = std::env::temp_dir().join(format!(
+        "infra-cli-player-context-{}.json",
+        std::process::id()
+    ));
+    fs::write(
+        &context_path,
+        r#"{"trade_average_efficiency_percent":30.1,"manufacturing_average_efficiency_percent":25.1}"#,
+    )
+    .unwrap();
+    let report = run_player_json_with_context(None, context_path.to_str());
+    fs::remove_file(context_path).unwrap();
+
+    assert_eq!(report["schema_version"], 2);
+    assert_eq!(report["newbie_section_status"], "skipped_by_efficiency");
+    assert!(report["incomplete_newbie"].as_array().unwrap().len() > 10);
+    assert!(report["recommendations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["reason"] != "newbie_required"));
+    assert_eq!(report["context"]["trade_average_efficiency_percent"], 30.1);
+    assert_eq!(
+        report["context"]["manufacturing_average_efficiency_percent"],
+        25.1
+    );
 }

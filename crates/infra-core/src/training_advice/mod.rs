@@ -17,6 +17,7 @@ pub use knowledge::{
 pub use player::{
     build_player_training_advice, CombinationMemberProgress, CombinationProgress,
     CombinationProgressState, MemberProgress, NewbieProgress, PlayerAction, PlayerAdviceContext,
+    PlayerConditionEvaluation, PlayerConditionStatus, PlayerNewbieSectionStatus,
     PlayerRecommendation, PlayerRecommendationPriority, PlayerRecommendationReason,
     PlayerTrainingAdviceReport, MAX_PLAYER_RECOMMENDATIONS,
 };
