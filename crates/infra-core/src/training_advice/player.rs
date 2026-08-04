@@ -14,6 +14,37 @@ use super::types::OperatorTrainingState;
 
 pub const MAX_PLAYER_RECOMMENDATIONS: usize = 10;
 
+const PLAYER_COMBINATION_ORDER: [&str; 17] = [
+    "tequila_group",
+    "siracusa",
+    "exusiai_group",
+    "automation",
+    "metalwork",
+    "vermeil",
+    "red_pine",
+    "abyssal_hunters",
+    "perception_information",
+    "mizuki_standardization",
+    "bubble_group",
+    "rhine_lab",
+    "karlan_trade",
+    "glasgow",
+    "pozyomka_durin",
+    "penguin_logistics",
+    "human_fireworks",
+];
+
+fn player_combination_order(id: &str) -> usize {
+    PLAYER_COMBINATION_ORDER
+        .iter()
+        .position(|candidate| *candidate == id)
+        .unwrap_or(usize::MAX)
+}
+
+fn is_player_combination_visible(id: &str) -> bool {
+    PLAYER_COMBINATION_ORDER.contains(&id)
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PlayerAdviceContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -124,10 +155,12 @@ pub enum PlayerRecommendationPriority {
     FlagshipNewbie,
     OtherNewbie,
     OwnedTailor,
+    AutomationMustTrain,
     SmallHighEfficiencyCore,
     SmallHighEfficiencyImportant,
     SystemSingleCoreGap,
     OtherImportant,
+    LowerPriorityCore,
     HighEfficiencyStandalone,
 }
 
@@ -164,8 +197,13 @@ pub fn build_player_training_advice(
     context: &PlayerAdviceContext,
 ) -> PlayerTrainingAdviceReport {
     let incomplete_newbie = build_incomplete_newbie(operbox, knowledge);
-    let combinations = knowledge
+    let mut visible_entries = knowledge
         .combinations
+        .iter()
+        .filter(|entry| is_player_combination_visible(&entry.id))
+        .collect::<Vec<_>>();
+    visible_entries.sort_by_key(|entry| player_combination_order(&entry.id));
+    let combinations = visible_entries
         .iter()
         .map(|entry| build_combination_progress(operbox, entry))
         .collect::<Vec<_>>();
@@ -173,6 +211,7 @@ pub fn build_player_training_advice(
         operbox,
         knowledge,
         &incomplete_newbie,
+        &visible_entries,
         &combinations,
         context,
     );
@@ -396,6 +435,7 @@ fn build_recommendations(
     operbox: &OperBox,
     knowledge: &TrainingAdviceKnowledge,
     incomplete_newbie: &[NewbieProgress],
+    combination_entries: &[&CombinationKnowledgeEntry],
     combinations: &[CombinationProgress],
     context: &PlayerAdviceContext,
 ) -> Vec<PlayerRecommendation> {
@@ -450,8 +490,7 @@ fn build_recommendations(
         });
     }
 
-    for (combo_index, (entry, progress)) in
-        knowledge.combinations.iter().zip(combinations).enumerate()
+    for (combo_index, (entry, progress)) in combination_entries.iter().zip(combinations).enumerate()
     {
         let selected = progress
             .members
@@ -470,6 +509,35 @@ fn build_recommendations(
             .count();
         let core_ready = core_gaps == 0;
 
+        if entry.id == "automation" && progress.state == CombinationProgressState::Complete {
+            if let Some(member) = progress
+                .members
+                .iter()
+                .find(|member| member.operator == "承曦格雷伊")
+            {
+                if matches!(
+                    member.progress,
+                    MemberProgress::Missing | MemberProgress::OwnedNeedsTraining
+                ) {
+                    candidates.push(Candidate {
+                        stable_order: 10_000 + combo_index * 100,
+                        recommendation: PlayerRecommendation {
+                            operator: member.operator.clone(),
+                            action: action_for(member.progress),
+                            current: member.current.clone(),
+                            target: member.target.clone(),
+                            priority: PlayerRecommendationPriority::AutomationMustTrain,
+                            priority_rank: 45,
+                            reason: PlayerRecommendationReason::CombinationImportant,
+                            combination_id: Some(entry.id.clone()),
+                            combination_name: Some(entry.name.clone()),
+                            acquisition: None,
+                        },
+                    });
+                }
+            }
+        }
+
         for (member_index, member) in selected.into_iter().enumerate() {
             if tequila_candidate_blocked(&member.operator) {
                 continue;
@@ -487,8 +555,9 @@ fn build_recommendations(
                 continue;
             }
             let tailor = is_tailor(entry, &member.operator);
-            let classification = if tailor && member.progress == MemberProgress::OwnedNeedsTraining
-            {
+            let classification = if entry.id == "human_fireworks" && member.operator == "乌有" {
+                Some((PlayerRecommendationPriority::LowerPriorityCore, 75))
+            } else if tailor && member.progress == MemberProgress::OwnedNeedsTraining {
                 Some((PlayerRecommendationPriority::OwnedTailor, 40))
             } else if tailor {
                 None
@@ -590,10 +659,27 @@ fn build_recommendations(
             candidate.recommendation.operator.clone(),
             candidate.recommendation,
         );
-        if order.len() == MAX_PLAYER_RECOMMENDATIONS {
-            break;
-        }
     }
+
+    let mandatory = order
+        .iter()
+        .find(|operator| {
+            merged.get(*operator).is_some_and(|item| {
+                item.priority == PlayerRecommendationPriority::AutomationMustTrain
+            })
+        })
+        .cloned();
+    if let Some(mandatory) = mandatory {
+        if !order[..order.len().min(MAX_PLAYER_RECOMMENDATIONS)].contains(&mandatory) {
+            order.truncate(MAX_PLAYER_RECOMMENDATIONS - 1);
+            order.push(mandatory);
+        } else {
+            order.truncate(MAX_PLAYER_RECOMMENDATIONS);
+        }
+    } else {
+        order.truncate(MAX_PLAYER_RECOMMENDATIONS);
+    }
+
     order
         .into_iter()
         .filter_map(|operator| merged.remove(&operator))
@@ -729,6 +815,172 @@ mod tests {
             .recommendations
             .iter()
             .all(|item| item.operator != "薄绿"));
+    }
+
+    #[test]
+    fn player_combination_output_uses_requested_order_and_hides_legacy_groups() {
+        let report = build_player_training_advice(
+            &operbox(&[]),
+            &load_knowledge(),
+            &PlayerAdviceContext::default(),
+        );
+        let ids = report
+            .combinations
+            .iter()
+            .map(|combo| combo.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ids,
+            vec![
+                "tequila_group",
+                "siracusa",
+                "exusiai_group",
+                "automation",
+                "metalwork",
+                "vermeil",
+                "red_pine",
+                "abyssal_hunters",
+                "perception_information",
+                "mizuki_standardization",
+                "bubble_group",
+                "rhine_lab",
+                "karlan_trade",
+                "glasgow",
+                "pozyomka_durin",
+                "penguin_logistics",
+                "human_fireworks",
+            ]
+        );
+        assert!(!ids.contains(&"lungmen_control"));
+        assert!(!ids.contains(&"deepcolor_ulpianus"));
+        assert!(!ids.contains(&"kaltsit_omertosa"));
+    }
+
+    #[test]
+    fn automation_core_ready_always_recommends_gray() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "automation");
+        knowledge.standalone.clear();
+        let report = build_player_training_advice(
+            &operbox(&[
+                ("温蒂", 2, 1, 6),
+                ("清流", 1, 1, 4),
+                ("承曦格雷伊", 1, 40, 5),
+                ("冬时", 1, 1, 5),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        let gray = report
+            .recommendations
+            .iter()
+            .find(|item| item.operator == "承曦格雷伊")
+            .expect("automation should recommend gray once its core can start");
+        assert_eq!(
+            gray.priority,
+            PlayerRecommendationPriority::AutomationMustTrain
+        );
+        assert_eq!(gray.priority_rank, 45);
+
+        let not_startable = build_player_training_advice(
+            &operbox(&[
+                ("温蒂", 2, 1, 6),
+                ("清流", 1, 1, 4),
+                ("承曦格雷伊", 1, 40, 5),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(not_startable
+            .recommendations
+            .iter()
+            .all(|item| item.priority != PlayerRecommendationPriority::AutomationMustTrain));
+    }
+
+    #[test]
+    fn automation_must_train_reserves_a_slot_at_the_recommendation_cap() {
+        let report = build_player_training_advice(
+            &operbox(&[
+                ("温蒂", 2, 1, 6),
+                ("清流", 1, 1, 4),
+                ("承曦格雷伊", 1, 40, 5),
+                ("冬时", 1, 1, 5),
+            ]),
+            &load_knowledge(),
+            &PlayerAdviceContext::default(),
+        );
+
+        assert_eq!(report.recommendations.len(), MAX_PLAYER_RECOMMENDATIONS);
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|item| item.operator == "承曦格雷伊"
+                && item.priority == PlayerRecommendationPriority::AutomationMustTrain));
+    }
+
+    #[test]
+    fn equal_priority_combination_recommendations_follow_player_combination_order() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| matches!(entry.id.as_str(), "siracusa" | "karlan_trade"));
+        knowledge.standalone.clear();
+        let report = build_player_training_advice(
+            &operbox(&[
+                ("八幡海铃", 2, 1, 6),
+                ("贝洛内", 2, 1, 5),
+                ("银灰", 2, 1, 6),
+                ("孑", 1, 1, 4),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        let names = report
+            .recommendations
+            .iter()
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, vec!["伺夜", "灵知"]);
+        assert!(report
+            .recommendations
+            .iter()
+            .all(|item| item.priority == PlayerRecommendationPriority::SystemSingleCoreGap));
+    }
+
+    #[test]
+    fn human_fireworks_core_is_lower_priority_than_other_system_core_gaps() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| matches!(entry.id.as_str(), "siracusa" | "human_fireworks"));
+        knowledge.standalone.clear();
+        let report = build_player_training_advice(
+            &operbox(&[("八幡海铃", 2, 1, 6), ("乌有", 0, 5, 6)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        let names = report
+            .recommendations
+            .iter()
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(names, vec!["伺夜", "乌有"]);
+        let uyou = report
+            .recommendations
+            .iter()
+            .find(|item| item.operator == "乌有")
+            .unwrap();
+        assert_eq!(
+            uyou.priority,
+            PlayerRecommendationPriority::LowerPriorityCore
+        );
+        assert_eq!(uyou.priority_rank, 75);
     }
 
     #[test]
