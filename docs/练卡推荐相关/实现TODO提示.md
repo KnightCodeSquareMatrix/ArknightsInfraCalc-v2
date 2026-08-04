@@ -27,7 +27,7 @@
 18. 鸿雪挂件封闭集五人、放 4 触发  
 19. 红松成员对齐红松林体系文  
 20. 赤金工艺按技能名枚举  
-21. 用 `training_advice_knowledge` + player 重建；旧 `training_recommendations.json` 不反向裁决（v2 合同已归档）
+21. 用 `training_advice_knowledge` + player 重建；阶段 A 的 knowledge schema/加载校验/最小样例已完成，player 报告层仍待实现；旧 `training_recommendations.json` 不反向裁决（v2 合同已归档）
 
 ## 契约类（前后端，此处不定字段名）
 

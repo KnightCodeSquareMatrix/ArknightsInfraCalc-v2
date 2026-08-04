@@ -47,7 +47,7 @@
 
 ## 当前实现状态
 
-**2026-07-29：** 玩家合同在本目录；运行时仍主要是旧 v2 `training_recommendations.json` + `evaluate`/`rag` 五分区。`player` / `training_advice_knowledge.json` **未合入**。历史 stash 草案不作本分支事实。
+**2026-08-04：** 阶段 A 已合入：`training_advice_knowledge.json` 的独立 schema、加载校验和最小 canonical 样例已落在 `infra-core::training_advice`。运行时玩家报告、`player::build_player_report`、五章输出和 `--answer` 切换仍未合入；旧 v2 `training_recommendations.json` + `evaluate`/`rag` 继续作为诊断兼容路径。历史 stash 草案不作本分支事实。
 
 ## 新干员事实来源
 
