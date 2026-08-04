@@ -73,7 +73,7 @@ layout / operbox / runtime data
 | `skill_table` | `skill_table.json` 加载、数据路径与嵌入 fallback |
 | `support_facility` | 办公室/会客室静态求值的共享类型与 registry |
 | `tier` | `PromotionTier` 技能解锁档 |
-| `training_advice` | 练卡：当前 v2 机器诊断过滤/旧答卷；玩家 knowledge+player 层见实现计划（待建） |
+| `training_advice` | 练卡：玩家 knowledge/player 层生成基础名单、组合完成度与 ≤10 建议；v2 机器诊断继续兼容 |
 | `types` | EffectAtom 的 phase、selector、condition、action 等共享类型 |
 | `control` | 中枢求值与全局注入写回 |
 | `export` | MAA 排班 JSON 投影；不重新计算机制 |
@@ -170,7 +170,7 @@ layout / operbox / runtime data
 | `standalone_roster.json` | 具名 standalone 搜索边界；不替代普通制造 full pool |
 | `mood_model.json` | 心情消耗与恢复参数 |
 | `support_skill_registry.json` | 办公室/会客室静态技能 registry |
-| `training_recommendations.json` | **旧** v2 机器诊断规则载体，不是玩家真源、不是 solver 候选池；玩家层将用 `training_advice_knowledge.json`（待建） |
+| `training_recommendations.json` | **旧** v2 机器诊断规则载体，不是玩家真源、不是 solver 候选池；玩家层使用独立的 `training_advice_knowledge.json` |
 | `REGRESSION_CASES.csv` / `UNIT_OUTPUT_ANCHORS.csv` | `verify` 回归和单位产出锚点 |
 | `fixtures/` / `layout/` / `schedule_243/` | 真实入口 fixture、蓝图模板和排班样例 |
 | `tags/` | Selector/规则使用的阵营与结构 tag |

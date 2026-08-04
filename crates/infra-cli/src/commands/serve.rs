@@ -21,6 +21,11 @@ use infra_core::schedule::{
     DailyTotals, ShiftEfficiencies, TeamLabel, TeamRotationReport, TimedRotationProfile,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
+use infra_core::training_advice::{
+    build_player_training_advice, default_training_advice_knowledge_path,
+    load_training_advice_knowledge, PlayerAdviceContext, PlayerTrainingAdviceReport,
+    TrainingAdviceKnowledge,
+};
 use infra_core::Error;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
@@ -45,6 +50,9 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
     let state = ServeState {
         instances: OperatorInstances::load(&default_instances_path()?)?,
         table: SkillTable::load(&default_skill_table_path()?)?,
+        training_advice_knowledge: load_training_advice_knowledge(
+            &default_training_advice_knowledge_path()?,
+        )?,
         plan_schema: compile_plan_compute_schema()?,
         plan_contract_sha256: plan_contract_sha256(),
     };
@@ -179,6 +187,7 @@ fn write_response(
 struct ServeState {
     instances: OperatorInstances,
     table: SkillTable,
+    training_advice_knowledge: TrainingAdviceKnowledge,
     plan_schema: JSONSchema,
     plan_contract_sha256: String,
 }
@@ -407,6 +416,7 @@ struct PlanComputeResult {
     profile: BoxProfile,
     rotation: RotationSummary,
     maa: MaaSchedule,
+    training_advice: PlayerTrainingAdviceReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -604,13 +614,31 @@ fn handle_plan_compute(
     let maa = computed
         .maa
         .expect("MAA schedule is always requested by plan.compute");
+    let training_advice = build_plan_compute_training_advice(
+        &operbox,
+        &params.layout,
+        &state.training_advice_knowledge,
+    );
     serde_json::to_value(PlanComputeResult {
         schema_version: PLAN_SCHEMA_VERSION,
         profile,
         rotation: RotationSummary::from(&computed.current.rotation),
         maa,
+        training_advice,
     })
     .map_err(Error::from)
+}
+
+fn build_plan_compute_training_advice(
+    operbox: &OperBox,
+    blueprint: &BaseBlueprint,
+    knowledge: &TrainingAdviceKnowledge,
+) -> PlayerTrainingAdviceReport {
+    build_player_training_advice(
+        operbox,
+        knowledge,
+        &PlayerAdviceContext::from_blueprint(blueprint),
+    )
 }
 
 fn validated_label(value: Option<String>, fallback: &str, field: &str) -> Result<String, Error> {
@@ -921,5 +949,57 @@ mod tests {
         validate_plan_compute_params(&schema, &mismatched_product).unwrap();
         let params: PlanComputeParams = serde_json::from_value(mismatched_product).unwrap();
         assert!(params.layout.validate().is_err());
+    }
+
+    #[test]
+    fn plan_compute_training_advice_consumes_the_inline_layout_gate() {
+        let mut knowledge =
+            load_training_advice_knowledge(&default_training_advice_knowledge_path().unwrap())
+                .unwrap();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "bubble_group");
+        knowledge.standalone.retain(|entry| {
+            entry.product == infra_core::training_advice::ProductBucket::OriginiumShards
+        });
+        let operbox = inline_operbox(vec![operbox_entry("test", "12F")]).unwrap();
+        let without_originium: BaseBlueprint = serde_json::from_value(serde_json::json!({
+            "rooms": [
+                { "id": "factory", "kind": "factory", "level": 3,
+                  "product": { "factory": { "recipe": "gold" } } }
+            ]
+        }))
+        .unwrap();
+        let with_originium: BaseBlueprint = serde_json::from_value(serde_json::json!({
+            "rooms": [
+                { "id": "factory", "kind": "factory", "level": 3,
+                  "product": { "factory": { "recipe": "originium" } } }
+            ]
+        }))
+        .unwrap();
+
+        let gated = build_plan_compute_training_advice(&operbox, &without_originium, &knowledge);
+        assert_eq!(gated.context.has_originium_shard_factory, Some(false));
+        assert!(gated.recommendations.iter().all(|item| {
+            item.operator != "火神"
+                && !matches!(
+                    item.operator.as_str(),
+                    "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
+                )
+        }));
+
+        let enabled = build_plan_compute_training_advice(&operbox, &with_originium, &knowledge);
+        assert_eq!(enabled.context.has_originium_shard_factory, Some(true));
+        assert!(enabled
+            .recommendations
+            .iter()
+            .any(|item| item.operator == "火神"));
+        assert!(enabled.recommendations.iter().any(|item| {
+            matches!(
+                item.operator.as_str(),
+                "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
+            )
+        }));
     }
 }
