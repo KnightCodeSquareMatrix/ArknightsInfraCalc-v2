@@ -20,6 +20,8 @@ pub struct TrainingAdviceKnowledge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewbieKnowledgeEntry {
     pub operator: String,
+    #[serde(default)]
+    pub rarity: Option<u8>,
     pub product: ProductBucket,
     pub target: KnowledgeTarget,
     #[serde(default)]
@@ -39,6 +41,8 @@ pub struct CombinationKnowledgeEntry {
     #[serde(default)]
     pub tier: Option<CombinationTier>,
     pub facilities: Vec<String>,
+    #[serde(default)]
+    pub scale: CombinationScale,
     pub members: Vec<CombinationMember>,
     pub completion: CompletionSpec,
     #[serde(default)]
@@ -54,6 +58,16 @@ pub struct CombinationMember {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionSpec {
+    #[serde(default)]
+    pub required: Vec<String>,
+    #[serde(default)]
+    pub choice_groups: Vec<ChoiceGroup>,
+    #[serde(default)]
+    pub alternatives: Vec<CompletionAlternative>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CompletionAlternative {
     #[serde(default)]
     pub required: Vec<String>,
     #[serde(default)]
@@ -124,6 +138,14 @@ pub enum KnowledgeRole {
 pub enum CombinationTier {
     HighEfficiency,
     LowEfficiency,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CombinationScale {
+    #[default]
+    Small,
+    System,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,18 +296,59 @@ fn validate_combination(entry: &CombinationKnowledgeEntry) -> Result<()> {
         validate_target(&member.target, "combination member target")?;
     }
 
-    let mut completion_names = HashSet::new();
-    for required in &entry.completion.required {
-        validate_completion_member(entry, required, &member_names)?;
-        if !completion_names.insert(required.as_str()) {
+    validate_completion_shape(
+        entry,
+        &entry.completion.required,
+        &entry.completion.choice_groups,
+        &member_names,
+        "base",
+    )?;
+    let mut alternative_ids = HashSet::new();
+    for (index, alternative) in entry.completion.alternatives.iter().enumerate() {
+        validate_completion_shape(
+            entry,
+            &alternative.required,
+            &alternative.choice_groups,
+            &member_names,
+            &format!("alternative {index}"),
+        )?;
+        if alternative.required.is_empty() && alternative.choice_groups.is_empty() {
             return Err(Error::msg(format!(
-                "combination {} repeats completion member {}",
-                entry.id, required
+                "combination {} alternative {index} must not be empty",
+                entry.id
+            )));
+        }
+        for group in &alternative.choice_groups {
+            if !alternative_ids.insert(group.id.as_str()) {
+                return Err(Error::msg(format!(
+                    "combination {} repeats choice group {}",
+                    entry.id, group.id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_completion_shape(
+    entry: &CombinationKnowledgeEntry,
+    required: &[String],
+    groups: &[ChoiceGroup],
+    member_names: &HashSet<&str>,
+    label: &str,
+) -> Result<()> {
+    let mut completion_names = HashSet::new();
+    for member in required {
+        validate_completion_member(entry, member, member_names)?;
+        if !completion_names.insert(member.as_str()) {
+            return Err(Error::msg(format!(
+                "combination {} {label} repeats completion member {member}",
+                entry.id
             )));
         }
     }
     let mut group_ids = HashSet::new();
-    for group in &entry.completion.choice_groups {
+    for group in groups {
         validate_id(&mut group_ids, &group.id, "choice group")?;
         validate_name(&group.label, "choice group label")?;
         if group.minimum == 0 || group.minimum > group.members.len() {
@@ -296,11 +359,11 @@ fn validate_combination(entry: &CombinationKnowledgeEntry) -> Result<()> {
         }
         let mut group_members = HashSet::new();
         for member in &group.members {
-            validate_completion_member(entry, member, &member_names)?;
+            validate_completion_member(entry, member, member_names)?;
             if !group_members.insert(member.as_str()) || !completion_names.insert(member.as_str()) {
                 return Err(Error::msg(format!(
-                    "combination {} repeats choice member {}",
-                    entry.id, member
+                    "combination {} {label} repeats choice member {member}",
+                    entry.id
                 )));
             }
         }
@@ -461,6 +524,7 @@ mod tests {
             schema_version: 1,
             newbie: vec![NewbieKnowledgeEntry {
                 operator: "新手".to_string(),
+                rarity: Some(4),
                 product: ProductBucket::Trade,
                 target: KnowledgeTarget {
                     kind: TargetKind::Explicit,
@@ -480,6 +544,7 @@ mod tests {
                 consumer_products: Vec::new(),
                 tier: Some(CombinationTier::HighEfficiency),
                 facilities: vec!["trade_station".to_string()],
+                scale: CombinationScale::Small,
                 members: vec![CombinationMember {
                     operator: "甲".to_string(),
                     role: KnowledgeRole::Core,
@@ -492,6 +557,7 @@ mod tests {
                 completion: CompletionSpec {
                     required: vec!["甲".to_string()],
                     choice_groups: Vec::new(),
+                    alternatives: Vec::new(),
                 },
                 evidence: Vec::new(),
             }],

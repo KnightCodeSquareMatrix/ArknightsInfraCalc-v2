@@ -47,7 +47,7 @@
 
 ## 当前实现状态
 
-**2026-08-04：** 阶段 A 已合入：`training_advice_knowledge.json` 的独立 schema、加载校验和最小 canonical 样例已落在 `infra-core::training_advice`。运行时玩家报告、`player::build_player_report`、五章输出和 `--answer` 切换仍未合入；旧 v2 `training_recommendations.json` + `evaluate`/`rag` 继续作为诊断兼容路径。历史 stash 草案不作本分支事实。
+**2026-08-04：** 阶段 A 与当前阶段 B 已合入：`training_advice_knowledge.json` 的独立 schema、完整新手/常见组合样例、`player` 完成度与优先级输出，以及 `advice --player` JSON 入口已落在 `infra-core::training_advice` / `infra-cli`。五章自然语言报告和 `--answer` 仍留给未来 AI；旧 v2 `training_recommendations.json` + `evaluate`/`rag` 继续作为诊断兼容路径。历史 stash 草案不作本分支事实。
 
 ## 新干员事实来源
 

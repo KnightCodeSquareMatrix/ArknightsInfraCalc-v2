@@ -101,6 +101,27 @@ fn run_default_json(explain: bool) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
+fn run_player_json(layout: Option<&str>) -> serde_json::Value {
+    let root = workspace_root();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_infra-cli"));
+    command.current_dir(&root).args([
+        "advice",
+        "--operbox",
+        "data/fixtures/training_advice/witch_ready_untrained.json",
+        "--player",
+    ]);
+    if let Some(layout) = layout {
+        command.args(["--layout", layout]);
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
 #[test]
 fn custom_rules_explain_reads_workspace_markdown_but_rejects_absolute_sources() {
     let directory = std::env::temp_dir().join(format!(
@@ -187,4 +208,36 @@ fn answer_mode_prints_deterministic_sections_without_changing_json_modes() {
     assert!(answer.contains("龙舌兰"));
     assert!(answer.contains("卡夫卡"));
     assert!(!answer.trim_start().starts_with('{'));
+}
+
+#[test]
+fn player_mode_exposes_three_sections_and_layout_gates_originium() {
+    let unknown = run_player_json(None);
+    assert_eq!(unknown["schema_version"], 1);
+    assert!(unknown["incomplete_newbie"].as_array().unwrap().len() > 10);
+    assert!(!unknown["combinations"].as_array().unwrap().is_empty());
+    assert_eq!(unknown["recommendations"].as_array().unwrap().len(), 10);
+    assert!(unknown["recommendations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["operator"] != "薄绿" && item["operator"] != "火神"));
+
+    let originium_path = std::env::temp_dir().join(format!(
+        "infra-cli-player-originium-{}.json",
+        std::process::id()
+    ));
+    fs::write(
+        &originium_path,
+        r#"{"rooms":[{"id":"factory","kind":"factory","level":3,"product":{"factory":{"recipe":"originium"}}}]}"#,
+    )
+    .unwrap();
+    let originium = run_player_json(originium_path.to_str());
+    fs::remove_file(originium_path).unwrap();
+    assert_eq!(originium["context"]["has_originium_shard_factory"], true);
+    assert!(originium["combinations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == "bubble_group"));
 }
