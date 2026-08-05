@@ -422,7 +422,11 @@ mod tests {
             .unwrap();
         assert!(resolve_workspace_source(root, "/etc/passwd").is_none());
         assert!(resolve_workspace_source(root, "../Cargo.toml").is_none());
-        assert!(resolve_workspace_source(root, "docs/练卡推荐规则.md").is_some());
+        assert!(resolve_workspace_source(
+            root,
+            "docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md"
+        )
+        .is_some());
     }
 
     #[test]

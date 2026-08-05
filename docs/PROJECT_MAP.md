@@ -128,6 +128,7 @@ layout / operbox / runtime data
 | `trade yield <fixture>` | 单站单位产出探测 |
 | `bench --operbox <path>` | 固定布局的贸易/制造搜索基准 |
 | `bake [all\|trade\|manufacture]` / `bake validate` / `bake verify` | 生成、兼容校验和响应验证 Bake catalog |
+| `debug rerun --bundle <path>` | 重放反馈 debug bundle，并可按房间、干员或班次缩小输出 |
 | `serve` | 启动前端 JSON line 常驻 worker；机器主入口为内联 `plan.compute` |
 | `layout test` | 自定义蓝图的单班搜索或指定 assignment 探测 |
 | `layout team-rotation` | timed rotation 与 MAA 导出，不附带账号画像 |
@@ -146,6 +147,7 @@ layout / operbox / runtime data
 | `src/commands/layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval` adapter |
 | `src/commands/advice.rs` | v2 练卡规则和 operbox adapter |
 | `src/commands/bake.rs` | Bake 生成、validate 和 verify adapter |
+| `src/commands/debug.rs` | debug bundle 校验、重放和诊断输出 adapter |
 | `src/commands/profile.rs` | layout、analysis 和 Bake dependency profile |
 | `src/commands/verify.rs` | `expect_rule_id` 回归断言和 fixture 选择 |
 | `src/verify/{cases,fixtures}.rs` | CSV case 加载与硬编码最小房间 fixture |

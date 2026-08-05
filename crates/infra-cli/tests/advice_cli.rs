@@ -141,7 +141,10 @@ fn custom_rules_explain_reads_workspace_markdown_but_rejects_absolute_sources() 
     let valid_rules = directory.join("valid.json");
     fs::write(
         &valid_rules,
-        custom_rules("docs/练卡推荐规则.md", Some("RAG 解释层")),
+        custom_rules(
+            "docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md",
+            Some("RAG 解释层"),
+        ),
     )
     .unwrap();
     let valid = run_explain(&valid_rules);
