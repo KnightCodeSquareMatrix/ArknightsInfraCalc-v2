@@ -6,11 +6,12 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::layout::BaseBlueprint;
 use crate::operbox::OperBox;
+use crate::tier::PromotionTier;
 
 use super::knowledge::{
     AcquisitionInfo, ChoiceGroup, CombinationKnowledgeEntry, CombinationScale, CombinationTier,
-    EfficiencyFact, KnowledgeCondition, KnowledgeRole, KnowledgeTarget, ProductBucket, TargetKind,
-    TrainingAdviceKnowledge,
+    ConditionKind, EfficiencyFact, KnowledgeCondition, KnowledgeRole, KnowledgeTarget,
+    ProductBucket, TargetKind, TrainingAdviceKnowledge,
 };
 use super::types::OperatorTrainingState;
 
@@ -446,7 +447,7 @@ fn build_combination_progress(
                 owned: current_progress(operbox, &member.operator).is_some(),
                 target_met: status_by_name[member.operator.as_str()] == MemberProgress::Ready,
                 current: current_progress(operbox, &member.operator),
-                target: member.target.clone(),
+                target: report_target_for(operbox, &member.operator, &member.target),
                 counts_toward_completion: selected_names.contains(member.operator.as_str()),
             })
             .collect(),
@@ -626,7 +627,7 @@ fn build_recommendations(
                             operator: member.operator.clone(),
                             action: action_for(member.progress),
                             current: member.current.clone(),
-                            target: member.target.clone(),
+                            target: report_target_for(operbox, &member.operator, &member.target),
                             priority: PlayerRecommendationPriority::AutomationMustTrain,
                             priority_rank: 45,
                             reason: PlayerRecommendationReason::CombinationImportant,
@@ -646,10 +647,7 @@ fn build_recommendations(
             if tequila_candidate_blocked(&member.operator) {
                 continue;
             }
-            if entry.id == "bubble_group"
-                && member.operator == "火神"
-                && context.has_originium_shard_factory != Some(true)
-            {
+            if entry.id == "bubble_group" && context.has_originium_shard_factory != Some(true) {
                 continue;
             }
             if !matches!(
@@ -703,7 +701,7 @@ fn build_recommendations(
                     operator: member.operator.clone(),
                     action: action_for(member.progress),
                     current: member.current.clone(),
-                    target: member.target.clone(),
+                    target: report_target_for(operbox, &member.operator, &member.target),
                     priority,
                     priority_rank: base_rank,
                     reason: if member.role == KnowledgeRole::Core {
@@ -746,10 +744,10 @@ fn build_recommendations(
                 status: evaluate_condition(context, condition),
             })
             .collect::<Vec<_>>();
-        if conditions
-            .iter()
-            .any(|condition| condition.status != PlayerConditionStatus::Satisfied)
-        {
+        if conditions.iter().any(|condition| {
+            condition.condition.kind != ConditionKind::SameStation
+                && condition.status != PlayerConditionStatus::Satisfied
+        }) {
             continue;
         }
         candidates.push(Candidate {
@@ -791,6 +789,34 @@ fn build_recommendations(
         );
     }
 
+    let bubble_pair = ["泡泡", "火神"];
+    let bubble_gaps = bubble_pair
+        .iter()
+        .filter(|operator| merged.contains_key(**operator))
+        .copied()
+        .collect::<Vec<_>>();
+    let mut selected_order = Vec::new();
+    let mut bubble_handled = false;
+    for operator in &order {
+        if bubble_pair.contains(&operator.as_str()) && bubble_gaps.len() == 2 {
+            if bubble_handled {
+                continue;
+            }
+            bubble_handled = true;
+            if selected_order.len() + 2 <= MAX_PLAYER_RECOMMENDATIONS {
+                for bubble_operator in &order {
+                    if bubble_pair.contains(&bubble_operator.as_str()) {
+                        selected_order.push(bubble_operator.clone());
+                    }
+                }
+            }
+            continue;
+        }
+        if selected_order.len() < MAX_PLAYER_RECOMMENDATIONS {
+            selected_order.push(operator.clone());
+        }
+    }
+
     let mandatory = order
         .iter()
         .find(|operator| {
@@ -800,17 +826,20 @@ fn build_recommendations(
         })
         .cloned();
     if let Some(mandatory) = mandatory {
-        if !order[..order.len().min(MAX_PLAYER_RECOMMENDATIONS)].contains(&mandatory) {
-            order.truncate(MAX_PLAYER_RECOMMENDATIONS - 1);
-            order.push(mandatory);
-        } else {
-            order.truncate(MAX_PLAYER_RECOMMENDATIONS);
+        if !selected_order.contains(&mandatory) {
+            if selected_order.len() == MAX_PLAYER_RECOMMENDATIONS {
+                if let Some(index) = selected_order
+                    .iter()
+                    .rposition(|operator| !bubble_pair.contains(&operator.as_str()))
+                {
+                    selected_order.remove(index);
+                }
+            }
+            selected_order.push(mandatory);
         }
-    } else {
-        order.truncate(MAX_PLAYER_RECOMMENDATIONS);
     }
 
-    order
+    selected_order
         .into_iter()
         .filter_map(|operator| merged.remove(&operator))
         .collect()
@@ -889,12 +918,6 @@ fn is_tailor(entry: &CombinationKnowledgeEntry, operator: &str) -> bool {
 }
 
 fn progress_for(operbox: &OperBox, operator: &str, target: &KnowledgeTarget) -> MemberProgress {
-    if matches!(
-        target.kind,
-        TargetKind::DeriveFromSkillBinding | TargetKind::NeedsReview
-    ) {
-        return MemberProgress::NeedsReview;
-    }
     let Some(progress) = operbox.progress_of(operator) else {
         return MemberProgress::Missing;
     };
@@ -911,7 +934,44 @@ fn progress_for(operbox: &OperBox, operator: &str, target: &KnowledgeTarget) -> 
             }
         }
         TargetKind::NoRequirement => MemberProgress::Ready,
-        TargetKind::DeriveFromSkillBinding | TargetKind::NeedsReview => unreachable!(),
+        TargetKind::DeriveFromSkillBinding => {
+            if PromotionTier::from_progress(progress) == PromotionTier::TierUp {
+                MemberProgress::Ready
+            } else {
+                MemberProgress::OwnedNeedsTraining
+            }
+        }
+        TargetKind::NeedsReview => MemberProgress::NeedsReview,
+    }
+}
+
+fn report_target_for(
+    operbox: &OperBox,
+    operator: &str,
+    target: &KnowledgeTarget,
+) -> KnowledgeTarget {
+    if target.kind != TargetKind::DeriveFromSkillBinding {
+        return target.clone();
+    }
+    let Some(progress) = operbox.progress_of(operator) else {
+        return target.clone();
+    };
+    match progress.rarity {
+        1 | 2 => KnowledgeTarget {
+            kind: TargetKind::Explicit,
+            elite: Some(0),
+            level: Some(30),
+        },
+        3 | 4 => KnowledgeTarget {
+            kind: TargetKind::Explicit,
+            elite: Some(1),
+            level: None,
+        },
+        _ => KnowledgeTarget {
+            kind: TargetKind::Explicit,
+            elite: Some(2),
+            level: None,
+        },
     }
 }
 
@@ -976,6 +1036,41 @@ mod tests {
             .recommendations
             .iter()
             .all(|item| item.operator != "薄绿"));
+    }
+
+    #[test]
+    fn owned_four_star_elite_one_tasks_precede_flagship_newbies() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.retain(|entry| {
+            matches!(
+                entry.operator.as_str(),
+                "但书" | "可露希尔" | "巫恋" | "龙舌兰" | "清流"
+            )
+        });
+        knowledge.combinations.clear();
+        knowledge.standalone.clear();
+        let report = build_player_training_advice(
+            &operbox(&[
+                ("但书", 0, 1, 5),
+                ("可露希尔", 0, 1, 6),
+                ("巫恋", 0, 1, 5),
+                ("龙舌兰", 0, 1, 5),
+                ("清流", 0, 1, 4),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+
+        let names = report
+            .recommendations
+            .iter()
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(names, vec!["清流", "但书", "可露希尔", "巫恋", "龙舌兰"]);
+        assert_eq!(
+            report.recommendations[0].priority,
+            PlayerRecommendationPriority::NewbieFourStarEliteOne
+        );
     }
 
     #[test]
@@ -1241,6 +1336,9 @@ mod tests {
         knowledge
             .combinations
             .retain(|combo| combo.id == "bubble_group");
+        knowledge
+            .standalone
+            .retain(|entry| entry.product == ProductBucket::OriginiumShards);
         let box_ = operbox(&[]);
         let without = build_player_training_advice(
             &box_,
@@ -1250,6 +1348,8 @@ mod tests {
                 ..PlayerAdviceContext::default()
             },
         );
+        let unknown =
+            build_player_training_advice(&box_, &knowledge, &PlayerAdviceContext::default());
         let with = build_player_training_advice(
             &box_,
             &knowledge,
@@ -1261,10 +1361,92 @@ mod tests {
         assert!(without
             .recommendations
             .iter()
-            .all(|item| item.operator != "薄绿" && item.operator != "火神"));
+            .all(|item| !matches!(item.operator.as_str(), "薄绿" | "泡泡" | "火神")));
+        assert!(unknown
+            .recommendations
+            .iter()
+            .all(|item| !matches!(item.operator.as_str(), "薄绿" | "泡泡" | "火神")));
+        let bubble_recommendations = with
+            .recommendations
+            .iter()
+            .filter(|item| item.combination_id.as_deref() == Some("bubble_group"))
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(bubble_recommendations, vec!["泡泡", "火神"]);
         assert!(with.recommendations.iter().any(|item| {
-            item.operator == "薄绿" || item.combination_id.as_deref() == Some("bubble_group")
+            matches!(
+                item.operator.as_str(),
+                "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
+            )
         }));
+
+        let one_ready = build_player_training_advice(
+            &operbox(&[("泡泡", 1, 1, 4)]),
+            &knowledge,
+            &PlayerAdviceContext {
+                has_originium_shard_factory: Some(true),
+                ..PlayerAdviceContext::default()
+            },
+        );
+        let remaining_bubble_actions = one_ready
+            .recommendations
+            .iter()
+            .filter(|item| item.combination_id.as_deref() == Some("bubble_group"))
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(remaining_bubble_actions, vec!["火神"]);
+    }
+
+    #[test]
+    fn bubble_pair_does_not_split_at_the_recommendation_cap() {
+        let mut knowledge = load_knowledge();
+        let template = knowledge
+            .newbie
+            .iter()
+            .find(|entry| entry.operator == "石英")
+            .unwrap()
+            .clone();
+        knowledge.newbie = (0..9)
+            .map(|index| {
+                let mut entry = template.clone();
+                entry.operator = format!("高优先{index}");
+                entry.acquisition = None;
+                entry
+            })
+            .collect();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "bubble_group");
+        knowledge.standalone.clear();
+        let box_ = OperBox::from_entries(
+            (0..9)
+                .map(|index| OperBoxEntry {
+                    id: format!("high_priority_{index}"),
+                    name: format!("高优先{index}"),
+                    elite: 0,
+                    level: 1,
+                    own: true,
+                    potential: 1,
+                    rarity: 4,
+                })
+                .collect(),
+        )
+        .unwrap();
+
+        let report = build_player_training_advice(
+            &box_,
+            &knowledge,
+            &PlayerAdviceContext {
+                has_originium_shard_factory: Some(true),
+                ..PlayerAdviceContext::default()
+            },
+        );
+
+        assert_eq!(report.recommendations.len(), 9);
+        assert!(report
+            .recommendations
+            .iter()
+            .all(|item| !matches!(item.operator.as_str(), "泡泡" | "火神")));
     }
 
     #[test]
@@ -1386,7 +1568,7 @@ mod tests {
     }
 
     #[test]
-    fn standalone_conditions_require_known_satisfied_context() {
+    fn same_station_conditions_are_informational_but_layout_conditions_still_gate() {
         let mut knowledge = load_knowledge();
         knowledge.newbie.clear();
         knowledge.combinations.clear();
@@ -1401,7 +1583,16 @@ mod tests {
             &knowledge,
             &PlayerAdviceContext::default(),
         );
-        assert!(unknown.recommendations.is_empty());
+        let unknown_names = unknown
+            .recommendations
+            .iter()
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(unknown_names, vec!["吉星"]);
+        assert_eq!(
+            unknown.recommendations[0].conditions[0].status,
+            PlayerConditionStatus::Unknown
+        );
 
         let known = build_player_training_advice(
             &operbox(&[]),
@@ -1419,17 +1610,12 @@ mod tests {
             .map(|item| item.operator.as_str())
             .collect::<Vec<_>>();
 
-        assert_eq!(names, vec!["伺夜", "空弦", "至简"]);
+        assert_eq!(names, vec!["吉星", "伺夜", "空弦", "至简"]);
         assert!(known.recommendations.iter().all(|item| {
             item.reason == PlayerRecommendationReason::Standalone
                 && item.product.is_some()
                 && item.efficiency.is_some()
-                && item
-                    .conditions
-                    .iter()
-                    .all(|condition| condition.status == PlayerConditionStatus::Satisfied)
         }));
-        assert!(!names.contains(&"吉星"));
     }
 
     #[test]

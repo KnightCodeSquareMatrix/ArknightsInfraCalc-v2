@@ -18,7 +18,8 @@ use infra_core::operbox::{
     default_layout_243_path, default_operbox_full_e2_path, OperBox, OperBoxEntry,
 };
 use infra_core::schedule::{
-    DailyTotals, ShiftEfficiencies, TeamLabel, TeamRotationReport, TimedRotationProfile,
+    DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
+    TimedRotationProfile,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::training_advice::{
@@ -618,6 +619,7 @@ fn handle_plan_compute(
         &operbox,
         &params.layout,
         &state.training_advice_knowledge,
+        Some(&computed.current.rotation),
     );
     serde_json::to_value(PlanComputeResult {
         schema_version: PLAN_SCHEMA_VERSION,
@@ -633,12 +635,40 @@ fn build_plan_compute_training_advice(
     operbox: &OperBox,
     blueprint: &BaseBlueprint,
     knowledge: &TrainingAdviceKnowledge,
+    rotation: Option<&TeamRotationReport>,
 ) -> PlayerTrainingAdviceReport {
-    build_player_training_advice(
-        operbox,
-        knowledge,
-        &PlayerAdviceContext::from_blueprint(blueprint),
-    )
+    let mut context = PlayerAdviceContext::from_blueprint(blueprint);
+    if let Some(rotation) = rotation {
+        context.trade_average_efficiency_percent = average_station_skill_efficiency_percent(
+            rotation
+                .shifts
+                .iter()
+                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
+            |line| line.trade_efficiency,
+            |line| line.trade_skill_efficiency,
+        );
+        context.manufacturing_average_efficiency_percent = average_station_skill_efficiency_percent(
+            rotation
+                .shifts
+                .iter()
+                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
+            |line| line.manufacture_efficiency,
+            |line| line.manufacture_skill_efficiency,
+        );
+    }
+    build_player_training_advice(operbox, knowledge, &context)
+}
+
+fn average_station_skill_efficiency_percent<'a>(
+    lines: impl Iterator<Item = &'a RoomEfficiencyLine>,
+    station_efficiency: impl Fn(&RoomEfficiencyLine) -> infra_core::Efficiency,
+    skill_efficiency: impl Fn(&RoomEfficiencyLine) -> infra_core::Efficiency,
+) -> Option<f64> {
+    let values = lines
+        .filter(|line| line.operator_count > 0 && !station_efficiency(line).is_zero())
+        .map(|line| skill_efficiency(line).as_f64() * 100.0 / line.operator_count as f64)
+        .collect::<Vec<_>>();
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
 fn validated_label(value: Option<String>, fallback: &str, field: &str) -> Result<String, Error> {
@@ -979,27 +1009,60 @@ mod tests {
         }))
         .unwrap();
 
-        let gated = build_plan_compute_training_advice(&operbox, &without_originium, &knowledge);
+        let gated =
+            build_plan_compute_training_advice(&operbox, &without_originium, &knowledge, None);
         assert_eq!(gated.context.has_originium_shard_factory, Some(false));
         assert!(gated.recommendations.iter().all(|item| {
-            item.operator != "火神"
+            !matches!(item.operator.as_str(), "泡泡" | "火神")
                 && !matches!(
                     item.operator.as_str(),
                     "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
                 )
         }));
 
-        let enabled = build_plan_compute_training_advice(&operbox, &with_originium, &knowledge);
+        let enabled =
+            build_plan_compute_training_advice(&operbox, &with_originium, &knowledge, None);
         assert_eq!(enabled.context.has_originium_shard_factory, Some(true));
-        assert!(enabled
+        let bubble_names = enabled
             .recommendations
             .iter()
-            .any(|item| item.operator == "火神"));
+            .filter(|item| item.combination_id.as_deref() == Some("bubble_group"))
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(bubble_names, vec!["泡泡", "火神"]);
         assert!(enabled.recommendations.iter().any(|item| {
             matches!(
                 item.operator.as_str(),
                 "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
             )
         }));
+    }
+
+    #[test]
+    fn t9_average_uses_skill_efficiency_per_worker_without_duration_weighting() {
+        let lines = vec![
+            RoomEfficiencyLine {
+                room_id: "trade_1".to_string(),
+                operator_count: 2,
+                trade_efficiency: infra_core::Efficiency::from_decimal(1.8),
+                trade_skill_efficiency: infra_core::Efficiency::from_decimal(0.8),
+                ..RoomEfficiencyLine::default()
+            },
+            RoomEfficiencyLine {
+                room_id: "trade_2".to_string(),
+                operator_count: 3,
+                trade_efficiency: infra_core::Efficiency::from_decimal(1.6),
+                trade_skill_efficiency: infra_core::Efficiency::from_decimal(0.6),
+                ..RoomEfficiencyLine::default()
+            },
+        ];
+
+        let average = average_station_skill_efficiency_percent(
+            lines.iter(),
+            |line| line.trade_efficiency,
+            |line| line.trade_skill_efficiency,
+        )
+        .unwrap();
+        assert_eq!(average, 30.0);
     }
 }

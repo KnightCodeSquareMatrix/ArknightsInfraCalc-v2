@@ -4219,6 +4219,7 @@ fn continuation_room_line(
 ) -> RoomEfficiencyLine {
     RoomEfficiencyLine {
         room_id: total.room_id.clone(),
+        operator_count: total.operator_count,
         trade_efficiency: continuation_efficiency(total.trade_efficiency, first.trade_efficiency),
         trade_skill_efficiency: continuation_efficiency(
             total.trade_skill_efficiency,
@@ -5028,18 +5029,19 @@ mod tests {
         );
         let first = RoomEfficiencyLine {
             room_id: "trade_1".into(),
+            operator_count: 2,
             trade_efficiency: Efficiency::from_decimal(1.0),
             ..RoomEfficiencyLine::default()
         };
         let total = RoomEfficiencyLine {
             room_id: "trade_1".into(),
+            operator_count: 3,
             trade_efficiency: Efficiency::from_decimal(2.0),
             ..RoomEfficiencyLine::default()
         };
-        assert_eq!(
-            continuation_room_line(&total, &first).trade_efficiency,
-            Efficiency::from_decimal(3.0)
-        );
+        let continuation = continuation_room_line(&total, &first);
+        assert_eq!(continuation.trade_efficiency, Efficiency::from_decimal(3.0));
+        assert_eq!(continuation.operator_count, 3);
     }
 
     #[test]

@@ -152,6 +152,7 @@
         {"operator":"砾","role":"important","target":{"kind":"explicit","elite":1}},
         {"operator":"斑点","role":"important","target":{"kind":"explicit","elite":1}}
       ],
+      "dynamic_skill_members":[{"skill_name_contains":"金属工艺","facility":"manufacture","role":"important","choice_group_id":"metalwork_peer","exclude":["苍苔"]}],
       "completion":{"required":["苍苔"],"choice_groups":[{"id":"metalwork_peer","label":"金属工艺成员","minimum":1,"members":["砾","斑点"]}]}
     },
     {
@@ -163,7 +164,9 @@
         {"operator":"稀音","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"帕拉斯","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"刻俄柏","role":"important","target":{"kind":"explicit","elite":2}},
-        {"operator":"圣约送葬人","role":"secondary","target":{"kind":"explicit","elite":2}}
+        {"operator":"圣约送葬人","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"黑角","role":"secondary","target":{"kind":"no_requirement"}},
+        {"operator":"蛇屠箱","role":"secondary","target":{"kind":"no_requirement"}}
       ],
       "completion":{"required":["红云"],"alternatives":[
         {"required":["酒神","Miss.Christine"]},
@@ -204,7 +207,7 @@
     {
       "id":"mizuki_standardization","name":"水月标准化组","product":"general_manufacturing","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station","control_center"],
       "members":[
-        {"operator":"水月","role":"core","target":{"kind":"needs_review"}},
+        {"operator":"水月","role":"core","target":{"kind":"explicit","elite":2}},
         {"operator":"香草","role":"important","target":{"kind":"explicit","elite":0}},
         {"operator":"杰西卡","role":"important","target":{"kind":"explicit","elite":0}},
         {"operator":"史都华德","role":"secondary","target":{"kind":"explicit","elite":1}},
@@ -221,6 +224,7 @@
         {"operator":"淬羽赫默","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"娜斯提","role":"important","target":{"kind":"explicit","elite":2}}
       ],
+      "dynamic_skill_members":[{"skill_name_contains":"莱茵科技","facility":"manufacture","role":"secondary"}],
       "completion":{"required":["多萝西","淬羽赫默","娜斯提"]}
     },
     {

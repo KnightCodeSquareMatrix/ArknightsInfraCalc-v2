@@ -47,7 +47,7 @@
 
 ## 当前实现状态
 
-**2026-08-05：** 阶段 A/B/C/E 已合入：独立 knowledge schema、完整新手/17 组/18 名散件知识、`player` schema v2 完成度与优先级输出、C2/C3/T9 上下文 policy，以及 `advice --player --player-context <json> [--layout <blueprint>]` 入口已落在 `infra-core::training_advice` / `infra-cli`。前端 `plan.compute.training_advice` 同样消费本次 operbox/layout，可直接判定源石、会客室、宿舍和工程机器人布局条件；人均效率的 plan.compute 统计口径尚未裁决，因此不从 daily 总效率猜测 T9。待决目标、动态成员、T11 组合级实际效率和同站编制条件保持开放；五章自然语言报告和 `--answer` 留给未来 AI。旧 v2 `training_recommendations.json` + `evaluate`/`rag` 继续作为诊断兼容路径，阶段 D 尚未修改。
+**2026-08-05：** 阶段 A/B/C/E 已合入：独立 knowledge schema、完整新手/17 组/散件知识、`player` schema v2 完成度与优先级输出，以及 `plan.compute.training_advice` 前端接口。T9 由排班结果中各班各站的 `skill-efficiency ÷ 当班人数` 简单平均计算；动态金属工艺/莱茵科技成员由技能名自动枚举；同站条件只作说明，源石线和泡泡双人门闩仍是行动门闩；“部分可用/30% 合格形态”已废弃。新前端直接使用 `plan.compute.training_advice`，旧 v2 `training_recommendations.json`/`evaluate`/`rag` 仅保留为独立诊断工具，不作为前端数据源；五章自然语言报告和 `--answer` 留给未来 AI。
 
 ## 新干员事实来源
 

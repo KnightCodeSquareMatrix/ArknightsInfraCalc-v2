@@ -10,9 +10,9 @@ pub use knowledge::{
     default_training_advice_knowledge_path, load_training_advice_knowledge,
     validate_training_advice_knowledge, AcquisitionInfo, AcquisitionKind, ChoiceGroup,
     CombinationKnowledgeEntry, CombinationMember, CombinationScale, CombinationTier,
-    CompletionAlternative, CompletionSpec, ConditionKind, EfficiencyFact, EfficiencyUnit,
-    KnowledgeRole, KnowledgeSource, KnowledgeTarget, NewbieKnowledgeEntry, ProductBucket,
-    StandaloneKnowledgeEntry, TargetKind, TrainingAdviceKnowledge,
+    CompletionAlternative, CompletionSpec, ConditionKind, DynamicSkillMembers, EfficiencyFact,
+    EfficiencyUnit, KnowledgeRole, KnowledgeSource, KnowledgeTarget, NewbieKnowledgeEntry,
+    ProductBucket, StandaloneKnowledgeEntry, TargetKind, TrainingAdviceKnowledge,
 };
 pub use player::{
     build_player_training_advice, CombinationMemberProgress, CombinationProgress,

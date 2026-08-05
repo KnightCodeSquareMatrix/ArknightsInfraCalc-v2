@@ -1,10 +1,13 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
+use crate::instances::{default_instances_path, OperatorInstances};
 use crate::skill_table::data_path;
+use crate::skill_table::{default_skill_table_path, SkillTable};
+use crate::tier::PromotionTier;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingAdviceKnowledge {
@@ -44,9 +47,22 @@ pub struct CombinationKnowledgeEntry {
     #[serde(default)]
     pub scale: CombinationScale,
     pub members: Vec<CombinationMember>,
+    #[serde(default)]
+    pub dynamic_skill_members: Vec<DynamicSkillMembers>,
     pub completion: CompletionSpec,
     #[serde(default)]
     pub evidence: Vec<KnowledgeSource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamicSkillMembers {
+    pub skill_name_contains: String,
+    pub facility: String,
+    pub role: KnowledgeRole,
+    #[serde(default)]
+    pub choice_group_id: Option<String>,
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,14 +233,110 @@ pub fn load_training_advice_knowledge(path: &Path) -> Result<TrainingAdviceKnowl
             path.display()
         ))
     })?;
-    let knowledge: TrainingAdviceKnowledge = serde_json::from_str(&raw).map_err(|error| {
+    let mut knowledge: TrainingAdviceKnowledge = serde_json::from_str(&raw).map_err(|error| {
         Error::msg(format!(
             "training advice knowledge parse {}: {error}",
             path.display()
         ))
     })?;
+    if knowledge
+        .combinations
+        .iter()
+        .any(|entry| !entry.dynamic_skill_members.is_empty())
+    {
+        let instances = OperatorInstances::load(&default_instances_path()?)?;
+        let table = SkillTable::load(&default_skill_table_path()?)?;
+        expand_dynamic_skill_members(&mut knowledge, &instances, &table)?;
+    }
     validate_training_advice_knowledge(&knowledge)?;
     Ok(knowledge)
+}
+
+fn expand_dynamic_skill_members(
+    knowledge: &mut TrainingAdviceKnowledge,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<()> {
+    for entry in &mut knowledge.combinations {
+        for selector in entry.dynamic_skill_members.clone() {
+            let mut candidates = BTreeMap::<String, PromotionTier>::new();
+            for (_, instance) in instances.iter() {
+                let Some(binding) = instance.facilities.get(&selector.facility) else {
+                    continue;
+                };
+                if !binding.buff_ids.iter().any(|buff_id| {
+                    table.get(buff_id).is_some_and(|skill| {
+                        skill.skill_name.contains(&selector.skill_name_contains)
+                    })
+                }) {
+                    continue;
+                }
+                let Some(tier) = PromotionTier::parse(&instance.tier) else {
+                    continue;
+                };
+                candidates
+                    .entry(instance.name.clone())
+                    .and_modify(|current| {
+                        if tier == PromotionTier::Tier0 {
+                            *current = tier;
+                        }
+                    })
+                    .or_insert(tier);
+            }
+
+            for (operator, tier) in candidates {
+                if selector.exclude.contains(&operator) {
+                    continue;
+                }
+                if !entry
+                    .members
+                    .iter()
+                    .any(|member| member.operator == operator)
+                {
+                    entry.members.push(CombinationMember {
+                        operator: operator.clone(),
+                        role: selector.role,
+                        target: match tier {
+                            PromotionTier::Tier0 => KnowledgeTarget {
+                                kind: TargetKind::Explicit,
+                                elite: Some(0),
+                                level: None,
+                            },
+                            PromotionTier::TierUp => KnowledgeTarget {
+                                kind: TargetKind::DeriveFromSkillBinding,
+                                elite: None,
+                                level: None,
+                            },
+                        },
+                    });
+                }
+                if let Some(group_id) = selector.choice_group_id.as_deref() {
+                    let group = entry
+                        .completion
+                        .choice_groups
+                        .iter_mut()
+                        .chain(
+                            entry
+                                .completion
+                                .alternatives
+                                .iter_mut()
+                                .flat_map(|alternative| alternative.choice_groups.iter_mut()),
+                        )
+                        .find(|group| group.id == group_id)
+                        .ok_or_else(|| {
+                            Error::msg(format!(
+                                "combination {} dynamic selector references unknown choice group {}",
+                                entry.id, group_id
+                            ))
+                        })?;
+                    if !group.members.contains(&operator) {
+                        group.members.push(operator);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn validate_training_advice_knowledge(knowledge: &TrainingAdviceKnowledge) -> Result<()> {
@@ -294,6 +406,16 @@ fn validate_combination(entry: &CombinationKnowledgeEntry) -> Result<()> {
             )));
         }
         validate_target(&member.target, "combination member target")?;
+    }
+    for selector in &entry.dynamic_skill_members {
+        validate_name(
+            &selector.skill_name_contains,
+            "dynamic skill member selector",
+        )?;
+        validate_name(&selector.facility, "dynamic skill member facility")?;
+        for operator in &selector.exclude {
+            validate_name(operator, "dynamic skill member exclusion")?;
+        }
     }
 
     validate_completion_shape(
@@ -479,6 +601,53 @@ mod tests {
     }
 
     #[test]
+    fn default_knowledge_expands_skill_named_combination_members() {
+        let knowledge =
+            load_training_advice_knowledge(&default_training_advice_knowledge_path().unwrap())
+                .unwrap();
+        let metalwork = knowledge
+            .combinations
+            .iter()
+            .find(|entry| entry.id == "metalwork")
+            .unwrap();
+        let metalwork_names = metalwork
+            .members
+            .iter()
+            .map(|member| member.operator.as_str())
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            metalwork_names,
+            HashSet::from(["苍苔", "引星棘刺", "砾", "斑点", "夜烟", "温米"])
+        );
+        let metalwork_choice = &metalwork.completion.choice_groups[0].members;
+        assert_eq!(metalwork_choice.len(), 5);
+        assert!(!metalwork_choice.iter().any(|operator| operator == "苍苔"));
+
+        let rhine = knowledge
+            .combinations
+            .iter()
+            .find(|entry| entry.id == "rhine_lab")
+            .unwrap();
+        let rhine_names = rhine
+            .members
+            .iter()
+            .map(|member| member.operator.as_str())
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            rhine_names,
+            HashSet::from([
+                "赫默",
+                "白面鸮",
+                "星源",
+                "溯光星源",
+                "多萝西",
+                "淬羽赫默",
+                "娜斯提",
+            ])
+        );
+    }
+
+    #[test]
     fn explicit_targets_require_a_valid_elite() {
         let mut target = KnowledgeTarget {
             kind: TargetKind::Explicit,
@@ -554,6 +723,7 @@ mod tests {
                         level: None,
                     },
                 }],
+                dynamic_skill_members: Vec::new(),
                 completion: CompletionSpec {
                     required: vec!["甲".to_string()],
                     choice_groups: Vec::new(),
