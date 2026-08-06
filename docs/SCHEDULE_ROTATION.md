@@ -78,7 +78,7 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 - 每班中枢满编 5 人。
 - 休息队的中枢干员不进入当班中枢。
 - 每个中枢干员在 αβγ 周期内至少休息 1 班。
-- 优先保留贸易 / 制造效率注入；未被体系认领的 producer 不作为中枢插件补位。
+- 优先保留贸易 / 制造效率注入；未被体系认领的纯资源型 standalone producer 不作为中枢插件补位，已认领或具备插件能力的动态 producer 仍可经普通中枢候选/插件位按实际计划结算。
 
 中枢干员归队：
 
@@ -266,6 +266,6 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 - **改但书 / 可露希尔 / 龙巫 meta 取舍** → `trade_segments.json` 的 `roles` + `search/role_pick.rs`；不要把 core priority 写回 fixed registry。
 - **改 peak 编制** → 编排层 / `assign_shift`，见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)。
 
-γ 半班生产搜索使用实际共存上下文：H1 合并 β 与当前 γ partial，H2 合并 α 与当前 γ partial；每个贸易/制造房落位前重新 resolve。中枢 seed 按实际 `shift_bind` 的生产半区过滤：正在被 γ 接替的半区处于休息态，其绑定 producer 不进入候选上下文；另一活跃半区的绑定 producer 保留，并在该 producer 活跃的 half 屏蔽新增未绑定目标标签。不能复用静态 peak `production_layout` 或 peak 全中枢代替当班共存成员。
+γ 半班生产搜索使用实际共存上下文：H1 合并 β 与当前 γ partial，H2 合并 α 与当前 γ partial；每个贸易/制造房落位前重新 resolve。中枢 seed 按实际 `shift_bind` 的生产半区过滤：正在被 γ 接替的半区处于休息态，其绑定 producer 不进入候选上下文；另一活跃半区的绑定 producer 保留。不能复用静态 peak `production_layout` 或 peak 全中枢代替当班共存成员。
 
-未形成 peak bind 的可选动态 producer 不会被轮换层强塞，只在普通中枢搜索实际选中时受 presence 约束。调度器为 α、β、γ 和两个 γ half 计算三班 presence：无 bind producer 只能与所有实际目标标签贸易干员完全不相交，不能在 roster 阶段后置新建 cohort；已有 bind 的 pair 才允许向量完全相同，其他未绑定标签仍只能出现在 producer 的休息班。找不到合法 control team 时该 producer 本轮不可用。最终导出前统一校验每班中枢恰好 5 人、显式 bind 同上同下且满足上 2 休 1，以及 producer 只按中枢、consumer 只按贸易站统计的逐班 presence 关系。
+未形成 peak bind 的可选动态 producer 不会被轮换层强塞，只在普通中枢搜索实际选中时按每班实际在场结算收益；γ 班允许普通搜索新增未绑定的目标标签 consumer，其收益只按该班最终实际在场状态结算，不要求轮换层后置新建 cohort 或反向绑定 producer（ADR 0004 D6，轮换搜索 heuristic）。最终导出前统一校验每班中枢恰好 5 人、显式 bind 同上同下且满足上 2 休 1；不再按标签重推 producer/consumer presence。

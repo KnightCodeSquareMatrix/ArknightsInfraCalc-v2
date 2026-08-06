@@ -1496,6 +1496,91 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pinus_gold_penalty_belongs_to_yanwei_only() {
+        use crate::layout::AssignedOperator;
+        use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint};
+
+        let table = table();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let room_members = vec![
+            AssignedOperator::new("灰毫", 2),
+            AssignedOperator::new("远牙", 2),
+            AssignedOperator::new("野鬃", 2),
+        ];
+
+        // 仅焰尾：红松成员赤金 -10% 生效（75 本体 - 30 焰尾 = 45）。
+        let mut yanwei_only = BaseAssignment::default();
+        yanwei_only.set_room("control", vec![AssignedOperator::new("焰尾", 2)]);
+        yanwei_only.set_room("manu_1", room_members.clone());
+        let resolved_y = resolve_base(
+            &blueprint,
+            &yanwei_only,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let room_y = resolved_y
+            .manu_rooms
+            .iter()
+            .find(|r| r.id.0 == "manu_1")
+            .unwrap();
+        let gold_y = crate::manufacture::solver::solve_manufacture(
+            &ManuRoomInput {
+                level: room_y.level,
+                operators: room_y.operators.clone(),
+                active_recipe: RecipeKind::Gold,
+                mood: 24.0,
+                layout: std::sync::Arc::new(room_y.layout.clone()),
+            },
+            &table,
+        )
+        .unwrap();
+        assert!(
+            ((gold_y.skill_efficiency.as_f64() * 100.0) - 45.0).abs() < 0.5,
+            "仅焰尾红松赤金 = 75-30 = 45, got {}",
+            gold_y.skill_efficiency.as_f64() * 100.0
+        );
+
+        // 仅薇薇安娜：无 -10%（75 本体 + 21 骑士 = 96）。
+        let mut viv_only = BaseAssignment::default();
+        viv_only.set_room("control", vec![AssignedOperator::new("薇薇安娜", 2)]);
+        viv_only.set_room("manu_1", room_members);
+        let resolved_v = resolve_base(
+            &blueprint,
+            &viv_only,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let room_v = resolved_v
+            .manu_rooms
+            .iter()
+            .find(|r| r.id.0 == "manu_1")
+            .unwrap();
+        let gold_v = crate::manufacture::solver::solve_manufacture(
+            &ManuRoomInput {
+                level: room_v.level,
+                operators: room_v.operators.clone(),
+                active_recipe: RecipeKind::Gold,
+                mood: 24.0,
+                layout: std::sync::Arc::new(room_v.layout.clone()),
+            },
+            &table,
+        )
+        .unwrap();
+        assert!(
+            ((gold_v.skill_efficiency.as_f64() * 100.0) - 96.0).abs() < 0.5,
+            "仅薇薇安娜红松赤金 = 75+21 = 96, got {}",
+            gold_v.skill_efficiency.as_f64() * 100.0
+        );
+    }
+
     fn cangtai_e2_buffs() -> Vec<&'static str> {
         vec!["manu_formula_spd[100]", "manu_skill_spd1[020]"]
     }

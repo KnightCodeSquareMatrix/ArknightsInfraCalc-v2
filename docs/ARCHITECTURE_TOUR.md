@@ -194,7 +194,7 @@ L3 不是候选选型器。它只在真实三人组和 producer manifest 已确�
 5. 从剩余池构建 gamma 对两个半区的替补。
 6. 按每班活跃队伍重建中枢和各生产房间。
 7. 对三班实际 assignment 重新评分，处理菲亚梅塔回岗。
-8. final validator 显式校验中枢 5 人、bind 次数/共同 presence 与可选动态 producer presence；生产房容量和人员互斥继续由构造、`used` 与回归验收。
+8. final validator 显式校验中枢 5 人、bind 次数/共同 presence 与计划声明的依赖事实；可选动态 producer 按每班实际在场结算，不再按标签重推；生产房容量和人员互斥继续由构造、`used` 与回归验收。
 9. 分别汇总三类按时长加权的 daily totals。
 
 轮换不等于连续心情全局最优化；当前 profile 与导出契约见 [排班模式.md](排班模式.md) 和 [SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)。

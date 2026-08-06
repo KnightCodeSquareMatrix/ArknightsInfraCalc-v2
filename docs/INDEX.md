@@ -36,7 +36,7 @@
 | 接入 Worker / BFF | [前端对接说明](FRONTEND_CLI.md) | `plan.compute` 请求响应与兼容契约 |
 | 部署长驻服务 | [前端 serve 指南](FRONTEND_SERVE_GUIDE.md) | 启动、探活、超时和部署操作 |
 | 构建发布包 | [release README](../release/README.md) | 发布目录、构建脚本和发布夹具 |
-| 使用练卡推荐 | [基建练卡推荐规则](练卡推荐规则.md) | `advice` 产品语义、规则 schema 和过滤边界 |
+| 使用练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) | 玩家产品语义、结构化输出与旧 v2 诊断边界 |
 
 命令的当前参数以生成/runtime help 和 [INFRA_CLI.md](INFRA_CLI.md) 为准；前端不得从示例输出反推长期 wire schema。
 
@@ -64,7 +64,7 @@
 | 跨设施与成套体系 | [体系导航](SYSTEM_CHAINS.md) 及其中链接的各体系 canonical |
 | 排班与换班 | [排班模式](排班模式.md)、[定时换班](定时换班.md)、[菲亚梅塔](Fiammetta.md) |
 | 对外接口 | [infra-cli](INFRA_CLI.md)、[前端接口](FRONTEND_CLI.md) |
-| 练卡推荐 | [基建练卡推荐规则](练卡推荐规则.md) |
+| 练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) |
 
 ### 完整 canonical owner 表
 
@@ -73,7 +73,11 @@
 <!-- BEGIN GENERATED CANONICAL -->
 | 领域键 | 权威入口 |
 |---|---|
-| `advice.training` | [基建练卡推荐规则](练卡推荐规则.md) |
+| `advice.training` | [练卡推荐玩家输出口径](练卡推荐相关/玩家输出口径.md) |
+| `advice.training.combinations` | [练卡推荐组合知识库](练卡推荐相关/组合知识库.md) |
+| `advice.training.newbie` | [新手基建必练与必收集名单](练卡推荐相关/新手必练与必收集名单.md) |
+| `advice.training.output` | [练卡推荐玩家输出口径](练卡推荐相关/玩家输出口径.md) |
+| `advice.training.standalone` | [高效率散件与搓玉名单](练卡推荐相关/高效率散件与搓玉名单.md) |
 | `architecture.cli` | [infra-cli 模块职责](INFRA_CLI.md) |
 | `architecture.orchestration` | [编排层重构路线图（Orchestration Layer）](ORCHESTRATION_LAYER.md) |
 | `docs.lifecycle` | [文档生命周期](文档生命周期.md) |
@@ -126,6 +130,7 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 | [ADR 0001: layout 体系编排与 assignment 拆分](ADR/0001-layout-assignment-decomposition.md) | `accepted` | 保存布局编制分解为 System、Plan、Execute 的架构决策 |
 | [ADR 0002: 排班换班逻辑按模式分层](ADR/0002-schedule-rotation-mode-split.md) | `accepted` | 保存排班按执行模式分层的架构决策 |
 | [ADR 0003：办公室与会客室前端结果契约](ADR/0003-support-facility-frontend-contract.md) | `accepted` | 规定办公室与会客室静态求值未来如何通过 plan.compute 增量提供给 beta 前端 |
+| [ADR 0004: 体系审计裁决与排班责任边界](ADR/0004-scheduling-semantics-audit-rulings.md) | `accepted` | 保存 2026-07 体系审计中确认的领域语义、排班事实所有权与动态 producer 范围 |
 <!-- END GENERATED DECISIONS -->
 
 ## 6. 开发与项目治理

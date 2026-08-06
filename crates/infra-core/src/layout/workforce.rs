@@ -153,13 +153,10 @@ impl WorkforceIndex {
             .map(|a| vec![a.name.clone()])
             .unwrap_or_default();
 
-        let rhine_life_in_base = count_tagged_in_base_excluding(
-            instances,
-            &all_base_names,
-            &training_assist,
-            TAG_RHINE,
-            6,
-        );
+        // 训练主位与训练副手均计入莱茵生命阵营人数（canonical RHINE_LAB §3）；
+        // all_base_names 已包含副手，此处不再排除。
+        let rhine_life_in_base =
+            count_tagged_in_base_excluding(instances, &all_base_names, &[], TAG_RHINE, 6);
 
         let durin_in_base = count_tagged_in_base_excluding(
             instances,
@@ -519,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn rhine_life_in_base_counts_tagged_workforce_capped_and_excludes_assist() {
+    fn rhine_life_in_base_counts_tagged_workforce_capped() {
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let instances =
             OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
@@ -539,6 +536,62 @@ mod tests {
         assignment.training_assist = Some(AssignedOperator::new("流明", 2));
         let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert_eq!(idx.rhine_life_in_base, 6);
+    }
+
+    #[test]
+    fn rhine_life_in_base_includes_training_assist() {
+        let bp = BaseBlueprint::template_243_use_this().unwrap();
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.base_workforce = ["缪尔赛思", "多萝西", "娜斯提"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assignment.training_assist = Some(AssignedOperator::new("赫默", 2));
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.rhine_life_in_base, 4);
+    }
+
+    #[test]
+    fn rhine_life_in_base_includes_dormitory_operator() {
+        let bp = BaseBlueprint::template_243_use_this().unwrap();
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("dorm_1", vec![AssignedOperator::new("星源", 2)]);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.rhine_life_in_base, 1);
+    }
+
+    #[test]
+    fn rhine_life_in_base_ignores_non_rhine_training_assist() {
+        let bp = BaseBlueprint::template_243_use_this().unwrap();
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.base_workforce = ["缪尔赛思", "多萝西"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assignment.training_assist = Some(AssignedOperator::new("流明", 2));
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.rhine_life_in_base, 2);
+    }
+
+    #[test]
+    fn rhine_life_in_base_dedups_assist_already_in_workforce() {
+        let bp = BaseBlueprint::template_243_use_this().unwrap();
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.base_workforce = ["缪尔赛思", "多萝西", "赫默"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assignment.training_assist = Some(AssignedOperator::new("赫默", 2));
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.rhine_life_in_base, 3);
     }
 
     #[test]

@@ -1478,4 +1478,83 @@ mod tests {
             layout.office_hire_spd_pct
         );
     }
+
+    #[test]
+    fn suscentheart_produces_fixed_silent_echo_at_elite0_without_perception() {
+        // PRTS「无声共鸣」精0 开放：现阶段按固定 5 点 SilentEcho 结算（ADR 0004 D4）；
+        // 不产 Perception、不影响 50 感知启动门槛。
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("dorm_1", vec![AssignedOperator::new("塑心", 0)]);
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        assert!(
+            (resolved.layout.global.get(GlobalResourceKey::SilentEcho) - 5.0).abs() < f64::EPSILON,
+            "塑心精0 应产 5 点无声共鸣, got {}",
+            resolved.layout.global.get(GlobalResourceKey::SilentEcho)
+        );
+        assert!(
+            (resolved.layout.global.get(GlobalResourceKey::Perception) - 0.0).abs() < f64::EPSILON,
+            "塑心不应产感知, got {}",
+            resolved.layout.global.get(GlobalResourceKey::Perception)
+        );
+
+        let mut e2 = BaseAssignment::default();
+        e2.set_room("dorm_1", vec![AssignedOperator::new("塑心", 2)]);
+        let resolved_e2 =
+            resolve_base(&blueprint, &e2, Some(&instances), Some(&table), 24.0, None).unwrap();
+        assert!(
+            (resolved_e2.layout.global.get(GlobalResourceKey::SilentEcho) - 5.0).abs()
+                < f64::EPSILON,
+            "塑心精2 同样产 5 点无声共鸣, got {}",
+            resolved_e2.layout.global.get(GlobalResourceKey::SilentEcho)
+        );
+    }
+
+    #[test]
+    fn low_elite_dorm_producers_stay_excluded_except_silent_echo() {
+        // collector 保护：精0/精1 宿舍干员的梦境/小节仍不进入全局池；
+        // 只有塑心「无声共鸣」的 SilentEcho 产出按精0 放行。
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            "dorm_1",
+            vec![
+                AssignedOperator::new("爱丽丝", 0),
+                AssignedOperator::new("车尔尼", 0),
+                AssignedOperator::new("塑心", 0),
+            ],
+        );
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        assert!((resolved.layout.global.get(GlobalResourceKey::Dream) - 0.0).abs() < f64::EPSILON);
+        assert!(
+            (resolved
+                .layout
+                .global
+                .get(GlobalResourceKey::MusicalSection)
+                - 0.0)
+                .abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (resolved.layout.global.get(GlobalResourceKey::SilentEcho) - 5.0).abs() < f64::EPSILON
+        );
+    }
 }

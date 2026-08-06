@@ -2468,6 +2468,18 @@ mod tests {
         assert_eq!(selected(&inactive, "rosemary_perception"), None);
         assert!(!inactive.skip_registry_ids.contains("human_fireworks_pure"));
 
+        // 40 感知 + 塑心 E0（固定 5 点 SilentEcho）仍不能跨过 50 感知启动门槛：
+        // 无声共鸣不是 Perception 资源。
+        let forty_plus_suscentheart =
+            operbox(&[("迷迭香", 2), ("黑键", 2), ("八幡海铃", 2), ("塑心", 0)]);
+        let inactive_suscentheart =
+            compile(&bp, &forty_plus_suscentheart, &BaseAssignment::default());
+        assert_eq!(
+            selected(&inactive_suscentheart, "rosemary_perception"),
+            None,
+            "塑心 SilentEcho 不参与 50 感知门槛（ADR 0004 D4）"
+        );
+
         let fifty = operbox(&[("迷迭香", 2), ("黑键", 2), ("八幡海铃", 2), ("夕", 0)]);
         let compiled = compile(&bp, &fifty, &BaseAssignment::default());
         assert_eq!(
