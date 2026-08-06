@@ -59,7 +59,7 @@ legacy Worker `plan` ──────┘
 2. `compute_plan` 调用一次 `run_user_rotation_probe_with_profile_and_preferences`；该 probe 通过所选 `TimedRotationProfile` 进入 `schedule_timed_rotation`。
 3. 请求 profile 时，`build_box_profile_from_current_probe` 消费该 probe，不再运行第二次用户 rotation；profile 仍独立评估固定 baseline。
 4. 请求 MAA 时，`build_from_team_rotation` 消费同一 `current.rotation`。
-5. argv `plan` 用同一 rotation 打印文本并总是写 profile；`plan.compute` 返回 profile、rotation summary 与 MAA；legacy Worker `plan` 返回 rotation 摘要，并按请求生成文件输出。
+5. argv `plan` 用同一 rotation 打印文本并总是写 profile；`plan.compute` 返回 profile、rotation summary、MAA，并以同一请求的 operbox/layout 附加结构化练卡建议；legacy Worker `plan` 返回 rotation 摘要，并按请求生成文件输出。
 
 profile 是同一次排班 probe 的分析投影，不包含完整 MAA assignment。独立调用 `build_box_profile` 仍是合法 library 入口，但它不是用户 `plan` 的共享计算路径。
 

@@ -17,6 +17,7 @@ use crate::trade::solve_trade_with_shift;
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RoomEfficiencyLine {
     pub room_id: String,
+    pub operator_count: usize,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
@@ -96,6 +97,7 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.trade_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: room.operators.len(),
             ..RoomEfficiencyLine::default()
         };
         if let Some(snapshot) = assignment.efficiency_in(&room.id).filter(|s| s.is_trade()) {
@@ -132,6 +134,7 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.manu_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: room.operators.len(),
             ..RoomEfficiencyLine::default()
         };
         if let Some(snapshot) = assignment
@@ -167,6 +170,7 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.power_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: 1,
             ..RoomEfficiencyLine::default()
         };
         let input = PowerRoomInput {
@@ -253,5 +257,6 @@ mod tests {
             line.manufacture_skill_efficiency,
             Efficiency::from_decimal(0.300)
         );
+        assert_eq!(line.operator_count, 3);
     }
 }
