@@ -47,7 +47,7 @@
 
 ## 当前实现状态
 
-**2026-07-29：** 玩家合同在本目录；运行时仍主要是旧 v2 `training_recommendations.json` + `evaluate`/`rag` 五分区。`player` / `training_advice_knowledge.json` **未合入**。历史 stash 草案不作本分支事实。
+**2026-08-05：** 阶段 A/B/C/E 已合入：独立 knowledge schema、完整新手/17 组/散件知识、`player` schema v2 完成度与优先级输出，以及 `plan.compute.training_advice` 前端接口。T9 由排班结果中各班各站的 `skill-efficiency ÷ 当班人数` 简单平均计算；动态金属工艺/莱茵科技成员由技能名自动枚举；同站条件只作说明，源石线和泡泡双人门闩仍是行动门闩；“部分可用/30% 合格形态”已废弃。新前端直接使用 `plan.compute.training_advice`，旧 v2 `training_recommendations.json`/`evaluate`/`rag` 仅保留为独立诊断工具，不作为前端数据源；五章自然语言报告和 `--answer` 留给未来 AI。
 
 ## 新干员事实来源
 

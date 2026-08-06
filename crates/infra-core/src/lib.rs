@@ -152,13 +152,20 @@ pub use support_facility::{
 };
 pub use tier::PromotionTier;
 pub use training_advice::{
-    build_training_advice, build_training_advice_rag_input, default_training_recommendations_path,
-    load_training_recommendation_rules, render_training_advice_answer, AcquisitionMode,
-    AcquisitionPolicy, BlockedRuleReport, EvidenceRef, EvidenceSnippet, MemberBenefit, MemberRole,
-    MissingCoreGroupReport, OperatorAdviceItem, OperatorTrainingState, PickOneCoreSlot,
+    build_player_training_advice, build_training_advice, build_training_advice_rag_input,
+    default_training_advice_knowledge_path, default_training_recommendations_path,
+    load_training_advice_knowledge, load_training_recommendation_rules,
+    render_training_advice_answer, validate_training_advice_knowledge, AcquisitionInfo,
+    AcquisitionKind, AcquisitionMode, AcquisitionPolicy, BlockedRuleReport,
+    CombinationMemberProgress, CombinationProgress, CombinationProgressState, CombinationScale,
+    CompletionAlternative, EvidenceRef, EvidenceSnippet, MemberBenefit, MemberProgress, MemberRole,
+    MissingCoreGroupReport, NewbieProgress, OperatorAdviceItem, OperatorTrainingState,
+    PickOneCoreSlot, PlayerAction, PlayerAdviceContext, PlayerRecommendation,
+    PlayerRecommendationPriority, PlayerRecommendationReason, PlayerTrainingAdviceReport,
     RecommendationAction, RecommendationPriority, RequiredCoreGroup, ReviewStatus, RuleAdmission,
     RuleKind, RuleMatch, RuleMember, RuleReview, RuleScope, TrainingAdviceBundle,
-    TrainingAdviceFact, TrainingAdviceOptions, TrainingAdviceRagInput, TrainingAdviceReport,
-    TrainingAdviceSummary, TrainingRecommendationRules, TrainingRule, TrainingTarget,
+    TrainingAdviceFact, TrainingAdviceKnowledge, TrainingAdviceOptions, TrainingAdviceRagInput,
+    TrainingAdviceReport, TrainingAdviceSummary, TrainingRecommendationRules, TrainingRule,
+    TrainingTarget, MAX_PLAYER_RECOMMENDATIONS,
 };
 pub use types::*;

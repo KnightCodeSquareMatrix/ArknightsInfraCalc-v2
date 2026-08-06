@@ -259,7 +259,7 @@ infra-cli layout team-rotation \
 **前端解析建议：**
 
 - 一次性 CLI 集成：使用 **`plan`**，传入 `--profile-out` + `--maa-out`，读取对应文件。
-- 常驻 Next BFF：使用 `infra-cli serve` 的 `plan.compute`，内联提交 layout/operbox，并从同一响应读取 profile、rotation 和 MAA。
+- 常驻 Next BFF：使用 `infra-cli serve` 的 `plan.compute`，内联提交 layout/operbox，并从同一响应读取 profile、rotation、MAA 和结构化练卡建议。
 - stdout / stderr 作为日志或人类可读报告展示，不作为结构化数据源。
 - 下载 / 导入 MAA：一次性 CLI 使用 **`--maa-out` 已知路径** 读文件；常驻 Worker 直接读取 `result.maa`。
 - 成功：`exit code == 0`；失败：stderr 含 `error:`，非零退出码。
@@ -272,7 +272,7 @@ infra-cli layout team-rotation \
 {"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
-响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）和 `maa`。`rotation.shifts[]` 承载 index、duration、active/resting teams、weighted 指标和 `efficiencies.room_lines`，不承载完整 assignment。`rotation` 取值为 `abc_12_6_6`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5`；省略时为默认 ABC，非法值明确失败。
+响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`training_advice` 固定包含新手章节状态 `newbie_section_status`、全量 `incomplete_newbie`、常见组合 `combinations` 和最多 10 人的 `recommendations`；建议可附带 `product`、`efficiency` 和逐条件 `conditions`。它消费本次请求的 operbox 与 layout，已知无源石碎片制造站时不会推荐搓玉干员或泡泡/火神，且泡泡组有源石线时成对输出；同站条件只作说明。排班结果按每班每站 `skill-efficiency ÷ operator_count` 的简单平均注入 T9 上下文，超过贸易 30% 且制造 25% 时跳过新手行动建议但保留完整未完成清单。`rotation.shifts[]` 的 `efficiencies.room_lines[]` 还包含 `operator_count`，便于前端复核均效口径。
 
 `plan.compute` v1 参数的机器契约是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)，人类可读契约见 [`contracts/plan-compute-v1.md`](../contracts/plan-compute-v1.md)。Worker 在 Serde 反序列化前执行该 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 发布后不可原地增加、删除或改变请求字段，任何结构或语义扩展必须使用新版本。
 

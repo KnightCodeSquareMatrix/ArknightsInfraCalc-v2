@@ -76,7 +76,7 @@ fn print_usage() {
         "      [--profile-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--json]"
     );
     eprintln!("      (default layout: data/fixtures/243/layout.json)");
-    eprintln!("  infra-cli advice --operbox <path.json> [--rules <path>] [--answer | --explain [--pretty]]");
+    eprintln!("  infra-cli advice --operbox <path.json> [--player [--layout <layout.json>] [--player-context <context.json>] [--pretty] | --rules <path> | --answer | --explain [--pretty]]");
     eprintln!("  infra-cli verify --case <case_id>");
     eprintln!("  infra-cli verify --all");
     eprintln!("  infra-cli pool [--trade] [--manufacture] [--roster <path>] [--operbox <path>] [-o <file.csv>] [--text]");

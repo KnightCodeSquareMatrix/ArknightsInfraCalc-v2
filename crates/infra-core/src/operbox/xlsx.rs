@@ -153,6 +153,7 @@ fn trim_float(f: f64) -> String {
 
 fn cell_u8(cell: Option<&Data>) -> Result<u8> {
     match cell {
+        None | Some(Data::Empty) => Ok(0),
         Some(Data::Int(value)) => u8::try_from(*value)
             .map_err(|_| Error::msg(format!("expected integer 0..=255, got {value}"))),
         Some(Data::Float(value))
@@ -174,6 +175,7 @@ fn cell_u8(cell: Option<&Data>) -> Result<u8> {
 
 fn cell_u32(cell: Option<&Data>) -> Result<u32> {
     match cell {
+        None | Some(Data::Empty) => Ok(0),
         Some(Data::Int(value)) => u32::try_from(*value)
             .map_err(|_| Error::msg(format!("expected integer 0..={}, got {value}", u32::MAX))),
         Some(Data::Float(value))
@@ -196,6 +198,7 @@ fn cell_u32(cell: Option<&Data>) -> Result<u32> {
 
 fn cell_bool(cell: Option<&Data>) -> Result<bool> {
     match cell {
+        None | Some(Data::Empty) => Ok(false),
         Some(Data::Bool(value)) => Ok(*value),
         Some(Data::Int(0)) => Ok(false),
         Some(Data::Int(1)) => Ok(true),
@@ -227,11 +230,13 @@ mod tests {
 
     #[test]
     fn parse_bool_and_int_cells_strictly() {
-        assert!(cell_bool(Some(&Data::Empty)).is_err());
+        assert!(!cell_bool(Some(&Data::Empty)).unwrap());
         assert!(cell_bool(Some(&Data::Bool(true))).unwrap());
         assert!(cell_bool(Some(&Data::Int(1))).unwrap());
         assert!(!cell_bool(Some(&Data::String("否".into()))).unwrap());
         assert!(cell_bool(Some(&Data::String("unknown".into()))).is_err());
+        assert_eq!(cell_u8(Some(&Data::Empty)).unwrap(), 0);
+        assert_eq!(cell_u32(None).unwrap(), 0);
         assert_eq!(cell_u8(Some(&Data::Float(2.0))).unwrap(), 2);
         assert!(cell_u8(Some(&Data::Float(2.4))).is_err());
         assert_eq!(cell_u32(Some(&Data::String("90".into()))).unwrap(), 90);

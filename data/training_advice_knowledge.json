@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "newbie": [
+    {"operator":"但书","rarity":5,"product":"trade","target":{"kind":"explicit","elite":2}},
+    {"operator":"可露希尔","rarity":6,"product":"trade","target":{"kind":"explicit","elite":2}},
+    {"operator":"巫恋","rarity":5,"product":"trade","target":{"kind":"explicit","elite":2}},
+    {"operator":"龙舌兰","rarity":5,"product":"trade","target":{"kind":"explicit","elite":2}},
+    {"operator":"石英","rarity":4,"product":"trade","target":{"kind":"explicit","elite":1},"acquisition":{"kind":"shop","detail":"采购凭证商店兑换；可刷取 AP-5 获得采购凭证"}},
+    {"operator":"月见夜","rarity":3,"product":"trade","target":{"kind":"explicit","elite":0}},
+    {"operator":"空爆","rarity":3,"product":"trade","target":{"kind":"explicit","elite":0}},
+    {"operator":"古米","rarity":4,"product":"trade","target":{"kind":"explicit","elite":0}},
+    {"operator":"夜刀","rarity":2,"product":"trade","target":{"kind":"explicit","elite":0}},
+    {"operator":"慕斯","rarity":4,"product":"trade","target":{"kind":"explicit","elite":0}},
+
+    {"operator":"清流","rarity":4,"product":"gold","target":{"kind":"explicit","elite":1},"acquisition":{"kind":"public_recruitment","detail":"公开招募使用“支援＋医疗干员”或“支援＋治疗”"}},
+    {"operator":"砾","rarity":4,"product":"gold","target":{"kind":"explicit","elite":1}},
+    {"operator":"斑点","rarity":3,"product":"gold","target":{"kind":"explicit","elite":1}},
+    {"operator":"夜烟","rarity":4,"product":"gold","target":{"kind":"explicit","elite":0}},
+    {"operator":"苍苔","rarity":5,"product":"gold","target":{"kind":"explicit","elite":0},"acquisition":{"kind":"event","detail":"打通“曲谱—夏日律动—火山旅梦”活动获取"}},
+
+    {"operator":"断罪者","rarity":4,"product":"experience","target":{"kind":"explicit","elite":1},"acquisition":{"kind":"redeem_code","detail":"每年 4 月 1 日愚人节期间在游戏官网使用兑换码"}},
+    {"operator":"红豆","rarity":4,"product":"experience","target":{"kind":"explicit","elite":0}},
+    {"operator":"白雪","rarity":4,"product":"experience","target":{"kind":"explicit","elite":1}},
+    {"operator":"霜叶","rarity":4,"product":"experience","target":{"kind":"explicit","elite":1}},
+    {"operator":"机械师","rarity":6,"product":"experience","target":{"kind":"explicit","elite":0},"acquisition":{"kind":"integrated_strategy","detail":"集成战略“黑流树海”赠送"}},
+    {"operator":"食铁兽","rarity":5,"product":"experience","target":{"kind":"explicit","elite":0}},
+    {"operator":"红云","rarity":4,"product":"experience","target":{"kind":"explicit","elite":1}},
+    {"operator":"怒潮凛冬","rarity":6,"product":"experience","target":{"kind":"explicit","elite":0}},
+    {"operator":"Castle-3","rarity":1,"product":"experience","target":{"kind":"explicit","elite":0,"level":30},"acquisition":{"kind":"public_recruitment","detail":"公开招募使用“支援机械＋近卫干员”，或单选“近卫干员”并设置一小时"}},
+
+    {"operator":"香草","rarity":3,"product":"general_manufacturing","target":{"kind":"explicit","elite":0}},
+    {"operator":"杰西卡","rarity":4,"product":"general_manufacturing","target":{"kind":"explicit","elite":0}},
+    {"operator":"史都华德","rarity":3,"product":"general_manufacturing","target":{"kind":"explicit","elite":1}},
+    {"operator":"调香师","rarity":4,"product":"general_manufacturing","target":{"kind":"explicit","elite":1}},
+    {"operator":"罗比菈塔","rarity":4,"product":"general_manufacturing","target":{"kind":"explicit","elite":1}}
+  ],
+  "combinations": [
+    {
+      "id":"tequila_group","name":"龙舌兰组","product":"trade","tier":"high_efficiency","scale":"small","facilities":["trade_station"],
+      "members":[
+        {"operator":"巫恋","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"龙舌兰","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"卡夫卡","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"柏喙","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"明椒","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"折光","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["巫恋","龙舌兰"],"choice_groups":[{"id":"tailor_beta","label":"裁缝 β 四选一","minimum":1,"members":["卡夫卡","柏喙","明椒","折光"]}]},
+      "evidence":[{"path":"docs/练卡推荐相关/组合知识库.md","heading":"4.1 高效率组合"}]
+    },
+    {
+      "id":"exusiai_group","name":"能天使组","product":"trade","tier":"high_efficiency","scale":"small","facilities":["trade_station"],
+      "members":[
+        {"operator":"能天使","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"蕾缪安","role":"core","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["能天使","蕾缪安"]}
+    },
+    {
+      "id":"siracusa","name":"叙拉古","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","control_center"],
+      "members":[
+        {"operator":"伺夜","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"八幡海铃","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"贝洛内","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["伺夜","八幡海铃","贝洛内"]}
+    },
+    {
+      "id":"karlan_trade","name":"喀兰贸易组","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","control_center"],
+      "members":[
+        {"operator":"灵知","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"银灰","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"孑","role":"core","target":{"kind":"explicit","elite":1}},
+        {"operator":"琳琅诗怀雅","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"崖心","role":"secondary","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["灵知","银灰","孑"]}
+    },
+    {
+      "id":"glasgow","name":"格拉斯哥帮组","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","control_center"],
+      "members":[
+        {"operator":"摩根","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"戴菲恩","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"推进之王","role":"core","target":{"kind":"explicit","elite":0}},
+        {"operator":"维娜·维多利亚","role":"secondary","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["摩根","戴菲恩","推进之王"]}
+    },
+    {
+      "id":"pozyomka_durin","name":"鸿雪杜林组","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","base"],
+      "members":[
+        {"operator":"鸿雪","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"绮良","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"图耶","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"至简","role":"hanger","target":{"kind":"no_requirement"}},
+        {"operator":"桃金娘","role":"hanger","target":{"kind":"no_requirement"}},
+        {"operator":"褐果","role":"hanger","target":{"kind":"no_requirement"}},
+        {"operator":"杜林","role":"hanger","target":{"kind":"no_requirement"}},
+        {"operator":"特克诺","role":"hanger","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["鸿雪","绮良","图耶"],"choice_groups":[{"id":"durin_hangers","label":"杜林挂件五选四","minimum":4,"members":["至简","桃金娘","褐果","杜林","特克诺"]}]}
+    },
+    {
+      "id":"human_fireworks","name":"人间烟火组","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","control_center","office"],
+      "members":[
+        {"operator":"乌有","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"重岳","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"令","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"桑葚","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"琴柳","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"夕","role":"secondary","target":{"kind":"explicit","elite":0}},
+        {"operator":"截云","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"黍","role":"secondary","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["乌有","重岳","令","桑葚","琴柳"]}
+    },
+    {
+      "id":"penguin_logistics","name":"企鹅物流","product":"trade","tier":"low_efficiency","scale":"small","facilities":["trade_station"],
+      "members":[
+        {"operator":"德克萨斯","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"拉普兰德","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"能天使","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["德克萨斯","拉普兰德","能天使"]}
+    },
+    {
+      "id":"deepcolor_ulpianus","name":"深巡＋乌尔比安","product":"trade","tier":"low_efficiency","scale":"small","facilities":["trade_station","base"],
+      "members":[
+        {"operator":"深巡","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"乌尔比安","role":"hanger","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["深巡","乌尔比安"]}
+    },
+    {
+      "id":"automation","name":"自动化组","product":"gold","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station","power_station","control_center"],
+      "members":[
+        {"operator":"温蒂","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"清流","role":"core","target":{"kind":"explicit","elite":1}},
+        {"operator":"承曦格雷伊","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"森蚺","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"冬时","role":"important","target":{"kind":"explicit","elite":1}},
+        {"operator":"异客","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"掠风","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"Lancet-2","role":"hanger","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["温蒂","清流"],"choice_groups":[{"id":"automation_third","label":"自动化第三人","minimum":1,"members":["承曦格雷伊","森蚺","冬时"]}]}
+    },
+    {
+      "id":"metalwork","name":"赤金工艺组","product":"gold","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station"],
+      "members":[
+        {"operator":"苍苔","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"砾","role":"important","target":{"kind":"explicit","elite":1}},
+        {"operator":"斑点","role":"important","target":{"kind":"explicit","elite":1}}
+      ],
+      "dynamic_skill_members":[{"skill_name_contains":"金属工艺","facility":"manufacture","role":"important","choice_group_id":"metalwork_peer","exclude":["苍苔"]}],
+      "completion":{"required":["苍苔"],"choice_groups":[{"id":"metalwork_peer","label":"金属工艺成员","minimum":1,"members":["砾","斑点"]}]}
+    },
+    {
+      "id":"vermeil","name":"红云组","product":"experience","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station"],
+      "members":[
+        {"operator":"红云","role":"core","target":{"kind":"explicit","elite":1}},
+        {"operator":"酒神","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"Miss.Christine","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"稀音","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"帕拉斯","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"刻俄柏","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"圣约送葬人","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"黑角","role":"secondary","target":{"kind":"no_requirement"}},
+        {"operator":"蛇屠箱","role":"secondary","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["红云"],"alternatives":[
+        {"required":["酒神","Miss.Christine"]},
+        {"choice_groups":[{"id":"vermeil_capacity","label":"仓容分支三选二","minimum":2,"members":["稀音","帕拉斯","刻俄柏"]}]}
+      ]}
+    },
+    {
+      "id":"red_pine","name":"红松林骑士组","product":"experience","tier":"high_efficiency","scale":"system","facilities":["manufacturing_station","control_center"],
+      "members":[
+        {"operator":"焰尾","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"薇薇安娜","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"灰毫","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"远牙","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"野鬃","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["焰尾","薇薇安娜"],"choice_groups":[{"id":"red_pine_workers","label":"红松林制造成员三选二","minimum":2,"members":["灰毫","远牙","野鬃"]}]}
+    },
+    {
+      "id":"abyssal_hunters","name":"深海猎人组","product":"general_manufacturing","tier":"high_efficiency","scale":"system","facilities":["manufacturing_station","control_center"],
+      "members":[
+        {"operator":"歌蕾蒂娅","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"乌尔比安","role":"important","target":{"kind":"no_requirement"}},
+        {"operator":"斯卡蒂","role":"important","target":{"kind":"no_requirement"}},
+        {"operator":"幽灵鲨","role":"important","target":{"kind":"no_requirement"}},
+        {"operator":"安哲拉","role":"important","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["歌蕾蒂娅","乌尔比安","斯卡蒂","幽灵鲨","安哲拉"]}
+    },
+    {
+      "id":"bubble_group","name":"泡泡组","product":"general_manufacturing","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station"],
+      "members":[
+        {"operator":"泡泡","role":"core","target":{"kind":"explicit","elite":1}},
+        {"operator":"火神","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"贝娜","role":"secondary","target":{"kind":"explicit","elite":0}}
+      ],
+      "completion":{"required":["泡泡","火神"]}
+    },
+    {
+      "id":"mizuki_standardization","name":"水月标准化组","product":"general_manufacturing","tier":"high_efficiency","scale":"small","facilities":["manufacturing_station","control_center"],
+      "members":[
+        {"operator":"水月","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"香草","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"杰西卡","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"史都华德","role":"secondary","target":{"kind":"explicit","elite":1}},
+        {"operator":"罗比菈塔","role":"secondary","target":{"kind":"explicit","elite":1}},
+        {"operator":"调香师","role":"secondary","target":{"kind":"explicit","elite":1}},
+        {"operator":"涤火杰西卡","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["水月"],"choice_groups":[{"id":"standardization_workers","label":"标准化成员五选二","minimum":2,"members":["香草","杰西卡","史都华德","罗比菈塔","调香师"]}]}
+    },
+    {
+      "id":"rhine_lab","name":"莱茵科技","product":"general_manufacturing","tier":"high_efficiency","scale":"system","facilities":["manufacturing_station"],
+      "members":[
+        {"operator":"多萝西","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"淬羽赫默","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"娜斯提","role":"important","target":{"kind":"explicit","elite":2}}
+      ],
+      "dynamic_skill_members":[{"skill_name_contains":"莱茵科技","facility":"manufacture","role":"secondary"}],
+      "completion":{"required":["多萝西","淬羽赫默","娜斯提"]}
+    },
+    {
+      "id":"perception_information","name":"感知信息组","consumer_products":["trade","gold","experience"],"tier":"high_efficiency","scale":"system","facilities":["trade_station","manufacturing_station","control_center","office","dormitory"],
+      "members":[
+        {"operator":"迷迭香","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"黑键","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"絮雨","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"琴柳","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"夕","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"爱丽丝","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"车尔尼","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"塑心","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"令","role":"secondary","target":{"kind":"explicit","elite":2}}
+      ],
+      "completion":{"required":["迷迭香","黑键","絮雨","琴柳","夕"]}
+    },
+    {
+      "id":"lungmen_control","name":"龙门中枢组","tier":"low_efficiency","scale":"small","facilities":["control_center"],
+      "members":[
+        {"operator":"斩业星熊","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"诗怀雅","role":"important","target":{"kind":"no_requirement"}},
+        {"operator":"陈","role":"secondary","target":{"kind":"no_requirement"}}
+      ],
+      "completion":{"required":["斩业星熊","诗怀雅"]}
+    },
+    {
+      "id":"kaltsit_omertosa","name":"凯尔希·思衡托","tier":"high_efficiency","scale":"system","facilities":["office","base"],
+      "members":[{"operator":"凯尔希·思衡托","role":"core","target":{"kind":"explicit","elite":2}}],
+      "completion":{"required":["凯尔希·思衡托"]}
+    }
+  ],
+  "standalone": [
+    {"id":"luck_trade","operator":"吉星","product":"trade","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"order_percent","note":"三级贸易站内另有两名工作干员时达到 40%"},"conditions":[{"kind":"same_station","key":"trade_station_other_workers_at_least","value":2,"description":"三级贸易站内除吉星外至少另有两名处于工作状态的干员"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"2. 贸易散件"}]},
+    {"id":"vigil_trade","operator":"伺夜","product":"trade","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"order_percent","note":"三级会客室时达到 40%"},"conditions":[{"kind":"facility","key":"meeting_room_max_level_at_least","value":3,"description":"会客室达到三级"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"2. 贸易散件"}]},
+    {"id":"archetto_trade","operator":"空弦","product":"trade","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"order_percent","note":"总宿舍等级为 20 时达到 40%"},"conditions":[{"kind":"dormitory","key":"dormitory_level_sum_at_least","value":20,"description":"四间五级宿舍，总宿舍等级达到 20"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"2. 贸易散件"}]},
+
+    {"id":"aroma_gold","operator":"阿罗玛","product":"gold","target":{"kind":"explicit","elite":2},"efficiency":{"value":45,"unit":"production_percent","note":"长班最终 45%；上班后由 25% 逐小时提高，并非立即达到"},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"3. 赤金散件"}]},
+    {"id":"greyy_gold","operator":"苍苔","product":"gold","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"production_percent","note":"同站含自身共两个金属工艺技能时 40%，三个时 45%"},"conditions":[{"kind":"same_station","key":"metalwork_skills_in_same_station_at_least","value":2,"description":"当前制造站内含苍苔在内至少有两个金属工艺或贵金属工艺技能"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"3. 赤金散件"}]},
+
+    {"id":"waai_fu_general","operator":"槐琥","product":"general_manufacturing","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"production_percent","note":"同站其他干员的合格生产力合计达到 40% 时，槐琥达到上限 40%"},"conditions":[{"kind":"same_station","key":"same_station_other_production_percent_at_least","value":40,"description":"同站其他干员提供的合格生产力合计达到 40%，且不计按设施数量提供的生产力"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"4. 通用制造散件"}]},
+    {"id":"minimalist_general","operator":"至简","product":"general_manufacturing","target":{"kind":"explicit","elite":2},"efficiency":{"value":40,"unit":"production_percent","note":"达到 64 个工程机器人时为 40%"},"conditions":[{"kind":"engineering_robots","key":"engineering_robot_count_at_least","value":64,"description":"当前布局提供至少 64 个工程机器人"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"4. 通用制造散件"}]},
+
+    {"id":"feater_experience","operator":"食铁兽","product":"experience","target":{"kind":"explicit","elite":2},"efficiency":{"value":35,"unit":"production_percent"},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"5. 经验散件"}]},
+    {"id":"crownslayer_experience","operator":"弑君者","product":"experience","target":{"kind":"explicit","elite":2},"efficiency":{"value":35,"unit":"production_percent"},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"5. 经验散件"}]},
+    {"id":"loud_experience","operator":"裂响","product":"experience","target":{"kind":"explicit","elite":2},"efficiency":{"value":35,"unit":"production_percent","note":"额外心情消耗不是生产力加成"},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"5. 经验散件"}]},
+    {"id":"jiushen_experience","operator":"酒神","product":"experience","target":{"kind":"explicit","elite":2},"efficiency":{"value":35,"unit":"production_percent"},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"5. 经验散件"}]},
+    {"id":"winter_experience","operator":"怒潮凛冬","product":"experience","target":{"kind":"explicit","elite":0},"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"5. 经验散件"}]},
+
+    {"id":"brownfruit_originium","operator":"褐果","product":"originium_shards","target":{"kind":"explicit","elite":1},"efficiency":{"value":45,"unit":"production_percent"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]},
+    {"id":"lava_originium","operator":"炎熔","product":"originium_shards","target":{"kind":"explicit","elite":1},"efficiency":{"value":35,"unit":"production_percent"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]},
+    {"id":"earthspirit_originium","operator":"地灵","product":"originium_shards","target":{"kind":"explicit","elite":1},"efficiency":{"value":35,"unit":"production_percent"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]},
+    {"id":"aphris_originium","operator":"谬因","product":"originium_shards","target":{"kind":"explicit","elite":0},"efficiency":{"value":35,"unit":"production_percent"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]},
+    {"id":"eyjafjalla_originium","operator":"艾雅法拉","product":"originium_shards","target":{"kind":"explicit","elite":0},"efficiency":{"value":35,"unit":"production_percent"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]},
+    {"id":"mint_originium","operator":"薄绿","product":"originium_shards","target":{"kind":"explicit","elite":1},"efficiency":{"value":30,"unit":"production_percent","note":"精一 30% 搓玉成立，不套用经验制造 35% 阈值"},"conditions":[{"kind":"layout","key":"has_originium_shard_factory","value":true,"description":"当前布局存在源石碎片制造站"}],"evidence":[{"path":"docs/练卡推荐相关/高效率散件与搓玉名单.md","heading":"7. 搓玉名单"}]}
+  ]
+}

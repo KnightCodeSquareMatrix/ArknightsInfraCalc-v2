@@ -28,12 +28,13 @@
 成功响应：
 
 ```json
-{"id":1,"ok":true,"elapsed_ms":123,"result":{"schema_version":1,"profile":{},"rotation":{"profile":"abc_12_6_6","daily":{},"shifts":[]},"maa":{}}}
+{"id":1,"ok":true,"elapsed_ms":123,"result":{"schema_version":1,"profile":{},"rotation":{"profile":"abc_12_6_6","daily":{},"shifts":[]},"maa":{},"training_advice":{"schema_version":2,"context":{"has_originium_shard_factory":false,"meeting_room_max_level":3,"dormitory_level_sum":20,"engineering_robot_count":64},"newbie_section_status":"complete","incomplete_newbie":[],"combinations":[],"recommendations":[]}}}
 ```
 
 - `profile`：现有账号画像 schema v4。
 - `rotation`：当前 profile、daily 和班次效率摘要。
 - `maa`：可直接下载或用于现有 UI 的 MAA 排班 JSON。
+- `training_advice`：同一 operbox/layout 的结构化练卡结果（schema v2）；包含新手章节状态、全量未完成基础名单、常见组合完成度和按优先级去重后的最多 10 人建议。它直接消费蓝图可确定的源石线、会客室、宿舍和工程机器人条件；排班结果按每班每站 `skill-efficiency ÷ operator_count` 的简单平均注入 T9，上线前端可直接使用该结果。无源石线时搓玉和泡泡/火神不进入行动推荐；同站条件只作为说明。
 
 错误响应：
 
