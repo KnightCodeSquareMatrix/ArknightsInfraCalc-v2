@@ -2057,6 +2057,26 @@ fn normalize_control_team_membership(
     }
 }
 
+/// 是否为 producer_rules 登记的 deferred_optional 动态 producer。
+/// 这类 producer 只能由 peak 的 winner→bind 或普通中枢搜索自然选中，
+/// 轮换层不得通过注入覆盖后置强塞（ADR 0004 D6）。
+fn entry_is_deferred_dynamic_producer(
+    entry: &crate::pool::ControlPoolEntry,
+    table: &SkillTable,
+) -> bool {
+    crate::response_dependency::producer_rule_catalog(table)
+        .map(|catalog| {
+            entry.buff_ids.iter().any(|bid| {
+                catalog.rules.iter().any(|rule| {
+                    rule.admission
+                        == crate::response_dependency::ProducerAdmission::DeferredOptional
+                        && rule.source_buff_id == *bid
+                })
+            })
+        })
+        .unwrap_or(false)
+}
+
 fn control_replace_rank(
     op: &AssignedOperator,
     system_ctrl_names: &HashSet<String>,
@@ -2133,6 +2153,7 @@ fn ensure_control_inject_coverage(
             .entries
             .iter()
             .filter(|entry| class(entry) && !control_exclusions.contains(&entry.name))
+            .filter(|entry| !entry_is_deferred_dynamic_producer(entry, table))
         {
             if assigned.contains(&candidate.name)
                 || ops.iter().any(|operator| operator.name == candidate.name)
@@ -7612,6 +7633,63 @@ mod tests {
             .control_operators()
             .iter()
             .any(|op| op.name == "八幡海铃"));
+    }
+
+    #[test]
+    fn gamma_unbound_consumer_benefit_settles_by_presence_without_bind() {
+        // ADR 0004 D6：γ 班允许普通搜索新增未绑定叙拉古 consumer；
+        // 不要求轮换层后置新建 cohort，注入按该班最终实际在场人数结算。
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut peak = BaseAssignment::default();
+        peak.set_room("control", vec![AssignedOperator::new("八幡海铃", 2)]);
+        peak.set_room("trade_1", vec![AssignedOperator::new("伺夜", 2)]);
+        let bind = RuntimeShiftBind {
+            operators: vec!["八幡海铃".into(), "伺夜".into()],
+            on_shifts: 2,
+            off_shifts: 1,
+        };
+        let h1 = FacilityHalf {
+            trade: vec![RoomId::from("trade_1")],
+            ..Default::default()
+        };
+        let h2 = FacilityHalf {
+            trade: vec![RoomId::from("trade_2")],
+            ..Default::default()
+        };
+        let alpha = production_half_from_peak(&peak, &h1);
+
+        // γ 接替 H2 时：活跃半区 α 的绑定 producer 保留在 seed，
+        // γ 再新增未绑定叙拉古成员（贝洛内）进 trade_2。
+        let ctx = gamma_production_coexist_seed(
+            &blueprint,
+            &BaseAssignment::default(),
+            &peak,
+            std::slice::from_ref(&bind),
+            &h2,
+            &alpha,
+        );
+        let mut gamma = ctx.assignment;
+        gamma.set_room("trade_2", vec![AssignedOperator::new("贝洛内", 2)]);
+        let layout = resolve_base(
+            &blueprint,
+            &gamma,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap()
+        .layout_snapshot();
+        // 八幡海铃注入 = 5 × 全贸易站叙拉古人数（伺夜 + 贝洛内 = 2）→ 10%。
+        assert_eq!(
+            layout.global_inject.trade_eff_pct(),
+            10.0,
+            "未绑定 consumer 的收益按实际在场结算（D6）"
+        );
+        // γ 搜索上下文是纯 assignment，不派生 bind/cohort：
+        // 后置 bind 只能来自 peak_plan（shift_binds_from_plan 唯一生成）。
     }
 
     #[test]
