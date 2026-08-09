@@ -492,10 +492,11 @@ fn rerun_rotation(
         .serve_request
         .as_ref()
         .and_then(|request| request.params.get("rotation"))
-        .and_then(Value::as_str)
     {
+        // serve 侧协议名（serde wire name）只通过 serde 反序列化，不走 CLI FromStr 别名。
+        let profile = TimedRotationProfile::deserialize(value)?;
         return Ok(OptionWithOrigin {
-            value: value.parse()?,
+            value: profile,
             origin: "recorded_request",
         });
     }
@@ -1033,6 +1034,49 @@ mod tests {
             json!({"value": 2})
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rerun_rotation_uses_serde_wire_names_from_recorded_request() {
+        for (wire, expected) in [
+            ("abc_12_6_6", TimedRotationProfile::Abc12_6_6),
+            ("main_backup_12_12", TimedRotationProfile::MainBackup12_12),
+            ("fiammetta_8_8_4_4", TimedRotationProfile::Fiammetta8_8_4_4),
+            ("abyssal_7_5_7_5", TimedRotationProfile::Abyssal7_5_7_5),
+        ] {
+            let bundle = DebugBundleEnvelope {
+                version: None,
+                started_at: None,
+                layout: None,
+                operbox: None,
+                input_summary: None,
+                serve_request: Some(RecordedRequest {
+                    method: "plan".to_string(),
+                    params: json!({ "rotation": wire }),
+                }),
+                serve_response: None,
+            };
+            let rotation = rerun_rotation(&[], &bundle).expect("wire name resolves");
+            assert_eq!(rotation.value, expected);
+            assert_eq!(rotation.origin, "recorded_request");
+        }
+    }
+
+    #[test]
+    fn rerun_rotation_cli_override_keeps_from_str_aliases() {
+        let bundle = DebugBundleEnvelope {
+            version: None,
+            started_at: None,
+            layout: None,
+            operbox: None,
+            input_summary: None,
+            serve_request: None,
+            serve_response: None,
+        };
+        let rotation = rerun_rotation(&["--rotation".into(), "2".into()], &bundle)
+            .expect("cli alias resolves");
+        assert_eq!(rotation.value, TimedRotationProfile::MainBackup12_12);
+        assert_eq!(rotation.origin, "explicit_override");
     }
 
     #[test]

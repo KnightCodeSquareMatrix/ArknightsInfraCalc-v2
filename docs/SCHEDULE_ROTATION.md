@@ -20,7 +20,7 @@
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错 |
 | `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；独立替补后交替两次 | hard claims 或替补不可满足即报错 |
 
-所有显式 profile 都是 hard constraint，不静默降级。最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
+所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
 
 MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3班` / `4班`。每个 plan 说明下一段相对间隔；自动定时触发仍由外部 MAA 任务配置。菲亚事件态只重放目标房，其他房间和无人机均跳过。
 
