@@ -1077,7 +1077,7 @@ fn write_team_rotation_text(
         report.daily.trade, report.daily.manufacture, report.daily.power
     ));
 
-    report_line("\n--- 轮换队伍花名册（设施始终满编不空转）---");
+    report_line("\n--- 轮换队伍花名册（办公室/会客室尽量满编，缺员见 warnings）---");
     for team in &report.teams {
         report_line(&format!(
             "  {} 队 ({} 人): {}",
@@ -1085,6 +1085,12 @@ fn write_team_rotation_text(
             team.operators.len(),
             team.operators.join(", ")
         ));
+    }
+    if !report.warnings.is_empty() {
+        report_line("\n--- 缺员提示 ---");
+        for warning in &report.warnings {
+            report_line(&format!("  {warning}"));
+        }
     }
 
     report_line("\n--- 轮换一览 ---");

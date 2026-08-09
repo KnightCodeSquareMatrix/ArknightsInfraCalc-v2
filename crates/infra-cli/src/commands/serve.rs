@@ -409,6 +409,8 @@ struct PlanResult {
     daily_manufacture_efficiency: infra_core::Efficiency,
     daily_power_efficiency: infra_core::Efficiency,
     shifts: Vec<infra_core::schedule::TeamShiftResult>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -425,6 +427,8 @@ struct RotationSummary {
     profile: TimedRotationProfile,
     daily: DailyTotals,
     shifts: Vec<RotationShiftSummary>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -458,6 +462,7 @@ impl From<&TeamRotationReport> for RotationSummary {
                     weighted_power: shift.weighted_power,
                 })
                 .collect(),
+            warnings: rotation.warnings.clone(),
         }
     }
 }
@@ -804,6 +809,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
         daily_manufacture_efficiency: rotation.daily.manufacture,
         daily_power_efficiency: rotation.daily.power,
         shifts: rotation.shifts.clone(),
+        warnings: rotation.warnings.clone(),
     };
     serde_json::to_value(result).map_err(Error::from)
 }

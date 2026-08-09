@@ -297,6 +297,7 @@ fn probe_shell(
             teams: vec![],
             shifts: vec![],
             daily,
+            warnings: vec![],
             elapsed: Duration::ZERO,
         },
     })

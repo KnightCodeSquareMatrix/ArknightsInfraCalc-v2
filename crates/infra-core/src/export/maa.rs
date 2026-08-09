@@ -943,6 +943,7 @@ mod tests {
                 weighted_power: crate::Efficiency::ZERO,
             }],
             daily: Default::default(),
+            warnings: vec![],
             elapsed: Duration::from_millis(1),
         };
 
@@ -1010,6 +1011,7 @@ mod tests {
                 weighted_power: crate::Efficiency::ZERO,
             }],
             daily: Default::default(),
+            warnings: vec![],
             elapsed: Duration::ZERO,
         };
 

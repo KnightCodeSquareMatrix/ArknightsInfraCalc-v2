@@ -16,11 +16,13 @@
 | profile | CLI | 状态与 owner | 失败语义 |
 |---|---|---|---|
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
-| `main_backup_12_12` | `--rotation 2` | 两次独立完整 Peak 求解，各自保留 `AssignmentPlan`；主替 assignment 全成员互斥 | 互斥 policy 下无解即报错，不回退 |
-| `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错 |
-| `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；独立替补后交替两次 | hard claims 或替补不可满足即报错 |
+| `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
+| `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
+| `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；main 填充后独立替补交替两次，5h 恢复态固定 dorm_rest | hard claims 或替补不可满足即报错；办公室/会客室缺员仅 warnings |
 
 所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
+
+办公室与会客室不要求「必须满编」：候选不足可空置，但实际人数不得超过容量，缺额必须经 `TeamRotationReport.warnings`（及 serve `rotation.warnings`）逐班提示（shift、设施、room id、缺额）。roster 充足时仍须满编且 warnings 为空。该容错覆盖 ABC、二班、菲亚与深海全部 profile（见 [ADR 0006](ADR/0006-rotation-shortfall-tolerance-and-validation.md)）。
 
 MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3班` / `4班`。每个 plan 说明下一段相对间隔；自动定时触发仍由外部 MAA 任务配置。菲亚事件态只重放目标房，其他房间和无人机均跳过。
 
@@ -34,8 +36,8 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 | 核心 API | `schedule_team_rotation` |
 | 班次结构 | 12h + 6h + 6h；每班 **两队上岗、一队休息** |
 | 生产设施 | 切成 H1/H2 两半；α/β 来自 peak 切半，γ 替补 |
-| 中枢 / 宿舍 / 办公室 | 办公室按 αβγ cohort 轮换，每班满编；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
-| 设施空转 | **禁止**（每班满编） |
+| 中枢 / 宿舍 / 办公室 | 办公室按 αβγ cohort 轮换，尽量满编；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
+| 设施空转 | 生产/中枢 **禁止**（每班满编）；办公室/会客室候选不足可空置，但必须经报告级 `warnings` 显式提示缺额 |
 
 用户说「跑一遍模拟」「三班模拟」时，Agent 默认用 **`plan`** + `--maa-out`（账号分析 + αβγ 排班）；只有用户明确要求“仅排班”时才用 **`layout team-rotation`**。见 [INFRA_CLI.md](INFRA_CLI.md)。
 
