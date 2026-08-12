@@ -196,10 +196,11 @@ Worker 的 `ping` result 包含：
 {
   "protocol_version": 1,
   "plan_schema_version": 1,
-  "plan_contract_sha256": "<64 lowercase hex characters>"
+  "plan_contract_sha256": "<64 lowercase hex characters>",
+  "solver_executable_sha256": "<64 lowercase hex characters>"
 }
 ```
 
-`plan_contract_sha256` 是 Worker 内嵌 JSON Schema 原始 bytes 的 SHA-256。Linux 发布包在 `contracts/SHA256SUMS` 中记录同一 schema 和本文档的校验值。
+`plan_contract_sha256` 是 Worker 内嵌 JSON Schema 原始 bytes 的 SHA-256。Linux 发布包在 `contracts/SHA256SUMS` 中记录同一 schema 和本文档的校验值。`solver_executable_sha256` 是进程启动时对当前可执行文件字节的 SHA-256，标识实际运行的 solver 制品；运行时可从外部目录加载数据，因此该字段不覆盖外部数据身份。
 
-**能力判定规则**：`ping` 的 `plan_contract_sha256` 是诊断/对账字段，不参与兼容性判定。调用方只以 `protocol_version` 和 `plan_schema_version` 判断 `plan.compute` 是否可用；hash 缺失或不匹配仅作诊断记录，不阻断请求。
+**能力判定规则**：`ping` 的两个 hash 字段都是诊断/对账字段，不参与兼容性判定。调用方只以 `protocol_version` 和 `plan_schema_version` 判断 `plan.compute` 是否可用；hash 缺失或不匹配仅作诊断记录，不阻断请求。

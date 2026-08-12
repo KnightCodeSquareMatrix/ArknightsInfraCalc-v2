@@ -56,6 +56,10 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         )?,
         plan_schema: compile_plan_compute_schema()?,
         plan_contract_sha256: plan_contract_sha256(),
+        solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
+            eprintln!("infra-cli serve: could not fingerprint executable: {err}");
+            String::new()
+        }),
     };
 
     let _bake_handle = spawn_background_bake();
@@ -191,6 +195,7 @@ struct ServeState {
     training_advice_knowledge: TrainingAdviceKnowledge,
     plan_schema: JSONSchema,
     plan_contract_sha256: String,
+    solver_executable_sha256: String,
 }
 
 fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
@@ -204,6 +209,12 @@ fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
 
 fn plan_contract_sha256() -> String {
     format!("{:x}", Sha256::digest(PLAN_COMPUTE_SCHEMA_JSON.as_bytes()))
+}
+
+fn solver_executable_sha256() -> Result<String, Error> {
+    let path = std::env::current_exe()?;
+    let bytes = fs::read(&path)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
 fn validate_plan_compute_params(
@@ -493,6 +504,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": PLAN_SCHEMA_VERSION,
                 "plan_contract_sha256": state.plan_contract_sha256,
+                "solver_executable_sha256": state.solver_executable_sha256,
             })),
             None,
             None,
@@ -921,6 +933,13 @@ mod tests {
             "unexpected": true,
         });
         assert!(serde_json::from_value::<PlanComputeParams>(value).is_err());
+    }
+
+    #[test]
+    fn solver_executable_fingerprint_is_a_sha256_hex() {
+        let fingerprint = solver_executable_sha256().unwrap();
+        assert_eq!(fingerprint.len(), 64);
+        assert!(fingerprint.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]
