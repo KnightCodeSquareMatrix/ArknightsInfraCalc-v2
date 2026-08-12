@@ -4,6 +4,7 @@
 > 生命周期状态：accepted
 > 当前真源：docs/定时换班.md；docs/SCHEDULE_ROTATION.md；docs/FRONTEND_CLI.md；docs/FRONTEND_SERVE_GUIDE.md
 > 摘要：裁决 `main_backup_12_12` 与 `abyssal_7_5_7_5` 的主备求解、办公室与会客室缺员容错、绑定终验、warnings 输出及 ABC 全 profile 一致性
+
 > 日期：2026-08-09
 > 实现参考：`crates/infra-core/src/schedule/team_rotation.rs`；`crates/infra-core/src/schedule/base_rotation.rs`；`crates/infra-core/src/layout/orchestrate/plan.rs`；`crates/infra-core/src/layout/orchestrate/execute.rs`；`crates/infra-cli/src/commands/serve.rs`；`crates/infra-cli/src/output.rs`；`crates/infra-core/src/export/maa.rs`
 > 历史评审：2026-08-09 前三轮定时换班方案复审（前两轮 REVISE，第三轮收敛）及用户逐项最终裁决

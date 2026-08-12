@@ -131,6 +131,8 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 | [ADR 0002: 排班换班逻辑按模式分层](ADR/0002-schedule-rotation-mode-split.md) | `accepted` | 保存排班按执行模式分层的架构决策 |
 | [ADR 0003：办公室与会客室前端结果契约](ADR/0003-support-facility-frontend-contract.md) | `accepted` | 规定办公室与会客室静态求值未来如何通过 plan.compute 增量提供给 beta 前端 |
 | [ADR 0004: 体系审计裁决与排班责任边界](ADR/0004-scheduling-semantics-audit-rulings.md) | `accepted` | 保存 2026-07 体系审计中确认的领域语义、排班事实所有权与动态 producer 范围 |
+| [ADR 0005: 定时换班语义审计裁决与修复边界](ADR/0005-timed-rotation-semantics-audit-rulings.md) | `accepted` | 保存定时换班连续工作、菲亚执行边界及宿舍、办公室、菲亚目标、调试与无人机偏离的审计裁决 |
+| [ADR 0006: 二班与深海轮换的缺员容错与终验契约](ADR/0006-rotation-shortfall-tolerance-and-validation.md) | `accepted` | 裁决 `main_backup_12_12` 与 `abyssal_7_5_7_5` 的主备求解、办公室与会客室缺员容错、绑定终验、warnings 输出及 ABC 全 profile 一致性 |
 <!-- END GENERATED DECISIONS -->
 
 ## 6. 开发与项目治理

@@ -20,6 +20,7 @@
 | [Worker 旧路径协议清理](Worker旧路径协议清理.md) | `blocked` | 等待 plan.compute v1 集成部署和 inventory 后删除 legacy plan 路径协议与兼容说明 |
 | [下一版本简化 Worker 契约校验](下一版本简化Worker契约校验.md) | `ready-on-request` | 下一版本移除运行时契约 hash 验证，仅对不符合 JSON Schema 的参数输出错误报告 |
 | [体系注册表后续缺口](体系注册表后续缺口.md) | `ready-on-request` | 承接旧组合体系规范化报告中仍有效但未获当前授权的开放项 |
+| [前端 contractHash 对账与版本上报修改建议](前端contractHash对账与版本上报修改建议.md) | `proposal` | 给前端团队的接口修改建议：feedback 携带 solver 构建版本、移除运行时契约 hash 门禁、更新防呆改为发布对账 |
 | [动态 Producer 旧设计阻塞分析交接](动态Producer旧设计阻塞分析交接.md) | `ready-on-request` | 记录回退后的动态 producer 旧模型边界、已验证阻塞和下一位 agent 的只读分析入口 |
 | [求解器质量与性能优化建议路线图](求解器质量与性能优化建议路线图.md) | `proposal` | 以证据门禁协调求解质量、联合选择和热路径性能优化建议 |
 | [精英干员组后端缺口](精英干员组后端缺口.md) | `ready-on-request` | 后端按实际编制统计精英设施数并结算凯尔希·思衡托「泰拉的方舟」；推荐可先展示、不得宣称求解已支持 |

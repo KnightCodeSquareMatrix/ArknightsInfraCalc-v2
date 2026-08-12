@@ -278,9 +278,9 @@ infra-cli layout team-rotation \
 
 协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。重复 room/operator ID、房间 kind 与 product 的跨字段一致性等不能由结构 schema 完整表达的规则，仍由 Rust 领域校验拒绝。
 
-`ping` 的 result 返回 `protocol_version=1`、`plan_schema_version=1` 和 `plan_contract_sha256`。hash 是 Worker 内嵌 schema 原始 bytes 的 SHA-256，可与发布包 `contracts/SHA256SUMS` 对账；它不替代 schema version。
+`ping` 的 result 返回 `protocol_version=1`、`plan_schema_version=1` 和 `plan_contract_sha256`。hash 是 Worker 内嵌 schema 原始 bytes 的 SHA-256，可与发布包 `contracts/SHA256SUMS` 对账。**hash 是诊断字段，不参与能力判定**：前端只以 `protocol_version` 和 `plan_schema_version` 判断兼容性，hash 缺失或不匹配仅记录诊断，不阻断 `plan.compute`。
 
-旧 `method: "plan"` 仅作为已发布前端的兼容入口，继续接收路径并按请求写 profile/MAA/shift 文件；它与 `plan.compute` 共用一次 Plan 编排，不是第二套 solver。新前端遇到 ping 缺少要求的版本字段或契约 hash 时要求升级，不回退旧路径协议。
+旧 `method: "plan"` 仅作为已发布前端的兼容入口，继续接收路径并按请求写 profile/MAA/shift 文件；它与 `plan.compute` 共用一次 Plan 编排，不是第二套 solver。新前端遇到 ping 缺少要求的版本字段时要求升级，不回退旧路径协议。
 
 在 [集成与部署验收](TODO/Worker内联JSON集成与部署验收.md) 完成且部署 inventory 证明旧调用方已退出前，不得删除该兼容入口；退役工作单独由 [Worker 旧路径协议清理](TODO/Worker旧路径协议清理.md) 跟踪。
 
