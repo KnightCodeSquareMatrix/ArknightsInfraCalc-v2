@@ -42,6 +42,10 @@ const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
 const MAX_TOP_K: usize = 100;
 
+mod solver_build_info {
+    include!(concat!(env!("OUT_DIR"), "/solver_build_info.rs"));
+}
+
 pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         print_serve_usage();
@@ -60,6 +64,7 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
         }),
+        solver: SolverBuildInfo::current(),
     };
 
     let _bake_handle = spawn_background_bake();
@@ -196,6 +201,22 @@ struct ServeState {
     plan_schema: JSONSchema,
     plan_contract_sha256: String,
     solver_executable_sha256: String,
+    solver: SolverBuildInfo,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SolverBuildInfo {
+    git_commit: Option<String>,
+    built_at: Option<String>,
+}
+
+impl SolverBuildInfo {
+    fn current() -> Self {
+        Self {
+            git_commit: solver_build_info::GIT_COMMIT.map(str::to_string),
+            built_at: solver_build_info::BUILT_AT.map(str::to_string),
+        }
+    }
 }
 
 fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
@@ -328,6 +349,7 @@ struct ServeResponse<T: Serialize> {
     id: serde_json::Value,
     ok: bool,
     elapsed_ms: u128,
+    solver: SolverBuildInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -505,6 +527,8 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "plan_schema_version": PLAN_SCHEMA_VERSION,
                 "plan_contract_sha256": state.plan_contract_sha256,
                 "solver_executable_sha256": state.solver_executable_sha256,
+                "solver_git_commit": state.solver.git_commit,
+                "solver_built_at": state.solver.built_at,
             })),
             None,
             None,
@@ -520,6 +544,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             id,
             ok: true,
             elapsed_ms: start.elapsed().as_millis(),
+            solver: state.solver.clone(),
             result: Some(result),
             error: None,
         },
@@ -545,6 +570,7 @@ fn error_response(
         id,
         ok: false,
         elapsed_ms,
+        solver: SolverBuildInfo::current(),
         result: None,
         error: Some(ServeError {
             code: None,
@@ -565,6 +591,7 @@ fn coded_error_response(
         id,
         ok: false,
         elapsed_ms,
+        solver: SolverBuildInfo::current(),
         result: None,
         error: Some(ServeError {
             code: Some(code),
@@ -940,6 +967,17 @@ mod tests {
         let fingerprint = solver_executable_sha256().unwrap();
         assert_eq!(fingerprint.len(), 64);
         assert!(fingerprint.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn solver_build_info_uses_a_full_commit_and_utc_timestamp() {
+        let info = SolverBuildInfo::current();
+        let commit = info.git_commit.expect("test build has a Git commit");
+        let built_at = info.built_at.expect("test build has a timestamp");
+        assert_eq!(commit.len(), 40);
+        assert!(commit.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(built_at.ends_with('Z'));
+        assert_eq!(built_at.len(), 20);
     }
 
     #[test]

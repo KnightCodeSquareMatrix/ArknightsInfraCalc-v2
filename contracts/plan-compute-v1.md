@@ -197,10 +197,25 @@ Worker 的 `ping` result 包含：
   "protocol_version": 1,
   "plan_schema_version": 1,
   "plan_contract_sha256": "<64 lowercase hex characters>",
-  "solver_executable_sha256": "<64 lowercase hex characters>"
+  "solver_executable_sha256": "<64 lowercase hex characters>",
+  "solver_git_commit": "<full Git commit>",
+  "solver_built_at": "<UTC RFC3339 timestamp>"
 }
 ```
 
-`plan_contract_sha256` 是 Worker 内嵌 JSON Schema 原始 bytes 的 SHA-256。Linux 发布包在 `contracts/SHA256SUMS` 中记录同一 schema 和本文档的校验值。`solver_executable_sha256` 是进程启动时对当前可执行文件字节的 SHA-256，标识实际运行的 solver 制品；运行时可从外部目录加载数据，因此该字段不覆盖外部数据身份。
+每个 Worker 响应顶层都包含本次运行的 solver 构建快照：
 
-**能力判定规则**：`ping` 的两个 hash 字段都是诊断/对账字段，不参与兼容性判定。调用方只以 `protocol_version` 和 `plan_schema_version` 判断 `plan.compute` 是否可用；hash 缺失或不匹配仅作诊断记录，不阻断请求。
+```json
+{
+  "solver": {
+    "git_commit": "<full Git commit or null>",
+    "built_at": "<UTC RFC3339 timestamp or null>"
+  }
+}
+```
+
+`plan.compute` 的成功和失败响应都包含该快照。前端反馈必须使用对应 `plan.compute` 响应中的快照，不使用最近一次 `ping`。`solver_git_commit` 和 `solver_built_at` 由构建时自动注入；运行时不读取 Git。若构建环境无法提供元数据，字段为 `null`，调用仍可继续。
+
+`plan_contract_sha256` 是 Worker 内嵌 JSON Schema 原始 bytes 的 SHA-256。Linux 发布包在 `contracts/SHA256SUMS` 中记录同一 schema 和本文档的校验值。`solver_executable_sha256` 是可执行文件字节的 SHA-256，仅作为制品完整性诊断，不是 solver 版本身份。运行时可从外部目录加载数据，因此上述字段都不覆盖外部数据身份。
+
+**能力判定规则**：所有 hash 和构建元数据都是诊断字段，不参与兼容性判定。调用方只以 `protocol_version` 和 `plan_schema_version` 判断 `plan.compute` 是否可用。

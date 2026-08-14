@@ -5,6 +5,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${1:-"$ROOT/dist/arknights-infra-linux-x86_64"}"
 
 cd "$ROOT"
+if ! git diff-index --quiet HEAD --; then
+  echo "release build requires a clean Git worktree" >&2
+  exit 1
+fi
+export SOLVER_GIT_COMMIT="$(git rev-parse HEAD)"
+export SOLVER_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cargo build --release -p infra-cli
 
 rm -rf "$DIST"
@@ -30,6 +36,10 @@ cp docs/FRONTEND_CLI.md "$DIST/docs/FRONTEND_CLI.md"
 cp release/plans/cli-format-reference.md "$DIST/plans/cli-format-reference.md"
 cp release/README.md "$DIST/README.md"
 cp release/VERSION.txt "$DIST/VERSION.txt"
+cat >> "$DIST/VERSION.txt" <<EOF
+Build date: $SOLVER_BUILT_AT
+Backend commit: $SOLVER_GIT_COMMIT
+EOF
 
 chmod +x "$DIST/infra-cli"
 

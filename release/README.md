@@ -4,7 +4,7 @@
 **平台**：Windows x64 / Linux x86_64
 **CLI 推荐入口**：`infra-cli plan`
 
-本包面向 beta 用户、Linux 主机部署和前端联调。它包含 CLI、静态 Layout 生成器、243 样例输入和前端集成文档。
+本包面向用户、Linux 主机部署和前端联调。Worker 在构建时自动记录 Git 提交号和 UTC 构建时间，并通过 `serve` 响应提供给前端反馈归因。
 
 ---
 

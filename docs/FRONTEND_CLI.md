@@ -278,7 +278,9 @@ infra-cli layout team-rotation \
 
 协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。重复 room/operator ID、房间 kind 与 product 的跨字段一致性等不能由结构 schema 完整表达的规则，仍由 Rust 领域校验拒绝。
 
-`ping` 的 result 返回 `protocol_version=1`、`plan_schema_version=1`、`plan_contract_sha256` 和 `solver_executable_sha256`。`plan_contract_sha256` 是 Worker 内嵌 schema 原始 bytes 的 SHA-256，可与发布包 `contracts/SHA256SUMS` 对账；`solver_executable_sha256` 是进程启动时对当前可执行文件字节的 SHA-256，标识实际运行的 solver 制品（不覆盖外部加载的数据身份）。**两个 hash 都是诊断/对账字段，不参与能力判定**：前端只以 `protocol_version` 和 `plan_schema_version` 判断兼容性，hash 缺失或不匹配仅记录诊断，不阻断 `plan.compute`。
+`ping` 的 result 返回 `protocol_version=1`、`plan_schema_version=1`、`plan_contract_sha256`、`solver_executable_sha256`、`solver_git_commit` 和 `solver_built_at`。前两个版本字段承担能力判定；所有 hash 和构建元数据都是诊断字段，不阻断 `plan.compute`。
+
+每个 Worker 响应顶层都有 `solver: {git_commit, built_at}` 构建快照。前端必须从本次 `plan.compute` 响应保存 solver 快照，并将它写入对应反馈的 `meta.json`；不得使用最近一次 ping 或前端自身 revision。字段缺失时写 `solver: null`，不阻断反馈。
 
 旧 `method: "plan"` 仅作为已发布前端的兼容入口，继续接收路径并按请求写 profile/MAA/shift 文件；它与 `plan.compute` 共用一次 Plan 编排，不是第二套 solver。新前端遇到 ping 缺少要求的版本字段时要求升级，不回退旧路径协议。
 

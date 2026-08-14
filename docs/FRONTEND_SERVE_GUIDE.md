@@ -48,7 +48,7 @@
 2. 同一客户端只允许一个 in-flight 请求；第二个请求立即返回 `WORKER_BUSY`。
 3. execution timeout 会终止 Worker 并失败当前请求，不自动重发。
 4. Worker busy 时 health 使用本地 running/busy 状态，不发送 ping。
-5. `ping` result 包含 `protocol_version=1`、`plan_schema_version=1`、`plan_contract_sha256` 和 `solver_executable_sha256`。前两个字段承担兼容性判定；两个 hash 都是诊断/对账字段——`plan_contract_sha256` 可与发布包 `contracts/SHA256SUMS` 对账，`solver_executable_sha256` 标识实际运行的 solver 制品（供部署检查比对与 feedback 归因），缺失或不匹配不阻断 `plan.compute`，仅记录诊断。
+5. `ping` result 包含 `protocol_version=1`、`plan_schema_version=1`、`plan_contract_sha256`、`solver_executable_sha256`、`solver_git_commit` 和 `solver_built_at`。前两个字段承担兼容性判定；其余字段都是诊断信息。每个响应顶层的 `solver` 是本次 Worker 的构建快照，前端反馈必须使用对应 `plan.compute` 响应的快照，不使用最近一次 ping。
 6. 运行记录由 Next 在收到响应后 best-effort 保存，保存失败不改变求解结果。
 
 ## Legacy
