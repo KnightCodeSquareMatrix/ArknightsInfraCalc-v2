@@ -1571,30 +1571,24 @@ fn clear_production_efficiencies(blueprint: &BaseBlueprint, assignment: &mut Bas
 /// 当前轻量策略每个 24h αβγ 周期只安排一次菲亚梅塔回岗。
 ///
 /// 顺序是公孙长乐确认的常规线性 fallback；布局动态排序和龙巫成组服务留给
-/// 后续完整心情排班器。
-/// 尚未迁移到声明式 continuous role 的 legacy fallback。
-/// 但书/可露希尔只由 `AssignmentPlan.continuous_roles` 决定，不在这里保留第二事实源。
-pub const FIAMMETTA_RETURN_PRIORITY: [&str; 3] = ["巫恋", "龙舌兰", "清流"];
+/// 后续完整心情排班器。continuous role 可以在固定顺序中提供单点回岗例外，但
+/// 不得重排业务顺序；普通 shift bind 目标和被换下成员都不能被单独移出。
+pub const FIAMMETTA_RETURN_PRIORITY: [&str; 5] = ["但书", "巫恋", "龙舌兰", "清流", "可露希尔"];
 
-fn fiammetta_target_names(
-    continuous_roles: &[crate::layout::ContinuousRole],
-    shift_binds: &[RuntimeShiftBind],
-) -> Vec<String> {
-    let mut target_names: Vec<String> = continuous_roles
-        .iter()
-        .map(|role| role.operator.clone())
-        .collect();
-    for name in FIAMMETTA_RETURN_PRIORITY {
-        if shift_binds.iter().any(|bind| {
-            bind.operators.len() > 1 && bind.operators.iter().any(|operator| operator == name)
-        }) {
-            continue;
-        }
-        if !target_names.iter().any(|target| target == name) {
-            target_names.push(name.to_string());
-        }
-    }
-    target_names
+fn has_multi_member_shift_bind(name: &str, shift_binds: &[RuntimeShiftBind]) -> bool {
+    shift_binds.iter().any(|bind| {
+        bind.operators.len() > 1 && bind.operators.iter().any(|operator| operator == name)
+    })
+}
+
+fn fiammetta_target_names<'a>(
+    continuous_roles: &'a [crate::layout::ContinuousRole],
+    shift_binds: &'a [RuntimeShiftBind],
+) -> impl Iterator<Item = &'static str> + 'a {
+    FIAMMETTA_RETURN_PRIORITY.into_iter().filter(move |name| {
+        continuous_roles.iter().any(|role| role.operator == *name)
+            || !has_multi_member_shift_bind(name, shift_binds)
+    })
 }
 
 fn first_fiammetta_target(
@@ -1603,21 +1597,19 @@ fn first_fiammetta_target(
     continuous_roles: &[crate::layout::ContinuousRole],
     shift_binds: &[RuntimeShiftBind],
 ) -> Option<(String, RoomId)> {
-    fiammetta_target_names(continuous_roles, shift_binds)
-        .into_iter()
-        .find_map(|target| {
-            assignment.rooms.iter().find_map(|room| {
-                let room_blueprint = blueprint.room(&room.room_id)?;
-                (matches!(
-                    room_blueprint.kind,
-                    FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
-                ) && room
-                    .operators
-                    .iter()
-                    .any(|operator| operator.name == target))
-                .then(|| (target.clone(), room.room_id.clone()))
-            })
+    fiammetta_target_names(continuous_roles, shift_binds).find_map(|target| {
+        assignment.rooms.iter().find_map(|room| {
+            let room_blueprint = blueprint.room(&room.room_id)?;
+            (matches!(
+                room_blueprint.kind,
+                FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
+            ) && room
+                .operators
+                .iter()
+                .any(|operator| operator.name == target))
+            .then(|| (target.to_string(), room.room_id.clone()))
         })
+    })
 }
 
 fn production_efficiency(
@@ -1676,7 +1668,7 @@ fn apply_fiammetta_return(
         };
         let Some(target_team) = teams
             .iter()
-            .find(|team| team.operators.iter().any(|name| name == &target_name))
+            .find(|team| team.operators.iter().any(|name| name == target_name))
             .map(|team| team.label)
         else {
             continue;
@@ -1690,7 +1682,7 @@ fn apply_fiammetta_return(
         if shifts[shift_index]
             .assignment
             .operator_names()
-            .contains(&target_name)
+            .contains(target_name)
         {
             continue;
         }
@@ -1719,6 +1711,9 @@ fn apply_fiammetta_return(
                 continue;
             };
             let displaced = room.operators[slot].clone();
+            if has_multi_member_shift_bind(&displaced.name, shift_binds) {
+                continue;
+            }
             room.operators[slot] = target_op.clone();
             room.efficiency = None;
 
@@ -1752,7 +1747,7 @@ fn apply_fiammetta_return(
         shift.weighted_power = scores.weighted_power(hours);
         shift.efficiencies = scores;
         shift.fiammetta = Some(FiammettaShiftAction {
-            target: target_name,
+            target: target_name.to_string(),
             displaced: displaced.name,
             room_id: source_room.room_id.clone(),
         });
@@ -7520,6 +7515,22 @@ mod tests {
                 shift.index + 1
             );
         }
+    }
+
+    #[test]
+    fn fiammetta_target_priority_matches_canonical_order() {
+        assert_eq!(
+            fiammetta_target_names(&[], &[]).collect::<Vec<_>>(),
+            ["但书", "巫恋", "龙舌兰", "清流", "可露希尔"],
+            "the canonical Fiammetta targets must remain in fixed priority order"
+        );
+
+        let bind = RuntimeShiftBind {
+            operators: vec!["绑定成员".to_string(), "绑定队友".to_string()],
+            on_shifts: 2,
+            off_shifts: 1,
+        };
+        assert!(has_multi_member_shift_bind("绑定成员", &[bind]));
     }
 
     #[test]

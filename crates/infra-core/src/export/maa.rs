@@ -1035,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_fiammetta_priority_excludes_declarative_continuous_trade_cores() {
+    fn legacy_fiammetta_priority_uses_canonical_order() {
         let blueprint = sample_blueprint();
         let mut assignment = BaseAssignment::default();
         assignment.set_room(
@@ -1052,7 +1052,7 @@ mod tests {
         let resolved = resolve_fiammetta(&opts.fiammetta_priority, &assignment);
 
         assert!(resolved.enable);
-        assert_eq!(resolved.target, "龙舌兰");
+        assert_eq!(resolved.target, "但书");
         assert_eq!(resolved.order, "pre");
     }
 
