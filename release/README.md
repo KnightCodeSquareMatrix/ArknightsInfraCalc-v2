@@ -16,6 +16,8 @@ release/
 ├── contracts/
 │   ├── plan-compute-v1.schema.json
 │   ├── plan-compute-v1.md
+│   ├── plan-compute-v2.schema.json
+│   ├── plan-compute-v2.md
 │   └── SHA256SUMS
 ├── data/                  # Linux 独立部署包会内置；Windows 旧包可放在 release 同级
 ├── layout-gen/

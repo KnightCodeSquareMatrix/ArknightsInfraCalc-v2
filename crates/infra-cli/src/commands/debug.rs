@@ -1040,6 +1040,7 @@ mod tests {
     fn rerun_rotation_uses_serde_wire_names_from_recorded_request() {
         for (wire, expected) in [
             ("abc_12_6_6", TimedRotationProfile::Abc12_6_6),
+            ("abc_12_12_12", TimedRotationProfile::Abc12_12_12),
             ("main_backup_12_12", TimedRotationProfile::MainBackup12_12),
             ("fiammetta_8_8_4_4", TimedRotationProfile::Fiammetta8_8_4_4),
             ("abyssal_7_5_7_5", TimedRotationProfile::Abyssal7_5_7_5),

@@ -47,7 +47,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
-                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|fiammetta-8844|abyssal-7575>] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|fiammetta-8844|abyssal-7575>] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Err(Error::msg(format!(
                 "unknown layout command {:?}",

@@ -16,6 +16,7 @@
 | profile | CLI | 状态与 owner | 失败语义 |
 |---|---|---|---|
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
+| `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；最多每个休息班一次菲亚回岗，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
 | `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
 | `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；main 填充后独立替补交替两次，5h 恢复态固定 dorm_rest | hard claims 或替补不可满足即报错；办公室/会客室缺员仅 warnings |
@@ -179,7 +180,7 @@ cargo run -p infra-cli -- plan \
   --maa-out out/243_maa.json
 ```
 
-- `--rotation`：可省略（默认 `3`），或取 `2`、`fiammetta-8844`、`abyssal-7575`
+- `--rotation`：可省略（默认 `3`），或取 `2`、`12/12/12`、`fiammetta-8844`、`abyssal-7575`
 - stdout：账号画像摘要 + 对应 profile 的人类可读排班表 + 队伍花名册
 - stderr：写出路径与运行元数据
 - `--maa-out`：MAA 排班 JSON（见 `export/maa.rs`）
@@ -227,7 +228,7 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 
 ### 7.2 菲亚梅塔主力回岗覆盖
 
-当前 ABC 主路径已接入一次轻量菲亚覆盖：
+当前 ABC 主路径已接入轻量菲亚覆盖：默认 12/6/6 每个 24h 周期一次，12/12/12 最多三个 12h 休息班各一次；每个班次至多一次且不强行凑满：
 
 1. 账号必须拥有菲亚梅塔；
 2. 从 peak 主力按 `但书 > 巫恋 > 龙舌兰 > 清流 > 可露希尔` 查找目标；
@@ -237,7 +238,7 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 6. 重新计算该班直接效率、加权效率与全日 totals；
 7. MAA 只在实际发生回岗的 plan 中输出 `Fiammetta.enable=true`。
 
-每个 24 小时 αβγ 周期当前只安排一次回岗。该步骤是基础 rotation 之后唯一允许改写生产房成员的后处理：它可以让但书回岗并换下 B 或 C 中的一名当班人员，因此最终 assignment / MAA 不再承诺精确 `A+B → B+C → C+A`，也不承诺 C 在两个最终班次中保持完全相同；reserve 只证明菲亚前的基础 γ 正确。布局动态优先级、菲亚实时心情与多次使用序列仍属于后续完整心情排班器。
+该步骤是基础 rotation 之后唯一允许改写生产房成员的后处理：它可以让但书回岗并换下 B 或 C 中的一名当班人员，因此最终 assignment / MAA 不再承诺精确 `A+B → B+C → C+A`，也不承诺 C 在两个最终班次中保持完全相同；reserve 只证明菲亚前的基础 γ 正确。12/12/12 的多次事件仍是固定优先级下的轻量序列，不是完整实时心情排班器。
 
 当前固定业务优先级高于单班瞬时效率门槛：系统会在合法替换位中选最终效率最高者，
 但不会用当前仍待校正的局部效率数值取消已确认的主力回岗。全周期收益仍应结合

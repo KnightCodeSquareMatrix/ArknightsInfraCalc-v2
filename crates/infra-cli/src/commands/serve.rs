@@ -32,10 +32,13 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 1;
+const PLAN_SCHEMA_VERSION: u32 = 2;
+const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
-const PLAN_COMPUTE_SCHEMA_JSON: &str =
+const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v1.schema.json");
+const PLAN_COMPUTE_SCHEMA_V2_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v2.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OPERBOX_ENTRIES: usize = 1000;
 const MAX_LAYOUT_ROOMS: usize = 64;
@@ -58,8 +61,10 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         training_advice_knowledge: load_training_advice_knowledge(
             &default_training_advice_knowledge_path()?,
         )?,
-        plan_schema: compile_plan_compute_schema()?,
-        plan_contract_sha256: plan_contract_sha256(),
+        plan_schema_v1: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON)?,
+        plan_schema_v2: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON)?,
+        plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
+        plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -198,8 +203,10 @@ struct ServeState {
     instances: OperatorInstances,
     table: SkillTable,
     training_advice_knowledge: TrainingAdviceKnowledge,
-    plan_schema: JSONSchema,
-    plan_contract_sha256: String,
+    plan_schema_v1: JSONSchema,
+    plan_schema_v2: JSONSchema,
+    plan_contract_sha256_v1: String,
+    plan_contract_sha256_v2: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -219,8 +226,8 @@ impl SolverBuildInfo {
     }
 }
 
-fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
-    let schema: serde_json::Value = serde_json::from_str(PLAN_COMPUTE_SCHEMA_JSON)
+fn compile_plan_compute_schema(schema_json: &str) -> Result<JSONSchema, Error> {
+    let schema: serde_json::Value = serde_json::from_str(schema_json)
         .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))?;
     JSONSchema::options()
         .with_draft(Draft::Draft202012)
@@ -228,8 +235,8 @@ fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
         .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))
 }
 
-fn plan_contract_sha256() -> String {
-    format!("{:x}", Sha256::digest(PLAN_COMPUTE_SCHEMA_JSON.as_bytes()))
+fn plan_contract_sha256(schema_json: &str) -> String {
+    format!("{:x}", Sha256::digest(schema_json.as_bytes()))
 }
 
 fn solver_executable_sha256() -> Result<String, Error> {
@@ -241,6 +248,7 @@ fn solver_executable_sha256() -> Result<String, Error> {
 fn validate_plan_compute_params(
     schema: &JSONSchema,
     params: &serde_json::Value,
+    schema_version: u32,
 ) -> Result<(), Error> {
     let Err(errors) = schema.validate(params) else {
         return Ok(());
@@ -255,7 +263,7 @@ fn validate_plan_compute_params(
         .collect::<Vec<_>>()
         .join("; ");
     Err(Error::msg(format!(
-        "plan.compute params do not match schema v{PLAN_SCHEMA_VERSION}: {details}"
+        "plan.compute params do not match schema v{schema_version}: {details}"
     )))
 }
 
@@ -524,8 +532,13 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             Ok(serde_json::json!({
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
-                "plan_schema_version": PLAN_SCHEMA_VERSION,
-                "plan_contract_sha256": state.plan_contract_sha256,
+                "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
+                "supported_plan_schema_versions": [1, 2],
+                "plan_contract_sha256": state.plan_contract_sha256_v1,
+                "plan_contract_sha256_by_version": {
+                    "1": state.plan_contract_sha256_v1,
+                    "2": state.plan_contract_sha256_v2,
+                },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
                 "solver_built_at": state.solver.built_at,
@@ -605,14 +618,22 @@ fn handle_plan_compute(
     state: &ServeState,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, Error> {
-    validate_plan_compute_params(&state.plan_schema, &params)?;
+    let schema_version = params
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| Error::msg("plan.compute params require schema_version"))?
+        as u32;
+    let schema = match schema_version {
+        1 => &state.plan_schema_v1,
+        2 => &state.plan_schema_v2,
+        other => {
+            return Err(Error::msg(format!(
+                "unsupported plan schema version {other}; expected 1 or {PLAN_SCHEMA_VERSION}"
+            )))
+        }
+    };
+    validate_plan_compute_params(schema, &params, schema_version)?;
     let params: PlanComputeParams = serde_json::from_value(params)?;
-    if params.schema_version != PLAN_SCHEMA_VERSION {
-        return Err(Error::msg(format!(
-            "unsupported plan schema version {}; expected {PLAN_SCHEMA_VERSION}",
-            params.schema_version
-        )));
-    }
     if params.options.top == 0 || params.options.top > MAX_TOP_K {
         return Err(Error::msg(format!("top must be between 1 and {MAX_TOP_K}")));
     }
@@ -666,7 +687,7 @@ fn handle_plan_compute(
         Some(&computed.current.rotation),
     );
     serde_json::to_value(PlanComputeResult {
-        schema_version: PLAN_SCHEMA_VERSION,
+        schema_version: params.schema_version,
         profile,
         rotation: RotationSummary::from(&computed.current.rotation),
         maa,
@@ -982,16 +1003,26 @@ mod tests {
 
     #[test]
     fn plan_compute_schema_accepts_the_v1_contract() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
         let value = valid_compute_params();
-        validate_plan_compute_params(&schema, &value).unwrap();
+        validate_plan_compute_params(&schema, &value, 1).unwrap();
         serde_json::from_value::<PlanComputeParams>(value).unwrap();
-        assert_eq!(plan_contract_sha256().len(), 64);
+        assert_eq!(plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON).len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_schema_v2_accepts_abc_12_12_12() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(2);
+        value["options"]["rotation"] = serde_json::json!("abc_12_12_12");
+        validate_plan_compute_params(&schema, &value, 2).unwrap();
+        serde_json::from_value::<PlanComputeParams>(value).unwrap();
     }
 
     #[test]
     fn plan_compute_schema_rejects_structural_mutations() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
 
         let mut unknown_room_field = valid_compute_params();
         unknown_room_field["layout"]["rooms"][0]["unexpected"] = serde_json::json!(true);
@@ -1016,19 +1047,19 @@ mod tests {
             invalid_level,
             invalid_top,
         ] {
-            assert!(validate_plan_compute_params(&schema, &value).is_err());
+            assert!(validate_plan_compute_params(&schema, &value, 1).is_err());
         }
     }
 
     #[test]
     fn semantic_validation_remains_after_schema_admission() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
         let mut duplicate_rooms = valid_compute_params();
         duplicate_rooms["layout"]["rooms"] = serde_json::json!([
             { "id": "control", "kind": "control_center", "level": 3 },
             { "id": "control", "kind": "power_plant", "level": 3 }
         ]);
-        validate_plan_compute_params(&schema, &duplicate_rooms).unwrap();
+        validate_plan_compute_params(&schema, &duplicate_rooms, 1).unwrap();
         let params: PlanComputeParams = serde_json::from_value(duplicate_rooms).unwrap();
         assert!(params.layout.validate().is_err());
 
@@ -1039,7 +1070,7 @@ mod tests {
             "level": 3,
             "product": { "factory": { "recipe": "gold" } }
         });
-        validate_plan_compute_params(&schema, &mismatched_product).unwrap();
+        validate_plan_compute_params(&schema, &mismatched_product, 1).unwrap();
         let params: PlanComputeParams = serde_json::from_value(mismatched_product).unwrap();
         assert!(params.layout.validate().is_err());
     }

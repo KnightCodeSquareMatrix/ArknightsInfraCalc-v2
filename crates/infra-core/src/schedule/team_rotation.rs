@@ -47,6 +47,9 @@ pub enum TimedRotationProfile {
     #[default]
     #[serde(rename = "abc_12_6_6")]
     Abc12_6_6,
+    /// ABC rotation with a 36-hour cycle of three 12-hour shifts.
+    #[serde(rename = "abc_12_12_12")]
+    Abc12_12_12,
     /// Two complete, disjoint main/backup states.
     #[serde(rename = "main_backup_12_12")]
     MainBackup12_12,
@@ -62,6 +65,7 @@ impl TimedRotationProfile {
     pub const fn cli_name(self) -> &'static str {
         match self {
             Self::Abc12_6_6 => "3",
+            Self::Abc12_12_12 => "abc-121212",
             Self::MainBackup12_12 => "2",
             Self::Fiammetta8_8_4_4 => "fiammetta-8844",
             Self::Abyssal7_5_7_5 => "abyssal-7575",
@@ -71,6 +75,7 @@ impl TimedRotationProfile {
     pub const fn display_name(self) -> &'static str {
         match self {
             Self::Abc12_6_6 => "ABC 三班 12/6/6",
+            Self::Abc12_12_12 => "ABC 三班 12/12/12",
             Self::MainBackup12_12 => "二班主替 12/12",
             Self::Fiammetta8_8_4_4 => "菲亚插班 8/8/4/4",
             Self::Abyssal7_5_7_5 => "深海四班 7/5/7/5",
@@ -80,6 +85,7 @@ impl TimedRotationProfile {
     pub const fn plan_times(self) -> &'static str {
         match self {
             Self::Abc12_6_6 => "3班",
+            Self::Abc12_12_12 => "3班",
             Self::MainBackup12_12 => "2班",
             Self::Fiammetta8_8_4_4 | Self::Abyssal7_5_7_5 => "4班",
         }
@@ -96,6 +102,7 @@ impl std::str::FromStr for TimedRotationProfile {
     fn from_str(value: &str) -> Result<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "3" | "abc" | "12/6/6" | "abc-1266" => Ok(Self::Abc12_6_6),
+            "abc-121212" | "12/12/12" | "abc-12-12-12" => Ok(Self::Abc12_12_12),
             "2" | "12/12" | "two-shift" | "main-backup" => Ok(Self::MainBackup12_12),
             "fiammetta-8844" | "8/8/4/4" => Ok(Self::Fiammetta8_8_4_4),
             "abyssal-7575" | "7/5/7/5" => Ok(Self::Abyssal7_5_7_5),
@@ -103,7 +110,7 @@ impl std::str::FromStr for TimedRotationProfile {
                 "rotation 4 requires a named profile: fiammetta-8844 or abyssal-7575",
             )),
             other => Err(Error::msg(format!(
-                "unsupported rotation {other:?}; expected 2, 3, fiammetta-8844, or abyssal-7575"
+                "unsupported rotation {other:?}; expected 2, 3, 12/12/12, fiammetta-8844, or abyssal-7575"
             ))),
         }
     }
@@ -1568,7 +1575,8 @@ fn clear_production_efficiencies(blueprint: &BaseBlueprint, assignment: &mut Bas
     }
 }
 
-/// 当前轻量策略每个 24h αβγ 周期只安排一次菲亚梅塔回岗。
+/// 当前轻量策略默认每个 24h αβγ 周期安排一次菲亚梅塔回岗；
+/// 36h 的 `12/12/12` profile 可由调用方允许每个休息班各安排一次。
 ///
 /// 顺序是公孙长乐确认的常规线性 fallback；布局动态排序和龙巫成组服务留给
 /// 后续完整心情排班器。continuous role 可以在固定顺序中提供单点回岗例外，但
@@ -1636,12 +1644,18 @@ fn apply_fiammetta_return(
     continuous_roles: &[crate::layout::ContinuousRole],
     shift_binds: &[RuntimeShiftBind],
     shifts: &mut [TeamShiftResult],
+    max_returns: usize,
+    cycle_hours: f64,
 ) -> Result<()> {
     if !operbox.owns("菲亚梅塔") {
         return Ok(());
     }
 
+    let mut applied_returns = 0;
     for target_name in fiammetta_target_names(continuous_roles, shift_binds) {
+        if applied_returns >= max_returns {
+            break;
+        }
         let Some(source_room) = peak
             .rooms
             .iter()
@@ -1684,6 +1698,9 @@ fn apply_fiammetta_return(
             .operator_names()
             .contains(target_name)
         {
+            continue;
+        }
+        if shifts[shift_index].fiammetta.is_some() {
             continue;
         }
 
@@ -1742,16 +1759,16 @@ fn apply_fiammetta_return(
         };
         let shift = &mut shifts[shift_index];
         shift.assignment = assignment;
-        shift.weighted_trade = scores.weighted_trade(hours);
-        shift.weighted_manufacture = scores.weighted_manufacture(hours);
-        shift.weighted_power = scores.weighted_power(hours);
+        shift.weighted_trade = scores.weighted_trade_for_cycle(hours, cycle_hours);
+        shift.weighted_manufacture = scores.weighted_manufacture_for_cycle(hours, cycle_hours);
+        shift.weighted_power = scores.weighted_power_for_cycle(hours, cycle_hours);
         shift.efficiencies = scores;
         shift.fiammetta = Some(FiammettaShiftAction {
             target: target_name.to_string(),
             displaced: displaced.name,
             room_id: source_room.room_id.clone(),
         });
-        break;
+        applied_returns += 1;
     }
 
     Ok(())
@@ -2632,6 +2649,20 @@ pub fn schedule_timed_rotation(
             [12.0, 6.0, 6.0],
             true,
             AbyssalShortShiftPolicy::Opportunistic,
+            TimedRotationProfile::Abc12_6_6,
+            1,
+        ),
+        TimedRotationProfile::Abc12_12_12 => schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            [12.0, 12.0, 12.0],
+            true,
+            AbyssalShortShiftPolicy::Disabled,
+            TimedRotationProfile::Abc12_12_12,
+            3,
         ),
         TimedRotationProfile::MainBackup12_12 => {
             schedule_main_backup_12_12(blueprint, operbox, instances, table, options)
@@ -2661,8 +2692,11 @@ fn schedule_abc_rotation(
     shift_hours: [f64; 3],
     enable_fiammetta_return: bool,
     abyssal_policy: AbyssalShortShiftPolicy,
+    profile: TimedRotationProfile,
+    fiammetta_return_limit: usize,
 ) -> Result<TeamRotationReport> {
     let t0 = Instant::now();
+    let cycle_hours: f64 = shift_hours.iter().sum();
     blueprint.validate()?;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
@@ -3502,9 +3536,9 @@ fn schedule_abc_rotation(
                 &bound_office_names,
                 &mut used_office,
             );
-            let weighted_trade = scores.weighted_trade(hours);
-            let weighted_manufacture = scores.weighted_manufacture(hours);
-            let weighted_power = scores.weighted_power(hours);
+            let weighted_trade = scores.weighted_trade_for_cycle(hours, cycle_hours);
+            let weighted_manufacture = scores.weighted_manufacture_for_cycle(hours, cycle_hours);
+            let weighted_power = scores.weighted_power_for_cycle(hours, cycle_hours);
             shifts.push(TeamShiftResult {
                 index,
                 plan_index: 0,
@@ -3570,9 +3604,9 @@ fn schedule_abc_rotation(
                 hours,
                 Some(durin_plan),
             )?;
-            let weighted_trade = scores.weighted_trade(hours);
-            let weighted_manufacture = scores.weighted_manufacture(hours);
-            let weighted_power = scores.weighted_power(hours);
+            let weighted_trade = scores.weighted_trade_for_cycle(hours, cycle_hours);
+            let weighted_manufacture = scores.weighted_manufacture_for_cycle(hours, cycle_hours);
+            let weighted_power = scores.weighted_power_for_cycle(hours, cycle_hours);
             shifts.push(TeamShiftResult {
                 index,
                 plan_index: 0,
@@ -3618,16 +3652,12 @@ fn schedule_abc_rotation(
             &peak_plan.continuous_roles,
             &shift_binds,
             &mut shifts,
+            fiammetta_return_limit,
+            shift_hours.iter().sum(),
         )?;
     }
     validate_final_rotation_invariants(&shifts, &shift_binds, &peak_plan.active_dependencies)?;
-    validate_mood_gap_decay_work_spans(
-        blueprint,
-        instances,
-        table,
-        TimedRotationProfile::Abc12_6_6,
-        &shifts,
-    )?;
+    validate_mood_gap_decay_work_spans(blueprint, instances, table, profile, &shifts)?;
     let daily = DailyTotals {
         trade: shifts.iter().map(|shift| shift.weighted_trade).sum(),
         manufacture: shifts.iter().map(|shift| shift.weighted_manufacture).sum(),
@@ -3646,7 +3676,7 @@ fn schedule_abc_rotation(
     );
 
     Ok(TeamRotationReport {
-        profile: TimedRotationProfile::Abc12_6_6,
+        profile,
         assignment_plans: vec![peak_plan.clone()],
         peak_plan,
         peak_mood_eta,
@@ -3948,6 +3978,8 @@ fn schedule_fiammetta_8_8_4_4(
         [16.0, 4.0, 4.0],
         false,
         AbyssalShortShiftPolicy::Disabled,
+        TimedRotationProfile::Abc12_6_6,
+        1,
     )?;
     let binds = shift_binds_from_plan(&raw.peak_plan);
     let (target, room_id) = first_fiammetta_target(
@@ -5562,6 +5594,10 @@ mod tests {
     #[test]
     fn timed_rotation_profile_parser_is_closed() {
         assert_eq!(
+            "12/12/12".parse::<TimedRotationProfile>().unwrap(),
+            TimedRotationProfile::Abc12_12_12
+        );
+        assert_eq!(
             "2".parse::<TimedRotationProfile>().unwrap(),
             TimedRotationProfile::MainBackup12_12
         );
@@ -5571,6 +5607,58 @@ mod tests {
         );
         assert!("4".parse::<TimedRotationProfile>().is_err());
         assert!("5".parse::<TimedRotationProfile>().is_err());
+    }
+
+    #[test]
+    fn abc_12_12_12_reuses_abc_team_rotation_for_a_36_hour_cycle() {
+        let (blueprint, operbox, instances, table) = fixtures();
+        let report = schedule_timed_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions::default(),
+            TimedRotationProfile::Abc12_12_12,
+        )
+        .unwrap();
+
+        assert_eq!(report.profile, TimedRotationProfile::Abc12_12_12);
+        assert_eq!(
+            report
+                .shifts
+                .iter()
+                .map(|shift| shift.duration_hours)
+                .collect::<Vec<_>>(),
+            vec![12.0, 12.0, 12.0]
+        );
+        assert!(report
+            .shifts
+            .iter()
+            .all(|shift| shift.active_teams.len() == 2));
+        assert!(report.shifts.iter().all(|shift| shift.dorm_rest.is_none()));
+        assert!(
+            report
+                .shifts
+                .iter()
+                .filter(|shift| shift.fiammetta.is_some())
+                .count()
+                <= 3
+        );
+        for shift in &report.shifts {
+            assert_eq!(
+                shift.weighted_trade,
+                shift.efficiencies.trade_efficiency.scale_ratio(1, 3),
+                "each 12h segment must contribute one third of the 36h cycle"
+            );
+            assert_eq!(
+                shift.weighted_manufacture,
+                shift.efficiencies.manufacture_efficiency.scale_ratio(1, 3)
+            );
+        }
+        assert_eq!(
+            report.daily.trade,
+            report.shifts.iter().map(|shift| shift.weighted_trade).sum()
+        );
     }
 
     #[test]

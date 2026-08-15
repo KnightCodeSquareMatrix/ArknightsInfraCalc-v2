@@ -207,7 +207,7 @@ infra-cli plan \
 | `domains[].current` / `baseline` | object | 当前 / 参考快照：`operators[]`、`score`，贸易域可带 `trade_pct` / `gold_pct` |
 | `domains[].gap_ratio` | number | `(current.score - baseline.score) / baseline.score` |
 | `domains[].severity` | `"ok" | "warn" | "critical"` | 缺口等级 |
-| `rotation` / `baseline_rotation` | object | 24h 三队轮休加权：`daily_trade`、`daily_manu`、`daily_power` |
+| `rotation` / `baseline_rotation` | object | 当前 profile 的日均轮休加权：`daily_trade`、`daily_manu`、`daily_power`；`abc_12_12_12` 按 36h 周期归一化 |
 | `actions[]` | array | 提升建议，元素含 `priority`、`kind`、`operator`、`domain_id`、`message` |
 | `flags[]` | string[] | 机器可读状态标记 |
 | `narration_hints[]` | string[] | 面向用户的补充说明 |

@@ -380,9 +380,18 @@ pub(super) fn build_domains(
     }
 
     let gap = efficiency_gap(current.rotation.daily.trade, baseline.rotation.daily.trade);
+    let (trade_label, manufacture_label) =
+        if options.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
+            (
+                "轮休·36h周期归一化日均贸易加权",
+                "轮休·36h周期归一化日均制造加权",
+            )
+        } else {
+            ("轮休·24h贸易加权", "轮休·24h制造加权")
+        };
     out.push(DomainMetric {
         id: "rotation_trade",
-        label: "轮休·24h贸易加权",
+        label: trade_label,
         current: ComboSnapshot {
             operators: vec![],
             final_efficiency: current.rotation.daily.trade,
@@ -403,7 +412,7 @@ pub(super) fn build_domains(
     );
     out.push(DomainMetric {
         id: "rotation_manufacture",
-        label: "轮休·24h制造加权",
+        label: manufacture_label,
         current: ComboSnapshot {
             operators: vec![],
             final_efficiency: current.rotation.daily.manufacture,

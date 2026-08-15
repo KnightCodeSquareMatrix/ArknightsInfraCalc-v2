@@ -261,7 +261,7 @@ cargo run -p infra-cli -- plan \
 |------|------|
 | `--operbox` | **必填**。`OperBox` JSON 或一图流练度 xlsx |
 | `--layout` | 可选。默认 `data/fixtures/243/layout.json` |
-| `--rotation` | 可选。`2` / `3` / `fiammetta-8844` / `abyssal-7575`；省略为 `3`，裸 `4` 报错 |
+| `--rotation` | 可选。`2` / `3` / `12/12/12` / `fiammetta-8844` / `abyssal-7575`；省略为 `3`，裸 `4` 报错 |
 | `--maa-out` | 写出 MAA 基建排班 JSON |
 | `--profile-out` | 可选。账号画像 JSON 路径（默认同目录 `*_profile.json`） |
 | `--output-dir` | 可选。按最终 2 / 3 / 4 个状态写出 `team_shift_*.json` assignment |

@@ -31,7 +31,14 @@ pub fn render_box_profile_narrative(profile: &BoxProfile) -> String {
     }
     out.push('\n');
 
-    out.push_str("【24h 三队轮休加权】\n");
+    let rotation_heading =
+        if profile.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
+            "【36h 周期归一化日均】"
+        } else {
+            "【24h 三队轮休加权】"
+        };
+    out.push_str(rotation_heading);
+    out.push('\n');
     out.push_str(&format!(
         "  贸易 {}（参考 {}）· 制造 {}（参考 {}）· 发电 {}（参考 {}）\n\n",
         profile.rotation.daily_trade_efficiency,

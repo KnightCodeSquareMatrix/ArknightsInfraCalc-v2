@@ -101,7 +101,7 @@ infra-cli plan         ──→  --profile-out 账号画像 JSON + --maa-out MA
 infra-cli plan \
   --operbox <练度盒.json | 一图流.xlsx> \
   [--layout <蓝图.json>] \
-  [--rotation <2 | 3 | fiammetta-8844 | abyssal-7575>] \
+  [--rotation <2 | 3 | 12/12/12 | fiammetta-8844 | abyssal-7575>] \
   [--maa-out <输出/schedule.json>] \
   [--profile-out <画像.json>]
 ```
@@ -110,7 +110,7 @@ infra-cli plan \
 |------|------|------|
 | `--operbox <path>` | 是 | `OperBox` JSON 数组，或一图流导出的 **xlsx** |
 | `--layout <path>` | 否 | 默认 `data/fixtures/243/layout.json` |
-| `--rotation <profile>` | 否 | 默认 `3`；可选 `2`、`fiammetta-8844`、`abyssal-7575`；裸 `4` 硬错误 |
+| `--rotation <profile>` | 否 | 默认 `3`；可选 `2`、`12/12/12`、`fiammetta-8844`、`abyssal-7575`；裸 `4` 硬错误 |
 | `--maa-out <path>` | 否* | MAA 自定义基建排班 JSON；一次性 CLI 集成应传入已知临时路径 |
 | `--profile-out <path>` | 否 | 账号画像 JSON；一次性 CLI 集成应传入已知临时路径 |
 | `--baseline <operbox>` | 否 | 对比基准练度盒（画像用） |
@@ -199,7 +199,7 @@ infra-cli plan \
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `schema_version` | `4` | 直接效率契约版本；不兼容变更必须升版本 |
-| `rotation_profile` | string | 本次画像与 `rotation` 指标使用的 profile：`abc_12_6_6`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5` |
+| `rotation_profile` | string | 本次画像与 `rotation` 指标使用的 profile：`abc_12_6_6`、`abc_12_12_12`、`main_backup_12_12`、`fiammetta_8_8_4_4`、`abyssal_7_5_7_5` |
 | `layout_label` / `operbox_label` / `baseline_label` | `string` | 展示用来源标签，不作为路径依赖 |
 | `summary` | object | 账号概览：`owned`、`tier_up_owned`、`trade_pool_ready`、`manufacture_pool_ready` |
 | `domains[]` | array | 分域对比，UI 主表使用 |
@@ -207,7 +207,7 @@ infra-cli plan \
 | `domains[].current` / `baseline` | object | 当前 / 参考快照：`operators[]`、`final_efficiency`，贸易域可带 `mechanic_equivalent_efficiency` |
 | `domains[].gap_ratio` | number | `(current.final_efficiency - baseline.final_efficiency) / baseline.final_efficiency` |
 | `domains[].severity` | `"ok" | "warn" | "critical"` | 缺口等级 |
-| `rotation` / `baseline_rotation` | object | 当前所选 24h profile / 固定参考排班加权：`daily_trade_efficiency`、`daily_manufacture_efficiency`、`daily_power_efficiency` |
+| `rotation` / `baseline_rotation` | object | 当前所选 profile 的日均指标 / 固定参考排班加权：`daily_trade_efficiency`、`daily_manufacture_efficiency`、`daily_power_efficiency`；`abc_12_12_12` 按 36h 周期归一化 |
 | `actions[]` | array | 提升建议，元素含 `priority`、`kind`、`operator`、`domain_id`、`message` |
 | `flags[]` | string[] | 机器可读状态标记 |
 | `narration_hints[]` | string[] | 面向用户的补充说明 |
@@ -218,7 +218,7 @@ infra-cli plan \
 infra-cli layout team-rotation \
   --layout <蓝图.json> \
   --operbox <练度盒.json> \
-  [--rotation <2 | 3 | fiammetta-8844 | abyssal-7575>] \
+  [--rotation <2 | 3 | 12/12/12 | fiammetta-8844 | abyssal-7575>] \
   --maa-out <输出/schedule.json>
 ```
 
@@ -274,7 +274,7 @@ infra-cli layout team-rotation \
 
 响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。`training_advice` 固定包含新手章节状态 `newbie_section_status`、全量 `incomplete_newbie`、常见组合 `combinations` 和最多 10 人的 `recommendations`；建议可附带 `product`、`efficiency` 和逐条件 `conditions`。它消费本次请求的 operbox 与 layout，已知无源石碎片制造站时不会推荐搓玉干员或泡泡/火神，且泡泡组有源石线时成对输出；同站条件只作说明。排班结果按每班每站 `skill-efficiency ÷ operator_count` 的简单平均注入 T9 上下文，超过贸易 30% 且制造 25% 时跳过新手行动建议但保留完整未完成清单。`rotation.shifts[]` 的 `efficiencies.room_lines[]` 还包含 `operator_count`，便于前端复核均效口径。
 
-`plan.compute` v1 参数的机器契约是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)，人类可读契约见 [`contracts/plan-compute-v1.md`](../contracts/plan-compute-v1.md)。Worker 在 Serde 反序列化前执行该 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 发布后不可原地增加、删除或改变请求字段，任何结构或语义扩展必须使用新版本。
+`plan.compute` v1/v2 参数的机器契约分别是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json) 与 [`contracts/plan-compute-v2.schema.json`](../contracts/plan-compute-v2.schema.json)，人类可读契约见对应的 `plan-compute-v1.md` / `plan-compute-v2.md`。Worker 在 Serde 反序列化前执行对应 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 保持原语义，`abc_12_12_12` 通过 v2 请求使用。
 
 协议边界：request/response 单帧均不超过 8 MiB；layout 包含 1 至 64 个房间；operbox 包含 1 至 1000 项；`top` 为 1 至 100；layout/operbox label 均为非空且不超过 200 UTF-8 bytes。重复 room/operator ID、房间 kind 与 product 的跨字段一致性等不能由结构 schema 完整表达的规则，仍由 Rust 领域校验拒绝。
 

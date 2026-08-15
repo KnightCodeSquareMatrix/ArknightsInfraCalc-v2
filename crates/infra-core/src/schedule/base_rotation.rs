@@ -64,11 +64,28 @@ impl ShiftEfficiencies {
     pub fn weighted_power(&self, shift_hours: f64) -> Efficiency {
         weighted_for_hours(self.power_efficiency, shift_hours)
     }
+
+    pub fn weighted_trade_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.trade_efficiency, shift_hours, cycle_hours)
+    }
+
+    pub fn weighted_manufacture_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.manufacture_efficiency, shift_hours, cycle_hours)
+    }
+
+    pub fn weighted_power_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.power_efficiency, shift_hours, cycle_hours)
+    }
 }
 
 fn weighted_for_hours(efficiency: Efficiency, hours: f64) -> Efficiency {
+    weighted_for_cycle(efficiency, hours, 24.0)
+}
+
+fn weighted_for_cycle(efficiency: Efficiency, hours: f64, cycle_hours: f64) -> Efficiency {
     let minutes = (hours * 60.0).round() as i64;
-    efficiency.scale_ratio(minutes, 24 * 60)
+    let cycle_minutes = (cycle_hours * 60.0).round() as i64;
+    efficiency.scale_ratio(minutes, cycle_minutes)
 }
 
 /// 对编制逐房求贸易/制造/发电直接效率（满心情）；`shift_hours` 影响发电爬升与产出折算。
