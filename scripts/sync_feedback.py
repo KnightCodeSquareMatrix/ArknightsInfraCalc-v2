@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Download production feedback files for local debugging.
 
+Production server: root@114.66.55.78 (ssh key ~/.ssh/id_rsa).
+
 Run:
     python3 scripts/sync_feedback.py
 
 Optional overrides:
-    python3 scripts/sync_feedback.py --target root@1.2.3.4
+    python3 scripts/sync_feedback.py --target root@1.2.3.4 --remote-dir /var/lib/arknights-infra/feedback
     SSH_PASSWORD=... python3 scripts/sync_feedback.py --target arkinfra-server
 """
 
@@ -20,18 +22,23 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_SSH_TARGET = "arkinfra-server"
-DEFAULT_REMOTE_FEEDBACK_DIR = (
-    "/root/ArknightsInfraCalc-v2_beta_test_frontend-main/server/storage/feedback"
-)
+DEFAULT_SSH_TARGET = "root@114.66.55.78"
+DEFAULT_REMOTE_FEEDBACK_DIRS = [
+    "/var/lib/arknights-infra/feedback",
+    "/var/lib/arknights-infra-dev/feedback",
+    "/var/lib/arknights-infra-quality/feedback",
+]
 DEFAULT_LOCAL_FEEDBACK_DIR = ROOT / "feedback"
 DEFAULT_NOTE = "feedback"
+
+# Local feedback folders use Beijing time (CST, UTC+8) for day + time prefix.
+LOCAL_TZ = timezone(timedelta(hours=8))
 
 
 def with_password_tool(base_cmd: list[str], password: str) -> list[str]:
@@ -153,7 +160,7 @@ def first_time(data: dict) -> datetime | None:
         if isinstance(value, (int, float)):
             if value > 10_000_000_000:
                 value = value / 1000
-            return datetime.fromtimestamp(value)
+            return datetime.fromtimestamp(value, tz=timezone.utc)
         if isinstance(value, str) and value.strip():
             parsed = parse_time(value.strip())
             if parsed is not None:
@@ -167,10 +174,10 @@ def parse_time(value: str) -> datetime | None:
         normalized = normalized[:-1] + "+00:00"
 
     for parser in [
-        lambda text: datetime.fromisoformat(text).replace(tzinfo=None),
-        lambda text: datetime.strptime(text, "%Y-%m-%d %H:%M:%S"),
-        lambda text: datetime.strptime(text, "%Y-%m-%d_%H-%M-%S"),
-        lambda text: datetime.strptime(text, "%Y%m%d%H%M%S"),
+        lambda text: datetime.fromisoformat(text),
+        lambda text: datetime.strptime(text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=LOCAL_TZ),
+        lambda text: datetime.strptime(text, "%Y-%m-%d_%H-%M-%S").replace(tzinfo=LOCAL_TZ),
+        lambda text: datetime.strptime(text, "%Y%m%d%H%M%S").replace(tzinfo=LOCAL_TZ),
     ]:
         try:
             return parser(normalized)
@@ -179,11 +186,22 @@ def parse_time(value: str) -> datetime | None:
     return None
 
 
+def meta_saved_time(item: Path) -> datetime | None:
+    meta = find_meta_json(item)
+    if meta is None:
+        return None
+    return first_time(json_file_data(meta))
+
+
 def item_time(item: Path, data: dict) -> datetime:
     parsed = first_time(data)
-    if parsed is not None:
-        return parsed
-    return datetime.fromtimestamp(item.stat().st_mtime)
+    if parsed is None:
+        parsed = meta_saved_time(item)
+    if parsed is None:
+        parsed = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=LOCAL_TZ)
+    return parsed.astimezone(LOCAL_TZ)
 
 
 def item_note(item: Path, data: dict) -> str:
@@ -212,9 +230,10 @@ def slug(value: str, limit: int = 80) -> str:
     return value[:limit].strip("-._")
 
 
-def organize_feedback(raw_root: Path, local_feedback_dir: Path) -> list[Path]:
+def organize_feedback(raw_root: Path, local_feedback_dir: Path, known: dict[str, Path] | None = None) -> list[Path]:
     local_feedback_dir.mkdir(parents=True, exist_ok=True)
-    known = existing_feedback_by_id(local_feedback_dir)
+    if known is None:
+        known = existing_feedback_by_id(local_feedback_dir)
     organized: list[Path] = []
     items = sorted(
         [path for path in raw_root.iterdir() if path.name not in {".", ".."}],
@@ -230,12 +249,14 @@ def organize_feedback(raw_root: Path, local_feedback_dir: Path) -> list[Path]:
         folder_name = f"{when.strftime('%H%M%S')}-{note}"
         fid = feedback_id(item)
         target = known.get(fid) if fid is not None else None
+        is_new = target is None
         if target is None:
             target = day_dir / folder_name
         if fid is not None:
             known[fid] = target
         copy_feedback(item, target)
-        organized.append(target)
+        if is_new:
+            organized.append(target)
 
     return organized
 
@@ -253,8 +274,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--target", default=DEFAULT_SSH_TARGET, help="ssh target alias/host")
     parser.add_argument(
         "--remote-dir",
-        default=DEFAULT_REMOTE_FEEDBACK_DIR,
-        help="remote feedback directory",
+        action="append",
+        default=[],
+        help="remote feedback directory (repeatable; defaults to all three services)",
     )
     parser.add_argument(
         "--local-dir",
@@ -298,45 +320,60 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     password = os.environ.get("SSH_PASSWORD", "")
     local_feedback_dir = resolve_local_dir(args.local_dir)
+    remote_dirs = args.remote_dir or DEFAULT_REMOTE_FEEDBACK_DIRS
 
     print(f"SSH target: {args.target}", flush=True)
-    print(f"Remote feedback: {args.remote_dir}", flush=True)
+    for remote_dir in remote_dirs:
+        print(f"Remote feedback: {remote_dir}", flush=True)
     print(f"Local feedback: {local_feedback_dir}", flush=True)
 
     with tempfile.TemporaryDirectory(prefix="feedback-sync-") as temp:
-        raw_root = Path(temp) / "raw"
-        raw_root.mkdir(parents=True)
+        known = existing_feedback_by_id(local_feedback_dir)
+        organized: list[Path] = []
 
-        if shutil.which("rsync") is not None:
-            cmd = with_password_tool(
-                [
-                    "rsync",
-                    "-az",
-                    f"{args.target}:{args.remote_dir}/",
-                    f"{raw_root}/",
-                ],
-                password,
-            )
-        else:
-            cmd = with_password_tool(
-                [
-                    "scp",
-                    "-r",
-                    f"{args.target}:{args.remote_dir}/.",
-                    str(raw_root),
-                ],
-                password,
-            )
+        for remote_dir in remote_dirs:
+            raw_root = Path(temp) / re.sub(r"[^0-9a-zA-Z._-]+", "_", remote_dir.strip("/").replace("/", "_"))
+            raw_root.mkdir(parents=True, exist_ok=True)
 
-        try:
-            run(cmd, password=password)
-        except subprocess.CalledProcessError as exc:
-            if exc.returncode == 255:
-                print_connection_hint(args.target)
-            raise
-        organized = organize_feedback(raw_root, local_feedback_dir)
+            exists_cmd = with_password_tool(["ssh", args.target, f"test -d {shlex.quote(remote_dir)} && echo 1"], password)
+            try:
+                probe = subprocess.run(exists_cmd, env=os.environ.copy(), capture_output=True, text=True, timeout=20)
+            except subprocess.TimeoutExpired:
+                probe = None
+            if probe is None or probe.returncode != 0 or "1" not in probe.stdout:
+                print(f"Skip missing remote dir: {remote_dir}", flush=True)
+                continue
 
-    print("\nOrganized feedback folders:")
+            if shutil.which("rsync") is not None:
+                cmd = with_password_tool(
+                    [
+                        "rsync",
+                        "-az",
+                        f"{args.target}:{remote_dir}/",
+                        f"{raw_root}/",
+                    ],
+                    password,
+                )
+            else:
+                cmd = with_password_tool(
+                    [
+                        "scp",
+                        "-r",
+                        f"{args.target}:{remote_dir}/.",
+                        str(raw_root),
+                    ],
+                    password,
+                )
+
+            try:
+                run(cmd, password=password)
+            except subprocess.CalledProcessError as exc:
+                if exc.returncode == 255:
+                    print_connection_hint(args.target)
+                raise
+            organized.extend(organize_feedback(raw_root, local_feedback_dir, known))
+
+    print("\nNew feedback folders synced:")
     if not organized:
         print("(none)")
     for path in organized:
