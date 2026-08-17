@@ -2647,7 +2647,7 @@ pub fn schedule_timed_rotation(
             table,
             options,
             [12.0, 6.0, 6.0],
-            true,
+            options.fiammetta_enable,
             AbyssalShortShiftPolicy::Opportunistic,
             TimedRotationProfile::Abc12_6_6,
             1,
@@ -2659,7 +2659,7 @@ pub fn schedule_timed_rotation(
             table,
             options,
             [12.0, 12.0, 12.0],
-            true,
+            options.fiammetta_enable,
             AbyssalShortShiftPolicy::Disabled,
             TimedRotationProfile::Abc12_12_12,
             3,
@@ -2668,6 +2668,11 @@ pub fn schedule_timed_rotation(
             schedule_main_backup_12_12(blueprint, operbox, instances, table, options)
         }
         TimedRotationProfile::Fiammetta8_8_4_4 => {
+            if !options.fiammetta_enable {
+                return Err(Error::msg(
+                    "fiammetta-8844 requires fiammetta_enable=true; disable conflicts with the explicit Fiammetta rotation profile",
+                ));
+            }
             schedule_fiammetta_8_8_4_4(blueprint, operbox, instances, table, options)
         }
         TimedRotationProfile::Abyssal7_5_7_5 => {
@@ -7603,6 +7608,75 @@ mod tests {
                 shift.index + 1
             );
         }
+    }
+
+    #[test]
+    fn fiammetta_enable_false_suppresses_return_actions() {
+        let (blueprint, operbox, instances, table) = user_243_fixtures();
+        assert!(
+            operbox.owns("菲亚梅塔"),
+            "fixture 必须拥有菲亚梅塔，否则本测试无法区分关闭与缺员"
+        );
+        let report = schedule_timed_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                fiammetta_enable: false,
+                ..Default::default()
+            },
+            TimedRotationProfile::default(),
+        )
+        .unwrap();
+        assert!(
+            report.shifts.iter().all(|shift| shift.fiammetta.is_none()),
+            "fiammetta_enable=false 时不得产生任何菲亚回岗动作"
+        );
+        let with_fiammetta = schedule_timed_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                fiammetta_enable: true,
+                ..Default::default()
+            },
+            TimedRotationProfile::default(),
+        )
+        .unwrap();
+        assert!(
+            with_fiammetta
+                .shifts
+                .iter()
+                .any(|shift| shift.fiammetta.is_some()),
+            "fiammetta_enable=true 时默认 ABC 应产生回岗动作"
+        );
+    }
+
+    #[test]
+    fn fiammetta_enable_false_rejects_8844_profile() {
+        let (blueprint, operbox, instances, table) = user_243_fixtures();
+        let err = schedule_timed_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions {
+                top_k: 5,
+                fiammetta_enable: false,
+                ..Default::default()
+            },
+            TimedRotationProfile::Fiammetta8_8_4_4,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("fiammetta-8844 requires fiammetta_enable=true"),
+            "禁用菲亚梅塔时显式 8844 profile 必须硬错误，实际: {err}"
+        );
     }
 
     #[test]

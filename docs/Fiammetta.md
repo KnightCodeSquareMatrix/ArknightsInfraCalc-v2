@@ -6,7 +6,7 @@
 > 当前真源：self
 > 摘要：裁决菲亚梅塔在当前排班中的目标和边界
 
-> 实现快照：默认 ABC 已接入单次主力回岗覆盖；`12/12/12` 已接入每个休息班至多一次的轻量多事件回岗；具名 `fiammetta-8844` 已实现菲亚事件插班；布局动态排序与完整实时心情排班尚未实现。
+> 实现快照：默认 ABC 已接入单次主力回岗覆盖；`12/12/12` 已接入每个休息班至多一次的轻量多事件回岗；具名 `fiammetta-8844` 已实现菲亚事件插班；回岗覆盖可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；布局动态排序与完整实时心情排班尚未实现。
 > 规则来源：公孙长乐 2026-07-11 评审稿。
 
 ## 当前已经实现
@@ -16,6 +16,8 @@
 ```text
 但书 > 巫恋 > 龙舌兰 > 清流 > 可露希尔
 ```
+
+菲亚梅塔回岗默认启用。如需关闭，CLI 使用 `--no-fiammetta`（`plan` 与 `layout team-rotation`）；`plan.compute` 使用 v3 契约的 `options.fiammetta_enable`（默认 `true`）。关闭后 ABC 排班不生成任何回岗动作，输出 MAA 的 `Fiammetta.enable` 全部为 `false`。`fiammetta_enable=false` 与显式 `rotation: fiammetta_8_8_4_4` 组合直接硬错误，不回退三班。
 
 选择规则：
 

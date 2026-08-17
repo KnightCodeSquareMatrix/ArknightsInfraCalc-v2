@@ -39,6 +39,8 @@ pub struct AssignBaseOptions {
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// 菲亚梅塔主力回岗覆盖开关；`false` 时 ABC 排班不生成回岗动作。
+    pub fiammetta_enable: bool,
     /// Dynamic producer prefix comparator. The public baseline remains V0;
     /// shadow runs opt into V1 explicitly.
     pub dynamic_producer_policy: ScoringPolicyId,
@@ -53,6 +55,7 @@ impl Default for AssignBaseOptions {
             shift_hours: 24.0,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
+            fiammetta_enable: true,
             dynamic_producer_policy: ScoringPolicyId::ControlInjectRawSumV0,
             trade_manufacture_weights: TradeManufactureEfficiencyWeights::default(),
         }

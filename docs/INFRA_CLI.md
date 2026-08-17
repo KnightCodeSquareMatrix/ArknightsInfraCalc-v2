@@ -262,6 +262,7 @@ cargo run -p infra-cli -- plan \
 | `--operbox` | **必填**。`OperBox` JSON 或一图流练度 xlsx |
 | `--layout` | 可选。默认 `data/fixtures/243/layout.json` |
 | `--rotation` | 可选。`2` / `3` / `12/12/12` / `fiammetta-8844` / `abyssal-7575`；省略为 `3`，裸 `4` 报错 |
+| `--no-fiammetta` | 可选。关闭菲亚梅塔主力回岗覆盖；关闭后 MAA 输出的 `Fiammetta.enable` 全部为 `false`。与 `--rotation fiammetta-8844` 组合直接硬错误 |
 | `--maa-out` | 写出 MAA 基建排班 JSON |
 | `--profile-out` | 可选。账号画像 JSON 路径（默认同目录 `*_profile.json`） |
 | `--output-dir` | 可选。按最终 2 / 3 / 4 个状态写出 `team_shift_*.json` assignment |
@@ -305,6 +306,7 @@ cargo run -p infra-cli -- layout team-rotation \
 | `--layout` | `plan` 可选，默认 `data/fixtures/243/layout.json`；`layout team-rotation` 必填 |
 | `--operbox` | **必填**。`OperBox` JSON；**Agent 默认** `data/fixtures/243/operbox_full_e2.json` |
 | `--rotation` | 可选；显式 profile 是 hard constraint，不会静默回退默认三班 |
+| `--no-fiammetta` | 可选。关闭菲亚梅塔回岗覆盖；与 `--rotation fiammetta-8844` 组合直接硬错误 |
 | `--maa-out` | **Agent 默认必带**。写出 MAA 基建排班 JSON；默认 `out/243_maa.json` |
 | `--maa-title` | 可选。覆盖 JSON 顶层 `title` |
 | `--top` | Top-K 搜索条数，默认 20 |

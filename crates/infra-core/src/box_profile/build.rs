@@ -19,6 +19,8 @@ pub struct BoxProfileOptions {
     pub top_k: usize,
     pub rotation_profile: TimedRotationProfile,
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// 菲亚梅塔主力回岗覆盖开关；`false` 时 current 排班不生成回岗动作。
+    pub fiammetta_enable: bool,
     /// baseline 练度（默认 full_e2，用于公孙 schedule eval）。
     pub baseline_operbox: Option<PathBuf>,
     /// 公孙参考排班 JSON（默认 `schedule_export.json`）。
@@ -33,6 +35,7 @@ impl Default for BoxProfileOptions {
             top_k: 10,
             rotation_profile: TimedRotationProfile::default(),
             system_preferences: std::collections::HashMap::new(),
+            fiammetta_enable: true,
             baseline_operbox: None,
             baseline_schedule: None,
             gap_warn: 0.08,
@@ -138,6 +141,7 @@ pub fn build_box_profile(
         options.top_k,
         options.rotation_profile,
         &options.system_preferences,
+        options.fiammetta_enable,
     )?;
     build_box_profile_from_current_probe(
         &current,

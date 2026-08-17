@@ -28,6 +28,7 @@ pub(super) struct PlanComputeInput<'a> {
     pub rotation_profile: TimedRotationProfile,
     pub system_preferences: &'a HashMap<String, String>,
     pub maa_title: Option<&'a str>,
+    pub fiammetta_enable: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -55,6 +56,7 @@ pub(super) fn compute_plan(
         input.top_k,
         input.rotation_profile,
         input.system_preferences,
+        input.fiammetta_enable,
     )?;
 
     let profile = requested
@@ -73,6 +75,7 @@ pub(super) fn compute_plan(
                     baseline_operbox: input.baseline_operbox.map(Path::to_path_buf),
                     rotation_profile: input.rotation_profile,
                     system_preferences: input.system_preferences.clone(),
+                    fiammetta_enable: input.fiammetta_enable,
                     ..BoxProfileOptions::default()
                 },
             )
@@ -83,7 +86,9 @@ pub(super) fn compute_plan(
         .maa
         .then(|| {
             let mut options = MaaExportOptions::for_blueprint(input.blueprint);
-            options.enable_gongsun_fiammetta_priority();
+            if input.fiammetta_enable {
+                options.enable_gongsun_fiammetta_priority();
+            }
             if let Some(title) = input.maa_title {
                 options.title = title.to_string();
             }

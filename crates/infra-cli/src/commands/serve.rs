@@ -32,13 +32,15 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 2;
+const PLAN_SCHEMA_VERSION: u32 = 3;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v1.schema.json");
 const PLAN_COMPUTE_SCHEMA_V2_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v2.schema.json");
+const PLAN_COMPUTE_SCHEMA_V3_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v3.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OPERBOX_ENTRIES: usize = 1000;
 const MAX_LAYOUT_ROOMS: usize = 64;
@@ -63,8 +65,10 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         )?,
         plan_schema_v1: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON)?,
         plan_schema_v2: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON)?,
+        plan_schema_v3: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
+        plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -205,8 +209,10 @@ struct ServeState {
     training_advice_knowledge: TrainingAdviceKnowledge,
     plan_schema_v1: JSONSchema,
     plan_schema_v2: JSONSchema,
+    plan_schema_v3: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
+    plan_contract_sha256_v3: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -427,10 +433,16 @@ struct PlanComputeOptions {
     system_preferences: HashMap<String, String>,
     #[serde(default)]
     maa_title: Option<String>,
+    #[serde(default = "default_fiammetta_enable")]
+    fiammetta_enable: bool,
 }
 
 fn default_top_k() -> usize {
     20
+}
+
+fn default_fiammetta_enable() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize)]
@@ -533,11 +545,12 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2],
+                "supported_plan_schema_versions": [1, 2, 3],
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,
                     "2": state.plan_contract_sha256_v2,
+                    "3": state.plan_contract_sha256_v3,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -626,9 +639,10 @@ fn handle_plan_compute(
     let schema = match schema_version {
         1 => &state.plan_schema_v1,
         2 => &state.plan_schema_v2,
+        3 => &state.plan_schema_v3,
         other => {
             return Err(Error::msg(format!(
-                "unsupported plan schema version {other}; expected 1 or {PLAN_SCHEMA_VERSION}"
+                "unsupported plan schema version {other}; expected 1, 2 or {PLAN_SCHEMA_VERSION}"
             )))
         }
     };
@@ -667,6 +681,7 @@ fn handle_plan_compute(
             rotation_profile: params.options.rotation,
             system_preferences: &params.options.system_preferences,
             maa_title: params.options.maa_title.as_deref(),
+            fiammetta_enable: params.options.fiammetta_enable,
         },
         RequestedOutputs {
             profile: true,
@@ -815,6 +830,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
             rotation_profile,
             system_preferences: &system_preferences,
             maa_title: params.maa_title.as_deref(),
+            fiammetta_enable: true,
         },
         RequestedOutputs {
             profile: params.profile_out.is_some(),
@@ -1018,6 +1034,27 @@ mod tests {
         value["options"]["rotation"] = serde_json::json!("abc_12_12_12");
         validate_plan_compute_params(&schema, &value, 2).unwrap();
         serde_json::from_value::<PlanComputeParams>(value).unwrap();
+    }
+
+    #[test]
+    fn plan_compute_schema_v3_accepts_fiammetta_enable() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(3);
+        value["options"]["fiammetta_enable"] = serde_json::json!(false);
+        validate_plan_compute_params(&schema, &value, 3).unwrap();
+        let params: PlanComputeParams = serde_json::from_value(value).unwrap();
+        assert!(!params.options.fiammetta_enable);
+        assert_eq!(plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON).len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_v3_must_reject_unknown_options_fields() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(3);
+        value["options"]["unexpected"] = serde_json::json!(true);
+        assert!(validate_plan_compute_params(&schema, &value, 3).is_err());
     }
 
     #[test]
