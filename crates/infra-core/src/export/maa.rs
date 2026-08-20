@@ -10,8 +10,8 @@ use crate::layout::{
 };
 use crate::operbox::OperBox;
 use crate::schedule::{
-    DormRestPlan, ShiftTransition, TeamLabel, TeamRotationReport, TimedRotationProfile,
-    FIAMMETTA_RETURN_PRIORITY,
+    DormRestPlan, DroneAction, ShiftTransition, TeamLabel, TeamRotationReport,
+    TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
 };
 use crate::trade::input::TradeOrderKind;
 use crate::types::RecipeKind;
@@ -141,10 +141,11 @@ struct PlanInput<'a> {
     resting: Vec<String>,
     fiammetta_target: Option<&'a str>,
     fiammetta_priority: &'a [String],
-    special_rest: Vec<(FacilityKind, String)>,
-    transition: ShiftTransition,
     fiammetta_room: Option<&'a RoomId>,
     dorm_rest: Option<&'a DormRestPlan>,
+    drone: Option<&'a crate::schedule::DroneAction>,
+    transition: ShiftTransition,
+    special_rest: Vec<(FacilityKind, String)>,
 }
 
 impl MaaSchedule {
@@ -225,6 +226,7 @@ pub fn build_from_team_rotation(
                 transition: shift.transition,
                 fiammetta_room: shift.fiammetta.as_ref().map(|action| &action.room_id),
                 dorm_rest: shift.dorm_rest.as_ref(),
+                drone: shift.drone.as_ref(),
             }
         })
         .map(|input| build_plan(blueprint, &input))
@@ -282,14 +284,36 @@ fn build_plan(blueprint: &BaseBlueprint, input: &PlanInput) -> MaaPlan {
             .fiammetta_target
             .map(resolve_scheduled_fiammetta)
             .unwrap_or_else(|| resolve_fiammetta(input.fiammetta_priority, input.assignment)),
-        drones: if input.transition == ShiftTransition::FiammettaOnly {
-            let mut drones = drone_defaults(blueprint);
-            drones.enable = false;
-            drones
-        } else {
-            drone_defaults(blueprint)
-        },
+        drones: resolve_drones(blueprint, input.drone),
         rooms,
+    }
+}
+
+/// 把 schedule 层已决策的无人机动作映射为 MAA 下标。
+///
+/// schedule 只在班次有合法赤金制造房且非菲亚-only 时给出 `DroneAction`；
+/// 这里只做 room_id → MAA `index` 的转换，不再自行选择目标。
+fn resolve_drones(blueprint: &BaseBlueprint, drone: Option<&DroneAction>) -> MaaDrones {
+    let Some(drone) = drone else {
+        return MaaDrones {
+            enable: false,
+            room: "manufacture",
+            index: 1,
+            order: "pre",
+        };
+    };
+    let index = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Factory)
+        .position(|room| room.id == drone.room_id)
+        .map(|i| (i + 1) as u8)
+        .unwrap_or(1);
+    MaaDrones {
+        enable: true,
+        room: "manufacture",
+        index,
+        order: drone.order,
     }
 }
 
@@ -344,7 +368,15 @@ fn build_rooms(
         meeting: blueprint
             .rooms_of(FacilityKind::MeetingRoom)
             .into_iter()
-            .map(|room| shared_slot(assignment, &room.id.0, true))
+            .map(|room| {
+                shared_slot_with_extra(
+                    assignment,
+                    &room.id.0,
+                    true,
+                    Vec::new(),
+                    Some(room.operator_capacity()),
+                )
+            })
             .collect(),
         hire: blueprint
             .rooms_of(FacilityKind::Office)
@@ -481,6 +513,9 @@ fn shared_slot_with_extra(
     extra: Vec<String>,
     capacity: Option<usize>,
 ) -> MaaRoomSlot {
+    // 会客室由求解器填满（pipeline 末尾的 assign_meeting_rooms）；当可占用
+    // 干员不足而保留空席（例如仅剩 required 共享成员、第二席无候选）时，
+    // 按已裁决契约导出 `autofill: true` 提示前端自动补位；完全填满则为 false。
     // special-rest 是该班的明确去向，优先于 peak/shared 中沿用的旧成员。
     let mut operators = Vec::new();
     for name in extra {
@@ -499,7 +534,12 @@ fn shared_slot_with_extra(
     if let Some(capacity) = capacity {
         operators.truncate(capacity);
     }
-    if operators.is_empty() && autofill_if_empty {
+    let needs_autofill = if let Some(capacity) = capacity {
+        autofill_if_empty && operators.len() < capacity
+    } else {
+        autofill_if_empty && operators.is_empty()
+    };
+    if needs_autofill {
         return MaaRoomSlot {
             skip: false,
             product: None,
@@ -604,27 +644,6 @@ fn resolve_fiammetta(priority: &[String], assignment: &BaseAssignment) -> MaaFia
     MaaFiammetta {
         enable: !target.is_empty(),
         target,
-        order: "pre",
-    }
-}
-
-fn drone_defaults(blueprint: &BaseBlueprint) -> MaaDrones {
-    let index = blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::Factory)
-        .enumerate()
-        .find_map(|(i, room)| match room.product.as_ref() {
-            Some(RoomProduct::Factory {
-                recipe: RecipeKind::Gold,
-            }) => Some((i + 1) as u8),
-            _ => None,
-        })
-        .unwrap_or(1);
-    MaaDrones {
-        enable: true,
-        room: "manufacture",
-        index,
         order: "pre",
     }
 }
@@ -916,6 +935,7 @@ mod tests {
                     room_id: RoomId::new("trade_1"),
                 }),
                 dorm_rest: None,
+                drone: None,
                 transition: crate::schedule::ShiftTransition::ReplaceRooms,
                 efficiencies: ShiftEfficiencies::default(),
                 weighted_trade: crate::Efficiency::ZERO,
@@ -923,6 +943,7 @@ mod tests {
                 weighted_power: crate::Efficiency::ZERO,
             }],
             daily: Default::default(),
+            warnings: vec![],
             elapsed: Duration::from_millis(1),
         };
 
@@ -982,6 +1003,7 @@ mod tests {
                     room_id: RoomId::new("trade_1"),
                 }),
                 dorm_rest: None,
+                drone: None,
                 transition: crate::schedule::ShiftTransition::FiammettaOnly,
                 efficiencies: ShiftEfficiencies::default(),
                 weighted_trade: crate::Efficiency::ZERO,
@@ -989,6 +1011,7 @@ mod tests {
                 weighted_power: crate::Efficiency::ZERO,
             }],
             daily: Default::default(),
+            warnings: vec![],
             elapsed: Duration::ZERO,
         };
 
@@ -1012,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_fiammetta_priority_excludes_declarative_continuous_trade_cores() {
+    fn legacy_fiammetta_priority_uses_canonical_order() {
         let blueprint = sample_blueprint();
         let mut assignment = BaseAssignment::default();
         assignment.set_room(
@@ -1029,7 +1052,7 @@ mod tests {
         let resolved = resolve_fiammetta(&opts.fiammetta_priority, &assignment);
 
         assert!(resolved.enable);
-        assert_eq!(resolved.target, "龙舌兰");
+        assert_eq!(resolved.target, "但书");
         assert_eq!(resolved.order, "pre");
     }
 
@@ -1055,5 +1078,74 @@ mod tests {
         assert!(!disabled.enable);
         assert!(disabled.target.is_empty());
         assert_eq!(disabled.order, "pre");
+    }
+
+    #[test]
+    fn shared_slot_partial_fill_marks_autofill_for_meeting() {
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("meeting", vec![AssignedOperator::new("麦哲伦", 2)]);
+        // 容量 2、只有 1 名成员 → 部分填充必须提示 autofill。
+        let slot = shared_slot_with_extra(&assignment, "meeting", true, Vec::new(), Some(2));
+        assert!(
+            slot.autofill,
+            "partial meeting fill must keep autofill=true"
+        );
+        assert_eq!(slot.operators, vec!["麦哲伦".to_string()]);
+
+        // 容量 2、2 名成员 → 填满，autofill=false。
+        assignment.set_room(
+            "meeting",
+            vec![
+                AssignedOperator::new("麦哲伦", 2),
+                AssignedOperator::new("和弦", 2),
+            ],
+        );
+        let full = shared_slot_with_extra(&assignment, "meeting", true, Vec::new(), Some(2));
+        assert!(!full.autofill, "full meeting fill must clear autofill");
+        assert_eq!(full.operators.len(), 2);
+    }
+
+    #[test]
+    fn drones_map_schedule_target_room_to_maa_index() {
+        let mut blueprint = sample_blueprint();
+        blueprint.rooms.extend([
+            RoomBlueprint {
+                id: RoomId::new("manu_1"),
+                kind: FacilityKind::Factory,
+                level: 3,
+                product: Some(RoomProduct::Factory {
+                    recipe: RecipeKind::BattleRecord,
+                }),
+                dorm_beds: None,
+                dorm_ambience_level: None,
+            },
+            RoomBlueprint {
+                id: RoomId::new("manu_2"),
+                kind: FacilityKind::Factory,
+                level: 3,
+                product: Some(RoomProduct::Factory {
+                    recipe: RecipeKind::Gold,
+                }),
+                dorm_beds: None,
+                dorm_ambience_level: None,
+            },
+        ]);
+        let drone = DroneAction {
+            room_id: RoomId::new("manu_2"),
+            order: "pre",
+        };
+        let drones = resolve_drones(&blueprint, Some(&drone));
+        assert!(drones.enable);
+        // MAA index 是金单制造房在制造房列表中的 1-based 序号（manu_2 是第二个制造房）。
+        assert_eq!(drones.index, 2);
+        assert_eq!(drones.room, "manufacture");
+    }
+
+    #[test]
+    fn drones_disable_when_no_gold_factory_room() {
+        let blueprint = sample_blueprint();
+        let drones = resolve_drones(&blueprint, None);
+        assert!(!drones.enable);
+        assert_eq!(drones.index, 1);
     }
 }

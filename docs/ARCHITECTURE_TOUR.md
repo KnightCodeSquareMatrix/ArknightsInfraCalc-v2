@@ -59,7 +59,7 @@ legacy Worker `plan` ──────┘
 2. `compute_plan` 调用一次 `run_user_rotation_probe_with_profile_and_preferences`；该 probe 通过所选 `TimedRotationProfile` 进入 `schedule_timed_rotation`。
 3. 请求 profile 时，`build_box_profile_from_current_probe` 消费该 probe，不再运行第二次用户 rotation；profile 仍独立评估固定 baseline。
 4. 请求 MAA 时，`build_from_team_rotation` 消费同一 `current.rotation`。
-5. argv `plan` 用同一 rotation 打印文本并总是写 profile；`plan.compute` 返回 profile、rotation summary 与 MAA；legacy Worker `plan` 返回 rotation 摘要，并按请求生成文件输出。
+5. argv `plan` 用同一 rotation 打印文本并总是写 profile；`plan.compute` 返回 profile、rotation summary、MAA，并以同一请求的 operbox/layout 附加结构化练卡建议；legacy Worker `plan` 返回 rotation 摘要，并按请求生成文件输出。
 
 profile 是同一次排班 probe 的分析投影，不包含完整 MAA assignment。独立调用 `build_box_profile` 仍是合法 library 入口，但它不是用户 `plan` 的共享计算路径。
 
@@ -194,7 +194,7 @@ L3 不是候选选型器。它只在真实三人组和 producer manifest 已确�
 5. 从剩余池构建 gamma 对两个半区的替补。
 6. 按每班活跃队伍重建中枢和各生产房间。
 7. 对三班实际 assignment 重新评分，处理菲亚梅塔回岗。
-8. final validator 显式校验中枢 5 人、bind 次数/共同 presence 与可选动态 producer presence；生产房容量和人员互斥继续由构造、`used` 与回归验收。
+8. final validator 显式校验中枢 5 人、bind 次数/共同 presence 与计划声明的依赖事实；可选动态 producer 按每班实际在场结算，不再按标签重推；生产房容量和人员互斥继续由构造、`used` 与回归验收。
 9. 分别汇总三类按时长加权的 daily totals。
 
 轮换不等于连续心情全局最优化；当前 profile 与导出契约见 [排班模式.md](排班模式.md) 和 [SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)。

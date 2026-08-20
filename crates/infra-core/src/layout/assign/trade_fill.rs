@@ -322,6 +322,8 @@ pub(super) fn refresh_trade_efficiency_snapshots(
             operators,
             Some(crate::layout::RoomEfficiencySnapshot {
                 trade_paper_efficiency: solved.efficiency.paper.paper_efficiency,
+                trade_occupancy_efficiency: solved.efficiency.paper.occupancy_efficiency,
+                trade_control_efficiency: solved.efficiency.paper.control_efficiency,
                 trade_unit_output_multiplier: solved
                     .efficiency
                     .production_basis

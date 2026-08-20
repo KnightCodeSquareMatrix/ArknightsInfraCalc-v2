@@ -11,6 +11,6 @@ pub use shift_bind::{
 };
 pub use team_rotation::{
     operator_team_map, schedule_team_rotation, schedule_timed_rotation, DailyTotals, DormRestPlan,
-    FacilityHalf, FiammettaShiftAction, ShiftTransition, TeamAssignment, TeamLabel,
+    DroneAction, FacilityHalf, FiammettaShiftAction, ShiftTransition, TeamAssignment, TeamLabel,
     TeamRotationReport, TeamShiftResult, TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
 };

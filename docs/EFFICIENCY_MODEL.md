@@ -40,7 +40,27 @@ bake schema v12 直接保存 `*_efficiency_millis: i32`，加载后还原为
 
 ## 3. 三类生产域
 
-### 3.1 贸易
+### 3.1 统一展示口径
+
+生产房间统一展示四个分量：
+
+```text
+operator_efficiency = 白字，干员本人及直接作用于干员的效率
+station_efficiency  = 绿字，入驻人数与中枢/其他设施全局加成
+total_efficiency    = 1.000 + operator_efficiency + station_efficiency
+```
+
+贸易站再按订单倍率生成实际产出效率：
+
+```text
+final_efficiency = total_efficiency × order_multiplier
+equivalent_efficiency = final_efficiency - 1.000 - station_efficiency
+```
+
+没有订单倍率的制造和发电站使用 `order_multiplier = 1.000`，其 `final_efficiency` 等于
+`total_efficiency`。跨站汇总只累加 `final_efficiency`，不重复累加白字或绿字。
+
+### 3.2 贸易
 
 ```text
 paper_efficiency
@@ -63,7 +83,7 @@ final_efficiency = paper_efficiency × unit_output_multiplier
 `equivalent_skill_efficiency` 也是从最终效率反算的展示分量。唯一排序和产出真源是
 `final_efficiency`。
 
-### 3.2 制造
+### 3.3 制造
 
 ```text
 final_efficiency
@@ -77,7 +97,7 @@ final_efficiency
 量纲，不写入贸易或发电的结果字段。具名编制 policy 可以显式消费各域分量做候选排序，
 但不改变这些分量的量纲或分域输出。
 
-### 3.3 发电
+### 3.4 发电
 
 ```text
 final_efficiency
@@ -113,10 +133,10 @@ L1 技能解释（原始机制数值）
 
 | 域 | 最终字段 | 主要分解字段 |
 |---|---|---|
-| 贸易 | `final_efficiency` | `paper_efficiency`、`unit_output_multiplier`、`mechanic_equivalent_efficiency` |
-| 制造 | `final_efficiency` | `occupancy_efficiency`、`skill_efficiency`、`global_efficiency` |
-| 发电 | `final_efficiency` | `skill_efficiency`、`ramp_efficiency` |
-| 班次 | `trade_efficiency` / `manufacture_efficiency` / `power_efficiency` | `room_lines` |
+| 贸易 | `total_efficiency`（纸面）/ `final_efficiency`（订单倍率后） | `operator_efficiency`、`station_efficiency`、`order_multiplier`、`equivalent_efficiency` |
+| 制造 | `total_efficiency` = `final_efficiency` | `operator_efficiency`、`station_efficiency` |
+| 发电 | `total_efficiency` = `final_efficiency` | `operator_efficiency` |
+| 班次 | `trade_efficiency` / `manufacture_efficiency` / `power_efficiency` | `room_lines`；每房输出 `operator_efficiency`、`station_efficiency`、`total_efficiency`、`order_multiplier`、`equivalent_efficiency` |
 | 日汇总 | `trade` / `manufacture` / `power` | 各自为按时长加权后的直接效率 |
 
 班次按时长折算后的字段固定为 `weighted_trade`、`weighted_manufacture`、

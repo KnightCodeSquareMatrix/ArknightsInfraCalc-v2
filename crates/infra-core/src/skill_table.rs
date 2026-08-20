@@ -301,6 +301,10 @@ fn exact_embedded_data(name: &str) -> Option<(&'static str, &'static [u8])> {
             env!("CARGO_MANIFEST_DIR"),
             "/../../data/training_recommendations.json"
         )) as &[u8],
+        "training_advice_knowledge.json" => include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../data/training_advice_knowledge.json"
+        )) as &[u8],
         "fixtures/243/layout.json" => include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../data/fixtures/243/layout.json"
@@ -395,6 +399,7 @@ fn exact_embedded_data(name: &str) -> Option<(&'static str, &'static [u8])> {
             "trade_segments.json" => "trade_segments.json",
             "trade_shortcuts.json" => "trade_shortcuts.json",
             "training_recommendations.json" => "training_recommendations.json",
+            "training_advice_knowledge.json" => "training_advice_knowledge.json",
             "fixtures/243/layout.json" => "fixtures/243/layout.json",
             "fixtures/243/operbox_full_e2.json" => "fixtures/243/operbox_full_e2.json",
             "fixtures/243/schedule_export.json" => "fixtures/243/schedule_export.json",
@@ -464,6 +469,7 @@ mod tests {
             "trade_segments.json",
             "trade_shortcuts.json",
             "training_recommendations.json",
+            "training_advice_knowledge.json",
         ] {
             assert!(
                 exact_embedded_data(name).is_some(),

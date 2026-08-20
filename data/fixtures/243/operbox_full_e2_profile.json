@@ -1,7 +1,8 @@
 {
   "schema_version": 4,
+  "rotation_profile": "abc_12_6_6",
   "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/operbox_full_e2.json",
+  "operbox_label": "data/fixtures/243/operbox_full_e2.json",
   "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 418,
@@ -19,7 +20,7 @@
           "巫恋",
           "龙舌兰"
         ],
-        "final_efficiency": 2.482,
+        "final_efficiency": 2.606,
         "mechanic_equivalent_efficiency": 0.46
       },
       "baseline": {
@@ -31,7 +32,7 @@
         "final_efficiency": 2.482,
         "mechanic_equivalent_efficiency": 0.46
       },
-      "gap_ratio": 0.0,
+      "gap_ratio": 0.049959709911361665,
       "severity": "ok"
     },
     {
@@ -39,11 +40,11 @@
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "维娜·维多利亚",
-          "但书",
-          "摩根"
+          "贝洛内",
+          "伺夜",
+          "但书"
         ],
-        "final_efficiency": 3.255
+        "final_efficiency": 3.1
       },
       "baseline": {
         "operators": [
@@ -53,7 +54,7 @@
         ],
         "final_efficiency": 2.79
       },
-      "gap_ratio": 0.1666666666666666,
+      "gap_ratio": 0.11111111111111113,
       "severity": "ok"
     },
     {
@@ -127,13 +128,13 @@
       "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 5.498
+        "final_efficiency": 5.484
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 5.332
+        "final_efficiency": 5.352
       },
-      "gap_ratio": 0.03113278319579902,
+      "gap_ratio": 0.02466367713004478,
       "severity": "ok"
     },
     {
@@ -141,23 +142,23 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 9.27
+        "final_efficiency": 9.29
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 9.084
       },
-      "gap_ratio": 0.020475561426684274,
+      "gap_ratio": 0.02267723469837071,
       "severity": "ok"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 5.498,
-    "daily_manufacture_efficiency": 9.27,
+    "daily_trade_efficiency": 5.484,
+    "daily_manufacture_efficiency": 9.29,
     "daily_power_efficiency": 3.664
   },
   "baseline_rotation": {
-    "daily_trade_efficiency": 5.332,
+    "daily_trade_efficiency": 5.352,
     "daily_manufacture_efficiency": 9.084,
     "daily_power_efficiency": 3.627
   },

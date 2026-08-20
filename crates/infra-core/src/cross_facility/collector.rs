@@ -4,7 +4,7 @@ use crate::instances::{resolve_buff_ids, OperatorInstances};
 use crate::layout::{BaseAssignment, BaseBlueprint, LayoutContext};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
-use crate::types::{AtomScope, EffectAtom};
+use crate::types::{Action, AtomScope, EffectAtom};
 use crate::{AssignedOperator, FacilityKind, RoomId};
 
 /// 从全基建编制中收集所有 `scope=Global` 的 atom。
@@ -52,8 +52,12 @@ pub fn collect_global_atoms(
                     if atom.scope != AtomScope::Global {
                         continue;
                     }
+                    // 精0/精1 的宿舍与办公室干员默认跳过全局 atom，防止低练度
+                    // 资源（梦境/小节/记忆碎片等）误入感知门槛链；塑心「无声共鸣」
+                    // 按 PRTS 在精0 开放，其 SilentEcho 产出不受该保护影响。
                     if matches!(room.kind, FacilityKind::Dormitory | FacilityKind::Office)
                         && op.elite < 2
+                        && !produces_silent_echo(atom)
                     {
                         continue;
                     }
@@ -81,6 +85,11 @@ pub fn collect_global_atoms(
     });
 
     entries
+}
+
+/// 是否为塑心「无声共鸣」式的 `SilentEcho` 产出 atom（精0 即生效）。
+fn produces_silent_echo(atom: &EffectAtom) -> bool {
+    matches!(atom.action, Action::StateProduce { ref key, .. } if key == "SilentEcho")
 }
 
 /// 根据设施类型和干员 elite 解析 buff_ids。

@@ -127,7 +127,7 @@
             {
               "id": "dorm_silent_echo",
               "facility": "dormitory",
-              "candidates": [{ "name": "塑心", "elite": 2 }],
+              "candidates": [{ "name": "塑心", "elite": 0 }],
               "min_count": 0,
               "max_count": 1,
               "selection": "all_available"
@@ -181,7 +181,7 @@
             {
               "id": "dorm_silent_echo",
               "facility": "dormitory",
-              "candidates": [{ "name": "塑心", "elite": 2 }],
+              "candidates": [{ "name": "塑心", "elite": 0 }],
               "min_count": 0,
               "max_count": 1,
               "selection": "all_available"
@@ -275,7 +275,7 @@
             {
               "id": "dorm_silent_echo",
               "facility": "dormitory",
-              "candidates": [{ "name": "塑心", "elite": 2 }],
+              "candidates": [{ "name": "塑心", "elite": 0 }],
               "min_count": 0,
               "max_count": 1,
               "selection": "all_available"

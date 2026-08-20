@@ -28,6 +28,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         .and_then(|w| w[1].parse().ok())
         .unwrap_or(20);
     let system_preferences = system_preferences_from_args(args)?;
+    let fiammetta_enable = !args.iter().any(|arg| arg == "--no-fiammetta");
 
     let blueprint = BaseBlueprint::load(&layout_path)?;
     let operbox = OperBox::load(&operbox_path)?;
@@ -60,6 +61,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             rotation_profile,
             system_preferences: &system_preferences,
             maa_title,
+            fiammetta_enable,
         },
         RequestedOutputs {
             profile: true,
@@ -76,6 +78,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         let shadow_options = AssignBaseOptions {
             top_k,
             system_preferences: system_preferences.clone(),
+            fiammetta_enable,
             ..AssignBaseOptions::default()
         };
         run_prefix_shadow(PrefixShadowInput {

@@ -18,23 +18,38 @@ use infra_core::operbox::{
     default_layout_243_path, default_operbox_full_e2_path, OperBox, OperBoxEntry,
 };
 use infra_core::schedule::{
-    DailyTotals, ShiftEfficiencies, TeamLabel, TeamRotationReport, TimedRotationProfile,
+    DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
+    TimedRotationProfile,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
+use infra_core::training_advice::{
+    build_player_training_advice, default_training_advice_knowledge_path,
+    load_training_advice_knowledge, PlayerAdviceContext, PlayerTrainingAdviceReport,
+    TrainingAdviceKnowledge,
+};
 use infra_core::Error;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 1;
+const PLAN_SCHEMA_VERSION: u32 = 3;
+const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
-const PLAN_COMPUTE_SCHEMA_JSON: &str =
+const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v1.schema.json");
+const PLAN_COMPUTE_SCHEMA_V2_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v2.schema.json");
+const PLAN_COMPUTE_SCHEMA_V3_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v3.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OPERBOX_ENTRIES: usize = 1000;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
 const MAX_TOP_K: usize = 100;
+
+mod solver_build_info {
+    include!(concat!(env!("OUT_DIR"), "/solver_build_info.rs"));
+}
 
 pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
@@ -45,8 +60,20 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
     let state = ServeState {
         instances: OperatorInstances::load(&default_instances_path()?)?,
         table: SkillTable::load(&default_skill_table_path()?)?,
-        plan_schema: compile_plan_compute_schema()?,
-        plan_contract_sha256: plan_contract_sha256(),
+        training_advice_knowledge: load_training_advice_knowledge(
+            &default_training_advice_knowledge_path()?,
+        )?,
+        plan_schema_v1: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON)?,
+        plan_schema_v2: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON)?,
+        plan_schema_v3: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON)?,
+        plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
+        plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
+        plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
+        solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
+            eprintln!("infra-cli serve: could not fingerprint executable: {err}");
+            String::new()
+        }),
+        solver: SolverBuildInfo::current(),
     };
 
     let _bake_handle = spawn_background_bake();
@@ -179,12 +206,34 @@ fn write_response(
 struct ServeState {
     instances: OperatorInstances,
     table: SkillTable,
-    plan_schema: JSONSchema,
-    plan_contract_sha256: String,
+    training_advice_knowledge: TrainingAdviceKnowledge,
+    plan_schema_v1: JSONSchema,
+    plan_schema_v2: JSONSchema,
+    plan_schema_v3: JSONSchema,
+    plan_contract_sha256_v1: String,
+    plan_contract_sha256_v2: String,
+    plan_contract_sha256_v3: String,
+    solver_executable_sha256: String,
+    solver: SolverBuildInfo,
 }
 
-fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
-    let schema: serde_json::Value = serde_json::from_str(PLAN_COMPUTE_SCHEMA_JSON)
+#[derive(Clone, Debug, Serialize)]
+struct SolverBuildInfo {
+    git_commit: Option<String>,
+    built_at: Option<String>,
+}
+
+impl SolverBuildInfo {
+    fn current() -> Self {
+        Self {
+            git_commit: solver_build_info::GIT_COMMIT.map(str::to_string),
+            built_at: solver_build_info::BUILT_AT.map(str::to_string),
+        }
+    }
+}
+
+fn compile_plan_compute_schema(schema_json: &str) -> Result<JSONSchema, Error> {
+    let schema: serde_json::Value = serde_json::from_str(schema_json)
         .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))?;
     JSONSchema::options()
         .with_draft(Draft::Draft202012)
@@ -192,13 +241,20 @@ fn compile_plan_compute_schema() -> Result<JSONSchema, Error> {
         .map_err(|err| Error::msg(format!("invalid embedded plan.compute schema: {err}")))
 }
 
-fn plan_contract_sha256() -> String {
-    format!("{:x}", Sha256::digest(PLAN_COMPUTE_SCHEMA_JSON.as_bytes()))
+fn plan_contract_sha256(schema_json: &str) -> String {
+    format!("{:x}", Sha256::digest(schema_json.as_bytes()))
+}
+
+fn solver_executable_sha256() -> Result<String, Error> {
+    let path = std::env::current_exe()?;
+    let bytes = fs::read(&path)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
 fn validate_plan_compute_params(
     schema: &JSONSchema,
     params: &serde_json::Value,
+    schema_version: u32,
 ) -> Result<(), Error> {
     let Err(errors) = schema.validate(params) else {
         return Ok(());
@@ -213,7 +269,7 @@ fn validate_plan_compute_params(
         .collect::<Vec<_>>()
         .join("; ");
     Err(Error::msg(format!(
-        "plan.compute params do not match schema v{PLAN_SCHEMA_VERSION}: {details}"
+        "plan.compute params do not match schema v{schema_version}: {details}"
     )))
 }
 
@@ -307,6 +363,7 @@ struct ServeResponse<T: Serialize> {
     id: serde_json::Value,
     ok: bool,
     elapsed_ms: u128,
+    solver: SolverBuildInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -376,10 +433,16 @@ struct PlanComputeOptions {
     system_preferences: HashMap<String, String>,
     #[serde(default)]
     maa_title: Option<String>,
+    #[serde(default = "default_fiammetta_enable")]
+    fiammetta_enable: bool,
 }
 
 fn default_top_k() -> usize {
     20
+}
+
+fn default_fiammetta_enable() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize)]
@@ -399,6 +462,8 @@ struct PlanResult {
     daily_manufacture_efficiency: infra_core::Efficiency,
     daily_power_efficiency: infra_core::Efficiency,
     shifts: Vec<infra_core::schedule::TeamShiftResult>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -407,6 +472,7 @@ struct PlanComputeResult {
     profile: BoxProfile,
     rotation: RotationSummary,
     maa: MaaSchedule,
+    training_advice: PlayerTrainingAdviceReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -414,6 +480,8 @@ struct RotationSummary {
     profile: TimedRotationProfile,
     daily: DailyTotals,
     shifts: Vec<RotationShiftSummary>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -447,6 +515,7 @@ impl From<&TeamRotationReport> for RotationSummary {
                     weighted_power: shift.weighted_power,
                 })
                 .collect(),
+            warnings: rotation.warnings.clone(),
         }
     }
 }
@@ -475,8 +544,17 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             Ok(serde_json::json!({
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
-                "plan_schema_version": PLAN_SCHEMA_VERSION,
-                "plan_contract_sha256": state.plan_contract_sha256,
+                "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
+                "supported_plan_schema_versions": [1, 2, 3],
+                "plan_contract_sha256": state.plan_contract_sha256_v1,
+                "plan_contract_sha256_by_version": {
+                    "1": state.plan_contract_sha256_v1,
+                    "2": state.plan_contract_sha256_v2,
+                    "3": state.plan_contract_sha256_v3,
+                },
+                "solver_executable_sha256": state.solver_executable_sha256,
+                "solver_git_commit": state.solver.git_commit,
+                "solver_built_at": state.solver.built_at,
             })),
             None,
             None,
@@ -492,6 +570,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             id,
             ok: true,
             elapsed_ms: start.elapsed().as_millis(),
+            solver: state.solver.clone(),
             result: Some(result),
             error: None,
         },
@@ -517,6 +596,7 @@ fn error_response(
         id,
         ok: false,
         elapsed_ms,
+        solver: SolverBuildInfo::current(),
         result: None,
         error: Some(ServeError {
             code: None,
@@ -537,6 +617,7 @@ fn coded_error_response(
         id,
         ok: false,
         elapsed_ms,
+        solver: SolverBuildInfo::current(),
         result: None,
         error: Some(ServeError {
             code: Some(code),
@@ -550,14 +631,23 @@ fn handle_plan_compute(
     state: &ServeState,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, Error> {
-    validate_plan_compute_params(&state.plan_schema, &params)?;
+    let schema_version = params
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| Error::msg("plan.compute params require schema_version"))?
+        as u32;
+    let schema = match schema_version {
+        1 => &state.plan_schema_v1,
+        2 => &state.plan_schema_v2,
+        3 => &state.plan_schema_v3,
+        other => {
+            return Err(Error::msg(format!(
+                "unsupported plan schema version {other}; expected 1, 2 or {PLAN_SCHEMA_VERSION}"
+            )))
+        }
+    };
+    validate_plan_compute_params(schema, &params, schema_version)?;
     let params: PlanComputeParams = serde_json::from_value(params)?;
-    if params.schema_version != PLAN_SCHEMA_VERSION {
-        return Err(Error::msg(format!(
-            "unsupported plan schema version {}; expected {PLAN_SCHEMA_VERSION}",
-            params.schema_version
-        )));
-    }
     if params.options.top == 0 || params.options.top > MAX_TOP_K {
         return Err(Error::msg(format!("top must be between 1 and {MAX_TOP_K}")));
     }
@@ -591,6 +681,7 @@ fn handle_plan_compute(
             rotation_profile: params.options.rotation,
             system_preferences: &params.options.system_preferences,
             maa_title: params.options.maa_title.as_deref(),
+            fiammetta_enable: params.options.fiammetta_enable,
         },
         RequestedOutputs {
             profile: true,
@@ -604,13 +695,60 @@ fn handle_plan_compute(
     let maa = computed
         .maa
         .expect("MAA schedule is always requested by plan.compute");
+    let training_advice = build_plan_compute_training_advice(
+        &operbox,
+        &params.layout,
+        &state.training_advice_knowledge,
+        Some(&computed.current.rotation),
+    );
     serde_json::to_value(PlanComputeResult {
-        schema_version: PLAN_SCHEMA_VERSION,
+        schema_version: params.schema_version,
         profile,
         rotation: RotationSummary::from(&computed.current.rotation),
         maa,
+        training_advice,
     })
     .map_err(Error::from)
+}
+
+fn build_plan_compute_training_advice(
+    operbox: &OperBox,
+    blueprint: &BaseBlueprint,
+    knowledge: &TrainingAdviceKnowledge,
+    rotation: Option<&TeamRotationReport>,
+) -> PlayerTrainingAdviceReport {
+    let mut context = PlayerAdviceContext::from_blueprint(blueprint);
+    if let Some(rotation) = rotation {
+        context.trade_average_efficiency_percent = average_station_skill_efficiency_percent(
+            rotation
+                .shifts
+                .iter()
+                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
+            |line| line.trade_efficiency,
+            |line| line.trade_skill_efficiency,
+        );
+        context.manufacturing_average_efficiency_percent = average_station_skill_efficiency_percent(
+            rotation
+                .shifts
+                .iter()
+                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
+            |line| line.manufacture_efficiency,
+            |line| line.manufacture_skill_efficiency,
+        );
+    }
+    build_player_training_advice(operbox, knowledge, &context)
+}
+
+fn average_station_skill_efficiency_percent<'a>(
+    lines: impl Iterator<Item = &'a RoomEfficiencyLine>,
+    station_efficiency: impl Fn(&RoomEfficiencyLine) -> infra_core::Efficiency,
+    skill_efficiency: impl Fn(&RoomEfficiencyLine) -> infra_core::Efficiency,
+) -> Option<f64> {
+    let values = lines
+        .filter(|line| line.operator_count > 0 && !station_efficiency(line).is_zero())
+        .map(|line| skill_efficiency(line).as_f64() * 100.0 / line.operator_count as f64)
+        .collect::<Vec<_>>();
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
 fn validated_label(value: Option<String>, fallback: &str, field: &str) -> Result<String, Error> {
@@ -692,6 +830,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
             rotation_profile,
             system_preferences: &system_preferences,
             maa_title: params.maa_title.as_deref(),
+            fiammetta_enable: true,
         },
         RequestedOutputs {
             profile: params.profile_out.is_some(),
@@ -746,6 +885,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
         daily_manufacture_efficiency: rotation.daily.manufacture,
         daily_power_efficiency: rotation.daily.power,
         shifts: rotation.shifts.clone(),
+        warnings: rotation.warnings.clone(),
     };
     serde_json::to_value(result).map_err(Error::from)
 }
@@ -860,17 +1000,66 @@ mod tests {
     }
 
     #[test]
+    fn solver_executable_fingerprint_is_a_sha256_hex() {
+        let fingerprint = solver_executable_sha256().unwrap();
+        assert_eq!(fingerprint.len(), 64);
+        assert!(fingerprint.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn solver_build_info_uses_a_full_commit_and_utc_timestamp() {
+        let info = SolverBuildInfo::current();
+        let commit = info.git_commit.expect("test build has a Git commit");
+        let built_at = info.built_at.expect("test build has a timestamp");
+        assert_eq!(commit.len(), 40);
+        assert!(commit.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(built_at.ends_with('Z'));
+        assert_eq!(built_at.len(), 20);
+    }
+
+    #[test]
     fn plan_compute_schema_accepts_the_v1_contract() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
         let value = valid_compute_params();
-        validate_plan_compute_params(&schema, &value).unwrap();
+        validate_plan_compute_params(&schema, &value, 1).unwrap();
         serde_json::from_value::<PlanComputeParams>(value).unwrap();
-        assert_eq!(plan_contract_sha256().len(), 64);
+        assert_eq!(plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON).len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_schema_v2_accepts_abc_12_12_12() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(2);
+        value["options"]["rotation"] = serde_json::json!("abc_12_12_12");
+        validate_plan_compute_params(&schema, &value, 2).unwrap();
+        serde_json::from_value::<PlanComputeParams>(value).unwrap();
+    }
+
+    #[test]
+    fn plan_compute_schema_v3_accepts_fiammetta_enable() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(3);
+        value["options"]["fiammetta_enable"] = serde_json::json!(false);
+        validate_plan_compute_params(&schema, &value, 3).unwrap();
+        let params: PlanComputeParams = serde_json::from_value(value).unwrap();
+        assert!(!params.options.fiammetta_enable);
+        assert_eq!(plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON).len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_v3_must_reject_unknown_options_fields() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(3);
+        value["options"]["unexpected"] = serde_json::json!(true);
+        assert!(validate_plan_compute_params(&schema, &value, 3).is_err());
     }
 
     #[test]
     fn plan_compute_schema_rejects_structural_mutations() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
 
         let mut unknown_room_field = valid_compute_params();
         unknown_room_field["layout"]["rooms"][0]["unexpected"] = serde_json::json!(true);
@@ -895,19 +1084,19 @@ mod tests {
             invalid_level,
             invalid_top,
         ] {
-            assert!(validate_plan_compute_params(&schema, &value).is_err());
+            assert!(validate_plan_compute_params(&schema, &value, 1).is_err());
         }
     }
 
     #[test]
     fn semantic_validation_remains_after_schema_admission() {
-        let schema = compile_plan_compute_schema().unwrap();
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON).unwrap();
         let mut duplicate_rooms = valid_compute_params();
         duplicate_rooms["layout"]["rooms"] = serde_json::json!([
             { "id": "control", "kind": "control_center", "level": 3 },
             { "id": "control", "kind": "power_plant", "level": 3 }
         ]);
-        validate_plan_compute_params(&schema, &duplicate_rooms).unwrap();
+        validate_plan_compute_params(&schema, &duplicate_rooms, 1).unwrap();
         let params: PlanComputeParams = serde_json::from_value(duplicate_rooms).unwrap();
         assert!(params.layout.validate().is_err());
 
@@ -918,8 +1107,93 @@ mod tests {
             "level": 3,
             "product": { "factory": { "recipe": "gold" } }
         });
-        validate_plan_compute_params(&schema, &mismatched_product).unwrap();
+        validate_plan_compute_params(&schema, &mismatched_product, 1).unwrap();
         let params: PlanComputeParams = serde_json::from_value(mismatched_product).unwrap();
         assert!(params.layout.validate().is_err());
+    }
+
+    #[test]
+    fn plan_compute_training_advice_consumes_the_inline_layout_gate() {
+        let mut knowledge =
+            load_training_advice_knowledge(&default_training_advice_knowledge_path().unwrap())
+                .unwrap();
+        knowledge.newbie.clear();
+        knowledge
+            .combinations
+            .retain(|entry| entry.id == "bubble_group");
+        knowledge.standalone.retain(|entry| {
+            entry.product == infra_core::training_advice::ProductBucket::OriginiumShards
+        });
+        let operbox = inline_operbox(vec![operbox_entry("test", "12F")]).unwrap();
+        let without_originium: BaseBlueprint = serde_json::from_value(serde_json::json!({
+            "rooms": [
+                { "id": "factory", "kind": "factory", "level": 3,
+                  "product": { "factory": { "recipe": "gold" } } }
+            ]
+        }))
+        .unwrap();
+        let with_originium: BaseBlueprint = serde_json::from_value(serde_json::json!({
+            "rooms": [
+                { "id": "factory", "kind": "factory", "level": 3,
+                  "product": { "factory": { "recipe": "originium" } } }
+            ]
+        }))
+        .unwrap();
+
+        let gated =
+            build_plan_compute_training_advice(&operbox, &without_originium, &knowledge, None);
+        assert_eq!(gated.context.has_originium_shard_factory, Some(false));
+        assert!(gated.recommendations.iter().all(|item| {
+            !matches!(item.operator.as_str(), "泡泡" | "火神")
+                && !matches!(
+                    item.operator.as_str(),
+                    "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
+                )
+        }));
+
+        let enabled =
+            build_plan_compute_training_advice(&operbox, &with_originium, &knowledge, None);
+        assert_eq!(enabled.context.has_originium_shard_factory, Some(true));
+        let bubble_names = enabled
+            .recommendations
+            .iter()
+            .filter(|item| item.combination_id.as_deref() == Some("bubble_group"))
+            .map(|item| item.operator.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(bubble_names, vec!["泡泡", "火神"]);
+        assert!(enabled.recommendations.iter().any(|item| {
+            matches!(
+                item.operator.as_str(),
+                "褐果" | "炎熔" | "地灵" | "谬因" | "艾雅法拉" | "薄绿"
+            )
+        }));
+    }
+
+    #[test]
+    fn t9_average_uses_skill_efficiency_per_worker_without_duration_weighting() {
+        let lines = vec![
+            RoomEfficiencyLine {
+                room_id: "trade_1".to_string(),
+                operator_count: 2,
+                trade_efficiency: infra_core::Efficiency::from_decimal(1.8),
+                trade_skill_efficiency: infra_core::Efficiency::from_decimal(0.8),
+                ..RoomEfficiencyLine::default()
+            },
+            RoomEfficiencyLine {
+                room_id: "trade_2".to_string(),
+                operator_count: 3,
+                trade_efficiency: infra_core::Efficiency::from_decimal(1.6),
+                trade_skill_efficiency: infra_core::Efficiency::from_decimal(0.6),
+                ..RoomEfficiencyLine::default()
+            },
+        ];
+
+        let average = average_station_skill_efficiency_percent(
+            lines.iter(),
+            |line| line.trade_efficiency,
+            |line| line.trade_skill_efficiency,
+        )
+        .unwrap();
+        assert_eq!(average, 30.0);
     }
 }

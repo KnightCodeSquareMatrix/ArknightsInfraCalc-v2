@@ -73,7 +73,7 @@ layout / operbox / runtime data
 | `skill_table` | `skill_table.json` 加载、数据路径与嵌入 fallback |
 | `support_facility` | 办公室/会客室静态求值的共享类型与 registry |
 | `tier` | `PromotionTier` 技能解锁档 |
-| `training_advice` | 练卡：当前 v2 机器诊断过滤/旧答卷；玩家 knowledge+player 层见实现计划（待建） |
+| `training_advice` | 练卡：玩家 knowledge/player 层生成基础名单、组合完成度与 ≤10 建议；v2 机器诊断继续兼容 |
 | `types` | EffectAtom 的 phase、selector、condition、action 等共享类型 |
 | `control` | 中枢求值与全局注入写回 |
 | `export` | MAA 排班 JSON 投影；不重新计算机制 |
@@ -128,6 +128,7 @@ layout / operbox / runtime data
 | `trade yield <fixture>` | 单站单位产出探测 |
 | `bench --operbox <path>` | 固定布局的贸易/制造搜索基准 |
 | `bake [all\|trade\|manufacture]` / `bake validate` / `bake verify` | 生成、兼容校验和响应验证 Bake catalog |
+| `debug rerun --bundle <path>` | 重放反馈 debug bundle，并可按房间、干员或班次缩小输出 |
 | `serve` | 启动前端 JSON line 常驻 worker；机器主入口为内联 `plan.compute` |
 | `layout test` | 自定义蓝图的单班搜索或指定 assignment 探测 |
 | `layout team-rotation` | timed rotation 与 MAA 导出，不附带账号画像 |
@@ -146,6 +147,7 @@ layout / operbox / runtime data
 | `src/commands/layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval` adapter |
 | `src/commands/advice.rs` | v2 练卡规则和 operbox adapter |
 | `src/commands/bake.rs` | Bake 生成、validate 和 verify adapter |
+| `src/commands/debug.rs` | debug bundle 校验、重放和诊断输出 adapter |
 | `src/commands/profile.rs` | layout、analysis 和 Bake dependency profile |
 | `src/commands/verify.rs` | `expect_rule_id` 回归断言和 fixture 选择 |
 | `src/verify/{cases,fixtures}.rs` | CSV case 加载与硬编码最小房间 fixture |
@@ -170,7 +172,7 @@ layout / operbox / runtime data
 | `standalone_roster.json` | 具名 standalone 搜索边界；不替代普通制造 full pool |
 | `mood_model.json` | 心情消耗与恢复参数 |
 | `support_skill_registry.json` | 办公室/会客室静态技能 registry |
-| `training_recommendations.json` | **旧** v2 机器诊断规则载体，不是玩家真源、不是 solver 候选池；玩家层将用 `training_advice_knowledge.json`（待建） |
+| `training_recommendations.json` | **旧** v2 机器诊断规则载体，不是玩家真源、不是 solver 候选池；玩家层使用独立的 `training_advice_knowledge.json` |
 | `REGRESSION_CASES.csv` / `UNIT_OUTPUT_ANCHORS.csv` | `verify` 回归和单位产出锚点 |
 | `fixtures/` / `layout/` / `schedule_243/` | 真实入口 fixture、蓝图模板和排班样例 |
 | `tags/` | Selector/规则使用的阵营与结构 tag |

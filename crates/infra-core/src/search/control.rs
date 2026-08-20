@@ -830,16 +830,33 @@ pub fn search_control_combos(
 ) -> Result<Vec<ControlSearchHit>> {
     // Skill-less operators are equivalent for control output. Keep only enough
     // stable-name fallbacks to fill the room, avoiding C(account_size, 5).
+    let automatically_excluded: HashSet<_> = pool
+        .entries
+        .iter()
+        .map(|entry| {
+            crate::response_dependency::control_buff_is_automatically_excluded(
+                table,
+                entry.buff_ids.iter().map(String::as_str),
+            )
+            .map(|excluded| (entry.name.as_str(), excluded))
+        })
+        .collect::<Result<_>>()?;
+    let is_automatically_excluded = |name: &str| {
+        automatically_excluded
+            .iter()
+            .any(|(excluded_name, excluded)| *excluded && *excluded_name == name)
+    };
     let mut entries: Vec<_> = pool
         .entries
         .iter()
         .filter(|entry| {
-            !entry.buff_ids.is_empty()
-                || options.must_include.contains(&entry.name)
-                || options
-                    .candidate_requirements
-                    .iter()
-                    .any(|(candidates, _)| candidates.contains(&entry.name))
+            (!is_automatically_excluded(&entry.name) || options.must_include.contains(&entry.name))
+                && (!entry.buff_ids.is_empty()
+                    || options.must_include.contains(&entry.name)
+                    || options
+                        .candidate_requirements
+                        .iter()
+                        .any(|(candidates, _)| candidates.contains(&entry.name)))
         })
         .collect();
     let fallback_slots = usize::from(options.max_operators.min(5));
@@ -847,7 +864,8 @@ pub fn search_control_combos(
         pool.entries
             .iter()
             .filter(|entry| {
-                entry.buff_ids.is_empty()
+                !is_automatically_excluded(&entry.name)
+                    && entry.buff_ids.is_empty()
                     && !options.must_include.contains(&entry.name)
                     && !options
                         .candidate_requirements

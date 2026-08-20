@@ -1,9 +1,10 @@
 # 下一版本简化 Worker 契约校验
 
-> 文档角色：active-change
-> 生命周期状态：ready-on-request
+> 文档角色：archive
+> 生命周期状态：superseded
 > 当前真源：docs/FRONTEND_CLI.md
 > 摘要：下一版本移除运行时契约 hash 验证，仅对不符合 JSON Schema 的参数输出错误报告
+> 替代项：[Worker 契约 hash 治理与前端版本上报](../../TODO/Worker契约hash治理与前端版本上报.md)
 
 ## 用户裁决
 

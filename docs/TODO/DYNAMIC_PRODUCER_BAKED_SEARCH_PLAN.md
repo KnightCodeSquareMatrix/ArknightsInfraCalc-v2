@@ -13,7 +13,7 @@
 > 恢复条件：产品要求 exact 多房保证、撤销当前 policy restriction、出现错误 winner、新机制
 > 无法表达、违反用户确认的性能预算，或用户重新授权。
 > 性能口径：当前 debug full-E2 样例约 8.4s 不是验收结论；尚无用户确认的当前性能预算。
-> 用户确认方向：凛御银灰、戴菲恩、八幡海铃进入同一套可选中枢 producer 生命周期。
+> 当前裁决：戴菲恩、八幡海铃进入可选中枢 producer 生命周期；凛御银灰仅保留 consumer 阈值事实，自动中枢 admission 为 `excluded_automatic`。
 > 算法偏好：枚举会改变机制的有限充分状态，不 Bake 最终阵容；小状态先用 live 精确参考，
 > 实测后再选择穷举或有可证明上界的 Join，并决定是否物化条件响应。不得扫描原始全笛卡尔积
 > 或使用固定 top-K。
@@ -61,7 +61,7 @@ mask、signature、合法性 join、winner 一次提交和 resolved dependency�
 
 | 位置 | 当前状态 | 实施动作 |
 |------|----------|----------|
-| `CONTROL_CENTER_ASSIGNMENT.md`、`AGENTS.md` | 已写入三 producer 权威公式与生命周期 | 代码必须服从；实现完成后移除“已知缺口”状态 |
+| `CONTROL_CENTER_ASSIGNMENT.md`、`AGENTS.md` | 已写入动态 producer admission 与 consumer 事实 | 代码必须服从；实现完成后移除“已知缺口”状态 |
 | `ORCHESTRATION_LAYER.md`、`SCHEDULE_ROTATION.md` | `meta_vina` 已标成当前 legacy 行为 | 删除 legacy role 说明，改成统一 joint solver 当前事实 |
 | `INTERNAL/SHORTCUT_MATCHING.md` | 已区分 legacy 选型与可保留的最终结算 | 删除选型入口；shortcut 只保留实际组合结算 |
 | `data/skill_table.json` | 戴菲恩使用跨贸易站总人数 selector | 改为逐贸易房 room-local 响应规则 |
@@ -71,13 +71,13 @@ mask、signature、合法性 join、winner 一次提交和 resolved dependency�
 
 ## 3. 用户确认的领域不变量
 
-### 3.1 三名 producer 共用同一生命周期
+### 3.1 两类 producer admission 与 consumer 事实
 
-凛御银灰、戴菲恩、八幡海铃都是**可选中枢 producer**，不是 fixed System、required anchor 或固定套餐：
+戴菲恩、八幡海铃是**可选中枢 producer**，不是 fixed System、required anchor 或固定套餐。凛御银灰规则保留用于 consumer 阈值事实，但自动 admission 为 `excluded_automatic`：
 
 1. 账号拥有或 producer 在候选池中，不能单独强制进编。
-2. 是否入选由同一批 control + trade 联合候选的真实结果决定。
-3. 没有实际消费者时动态贸易收益为 0；普通中枢组合可以自然胜出。
+2. 八幡海铃、戴菲恩是否入选由同一批 control + trade 联合候选的真实结果决定。
+3. 凛御银灰不进入 producer presence、普通 filler 或 rotation fallback；其 consumer 阈值仍可由银灰等 `cc.g.karlan` 成员事实识别。
 4. consumer 可以不上、单走、分居不同贸易站或自然同站；除已有独立 hard core 外，不新增固定三人组。
 5. shortcut 只结算已经选中的实际同房组合，不能激活 producer、强塞 consumer 或改变候选优先级。
 6. producer、consumer 和其他中枢成员在 winner 产生前都不能写入主 `assignment` / `used`。
@@ -91,7 +91,7 @@ mask、signature、合法性 join、winner 一次提交和 resolved dependency�
 |----------|-----------|--------------------------|--------|
 | 八幡海铃 | E2 / `tier_up` | `5 × Σ(q∈R) n_s(q)` | 跨所有贸易站求叙拉古总人数，然后对各贸易房注入同一数值 |
 | 戴菲恩 | E2 / `tier_up` | `10 × n_g(r)` | **逐贸易房本地计数**；`(3,0)` 与 `(2,1)` 不能合并成一个全局总数 |
-| 凛御银灰 | E0 起 / `tier_0`、`tier_up` | `10 × Σ(q∈R) I[n_k(q) ≥ 3]` | 逐站判断是否至少 3 名谢拉格，再统计达标贸易站数 |
+| 凛御银灰 | E0 起 / 保留规则 | 仅保留 consumer 阈值事实；不自动注入 | 自动中枢 admission 为 `excluded_automatic` |
 
 数值单位是订单获取效率百分点。相同 inject family 继续取最大，不同 family 按现有 `GlobalInjectManifest` 规则相加。
 
@@ -105,7 +105,7 @@ mask、signature、合法性 join、winner 一次提交和 resolved dependency�
 |----------|-------------------------------|
 | 八幡海铃 | 所有实际进驻贸易站、带 `cc.g.siracusa` 的成员 |
 | 戴菲恩 | 各贸易房内实际贡献本房计数的 `cc.g.glasgow` 成员 |
-| 凛御银灰 | 每个达到 `n_k(r) ≥ 3` 的贸易房内，构成该阈值的全部 `cc.g.karlan` 成员 |
+| 凛御银灰 | 仅用于识别每个达到 `n_k(r) ≥ 3` 的贸易房内的 `cc.g.karlan` 成员；不生成自动 producer bind |
 
 consumer 集为空时不生成 bind。集合非空时，producer 与这些实际 consumer 同上同下、上 2 休 1；不要求不同贸易站的 consumer 被搬到同房。producer 休息班注入必须为 0，未入选成员不得在 rotation 阶段重新强塞。
 
@@ -379,14 +379,14 @@ BakedRoomResponse
   true solver efficiency/breakdown/rule_id
 ```
 
-不物化所有 `LayoutContext` 的笛卡尔积，也不保存一个脱离 signature 的“永久最终分数”。首期可以为三名 producer 的有限组合及常见计数响应多烘焙几份结果；这是小型有限表，不是全局人物 `2^N` mask。
+不物化所有 `LayoutContext` 的笛卡尔积，也不保存一个脱离 signature 的“永久最终分数”。首期可以为自动 admission producer 的有限组合及常见计数响应多烘焙几份结果；这是小型有限表，不是全局人物 `2^N` mask。
 
 ### 7.2 Tier 边界
 
 最简单的首期快速表使用标准 full-E2 variant：
 
 - 八幡海铃与戴菲恩只有 E2 producer rule；
-- 凛御银灰 E0/E2 都有相同商业版图规则，full-E2 表使用其 E2 variant；
+- 凛御银灰规则仅保留 consumer 阈值事实，不产生自动 producer variant；
 - 混合 tier、未知 variant 或 catalog 未覆盖的 operator 现场生成对应行并进入同一个 live 枚举；不得把它当成“不存在”。
 
 后续若混合 tier 命中率确有价值，再扩展 `(logical_id, tier_variant)` catalog。logical mask 始终按姓名去重。
@@ -574,7 +574,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 
 - Haru E0 不激活；E2 对 0 / 1 / 2 / 多个实际 Siracusa trade consumer 分别为 `0 / 5 / 10 / ...`。
 - Daifeen 仅 E2 激活；`(3,0)` 与 `(2,1)` 逐房结果不同，制造、宿舍和仅在基建内不计数。
-- Silver E0/E2 均激活；`3+0` 命中 1 站，`2+1` 命中 0 站，两站各 3 人命中 2 站。
+- Silver consumer 阈值事实保留：`3+0` 命中 1 站，`2+1` 命中 0 站，两站各 3 人命中 2 站；凛御银灰不自动入中枢或生成 dependency。
 - Silver 不激活灵知 precision，也不改变孑 variant。
 - 同 family 最大、跨 family 相加。
 
@@ -582,7 +582,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 
 - 普通路径不选消费者，但 producer + consumer 联合后胜出的 bootstrap。
 - 有消费者但普通 control 仍胜出。
-- 三 producer 分别胜出、两两共存、三者共存和全部落败。
+- 八幡海铃、戴菲恩可分别胜出、共存或落败；凛御银灰在所有自动 candidate 集合中排除。
 - control、贸易房 1、贸易房 2 的 logical mask 无交集；冲突时能扫描到更深的合法行。
 - 同构房对称去重不改变 winner；不同房级保持有序。
 - 工具人热区之外、由 tag/capability 扩入的合法 consumer 可以胜出。
@@ -600,7 +600,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 ### 13.4 Rotation
 
 - dependency 只含实际贡献 consumer；0 consumer 不绑定。
-- 三 producer 与各自 consumer 的 presence vector 一致，跨站不强制同房。
+- 八幡海铃、戴菲恩与各自 consumer 的 presence vector 一致，跨站不强制同房；凛御银灰不生成自动 producer bind。
 - producer 休息班 dynamic effect 为 0。
 - 每班中枢 5 人、生产房满编、同一班无重复干员。
 - 未入选成员不会被 gamma 或 unavailable 特判重新强塞。
@@ -664,7 +664,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
   实际在岗且 producer 实际入选时形成 dependency/capability。
 - **火龙S黑角**：后续作为 control → global resource / Monster Hunter consumer rule，显式描述木天蓼、贸易/制造 target 与资源 gate。
 
-这些扩展只用于验证抽象可扩展性，不属于首期三 producer 的功能验收。实施前必须分别完成
+这些扩展只用于验证抽象可扩展性，不属于首期自动 admission producer 的功能验收。实施前必须分别完成
 领域不变量、作用域、tier、实际 consumer、comparator 和轮换审计。怪猎、人间烟火、
 红松林等已确认硬体系继续由 plan 激活；设施无关 rule 只描述其响应，不接管其硬核心选型。
 
@@ -683,7 +683,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 
 | 不变量 | 唯一代码保证 | 删除的冲突 | 回归 | 真实 CLI | Bake/live 证据 |
 |--------|--------------|------------|------|----------|----------------|
-| 三 producer 自然可选 | rule registry + joint enumerator | Haru 多前缀 / Vina fixed role | 0/1/multi/bootstrap | 243 + 最小 operbox | winner 完全一致 |
+| 自动 admission producer 自然可选 | rule registry + joint enumerator | Haru 多前缀 / Vina fixed role | 0/1/multi/bootstrap | 243 + 最小 operbox | winner 完全一致 |
 | Daifeen 逐房 | room-local signature + resolver | trade-sum selector | `(3,0)` / `(2,1)` | 两贸易房明细 | response/live 一致 |
 | Silver 逐站阈值 | `tag@min` room vector | aggregate / precision 混用 | `3+0` / `2+1` | 跨站 layout | signature hash |
 | winner 一次 commit | `JointPrefixCandidate` | 分支提前写 used | seed 不变 / duplicate | profile + MAA | miss 只变慢 |

@@ -5392,19 +5392,6 @@
           },
           "phase": "global_inject",
           "phase_order": 10
-        },
-        {
-          "id": "control_mp_psk[000]:pinus_gold",
-          "action": {
-            "kind": "global_inject_manu_tagged_eff",
-            "params": {
-              "value": -10,
-              "target_tag": "cc.g.pinus",
-              "recipe": "gold"
-            }
-          },
-          "phase": "global_inject",
-          "phase_order": 10
         }
       ]
     },
@@ -5642,6 +5629,19 @@
               "value": 10,
               "target_tag": "cc.g.pinus",
               "recipe": "battle_record"
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10
+        },
+        {
+          "id": "control_mp_psk[000]:pinus_gold",
+          "action": {
+            "kind": "global_inject_manu_tagged_eff",
+            "params": {
+              "value": -10,
+              "target_tag": "cc.g.pinus",
+              "recipe": "gold"
             }
           },
           "phase": "global_inject",
@@ -6601,6 +6601,26 @@
             "params": {
               "key": "MusicalSection",
               "amount": 1.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "dorm_bd_num[000]",
+      "skill_name": "无声共鸣",
+      "facility": "dorm",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "scope": "global",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "SilentEcho",
+              "amount": 5.0
             }
           },
           "phase": "state_write",

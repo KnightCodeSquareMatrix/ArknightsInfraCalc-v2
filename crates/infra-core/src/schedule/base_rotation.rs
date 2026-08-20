@@ -17,24 +17,37 @@ use crate::trade::solve_trade_with_shift;
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct RoomEfficiencyLine {
     pub room_id: String,
+    pub operator_count: usize,
+    /// White: efficiency supplied directly by operators or their skills.
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub operator_efficiency: Efficiency,
+    /// Green: occupancy and facility/global environment efficiency.
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub station_efficiency: Efficiency,
+    /// Paper total before an order-specific multiplier is applied.
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub total_efficiency: Efficiency,
+    /// Actual efficiency after an order-specific multiplier.
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub final_efficiency: Efficiency,
+    /// Trade order multiplier; 1.000 for non-trade facilities.
+    #[serde(default)]
+    pub order_multiplier: Efficiency,
+    /// Blue: order-equivalent efficiency after removing base and station terms.
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub equivalent_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_skill_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub trade_display_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_skill_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub manufacture_display_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub power_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub power_skill_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub power_display_efficiency: Efficiency,
 }
 
 fn is_zero_efficiency(v: &Efficiency) -> bool {
@@ -63,11 +76,28 @@ impl ShiftEfficiencies {
     pub fn weighted_power(&self, shift_hours: f64) -> Efficiency {
         weighted_for_hours(self.power_efficiency, shift_hours)
     }
+
+    pub fn weighted_trade_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.trade_efficiency, shift_hours, cycle_hours)
+    }
+
+    pub fn weighted_manufacture_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.manufacture_efficiency, shift_hours, cycle_hours)
+    }
+
+    pub fn weighted_power_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
+        weighted_for_cycle(self.power_efficiency, shift_hours, cycle_hours)
+    }
 }
 
 fn weighted_for_hours(efficiency: Efficiency, hours: f64) -> Efficiency {
+    weighted_for_cycle(efficiency, hours, 24.0)
+}
+
+fn weighted_for_cycle(efficiency: Efficiency, hours: f64, cycle_hours: f64) -> Efficiency {
     let minutes = (hours * 60.0).round() as i64;
-    efficiency.scale_ratio(minutes, 24 * 60)
+    let cycle_minutes = (cycle_hours * 60.0).round() as i64;
+    efficiency.scale_ratio(minutes, cycle_minutes)
 }
 
 /// 对编制逐房求贸易/制造/发电直接效率（满心情）；`shift_hours` 影响发电爬升与产出折算。
@@ -96,12 +126,42 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.trade_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: room.operators.len(),
+            order_multiplier: Efficiency::ONE,
             ..RoomEfficiencyLine::default()
         };
         if let Some(snapshot) = assignment.efficiency_in(&room.id).filter(|s| s.is_trade()) {
             trade_efficiency += snapshot.trade_final_efficiency;
             line.trade_efficiency = snapshot.trade_final_efficiency;
             line.trade_skill_efficiency = snapshot.trade_skill_efficiency;
+            line.operator_efficiency = snapshot.trade_skill_efficiency;
+            line.order_multiplier = if snapshot.trade_unit_output_multiplier.is_zero() {
+                Efficiency::ONE
+            } else {
+                snapshot.trade_unit_output_multiplier
+            };
+            line.total_efficiency = if snapshot.trade_paper_efficiency.is_zero()
+                && !snapshot.trade_unit_output_multiplier.is_zero()
+            {
+                snapshot.trade_final_efficiency.scale_ratio(
+                    i64::from(Efficiency::SCALE),
+                    i64::from(snapshot.trade_unit_output_multiplier.millis()),
+                )
+            } else if snapshot.trade_paper_efficiency.is_zero() {
+                snapshot.trade_final_efficiency
+            } else {
+                snapshot.trade_paper_efficiency
+            };
+            line.final_efficiency = snapshot.trade_final_efficiency;
+            line.station_efficiency = if snapshot.trade_occupancy_efficiency.is_zero()
+                && snapshot.trade_control_efficiency.is_zero()
+            {
+                line.total_efficiency - Efficiency::ONE - line.operator_efficiency
+            } else {
+                snapshot.trade_occupancy_efficiency + snapshot.trade_control_efficiency
+            };
+            line.equivalent_efficiency =
+                snapshot.trade_final_efficiency - Efficiency::ONE - line.station_efficiency;
         } else if !room.operators.is_empty() {
             let input = TradeRoomInput {
                 level: room.level,
@@ -118,13 +178,14 @@ pub fn evaluate_base_assignment_efficiencies(
             trade_efficiency += result.efficiency.final_efficiency;
             line.trade_efficiency = result.efficiency.final_efficiency;
             line.trade_skill_efficiency = result.efficiency.paper.skill_efficiency;
-        }
-        if !line.trade_efficiency.is_zero() {
-            line.trade_display_efficiency = line.trade_efficiency
-                - Efficiency::ONE
-                - Efficiency::from_percent_points(
-                    room.layout.global_inject.trade_global_flat_eff_pct(),
-                );
+            line.operator_efficiency = result.efficiency.paper.skill_efficiency;
+            line.total_efficiency = result.efficiency.paper.paper_efficiency;
+            line.final_efficiency = result.efficiency.final_efficiency;
+            line.station_efficiency = result.efficiency.paper.occupancy_efficiency
+                + result.efficiency.paper.control_efficiency;
+            line.order_multiplier = result.efficiency.production_basis.unit_output_multiplier;
+            line.equivalent_efficiency =
+                result.efficiency.final_efficiency - Efficiency::ONE - line.station_efficiency;
         }
         room_lines.push(line);
     }
@@ -132,6 +193,8 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.manu_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: room.operators.len(),
+            order_multiplier: Efficiency::ONE,
             ..RoomEfficiencyLine::default()
         };
         if let Some(snapshot) = assignment
@@ -141,6 +204,19 @@ pub fn evaluate_base_assignment_efficiencies(
             manufacture_efficiency += snapshot.manufacture_final_efficiency;
             line.manufacture_efficiency = snapshot.manufacture_final_efficiency;
             line.manufacture_skill_efficiency = snapshot.manufacture_skill_efficiency;
+            line.operator_efficiency = snapshot.manufacture_skill_efficiency;
+            line.station_efficiency = if snapshot.manufacture_occupancy_efficiency.is_zero()
+                && snapshot.manufacture_global_efficiency.is_zero()
+            {
+                snapshot.manufacture_final_efficiency - Efficiency::ONE - line.operator_efficiency
+            } else {
+                snapshot.manufacture_occupancy_efficiency + snapshot.manufacture_global_efficiency
+            };
+            line.total_efficiency =
+                Efficiency::ONE + line.operator_efficiency + line.station_efficiency;
+            line.final_efficiency = snapshot.manufacture_final_efficiency;
+            line.equivalent_efficiency =
+                line.manufacture_efficiency - Efficiency::ONE - line.station_efficiency;
         } else if !room.operators.is_empty() {
             let input = ManuRoomInput {
                 level: room.level,
@@ -153,13 +229,12 @@ pub fn evaluate_base_assignment_efficiencies(
             manufacture_efficiency += result.final_efficiency;
             line.manufacture_efficiency = result.final_efficiency;
             line.manufacture_skill_efficiency = result.skill_efficiency;
-        }
-        if !line.manufacture_efficiency.is_zero() {
-            line.manufacture_display_efficiency = line.manufacture_efficiency
-                - Efficiency::ONE
-                - Efficiency::from_percent_points(
-                    room.layout.global_inject.manu_global_flat_eff_pct(),
-                );
+            line.operator_efficiency = result.skill_efficiency;
+            line.station_efficiency = result.occupancy_efficiency + result.global_efficiency;
+            line.total_efficiency = result.final_efficiency;
+            line.final_efficiency = result.final_efficiency;
+            line.equivalent_efficiency =
+                result.final_efficiency - Efficiency::ONE - line.station_efficiency;
         }
         room_lines.push(line);
     }
@@ -167,6 +242,8 @@ pub fn evaluate_base_assignment_efficiencies(
     for room in &resolved.power_rooms {
         let mut line = RoomEfficiencyLine {
             room_id: room.id.0.clone(),
+            operator_count: 1,
+            order_multiplier: Efficiency::ONE,
             ..RoomEfficiencyLine::default()
         };
         let input = PowerRoomInput {
@@ -185,7 +262,10 @@ pub fn evaluate_base_assignment_efficiencies(
         power_efficiency += efficiency;
         line.power_efficiency = efficiency;
         line.power_skill_efficiency = result.skill_efficiency;
-        line.power_display_efficiency = result.final_efficiency - Efficiency::ONE;
+        line.operator_efficiency = result.skill_efficiency + result.ramp_efficiency;
+        line.total_efficiency = efficiency;
+        line.final_efficiency = efficiency;
+        line.equivalent_efficiency = line.operator_efficiency;
         room_lines.push(line);
     }
 
@@ -253,5 +333,12 @@ mod tests {
             line.manufacture_skill_efficiency,
             Efficiency::from_decimal(0.300)
         );
+        assert_eq!(line.operator_efficiency, Efficiency::from_decimal(0.300));
+        assert_eq!(line.station_efficiency, Efficiency::from_decimal(2.030));
+        assert_eq!(line.total_efficiency, Efficiency::from_decimal(3.330));
+        assert_eq!(line.final_efficiency, Efficiency::from_decimal(3.330));
+        assert_eq!(line.order_multiplier, Efficiency::ONE);
+        assert_eq!(line.equivalent_efficiency, Efficiency::from_decimal(0.300));
+        assert_eq!(line.operator_count, 3);
     }
 }

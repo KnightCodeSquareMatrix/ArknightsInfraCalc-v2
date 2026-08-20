@@ -866,11 +866,45 @@ fn room_display_name(room_id: &str) -> String {
     }
 }
 
-/// 排班表按设施编号顺序列出（与蓝图 trade_1→…→control→办公室→会客室→宿舍 一致）。
-const SHIFT_STATION_ORDER: &[&str] = &[
-    "trade_1", "trade_2", "manu_1", "manu_2", "manu_3", "manu_4", "power_1", "power_2", "power_3",
-    "control", "office_1", "meeting", "dorm_1", "dorm_2", "dorm_3", "dorm_4",
-];
+fn shift_station_order(report: &TeamRotationReport) -> Vec<String> {
+    let mut room_ids: std::collections::BTreeSet<String> = report
+        .shifts
+        .iter()
+        .flat_map(|shift| shift.assignment.rooms.iter())
+        .map(|room| room.room_id.0.clone())
+        .collect();
+    room_ids.extend(
+        report
+            .shifts
+            .iter()
+            .flat_map(|shift| shift.efficiencies.room_lines.iter())
+            .map(|line| line.room_id.clone()),
+    );
+    let mut room_ids: Vec<_> = room_ids.into_iter().collect();
+    room_ids.sort_by_key(|room_id| {
+        let (group, index) = if let Some(index) = room_id.strip_prefix("trade_") {
+            (0, index.parse::<u32>().unwrap_or(u32::MAX))
+        } else if let Some(index) = room_id.strip_prefix("manu_") {
+            (1, index.parse::<u32>().unwrap_or(u32::MAX))
+        } else if let Some(index) = room_id.strip_prefix("power_") {
+            (2, index.parse::<u32>().unwrap_or(u32::MAX))
+        } else if room_id == "control" {
+            (3, 0)
+        } else if room_id == "office" {
+            (4, 0)
+        } else if let Some(index) = room_id.strip_prefix("office_") {
+            (4, index.parse::<u32>().unwrap_or(u32::MAX))
+        } else if room_id == "meeting" {
+            (5, 0)
+        } else if let Some(index) = room_id.strip_prefix("dorm_") {
+            (6, index.parse::<u32>().unwrap_or(u32::MAX))
+        } else {
+            (7, u32::MAX)
+        };
+        (group, index, room_id.clone())
+    });
+    room_ids
+}
 
 fn format_shift_station_line(
     shift: &infra_core::schedule::TeamShiftResult,
@@ -888,13 +922,23 @@ fn format_shift_station_line(
         .map(|r| {
             if !r.trade_efficiency.is_zero() {
                 format!(
-                    " [贸易效率{} / 技能效率{}]",
-                    r.trade_efficiency, r.trade_skill_efficiency
+                    " [总效率{} / 最终{} / 白{} / 绿{} / 蓝{}]",
+                    r.total_efficiency,
+                    r.final_efficiency,
+                    r.operator_efficiency,
+                    r.station_efficiency,
+                    r.equivalent_efficiency
                 )
             } else if !r.manufacture_efficiency.is_zero() {
-                format!(" [制造效率{}]", r.manufacture_efficiency)
+                format!(
+                    " [总效率{} / 白{} / 绿{}]",
+                    r.final_efficiency, r.operator_efficiency, r.station_efficiency
+                )
             } else if !r.power_efficiency.is_zero() {
-                format!(" [发电效率{}]", r.power_efficiency)
+                format!(
+                    " [发电效率{} / 白{}]",
+                    r.final_efficiency, r.operator_efficiency
+                )
             } else {
                 String::new()
             }
@@ -1077,7 +1121,7 @@ fn write_team_rotation_text(
         report.daily.trade, report.daily.manufacture, report.daily.power
     ));
 
-    report_line("\n--- 轮换队伍花名册（设施始终满编不空转）---");
+    report_line("\n--- 轮换队伍花名册（办公室/会客室尽量满编，缺员见 warnings）---");
     for team in &report.teams {
         report_line(&format!(
             "  {} 队 ({} 人): {}",
@@ -1085,6 +1129,12 @@ fn write_team_rotation_text(
             team.operators.len(),
             team.operators.join(", ")
         ));
+    }
+    if !report.warnings.is_empty() {
+        report_line("\n--- 缺员提示 ---");
+        for warning in &report.warnings {
+            report_line(&format!("  {warning}"));
+        }
     }
 
     report_line("\n--- 轮换一览 ---");
@@ -1147,12 +1197,12 @@ fn write_team_rotation_text(
         ));
 
         report_line("\n  【各设施上岗情况】");
-        for room_id in SHIFT_STATION_ORDER {
+        for room_id in shift_station_order(report) {
             report_line(&format_shift_station_line(
                 shift,
                 &op_team,
                 report.profile,
-                room_id,
+                &room_id,
             ));
         }
     }

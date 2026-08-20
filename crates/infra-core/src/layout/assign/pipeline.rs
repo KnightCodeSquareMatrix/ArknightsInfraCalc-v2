@@ -249,12 +249,137 @@ fn run_shift_pipeline_with_producer_pruning(
         Some(run.durin_plan),
     )?;
 
+    assign_meeting_rooms(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        &mut run.assignment,
+        &mut run.used,
+    )?;
+    timer.mark("会客室");
+
     timer.report();
     Ok(run.assignment)
 }
 
 fn producer_pruning_enabled(requested: bool, policy: ScoringPolicyId) -> bool {
     requested && policy == ScoringPolicyId::ControlInjectRawSumV0
+}
+
+/// 用未占用干员填满所有会客室（每间两人）。
+///
+/// 选人顺序：
+/// 1. 优先选择会客室线索搜集速度加成最高、且尚未被本班占用的干员（按
+///    `evaluate_meeting` 的 `skill_speed_bonus_pct` 排序，搭档条件在两人一起
+///    求值时自然生效）；
+/// 2. 没有可用的会客室技能干员时，兜底选取任意空闲干员；
+/// 3. 空余位置不足时保持空位（导出层按 `autofill` 提示）。
+///
+/// 本阶段只消费生产域分配后剩余的空闲干员，不进入任何生产域评分。
+fn assign_meeting_rooms(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    let registry = crate::support_facility::SupportRegistry::load_default()?;
+    let extra_recruit_slots = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == crate::layout::FacilityKind::Office)
+        .map(|room| room.level.saturating_sub(1))
+        .max()
+        .unwrap_or(0);
+    let elapsed_hours = options.shift_hours.max(1.0);
+    let layout = crate::layout::resolve::resolve_base(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?
+    .layout_snapshot();
+
+    let roster = operbox.roster();
+    for room in blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == crate::layout::FacilityKind::MeetingRoom)
+    {
+        let mut operators = assignment.operators_in(&room.id).to_vec();
+        while operators.len() < room.operator_capacity() {
+            let mut best: Option<(f64, String, crate::roster::OperatorProgress)> = None;
+            for name in roster.names() {
+                if used.contains(name.as_str()) {
+                    continue;
+                }
+                if operators.iter().any(|op| op.name == *name) {
+                    continue;
+                }
+                let Some(progress) = roster.progress(name) else {
+                    continue;
+                };
+                // 会客室总是两人同房：候选评分用哨兵补足第二席，使
+                // `SpeedIfSolo` 失效（solo 加成在双人房不生效），
+                // `SpeedIfPartner` 搭档加成按哨兵不匹配记 0。
+                let mut support_ops: Vec<_> = operators
+                    .iter()
+                    .map(|op| crate::support_facility::SupportOperator {
+                        name: op.name.clone(),
+                        elite: op.elite,
+                        level: op.level,
+                    })
+                    .chain(std::iter::once(crate::support_facility::SupportOperator {
+                        name: name.clone(),
+                        elite: progress.elite,
+                        level: progress.level,
+                    }))
+                    .collect();
+                if support_ops.len() < room.operator_capacity() {
+                    support_ops.push(crate::support_facility::SupportOperator {
+                        name: "\0meeting-partner-sentinel".to_string(),
+                        elite: 0,
+                        level: 1,
+                    });
+                }
+                let score = crate::meeting::evaluate_meeting(
+                    &crate::support_facility::SupportRoomInput {
+                        facility: crate::support_facility::SupportFacility::Meeting,
+                        operators: support_ops,
+                        capacity: room.operator_capacity(),
+                        extra_recruit_slots,
+                        elapsed_hours,
+                        external_speed_bonus_pct: 0.0,
+                        layout: layout.clone(),
+                    },
+                    &registry,
+                )?
+                .skill_speed_bonus_pct;
+                if best.as_ref().is_none_or(|(best_score, best_name, _)| {
+                    score > *best_score || (score == *best_score && *name < *best_name)
+                }) {
+                    best = Some((score, name.clone(), progress));
+                }
+            }
+            let Some((_, name, progress)) = best else {
+                break;
+            };
+            used.insert(name.clone());
+            operators.push(crate::layout::AssignedOperator::from_progress(
+                &name, progress,
+            ));
+        }
+        if !operators.is_empty() {
+            assignment.set_room(room.id.clone(), operators);
+        }
+    }
+    Ok(())
 }
 
 struct PeakPrefixCandidate<'a> {
@@ -587,6 +712,12 @@ fn dynamic_producer_candidates(
         .collect();
     let mut producers = Vec::new();
     for entry in &control_pool.entries {
+        if crate::response_dependency::control_buff_is_automatically_excluded(
+            table,
+            entry.buff_ids.iter().map(String::as_str),
+        )? {
+            continue;
+        }
         let trade_match = control_entry_deferred_trade_tags(entry, table)?
             .iter()
             .any(|tag| trade_tags.contains(tag.as_str()));
@@ -660,6 +791,115 @@ mod tests {
             potential: 0,
             rarity: 6,
         }
+    }
+
+    #[test]
+    fn meeting_rooms_are_filled_with_meeting_skilled_operators_first() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let blueprint = control_blueprint(true);
+        let operbox = OperBox::from_entries(
+            ["12F", "和弦", "复奏", "凛视", "麦哲伦"]
+                .into_iter()
+                .map(e2)
+                .collect(),
+        )
+        .unwrap();
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        assign_meeting_rooms(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions::default(),
+            &mut assignment,
+            &mut used,
+        )
+        .unwrap();
+        let names: Vec<_> = assignment
+            .operators_in(&RoomId::from("meeting"))
+            .iter()
+            .map(|op| op.name.as_str())
+            .collect();
+        assert_eq!(names.len(), 2, "meeting room must be filled to capacity");
+        assert!(
+            !names.contains(&"麦哲伦"),
+            "skillless operator must not displace meeting-skilled candidates: {names:?}"
+        );
+        assert!(
+            names.contains(&"12F") || names.contains(&"复奏"),
+            "fixed-speed meeting-skilled operator expected (solo-only 和弦 must not win in a two-person room): {names:?}"
+        );
+    }
+
+    #[test]
+    fn meeting_rooms_prefer_fixed_speed_over_solo_only_in_two_person_room() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let blueprint = control_blueprint(true);
+        // 三名候选：和弦 solo 50%（双人房失效）、见行者固定 35%、12F 固定 20%。
+        // 容量 2，若 solo 未失效，和弦(50) 必入选；哨兵修复后应选见行者+12F。
+        let operbox =
+            OperBox::from_entries(["和弦", "见行者", "12F"].into_iter().map(e2).collect()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        assign_meeting_rooms(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions::default(),
+            &mut assignment,
+            &mut used,
+        )
+        .unwrap();
+        let names: Vec<_> = assignment
+            .operators_in(&RoomId::from("meeting"))
+            .iter()
+            .map(|op| op.name.as_str())
+            .collect();
+        assert_eq!(names.len(), 2, "meeting room must be filled to capacity");
+        assert!(
+            !names.contains(&"和弦"),
+            "solo-only 和弦 (50%) must not win in a two-person room: {names:?}"
+        );
+        assert!(
+            names.contains(&"见行者") && names.contains(&"12F"),
+            "fixed-speed 见行者(35%) and 12F(20%) expected: {names:?}"
+        );
+    }
+
+    #[test]
+    fn meeting_rooms_fall_back_to_idle_operators_when_no_skill_candidates() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let blueprint = control_blueprint(true);
+        let operbox = OperBox::from_entries(
+            ["甲", "乙", "丙"]
+                .into_iter()
+                .map(|name| e2(name))
+                .collect(),
+        )
+        .unwrap();
+        let mut assignment = BaseAssignment::default();
+        let mut used = HashSet::new();
+        assign_meeting_rooms(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions::default(),
+            &mut assignment,
+            &mut used,
+        )
+        .unwrap();
+        let names: Vec<_> = assignment
+            .operators_in(&RoomId::from("meeting"))
+            .iter()
+            .map(|op| op.name.as_str())
+            .collect();
+        assert_eq!(names.len(), 2, "fallback must fill meeting room: {names:?}");
     }
 
     #[test]
@@ -1037,7 +1277,7 @@ mod tests {
     }
 
     #[test]
-    fn threshold_trade_producer_competes_through_the_same_rule_path() {
+    fn threshold_trade_consumer_does_not_reintroduce_excluded_control_producer() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let operbox = OperBox::from_entries(
@@ -1081,7 +1321,7 @@ mod tests {
             &seed,
             &AssignmentPlan::recovery(AssignShiftMode::Peak),
         );
-        assert!(assignment
+        assert!(!assignment
             .control_operators()
             .iter()
             .any(|operator| operator.name == "凛御银灰"));
@@ -1091,8 +1331,7 @@ mod tests {
             .map(|operator| operator.name.as_str())
             .collect();
         assert_eq!(trade, HashSet::from(["银灰", "崖心", "讯使"]));
-        assert_eq!(dependencies.len(), 1);
-        assert_eq!(dependencies[0].rule_id, "trade_karlan_station");
+        assert!(dependencies.is_empty());
     }
 
     #[test]

@@ -18,7 +18,7 @@
     {
       "id": "trade_karlan_station",
       "source_buff_id": "control_tra_limit&spd3[000]",
-      "admission": "deferred_optional",
+      "admission": "excluded_automatic",
       "target_facility": "trade",
       "schedule_relation": "exact_presence"
     },

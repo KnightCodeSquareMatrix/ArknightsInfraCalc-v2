@@ -19,6 +19,8 @@ pub struct BoxProfileOptions {
     pub top_k: usize,
     pub rotation_profile: TimedRotationProfile,
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// 菲亚梅塔主力回岗覆盖开关；`false` 时 current 排班不生成回岗动作。
+    pub fiammetta_enable: bool,
     /// baseline 练度（默认 full_e2，用于公孙 schedule eval）。
     pub baseline_operbox: Option<PathBuf>,
     /// 公孙参考排班 JSON（默认 `schedule_export.json`）。
@@ -33,6 +35,7 @@ impl Default for BoxProfileOptions {
             top_k: 10,
             rotation_profile: TimedRotationProfile::default(),
             system_preferences: std::collections::HashMap::new(),
+            fiammetta_enable: true,
             baseline_operbox: None,
             baseline_schedule: None,
             gap_warn: 0.08,
@@ -138,6 +141,7 @@ pub fn build_box_profile(
         options.top_k,
         options.rotation_profile,
         &options.system_preferences,
+        options.fiammetta_enable,
     )?;
     build_box_profile_from_current_probe(
         &current,
@@ -380,9 +384,18 @@ pub(super) fn build_domains(
     }
 
     let gap = efficiency_gap(current.rotation.daily.trade, baseline.rotation.daily.trade);
+    let (trade_label, manufacture_label) =
+        if options.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
+            (
+                "轮休·36h周期归一化日均贸易加权",
+                "轮休·36h周期归一化日均制造加权",
+            )
+        } else {
+            ("轮休·24h贸易加权", "轮休·24h制造加权")
+        };
     out.push(DomainMetric {
         id: "rotation_trade",
-        label: "轮休·24h贸易加权",
+        label: trade_label,
         current: ComboSnapshot {
             operators: vec![],
             final_efficiency: current.rotation.daily.trade,
@@ -403,7 +416,7 @@ pub(super) fn build_domains(
     );
     out.push(DomainMetric {
         id: "rotation_manufacture",
-        label: "轮休·24h制造加权",
+        label: manufacture_label,
         current: ComboSnapshot {
             operators: vec![],
             final_efficiency: current.rotation.daily.manufacture,

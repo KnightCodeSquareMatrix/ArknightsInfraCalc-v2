@@ -36,6 +36,7 @@ pub enum ResponseField {
 #[serde(rename_all = "snake_case")]
 pub enum ProducerAdmission {
     DeferredOptional,
+    ExcludedAutomatic,
     PlanRequired,
     NormalObservation,
     PolicyManaged,
@@ -321,6 +322,15 @@ fn validate_producer_rule_catalog(
     let mut ids = BTreeSet::new();
     let mut buff_ids = BTreeSet::new();
     for rule in &catalog.rules {
+        if !matches!(
+            rule.admission,
+            ProducerAdmission::DeferredOptional | ProducerAdmission::ExcludedAutomatic
+        ) {
+            return Err(format!(
+                "producer rule {} uses unsupported admission {:?}",
+                rule.id, rule.admission
+            ));
+        }
         if !ids.insert(rule.id.as_str()) {
             return Err(format!("duplicate producer rule id {}", rule.id));
         }
@@ -409,12 +419,25 @@ pub fn deferred_producer_rules_for_buffs<'a>(
         .rules
         .iter()
         .filter(|rule| {
-            rule.admission == ProducerAdmission::DeferredOptional
-                && rule.target_facility == target_facility
+            matches!(
+                rule.admission,
+                ProducerAdmission::DeferredOptional | ProducerAdmission::ExcludedAutomatic
+            ) && rule.target_facility == target_facility
                 && requested.contains(rule.source_buff_id.as_str())
         })
         .cloned()
         .collect())
+}
+
+pub fn control_buff_is_automatically_excluded<'a>(
+    table: &SkillTable,
+    buff_ids: impl IntoIterator<Item = &'a str>,
+) -> Result<bool> {
+    let requested: BTreeSet<&str> = buff_ids.into_iter().collect();
+    Ok(producer_rule_catalog(table)?.rules.iter().any(|rule| {
+        rule.admission == ProducerAdmission::ExcludedAutomatic
+            && requested.contains(rule.source_buff_id.as_str())
+    }))
 }
 
 pub fn resolve_assignment_producer_dependencies(
@@ -426,6 +449,9 @@ pub fn resolve_assignment_producer_dependencies(
     let catalog = producer_rule_catalog(table)?;
     let mut resolved = Vec::new();
     for rule in &catalog.rules {
+        if rule.admission == ProducerAdmission::ExcludedAutomatic {
+            continue;
+        }
         let mut producers: Vec<_> = assignment
             .control_operators()
             .into_iter()
@@ -1255,6 +1281,35 @@ mod tests {
                 && !rule.id.contains("银灰")
                 && !rule.id.contains("杰西卡")
         }));
+    }
+
+    #[test]
+    fn karlan_rule_keeps_consumer_discovery_but_excludes_automatic_admission() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let rules =
+            deferred_producer_rules_for_buffs(&table, ["control_tra_limit&spd3[000]"], "trade")
+                .unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].id, "trade_karlan_station");
+        assert_eq!(rules[0].admission, ProducerAdmission::ExcludedAutomatic);
+        assert!(
+            control_buff_is_automatically_excluded(&table, ["control_tra_limit&spd3[000]"])
+                .unwrap()
+        );
+        assert!(
+            !control_buff_is_automatically_excluded(&table, ["control_tra_limit&spd2[000]"])
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn producer_rule_catalog_rejects_unimplemented_admission() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut catalog = producer_rule_catalog(&table).unwrap().clone();
+        catalog.rules[0].admission = ProducerAdmission::PlanRequired;
+        assert!(validate_producer_rule_catalog(&catalog, &table)
+            .unwrap_err()
+            .contains("unsupported admission"));
     }
 
     #[test]

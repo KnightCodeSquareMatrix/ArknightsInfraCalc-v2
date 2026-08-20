@@ -95,6 +95,8 @@ pub(super) fn trade_efficiency_snapshot(hit: &TradeSearchHit) -> RoomEfficiencyS
         .expect("room assignment requires a single-station trade hit");
     RoomEfficiencySnapshot {
         trade_paper_efficiency: breakdown.paper_efficiency,
+        trade_occupancy_efficiency: breakdown.occupancy_efficiency,
+        trade_control_efficiency: breakdown.control_efficiency,
         trade_unit_output_multiplier: breakdown.unit_output_multiplier,
         trade_final_efficiency: breakdown.final_efficiency,
         trade_equivalent_skill_efficiency: breakdown.equivalent_skill_efficiency,
@@ -108,6 +110,8 @@ pub(super) fn trade_efficiency_snapshot(hit: &TradeSearchHit) -> RoomEfficiencyS
 pub(super) fn manu_efficiency_snapshot(hit: &ManuSearchHit) -> RoomEfficiencySnapshot {
     RoomEfficiencySnapshot {
         manufacture_final_efficiency: hit.breakdown.final_efficiency,
+        manufacture_occupancy_efficiency: hit.breakdown.occupancy_efficiency,
+        manufacture_global_efficiency: hit.breakdown.global_efficiency,
         manufacture_skill_efficiency: hit.breakdown.skill_efficiency,
         manufacture_storage_limit: hit.breakdown.storage_limit,
         ..RoomEfficiencySnapshot::default()

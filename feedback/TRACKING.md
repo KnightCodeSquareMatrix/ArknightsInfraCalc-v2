@@ -134,3 +134,13 @@ Targeted tests worth naming in PR notes:
 ## Reopen Rule
 
 If a user reports one of these symptoms again, do not create a new architecture plan. Reopen the matching `FB-*` row, paste the new reproduction command, and localize the regression to the smallest layer before changing code.
+
+## 2026-08-06 batch (synced from 114.66.55.78)
+
+| ID | Status | Area | Source | Closure / coverage |
+|----|--------|------|--------|--------------------|
+| FB-20260730-004002 | closed | meeting fill | `feedback/2026-07-30/004002-会客室输出不稳定-时有时无` | Solver now fills the meeting room (two seats, clue-speed skilled first, idle fallback) in the single-shift pipeline and ABC rotation cohorts; covered by `assign_meeting_rooms` tests and `abc_rotation_fills_meeting_room_with_rotating_meeting_skilled_cohort`. |
+| FB-20260802-145054 | upstream-frontend | manufacture roster | `feedback/2026-08-02/145054-没练红松林-检查下森空岛识别哪里出问题了` | The reported run used the "243 全精二示例" operbox (418 e2-90), not the user's own box; solver behavior was correct. Frontend data-source issue; needs the user's synced operbox to chase 森空岛 recognition. |
+| FB-20260802-145242 | upstream-frontend | trade roster | `feedback/2026-08-02/145242-没维娜-我402干员扫出来404个-森空岛上看也只有402个-看看哪里出问题了-另外-加油鸭-这东西要整出来将轰动舟区-祝好运` | Same run `b26e6f08` used the sample operbox; user's real export (07:53) owns 390 and lacks 维娜·维多利亚/远牙. Solver faithful; 森空岛 402→404 recognition needs frontend-side repro. |
+
+Upstream-frontend rows are evidence of frontend/skland recognition issues, not core-solver defects; reopen only with the user's actual operbox attached.

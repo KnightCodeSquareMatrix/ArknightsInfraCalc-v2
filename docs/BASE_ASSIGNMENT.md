@@ -86,7 +86,7 @@ operbox + blueprint
 
 **贸易 core priority**：只看蓝图中的实际贸易站数量、等级和订单。恰有 1 间贸易站且为龙门币订单时，可露希尔是 required core；至少 2 间贸易站且任一为龙门币订单时，但书是首个 required core。多贸龙门币默认顺序为但书 > 可露希尔 > 完整龙巫：但书优先进入可用的最低等级金单站，可露希尔随后优先进入可用的最高等级金单站，完整龙巫只进入能容纳巫恋 + 龙舌兰 + 合法裁缝 β/α 的三级金单站。全部贸易站均为源石订单时这些金单核心都不上，混合订单中的源石站也不被金单核心占用。双贸易站中 Rosemary/黑键体系 alternative 确认激活，且可露希尔与完整龙巫都可形成时，Plan 进一步把可露希尔+黑键固定为 B，并把完整龙巫 C 留给 γ 替补；不能先按当前房间结果反推体系是否激活。A/B 队友仍由各房正式 `final_efficiency` 搜索决定。八幡海铃、伺夜、贝洛内都不是编排硬核心，也不通过 registry 强制进编：伺夜、贝洛内可上 0/1/2 人且不预设同房，full-E2 下 A 期望自然选中伺夜+贝洛内。`gsl_docus_solo` / `gsl_docus_syracusa` 只在求解实际同房候选时提供机制结算，不参与总 core 顺序或队友候选优先顺序。缺可露或缺完整龙巫时分别沿后续 role 降级，不用巫恋+龙舌兰二人组伪造自动龙巫；普通白板组合只保留显式单站结算兼容，不进入自动 role。
 
-**动态 producer 当前边界**：八幡海铃、戴菲恩、凛御银灰和涤火杰西卡由一次 producer presence 子集枚举比较完整生产前缀；`vina_lungmen` / `meta_vina` 不再参与选型，灵知精密计算也不替代凛御银灰商业版图。贸易/制造多房内部仍是上述有序填房 policy；完整条件响应行 join 与 Bake/live 等价证明见 [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md) 和 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
+**动态 producer 当前边界**：八幡海铃、戴菲恩和涤火杰西卡由一次 producer presence 子集枚举比较完整生产前缀；凛御银灰 producer rule 仅保留 consumer 阈值识别，自动中枢 admission 排除。`vina_lungmen` / `meta_vina` 不再参与选型，灵知精密计算也不替代凛御银灰的独立 consumer 事实。贸易/制造多房内部仍是上述有序填房 policy；完整条件响应行 join 与 Bake/live 等价证明见 [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md) 和 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
 联合候选的目标 policy 已裁决为贸易、制造分域 `final_efficiency` 总和按显式权重比较，当前
 默认 `1:1`；未来可调整该 policy 权重，布局本身继续负责宏观产出结构。该 comparator 已在

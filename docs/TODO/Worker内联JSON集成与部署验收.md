@@ -10,7 +10,7 @@
 - 后端共享 Plan 编排、`plan.compute` v1、参数 JSON Schema admission 和 legacy adapter 已在协作工作区实现并通过本地证据。
 - Next BFF 已在独立集成工作区改为内联请求和响应；现有浏览器 API/UI 契约保持不变，本地 Full E2 与负向边界已经通过。
 - 目标分支集成、正式发布包、目标环境部署和真实浏览器验收尚未完成，不能据此宣称全链路迁移已经上线。
-- 已安装 Worker 的能力必须通过 `ping.protocol_version=1`、`ping.plan_schema_version=1` 与目标发布 schema 的 `ping.plan_contract_sha256` 共同判断。
+- 已安装 Worker 的能力必须通过 `ping.protocol_version=1` 与 `ping.plan_schema_version=1` 判断；solver 版本从每次响应顶层 `solver` 读取。
 
 ## 目标
 
@@ -31,8 +31,8 @@
 每个目标环境必须记录：
 
 - 环境标识、访问入口和部署时间；
-- 前端 revision、Worker revision、发布版本或产物 hash；
-- `ping.protocol_version`、`ping.plan_schema_version`、`ping.plan_contract_sha256` 的实际值和采样时间；
+- 前端 revision、Worker `solver.git_commit`、`solver.built_at` 和发布版本；
+- `ping.protocol_version`、`ping.plan_schema_version`、`ping.solver_git_commit`、`ping.solver_built_at` 的实际值和采样时间；
 - 可区分 `plan.compute` 与 legacy `plan` 的日志或指标来源、查询条件、观测窗口起止时间；
 - 两种 method 的调用量、可识别的调用方版本，以及无法归属的调用方；
 - 失败时可恢复的前端与 Worker revision / 产物。
@@ -48,6 +48,6 @@
 ## 完成条件
 
 - 后端与前端目标分支均包含可追溯的 v1 实现 revision，发布产物来自这些 revision。
-- 目标环境 `ping` 明确返回两个 v1 版本字段及与发布 schema 一致的契约 hash，真实浏览器 Plan 流程和 MAA 下载通过。
+- 目标环境 `ping` 明确返回两个 v1 版本字段和 solver 构建元数据；真实浏览器 Plan 流程和 MAA 下载通过。
 - 全部目标环境的 deployment inventory 已按本节字段记录；legacy 清理任务能据此保持 `blocked`，或在零 legacy 调用且无未知调用方时转为 `ready-on-request`。
 - 发布状态已吸收到 current owner，证据、索引和引用通过生命周期检查。

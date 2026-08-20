@@ -635,7 +635,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_threshold_dependency_uses_only_qualified_room_members() {
+    fn excluded_threshold_producer_does_not_create_dependency() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room("control", vec![AssignedOperator::new("凛御银灰", 2)]);
@@ -645,13 +645,7 @@ mod tests {
         let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
         resolve(&mut plan, &blueprint, &assignment);
 
-        let dependency = plan
-            .resolved_producer_dependencies
-            .iter()
-            .find(|dependency| dependency.source_buff_id == "control_tra_limit&spd3[000]")
-            .unwrap();
-        assert_eq!(dependency.consumers, vec!["崖心", "讯使", "银灰"]);
-        assert!(!dependency.consumers.contains(&"角峰".to_string()));
+        assert!(plan.resolved_producer_dependencies.is_empty());
     }
 
     #[test]

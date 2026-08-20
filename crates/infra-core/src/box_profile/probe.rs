@@ -65,6 +65,7 @@ pub fn run_user_rotation_probe_with_profile(
         top_k,
         profile,
         &HashMap::new(),
+        true,
     )
 }
 
@@ -76,6 +77,7 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
     top_k: usize,
     profile: TimedRotationProfile,
     system_preferences: &HashMap<String, String>,
+    fiammetta_enable: bool,
 ) -> Result<LayoutProbe> {
     let rotation = schedule_timed_rotation(
         blueprint,
@@ -85,6 +87,7 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
         &AssignBaseOptions {
             top_k,
             system_preferences: system_preferences.clone(),
+            fiammetta_enable,
             ..AssignBaseOptions::default()
         },
         profile,

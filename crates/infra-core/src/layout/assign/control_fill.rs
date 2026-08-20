@@ -133,10 +133,11 @@ fn assign_control_inner(
     let empty_excluded = HashSet::new();
     let filtered_pool = filter_control_pool_for_fill(
         &base_pool,
+        table,
         used,
         &pinned,
         excluded.unwrap_or(&empty_excluded),
-    );
+    )?;
 
     let combos = search_control_combos(&filtered_pool, table, &control_opts)?;
     let Some(hit) = pick_control_extending_pins(combos, &must_include, used, &|h| &h.names) else {
@@ -165,22 +166,38 @@ fn assign_control_inner(
 
 fn filter_control_pool_for_fill(
     pool: &ControlPool,
+    table: &SkillTable,
     used: &HashSet<String>,
     pinned: &HashSet<String>,
     excluded: &HashSet<String>,
-) -> ControlPool {
-    ControlPool {
+) -> Result<ControlPool> {
+    let automatically_excluded: HashSet<_> = pool
+        .entries
+        .iter()
+        .map(|entry| {
+            crate::response_dependency::control_buff_is_automatically_excluded(
+                table,
+                entry.buff_ids.iter().map(String::as_str),
+            )
+            .map(|excluded| (entry.name.as_str(), excluded))
+        })
+        .collect::<Result<_>>()?;
+    Ok(ControlPool {
         entries: pool
             .entries
             .iter()
             .filter(|e| {
-                (pinned.contains(&e.name) || !excluded.contains(&e.name))
+                (pinned.contains(&e.name)
+                    || (!excluded.contains(&e.name)
+                        && !automatically_excluded
+                            .iter()
+                            .any(|(name, excluded)| *excluded && *name == e.name)))
                     && (!used.contains(&e.name) || pinned.contains(&e.name))
             })
             .cloned()
             .collect(),
         skipped: pool.skipped.clone(),
-    }
+    })
 }
 
 fn pick_control_extending_pins<T: Clone>(
@@ -274,14 +291,21 @@ mod tests {
         let mut pool = build_control_pool(&roster, &instances, &table).unwrap();
         pool.entries[0].buff_ids.clear();
 
-        let filtered =
-            filter_control_pool_for_fill(&pool, &HashSet::new(), &HashSet::new(), &HashSet::new());
+        let filtered = filter_control_pool_for_fill(
+            &pool,
+            &table,
+            &HashSet::new(),
+            &HashSet::new(),
+            &HashSet::new(),
+        )
+        .unwrap();
 
         assert_eq!(filtered.entries.len(), 1);
         assert!(filtered.entries[0].buff_ids.is_empty());
 
         let pinned = HashSet::from(["阿米娅".to_string()]);
-        let filtered = filter_control_pool_for_fill(&pool, &HashSet::new(), &pinned, &pinned);
+        let filtered =
+            filter_control_pool_for_fill(&pool, &table, &HashSet::new(), &pinned, &pinned).unwrap();
         assert_eq!(filtered.entries.len(), 1);
     }
 

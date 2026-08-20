@@ -44,7 +44,11 @@ pub fn default_schedule_export_path() -> Result<PathBuf> {
 /// Default ABC keeps the historical second-shift probe. Explicit profiles use
 /// their first declared main state rather than accidentally profiling backup.
 pub fn reference_shift_assignment(report: &TeamRotationReport) -> &BaseAssignment {
-    let index = if report.profile == crate::schedule::TimedRotationProfile::Abc12_6_6 {
+    let index = if matches!(
+        report.profile,
+        crate::schedule::TimedRotationProfile::Abc12_6_6
+            | crate::schedule::TimedRotationProfile::Abc12_12_12
+    ) {
         1
     } else {
         0
@@ -297,6 +301,7 @@ fn probe_shell(
             teams: vec![],
             shifts: vec![],
             daily,
+            warnings: vec![],
             elapsed: Duration::ZERO,
         },
     })

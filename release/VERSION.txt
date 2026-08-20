@@ -1,7 +1,5 @@
-ArknightsInfraCalc beta release bundle
-Build date: 2026-06-25
-Backend commit: 9e52de9
-Frontend beta source commit: 3259eaa
+ArknightsInfraCalc release bundle
+Build metadata is appended by scripts/build_release_linux.sh.
 Platform: windows-x86_64 / linux-x86_64
 
 Recommended CLI entry:
