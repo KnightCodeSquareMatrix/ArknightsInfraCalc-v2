@@ -278,7 +278,7 @@ infra-cli layout team-rotation \
 {"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
-响应 `result.schema_version=1`，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。`training_advice` 固定包含新手章节状态 `newbie_section_status`、全量 `incomplete_newbie`、常见组合 `combinations` 和最多 10 人的 `recommendations`；建议可附带 `product`、`efficiency` 和逐条件 `conditions`。它消费本次请求的 operbox 与 layout，已知无源石碎片制造站时不会推荐搓玉干员或泡泡/火神，且泡泡组有源石线时成对输出；同站条件只作说明。排班结果按每班每站 `skill-efficiency ÷ operator_count` 的简单平均注入 T9 上下文，超过贸易 30% 且制造 25% 时跳过新手行动建议但保留完整未完成清单。`rotation.shifts[]` 的 `efficiencies.room_lines[]` 还包含 `operator_count`，便于前端复核均效口径。
+响应 `result.schema_version` 等于请求参数的 schema 版本，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。练卡字段的完整契约见下一节。
 
 `plan.compute` v1/v2/v3 参数的机器契约分别是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)、[`contracts/plan-compute-v2.schema.json`](../contracts/plan-compute-v2.schema.json) 与 [`contracts/plan-compute-v3.schema.json`](../contracts/plan-compute-v3.schema.json)，人类可读契约见对应的 `plan-compute-v1.md` / `plan-compute-v2.md` / `plan-compute-v3.md`。Worker 在 Serde 反序列化前执行对应 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 保持原语义，`abc_12_12_12` 通过 v2 请求使用，`options.fiammetta_enable`（默认 `true`）通过 v3 请求使用；`fiammetta_enable=false` 与 `rotation: fiammetta_8_8_4_4` 组合直接失败。
 
@@ -292,7 +292,123 @@ infra-cli layout team-rotation \
 
 在 [集成与部署验收](TODO/Worker内联JSON集成与部署验收.md) 完成且部署 inventory 证明旧调用方已退出前，不得删除该兼容入口；退役工作单独由 [Worker 旧路径协议清理](TODO/Worker旧路径协议清理.md) 跟踪。
 
-### 4.5 stderr 提示示例
+### 4.5 `training_advice`（排班附带的练卡建议）
+
+**这是新前端唯一的练卡入口。** 调用 `plan.compute` 时没有额外的 advice 参数、文件路径或第二次 CLI 调用：后端对同一份内联 `operbox` 和 `layout` 完成排班后，自动将 `result.training_advice` 一并返回。独立 `infra-cli advice`（包括 `--player`）是 legacy 诊断入口，不是前端协议，前端不得解析其 stdout 或调用它补充本响应。
+
+前端提交的输入仍是本节 `plan.compute` 请求中的 `operbox` 和 `layout`；两者均受对应请求 schema 校验。后端从 `layout` 派生以下 `context` 事实，并从实际 rotation 派生两个人均效率字段，调用方不能手工覆盖：
+
+| `context` 字段 | 来源 | 用途 |
+|---|---|---|
+| `has_originium_shard_factory` | 是否有源石碎片制造站 | 源石碎片、泡泡/火神行动建议门闩 |
+| `meeting_room_max_level` | 会客室最高等级 | 会客室条件说明 |
+| `dormitory_level_sum` | 宿舍等级总和 | 宿舍条件说明 |
+| `engineering_robot_count` | 除会客室外的设施等级和，上限 64 | 工程机器人条件说明 |
+| `trade_average_efficiency_percent` | 每班每贸易站 `trade_skill_efficiency * 100 / operator_count` 的简单平均 | T9 新手章节跳过线 |
+| `manufacturing_average_efficiency_percent` | 每班每制造站 `manufacture_skill_efficiency * 100 / operator_count` 的简单平均 | T9 新手章节跳过线 |
+
+只有贸易均效严格大于 `30` 且制造均效严格大于 `25` 时，`newbie_section_status` 为 `skipped_by_efficiency`。缺任一均效或恰好等于阈值都不跳过。`context` 内未能确定的字段会省略，绝不以 `null` 表示。
+
+#### 4.5.1 顶层 schema
+
+`result.training_advice` 始终为以下对象，`schema_version` 必须为 `2`；不兼容变更会升该版本。所有下表中标为“可省略”的字段会被省略而非输出 `null`。
+
+```json
+{
+  "schema_version": 2,
+  "context": {
+    "has_originium_shard_factory": true,
+    "meeting_room_max_level": 3,
+    "dormitory_level_sum": 20,
+    "engineering_robot_count": 64,
+    "trade_average_efficiency_percent": 31.25,
+    "manufacturing_average_efficiency_percent": 26.0
+  },
+  "newbie_section_status": "shown",
+  "incomplete_newbie": [],
+  "combinations": [],
+  "recommendations": []
+}
+```
+
+| 字段 | 类型 | 前端消费规则 |
+|---|---|---|
+| `context` | object | 本次排班和布局已经确认的事实；只展示或解释，不自行重算或覆盖。 |
+| `newbie_section_status` | `shown` \| `complete` \| `skipped_by_efficiency` | `shown` 才展示新手行动章节；其他值仍可使用 `incomplete_newbie` 做收集/完成度 UI。 |
+| `incomplete_newbie` | `NewbieProgress[]` | 全量未完成基础名单，不受 10 人行动建议上限截断。 |
+| `combinations` | `CombinationProgress[]` | 固定 17 组顺序的组合完成度；没有某组不是前端自行补齐的信号。 |
+| `recommendations` | `PlayerRecommendation[]` | 已去重、稳定排序且最多 10 人的本轮行动清单；按数组顺序展示，不按名字或 `product` 重排。 |
+
+共有嵌套类型：
+
+| 类型 | JSON 形状 |
+|---|---|
+| `TrainingState` | `{ "elite": 0..2, "level"?: integer }` |
+| `Target` | `{ "kind": "explicit" \| "no_requirement" \| "derive_from_skill_binding" \| "needs_review", "elite"?: integer, "level"?: integer }` |
+| `Acquisition` | `{ "kind": "shop" \| "public_recruitment" \| "event" \| "redeem_code" \| "integrated_strategy", "detail": string }` |
+| `Product` | `trade` \| `gold` \| `experience` \| `general_manufacturing` \| `originium_shards` |
+| `Condition` | `{ "kind": "layout" \| "facility" \| "same_station" \| "dormitory" \| "engineering_robots" \| "custom", "key": string, "value"?: JSON value, "description": string }` |
+
+#### 4.5.2 新手和组合完成度
+
+`NewbieProgress`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `operator` | string | 干员中文名。 |
+| `product` | `Product` | 基础名单所属产物桶。 |
+| `action` | `acquire` \| `train` | 未拥有为 `acquire`，已拥有未达目标为 `train`。 |
+| `current` | `TrainingState`，可省略 | 未拥有时省略。 |
+| `target` | `Target` | 目标练度或待核对目标。 |
+| `acquisition` | `Acquisition`，可省略 | 仅未拥有且知识已确认获取方式时存在。 |
+
+`CombinationProgress`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` / `name` | string | 稳定组合 ID 与展示名称。 |
+| `product` | `Product`，可省略 | 主要产物；感知信息等跨产物组可省略。 |
+| `consumer_products` | `Product[]`，可省略 | 跨产物消费端；空数组省略。 |
+| `tier` | `high_efficiency` \| `low_efficiency`，可省略 | 组合效率分层。 |
+| `scale` | `small` \| `system` | 组合尺度。 |
+| `facilities` | string[] | 目标设施。 |
+| `state` | `complete` \| `needs_training` \| `missing_core` \| `missing_important` \| `needs_review` | 本组当前完成态。 |
+| `completed_slots` / `total_slots` / `completion_percent` | integer | 已完成槽位、选定形态总槽位、向下取整完成百分比。 |
+| `missing_core` / `untrained_core` / `missing_important` / `untrained_important` | string[]，可省略 | 为空时省略；用于组内缺口展示。 |
+| `selected_alternative` | integer，可省略 | 多形态组合中被选中的 0-based 形态索引。 |
+| `members` | `CombinationMemberProgress[]` | 选定形态的成员状态。 |
+
+每个 `CombinationMemberProgress` 为 `{ operator, role, progress, owned, target_met, current?, target, counts_toward_completion }`：`role` 为 `core`、`important`、`secondary` 或 `hanger`；`progress` 为 `missing`、`owned_needs_training`、`ready` 或 `needs_review`。`current` 仅已拥有时存在。`counts_toward_completion` 说明该成员是否计入当前选定形态的完成槽位，前端不得用成员数自行替代 `completion_percent`。
+
+#### 4.5.3 最多 10 人的行动建议
+
+`PlayerRecommendation`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `operator` | string | 干员中文名；全数组去重。 |
+| `action` | `acquire` \| `train` | 本轮实际行动。 |
+| `current` | `TrainingState`，可省略 | 未拥有时省略。 |
+| `target` | `Target` | 建议目标。 |
+| `priority` | 见下表 | 稳定类别，供视觉层级或筛选使用。 |
+| `priority_rank` | integer | 后端排序键；数组已按该键和确定性次级规则排好，前端保持数组顺序。 |
+| `reason` | `newbie_required` \| `combination_core` \| `combination_important` \| `standalone` | 本条最高优先级身份。 |
+| `product` | `Product`，可省略 | 展示/筛选标签，不得据此重排。 |
+| `combination_id` / `combination_name` | string，可省略 | 建议关联组合；散件可省略。 |
+| `efficiency` | `{ value: number, unit: "order_percent" \| "production_percent", note?: string }`，可省略 | 已确认的知识事实，不是本次排班实测产出。 |
+| `conditions` | `{ condition: Condition, status: "satisfied" \| "unsatisfied" \| "unknown" }[]`，可省略 | 条件事实；空数组省略。同站条件为说明，不应从建议中移除。 |
+| `acquisition` | `Acquisition`，可省略 | 仅未拥有且已确认获取方式时存在。 |
+
+`priority` 的可能值和从高到低的类别为：`newbie_four_star_elite_one`、`flagship_newbie`、`other_newbie`、`owned_tailor`、`automation_must_train`、`small_high_efficiency_core`、`small_high_efficiency_important`、`system_single_core_gap`、`other_important`、`lower_priority_core`、`high_efficiency_standalone`。前端只渲染后端给出的建议：无源石碎片制造站时源石碎片、泡泡和火神不在数组中；泡泡/火神均未达标且有源石线时两人作为原子对出现，名额不足两人时整对不出现。
+
+#### 4.5.4 成功、失败与实现边界
+
+- `plan.compute` 成功时 `ok: true`，读取 `result.training_advice`；失败时 `ok: false`、`error.code: "PLAN_FAILED"`、`error.stage: "plan.compute"`，没有部分练卡结果可用。
+- 新手章节跳过不等于基础名单完成：`skipped_by_efficiency` 时仍保留全量 `incomplete_newbie`，只是其中条目不以新手理由占用 `recommendations` 的最多 10 人名额。
+- `recommendations` 是行动待办；`combinations` 是全量组合状态。不要从前者反推后者，也不要把灰色组合缺口计入 10 人限制。
+- 前端不得把旧 `training_recommendations.json`、legacy `advice` 的 `now`/`conditional` 输出或自然语言 `--answer` 混入本 schema。
+
+### 4.6 stderr 提示示例
 
 ```
 MAA 排班 JSON 已写入: out/243_maa.json

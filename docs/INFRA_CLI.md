@@ -41,7 +41,7 @@ crates/infra-cli/src/
 ├── main.rs              # 进程入口 + 子命令路由（其余子命令暂留此处，见「待拆」）
 ├── commands/
 │   ├── mod.rs           # 子命令模块聚合；对外 re-export
-│   ├── advice.rs        # `advice`：练卡推荐（玩家合同见 docs/练卡推荐相关/；运行时仍多 v2 JSON）
+│   ├── advice.rs        # `advice`：legacy 练卡诊断；前端练卡由 `serve plan.compute` 随排班返回
 │   ├── bake.rs          # `bake`：生成贸易/制造 3/2/1 人单房候选索引表（运行时验证后优先读取）
 │   ├── debug.rs         # `debug rerun`：从生产 bundle 对当前运行时做可追溯重跑
 │   ├── plan.rs          # `plan`：box profile + αβγ 排班 + MAA
@@ -74,7 +74,7 @@ crates/infra-cli/src/
 
 | 模块 | 职责 | 不负责 |
 |------|------|--------|
-| `advice.rs` | **`advice`**：operbox +（当前）v2 规则；默认 JSON，`--answer` 旧五分区中文，`--explain` 伪 RAG | **玩家语义真源** [练卡推荐相关](练卡推荐相关/README.md)；旧 v2 合同已归档；自由生成文案；solver 候选池 |
+| `advice.rs` | **`advice`**：legacy 独立诊断。默认/`--explain`/`--answer` 消费旧 v2 规则；`--player` 可输出玩家 schema 用于本地诊断，但不属于前端协议 | 前端产品调用；前端必须从 `serve plan.compute.result.training_advice` 消费同一轮排班结果，完整 wire 合同见 [FRONTEND_CLI.md](FRONTEND_CLI.md) §4.5 |
 | `bake.rs` | `bake`：并行生成 schema v12 的整数效率 `combo_table.bin`、`operators.json`、`manifest.json`；贸易行显式保存首批 room-local 机制签名，manifest 保存 table hash/count；`bake validate` 校验当前 CLI 指纹和完整贸易 row universe | 贸易/制造效率公式；手写搜索排序 |
 | `debug.rs` | `debug rerun`：读取 legacy `method=plan` 生产 bundle 的内联快照，以当前 CLI / data 重跑正式 rotation，输出稳定 assignment 投影、原结果对照和运行时指纹 | 冒充线上 bit-identical replay；执行 bundle 中的路径/命令；修改求解或候选 |
 | `plan_compute.rs` | `plan` 与 `serve` 共用的唯一 Plan 编排：一次 user rotation，再按调用方请求派生 profile/MAA | argv、文件写出、wire envelope、机制公式 |
