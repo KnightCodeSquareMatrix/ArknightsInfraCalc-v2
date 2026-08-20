@@ -104,8 +104,8 @@
       "id":"human_fireworks","name":"人间烟火组","product":"trade","tier":"high_efficiency","scale":"system","facilities":["trade_station","control_center","office"],
       "members":[
         {"operator":"乌有","role":"core","target":{"kind":"explicit","elite":2}},
-        {"operator":"重岳","role":"important","target":{"kind":"explicit","elite":2}},
-        {"operator":"令","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"重岳","role":"core","target":{"kind":"explicit","elite":2}},
+        {"operator":"令","role":"core","target":{"kind":"explicit","elite":2}},
         {"operator":"桑葚","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"琴柳","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"夕","role":"secondary","target":{"kind":"explicit","elite":0}},
@@ -165,6 +165,11 @@
         {"operator":"帕拉斯","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"刻俄柏","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"圣约送葬人","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"娜仁图亚","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"豆苗","role":"secondary","target":{"kind":"explicit","elite":1}},
+        {"operator":"裁度","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"洋灰","role":"secondary","target":{"kind":"explicit","elite":2}},
+        {"operator":"钼铅","role":"secondary","target":{"kind":"explicit","elite":2}},
         {"operator":"黑角","role":"secondary","target":{"kind":"no_requirement"}},
         {"operator":"蛇屠箱","role":"secondary","target":{"kind":"no_requirement"}}
       ],
@@ -188,10 +193,10 @@
       "id":"abyssal_hunters","name":"深海猎人组","product":"general_manufacturing","tier":"high_efficiency","scale":"system","facilities":["manufacturing_station","control_center"],
       "members":[
         {"operator":"歌蕾蒂娅","role":"core","target":{"kind":"explicit","elite":2}},
-        {"operator":"乌尔比安","role":"important","target":{"kind":"no_requirement"}},
-        {"operator":"斯卡蒂","role":"important","target":{"kind":"no_requirement"}},
-        {"operator":"幽灵鲨","role":"important","target":{"kind":"no_requirement"}},
-        {"operator":"安哲拉","role":"important","target":{"kind":"no_requirement"}}
+        {"operator":"乌尔比安","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"斯卡蒂","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"幽灵鲨","role":"important","target":{"kind":"explicit","elite":0}},
+        {"operator":"安哲拉","role":"important","target":{"kind":"explicit","elite":0}}
       ],
       "completion":{"required":["歌蕾蒂娅","乌尔比安","斯卡蒂","幽灵鲨","安哲拉"]}
     },

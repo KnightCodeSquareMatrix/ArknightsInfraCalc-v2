@@ -712,6 +712,12 @@ fn dynamic_producer_candidates(
         .collect();
     let mut producers = Vec::new();
     for entry in &control_pool.entries {
+        if crate::response_dependency::control_buff_is_automatically_excluded(
+            table,
+            entry.buff_ids.iter().map(String::as_str),
+        )? {
+            continue;
+        }
         let trade_match = control_entry_deferred_trade_tags(entry, table)?
             .iter()
             .any(|tag| trade_tags.contains(tag.as_str()));
@@ -1271,7 +1277,7 @@ mod tests {
     }
 
     #[test]
-    fn threshold_trade_producer_competes_through_the_same_rule_path() {
+    fn threshold_trade_consumer_does_not_reintroduce_excluded_control_producer() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let operbox = OperBox::from_entries(
@@ -1315,7 +1321,7 @@ mod tests {
             &seed,
             &AssignmentPlan::recovery(AssignShiftMode::Peak),
         );
-        assert!(assignment
+        assert!(!assignment
             .control_operators()
             .iter()
             .any(|operator| operator.name == "凛御银灰"));
@@ -1325,8 +1331,7 @@ mod tests {
             .map(|operator| operator.name.as_str())
             .collect();
         assert_eq!(trade, HashSet::from(["银灰", "崖心", "讯使"]));
-        assert_eq!(dependencies.len(), 1);
-        assert_eq!(dependencies[0].rule_id, "trade_karlan_station");
+        assert!(dependencies.is_empty());
     }
 
     #[test]

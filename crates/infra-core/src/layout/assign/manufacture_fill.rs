@@ -166,6 +166,8 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
             operators,
             Some(crate::layout::RoomEfficiencySnapshot {
                 manufacture_final_efficiency: solved.final_efficiency,
+                manufacture_occupancy_efficiency: solved.occupancy_efficiency,
+                manufacture_global_efficiency: solved.global_efficiency,
                 manufacture_skill_efficiency: solved.skill_efficiency,
                 manufacture_storage_limit: solved.storage_limit,
                 ..Default::default()

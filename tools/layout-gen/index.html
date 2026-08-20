@@ -277,6 +277,10 @@
       return `${kind}:${index}`;
     }
 
+    function defaultDormAmbience(index) {
+      return state.counts.power === 2 ? (index === 0 ? 2 : 1) : 5;
+    }
+
     function ensureRooms() {
       const kinds = [
         ["trading", state.counts.trading],
@@ -304,7 +308,7 @@
             room.factoryRecipe = defaultFactoryProduct(i, count);
           } else if (kind === "dormitory") {
             room.dormBeds = 5;
-            room.dormAmbienceLevel = 5;
+            room.dormAmbienceLevel = defaultDormAmbience(i);
           }
           next[key] = room;
         }
@@ -317,6 +321,7 @@
       state.counts.trading = preset.trading;
       state.counts.manufacture = preset.manufacture;
       state.counts.power = preset.power;
+      state.rooms = {};
       document.getElementById("template").value = preset.label;
       ensureRooms();
       render();

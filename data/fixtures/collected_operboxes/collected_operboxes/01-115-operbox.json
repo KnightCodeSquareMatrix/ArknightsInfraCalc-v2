@@ -1,0 +1,1037 @@
+[
+  {
+    "id": "char_002_amiya",
+    "name": "阿米娅",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_003_kalts",
+    "name": "凯尔希",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_009_12fce",
+    "name": "12F",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 2
+  },
+  {
+    "id": "char_1011_lava2",
+    "name": "炎狱炎熔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_102_texas",
+    "name": "德克萨斯",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_1036_fang2",
+    "name": "历阵锐枪芬",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_1042_phatm2",
+    "name": "酒神",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_1045_svash2",
+    "name": "凛御银灰",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_1047_halo2",
+    "name": "溯光星源",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "char_1049_catap2",
+    "name": "雷狼龙S空爆",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_1052_kalts2",
+    "name": "凯尔希·思衡托",
+    "elite": 2,
+    "level": 12,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_106_franka",
+    "name": "芙兰卡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_108_silent",
+    "name": "赫默",
+    "elite": 1,
+    "level": 35,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_109_fmout",
+    "name": "远山",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_117_myrrh",
+    "name": "末药",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_118_yuki",
+    "name": "白雪",
+    "elite": 0,
+    "level": 28,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_120_hibisc",
+    "name": "芙蓉",
+    "elite": 1,
+    "level": 15,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_121_lava",
+    "name": "炎熔",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_122_beagle",
+    "name": "米格鲁",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_123_fang",
+    "name": "芬",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_124_kroos",
+    "name": "克洛丝",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_128_plosis",
+    "name": "白面鸮",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_129_bluep",
+    "name": "蓝毒",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_131_flameb",
+    "name": "炎客",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_140_whitew",
+    "name": "拉普兰德",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_141_nights",
+    "name": "夜烟",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_1502_crosly",
+    "name": "弑君者",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 5,
+    "rarity": 6
+  },
+  {
+    "id": "char_150_snakek",
+    "name": "蛇屠箱",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 5,
+    "rarity": 4
+  },
+  {
+    "id": "char_151_myrtle",
+    "name": "桃金娘",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_154_morgan",
+    "name": "摩根",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "char_155_tiger",
+    "name": "因陀罗",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_157_dagda",
+    "name": "达格达",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "char_172_svrash",
+    "name": "银灰",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_181_flower",
+    "name": "调香师",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_183_skgoat",
+    "name": "地灵",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_187_ccheal",
+    "name": "嘉维尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_194_leto",
+    "name": "烈夏",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_196_sunbr",
+    "name": "古米",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_198_blackd",
+    "name": "讯使",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_2027_wang",
+    "name": "望",
+    "elite": 2,
+    "level": 90,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "char_202_demkni",
+    "name": "塞雷娅",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_209_ardign",
+    "name": "卡缇",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_211_adnach",
+    "name": "安德切尔",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_212_ansel",
+    "name": "安赛尔",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_213_mostma",
+    "name": "莫斯提马",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_219_meteo",
+    "name": "陨星",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_220_grani",
+    "name": "格拉尼",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_222_bpipe",
+    "name": "风笛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_230_savage",
+    "name": "暴行",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_235_jesica",
+    "name": "杰西卡",
+    "elite": 0,
+    "level": 10,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_236_rope",
+    "name": "暗索",
+    "elite": 1,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_237_gravel",
+    "name": "砾",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_248_mgllan",
+    "name": "麦哲伦",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_250_phatom",
+    "name": "傀影",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_253_greyy",
+    "name": "格雷伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_258_podego",
+    "name": "波登可",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_277_sqrrel",
+    "name": "阿消",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_278_orchid",
+    "name": "梓兰",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_281_popka",
+    "name": "泡普卡",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_282_catap",
+    "name": "空爆",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_283_midn",
+    "name": "月见夜",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_284_spot",
+    "name": "斑点",
+    "elite": 1,
+    "level": 55,
+    "own": true,
+    "potential": 6,
+    "rarity": 3
+  },
+  {
+    "id": "char_285_medic2",
+    "name": "Lancet-2",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 1
+  },
+  {
+    "id": "char_293_thorns",
+    "name": "棘刺",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_297_hamoni",
+    "name": "和弦",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_298_susuro",
+    "name": "苏苏洛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_328_cammou",
+    "name": "卡达",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_344_beewax",
+    "name": "蜜蜡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_350_surtr",
+    "name": "史尔特尔",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_358_lisa",
+    "name": "铃兰",
+    "elite": 1,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_366_acdrop",
+    "name": "酸糖",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_373_lionhd",
+    "name": "莱恩哈特",
+    "elite": 0,
+    "level": 50,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_385_finlpp",
+    "name": "清流",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_4014_lunacu",
+    "name": "子月",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4025_aprot2",
+    "name": "暮落",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_4041_chnut",
+    "name": "褐果",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_4042_lumen",
+    "name": "流明",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "char_4046_ebnhlz",
+    "name": "黑键",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_4052_surfer",
+    "name": "寻澜",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4062_totter",
+    "name": "铅踝",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_4071_peper",
+    "name": "明椒",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4083_chimes",
+    "name": "铎铃",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4119_wanqin",
+    "name": "万顷",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_411_tomimi",
+    "name": "特米米",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_4133_logos",
+    "name": "逻各斯",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_4137_udflow",
+    "name": "深巡",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_4145_ulpia",
+    "name": "乌尔比安",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_4148_philae",
+    "name": "菲莱",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4163_rosesa",
+    "name": "瑰盐",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4164_tecno",
+    "name": "特克诺",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "char_4166_varkis",
+    "name": "摆渡人",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4177_brigid",
+    "name": "水灯心",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "char_4179_monstr",
+    "name": "Mon3tr",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 2,
+    "rarity": 6
+  },
+  {
+    "id": "char_4194_rmixer",
+    "name": "信仰搅拌机",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 6
+  },
+  {
+    "id": "char_4195_radian",
+    "name": "电弧",
+    "elite": 1,
+    "level": 80,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "char_4207_branch",
+    "name": "折桠",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_4211_snhunt",
+    "name": "雪猎",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 4,
+    "rarity": 5
+  },
+  {
+    "id": "char_4221_ju",
+    "name": "矩",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_4222_taraxa",
+    "name": "风絮",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_4225_tanya",
+    "name": "裂响",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "char_4226_veen",
+    "name": "维伊",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "char_440_pinecn",
+    "name": "松果",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_446_aroma",
+    "name": "阿罗玛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_449_glider",
+    "name": "蜜莓",
+    "elite": 1,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_450_necras",
+    "name": "死芒",
+    "elite": 2,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 6
+  },
+  {
+    "id": "char_464_cement",
+    "name": "洋灰",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 3,
+    "rarity": 5
+  },
+  {
+    "id": "char_469_indigo",
+    "name": "深靛",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 6,
+    "rarity": 4
+  },
+  {
+    "id": "char_473_mberry",
+    "name": "桑葚",
+    "elite": 1,
+    "level": 70,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_474_glady",
+    "name": "歌蕾蒂娅",
+    "elite": 2,
+    "level": 60,
+    "own": true,
+    "potential": 6,
+    "rarity": 6
+  },
+  {
+    "id": "char_488_buildr",
+    "name": "青枳",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
+    "rarity": 5
+  },
+  {
+    "id": "char_491_humus",
+    "name": "休谟斯",
+    "elite": 0,
+    "level": 45,
+    "own": true,
+    "potential": 5,
+    "rarity": 4
+  },
+  {
+    "id": "char_494_vendla",
+    "name": "刺玫",
+    "elite": 0,
+    "level": 1,
+    "own": true,
+    "potential": 2,
+    "rarity": 5
+  },
+  {
+    "id": "char_500_noirc",
+    "name": "黑角",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 2,
+    "rarity": 2
+  },
+  {
+    "id": "char_501_durin",
+    "name": "杜林",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 2
+  },
+  {
+    "id": "char_502_nblade",
+    "name": "夜刀",
+    "elite": 0,
+    "level": 30,
+    "own": true,
+    "potential": 1,
+    "rarity": 2
+  }
+]

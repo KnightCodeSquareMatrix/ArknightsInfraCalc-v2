@@ -37,7 +37,7 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 | 核心 API | `schedule_team_rotation` |
 | 班次结构 | 12h + 6h + 6h；每班 **两队上岗、一队休息** |
 | 生产设施 | 切成 H1/H2 两半；α/β 来自 peak 切半，γ 替补 |
-| 中枢 / 宿舍 / 办公室 | 办公室按 αβγ cohort 轮换，尽量满编；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
+| 中枢 / 宿舍 / 办公室 | `12/6/6` 中办公室按 S1 与 S2+S3 两个连续 12h 段轮换，普通成员在 S2/S3 保持同一房间和成员，是唯一允许跨 cohort 复用的例外；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
 | 设施空转 | 生产/中枢 **禁止**（每班满编）；办公室/会客室候选不足可空置，但必须经报告级 `warnings` 显式提示缺额 |
 
 用户说「跑一遍模拟」「三班模拟」时，Agent 默认用 **`plan`** + `--maa-out`（账号分析 + αβγ 排班）；只有用户明确要求“仅排班”时才用 **`layout team-rotation`**。见 [INFRA_CLI.md](INFRA_CLI.md)。
@@ -108,7 +108,7 @@ S2 有深海短班特例：运行时按稳定 control buff capability 找 produc
 
 243 双贸中，贸易站不再依赖 `blackkey_closure` / `witch_long_beta` fixed registry 早占房。peak 与 γ 替补都走同一条 role 顺序：
 
-八幡海铃、戴菲恩、凛御银灰由同一次 producer presence 枚举自然入选，并由 winner 的实际 consumer 派生 resolved dependency；不存在 `meta_vina` role。房内完整响应行 join 仍见 [A+ 实施 TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
+八幡海铃、戴菲恩由同一次 producer presence 枚举自然入选，并由 winner 的实际 consumer 派生 resolved dependency；凛御银灰 producer rule 仅保留 consumer 阈值事实，自动中枢 admission 排除；不存在 `meta_vina` role。房内完整响应行 join 仍见 [A+ 实施 TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
 最新 canonical 是：多贸龙门币默认但书 > 可露希尔 > 完整龙巫；Rosemary/黑键 alternative 激活时，
 Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 γ reserve。下面编号记录当前
@@ -155,7 +155,7 @@ Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交�
 | `human_fireworks_*` | 乌有、实际入选的重岳/令；纯分支另含桑葚 | 同队、上 2 休 1；桑葚休息班办公室合法补位 | `AssignmentPlan` + `team_rotation.rs` |
 | `producer:*` | 规则实际 producer + 实际贡献 consumer | `exact_presence` / `requires_presence` / `none`；仅有效贡献存在时派生 | `AssignmentPlan.resolved_producer_dependencies` |
 
-八幡海铃绑定所有实际叙拉古贸易 consumer；戴菲恩绑定各房实际格拉斯哥 consumer；凛御银灰只绑定达到三人阈值房内的谢拉格 consumer。三者均同队、上 2 休 1，但不同贸易站不要求同房；涤火杰西卡关系为 `none`。未入选或未贡献者不绑定，schedule 不按名字或 tag 重推 producer。
+八幡海铃绑定所有实际叙拉古贸易 consumer；戴菲恩绑定各房实际格拉斯哥 consumer；凛御银灰不生成自动 producer bind。不同贸易站不要求同房；涤火杰西卡关系为 `none`。未入选或未贡献者不绑定，schedule 不按名字或 tag 重推 producer。
 
 **对齐**：若 peak 编制下绑定组成员落在不同 H1/H2 半区，`align_shift_binds_in_halves` 交换同类设施房间，使二者进入同一 cohort（α 或 β）。
 

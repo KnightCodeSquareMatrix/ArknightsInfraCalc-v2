@@ -83,6 +83,10 @@ pub struct RoomEfficiencySnapshot {
     /// 完整纸面效率，包含基础 100%、人头、技能与中枢。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_paper_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_occupancy_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_control_efficiency: Efficiency,
     /// 社区加强单位产出相对三级普通贸易站的倍率。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_unit_output_multiplier: Efficiency,
@@ -101,6 +105,10 @@ pub struct RoomEfficiencySnapshot {
     pub trade_mechanic_equivalent_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_final_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub manufacture_occupancy_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub manufacture_global_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_skill_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_i32")]

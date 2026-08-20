@@ -162,7 +162,7 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 来源：`MECHANICS_REGISTRY.csv` 中「当与 X 在同一个贸易站」+ 公孙工具人表。
 `base_systems.json` 保留跨站体系和历史同站锚点；当前 `assign_shift` 主路径会跳过 `witch_long_beta`、`blackkey_closure`、企鹅、推王等低优先 registry 抢站条目，贸易余站改由 `data/trade_segments.json` 的 `roles` 执行核心优先。
 
-> **当前实现（2026-07-19）**：`meta_vina`、`vina_lungmen` 选型和按 producer 分别重跑的前缀已删除。八幡海铃、戴菲恩、凛御银灰和涤火杰西卡由 `producer_rules.json` 登记，并在同一次 producer presence 子集枚举中比较完整生产前缀。房内完整响应行 joint/Bake 仍由 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 继续跟踪。
+> **当前实现（2026-08-19）**：`meta_vina`、`vina_lungmen` 选型和按 producer 分别重跑的前缀已删除。八幡海铃、戴菲恩和涤火杰西卡由 `producer_rules.json` 登记，并在同一次 producer presence 子集枚举中比较完整生产前缀；凛御银灰规则仅保留 consumer 阈值事实，自动中枢 admission 为 `excluded_automatic`。房内完整响应行 joint/Bake 仍由 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 继续跟踪。
 
 #### 已落地的数据与运行时归属
 
@@ -189,7 +189,7 @@ peak 固定为但书 A + 可露希尔/黑键 B，并让完整龙巫进入 γ res
 黑键同房和 reserve 约束，但不改变默认 `docus → closure → witch` 顺序，也不能由已经填出的
 房间反推体系激活。
 
-这条顺序表达独立 core / fallback 策略，不是任意固定三人组优先级。八幡海铃、戴菲恩、凛御银灰都只作为可选中枢 producer；叙拉古、格拉斯哥、谢拉格 consumer 的实际组合由合法候选和 solver 决定。伺夜与贝洛内不要求同站，八幡与单个贸易消费者的极端组合同样合法。
+这条顺序表达独立 core / fallback 策略，不是任意固定三人组优先级。八幡海铃、戴菲恩作为可选中枢 producer；凛御银灰不参与自动中枢 admission，叙拉古、格拉斯哥、谢拉格 consumer 的实际组合仍由合法候选和 solver 决定。伺夜与贝洛内不要求同站，八幡与单个贸易消费者的极端组合同样合法。
 
 #### Phase 2 待建（贸易 bond）
 

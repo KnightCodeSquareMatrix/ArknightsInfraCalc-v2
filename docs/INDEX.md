@@ -63,7 +63,7 @@
 | 设施与单班编制 | [制造站](MANUFACTURE_STATUS.md)、[控制中枢](CONTROL_CENTER_ASSIGNMENT.md)、[全基建编制](BASE_ASSIGNMENT.md)、[编排层](ORCHESTRATION_LAYER.md) |
 | 跨设施与成套体系 | [体系导航](SYSTEM_CHAINS.md) 及其中链接的各体系 canonical |
 | 排班与换班 | [排班模式](排班模式.md)、[定时换班](定时换班.md)、[菲亚梅塔](Fiammetta.md) |
-| 对外接口 | [infra-cli](INFRA_CLI.md)、[前端接口](FRONTEND_CLI.md) |
+| 对外接口 | [infra-cli](INFRA_CLI.md)、[前端接口](FRONTEND_CLI.md)、[前端效率字段迁移说明](前端效率字段迁移说明.md) |
 | 练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) |
 
 ### 完整 canonical owner 表

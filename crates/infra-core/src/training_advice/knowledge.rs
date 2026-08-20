@@ -648,6 +648,59 @@ mod tests {
     }
 
     #[test]
+    fn default_knowledge_contains_reviewed_combination_adjustments() {
+        let knowledge =
+            load_training_advice_knowledge(&default_training_advice_knowledge_path().unwrap())
+                .unwrap();
+        let combination = |id| {
+            knowledge
+                .combinations
+                .iter()
+                .find(|entry| entry.id == id)
+                .unwrap()
+        };
+
+        let vermeil = combination("vermeil");
+        for (operator, elite) in [
+            ("娜仁图亚", 2),
+            ("豆苗", 1),
+            ("裁度", 2),
+            ("洋灰", 2),
+            ("钼铅", 2),
+        ] {
+            let member = vermeil
+                .members
+                .iter()
+                .find(|member| member.operator == operator)
+                .unwrap();
+            assert_eq!(member.role, KnowledgeRole::Secondary);
+            assert_eq!(member.target.elite, Some(elite));
+            assert!(!vermeil.completion.required.contains(&operator.to_string()));
+        }
+
+        let fireworks = combination("human_fireworks");
+        for operator in ["重岳", "令"] {
+            let member = fireworks
+                .members
+                .iter()
+                .find(|member| member.operator == operator)
+                .unwrap();
+            assert_eq!(member.role, KnowledgeRole::Core);
+        }
+
+        let abyssal = combination("abyssal_hunters");
+        for operator in ["乌尔比安", "斯卡蒂", "幽灵鲨", "安哲拉"] {
+            let member = abyssal
+                .members
+                .iter()
+                .find(|member| member.operator == operator)
+                .unwrap();
+            assert_eq!(member.target.kind, TargetKind::Explicit);
+            assert_eq!(member.target.elite, Some(0));
+        }
+    }
+
+    #[test]
     fn explicit_targets_require_a_valid_elite() {
         let mut target = KnowledgeTarget {
             kind: TargetKind::Explicit,

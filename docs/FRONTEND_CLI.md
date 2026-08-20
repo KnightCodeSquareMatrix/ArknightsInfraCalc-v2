@@ -212,6 +212,12 @@ infra-cli plan \
 | `flags[]` | string[] | 机器可读状态标记 |
 | `narration_hints[]` | string[] | 面向用户的补充说明 |
 
+`rotation.shifts[].efficiencies.room_lines[]` 的统一效率字段由后端直接结算：
+`operator_efficiency`（白字）、`station_efficiency`（绿字）、`total_efficiency`（倍率前总效率）、
+`order_multiplier`、`final_efficiency`（倍率后实际效率）和 `equivalent_efficiency`（蓝字）。
+前端不得根据旧的 `*_skill_efficiency` 或房间人数自行重算产出；排班和无人机执行结果必须消费后端结算值。
+完整迁移步骤、缺省字段处理和验收清单见[前端效率字段迁移说明](前端效率字段迁移说明.md)。
+
 ### 4.2 `layout team-rotation`（仅排班 + MAA）
 
 ```bash

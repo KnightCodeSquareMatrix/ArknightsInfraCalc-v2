@@ -67,9 +67,9 @@ winner 只输出最终结算中仍然有效的 producer 贡献及其最小充分
 
 Mujica 不设“未满五人即非法”的原子启用门禁。其完整五人组合通常会因实际效率更高而由搜索自然选出；成员不足时仍按各自已建模的实际收益参与搜索，不使用人工固定赋值强制整队。
 
-### 三类可选动态贸易 producer
+### 动态贸易 producer
 
-凛御银灰、戴菲恩、八幡海铃服从同一套选型生命周期：都不是 fixed System 或 required anchor；中枢组合与全部实际贸易房候选联合求值后，才决定是否入选。无实际消费者时动态收益为 0，不因账号持有、tag 存在或固定套餐而强制进编。
+戴菲恩、八幡海铃服从可选动态 producer 生命周期：中枢组合与全部实际贸易房候选联合求值后，才决定是否入选。凛御银灰的 producer rule 保留用于识别银灰 consumer 阈值，但属于自动中枢排除项，不进入 producer presence、普通 filler 或轮换 fallback。无实际消费者时不得生成凛御银灰动态依赖。
 
 设 `n_s(r)`、`n_g(r)`、`n_k(r)` 为贸易房 `r` 中实际上岗的叙拉古、格拉斯哥、谢拉格人数：
 
@@ -77,7 +77,7 @@ Mujica 不设“未满五人即非法”的原子启用门禁。其完整五人�
 |----------|-----------|----------------------------------|
 | 八幡海铃 | E2 | `5 × Σq n_s(q)`；跨所有贸易站统计叙拉古总人数 |
 | 戴菲恩 | E2 | `10 × n_g(r)`；**只统计当前贸易房**，不同房间不得先求总和 |
-| 凛御银灰 | E0 起 | `10 × Σq I[n_k(q) ≥ 3]`；逐站判断至少 3 名谢拉格，再统计达标站数 |
+| 凛御银灰 | E0 起 | 仅作为保留的 consumer 阈值事实；自动中枢 admission 为 excluded |
 
 凛御银灰的「商业版图」与灵知的「精密计算」/ 孑形态完全独立，不得共享 producer bit、pool variant 或轮换特判。格拉斯哥组合可因实际 `final_efficiency` 自然胜出或落败；戴菲恩不能激活固定 `meta_vina` 优先站。
 
@@ -94,7 +94,7 @@ winner 只为实际贡献者派生同上同下关系：八幡海铃绑定实际�
 - `data/producer_rules.json` 以稳定 `source_buff_id` 登记 admission、目标设施与排班关系，并与其他 solver runtime 数据一起嵌入独立二进制；加载时会与 `skill_table` 的全部动态 workforce 注入做覆盖校验，漏登记或错登记直接报错。
 - Peak 把拥有实际 consumer tag 的 deferred producer 作为一个 presence set 做幂集枚举；每个子集从相同 seed 求精确中枢组合，候选重跑 `producer/dorm → power → trade → manufacture → resolve`。公开默认由具名 `ControlInjectRawSumV0` 比较；shadow 候选会刷新每个完整候选的贸易/制造快照后改用 `TradeManufactureWeightedEfficiencyV1`。人数不足只淘汰当前子集，真实 resolve 错误继续向上传播。
 - `must_include` producer 在组合生成前锁定，只枚举剩余中枢席位。每个 presence set 先以目标设施满席命中的正收益上界排序；只有上界严格低于当前真实 winner 才剪枝，平局不剪。若 active control buff 读取尚未完成的发电/贸易/基建 presence，上界为无穷并自动退回完整 live 前缀比较。
-- 八幡海铃、戴菲恩、凛御银灰使用同一贸易响应规则路径；涤火杰西卡使用同一制造响应规则路径。戴菲恩按实际贸易房逐房统计，凛御银灰按实际达标房统计，涤火杰西卡按实际制造 workforce 统计。
+- 八幡海铃、戴菲恩使用同一贸易响应规则路径；凛御银灰规则只保留 consumer 阈值和数据覆盖识别，不参与自动 producer admission；涤火杰西卡使用同一制造响应规则路径。
 - winner 的 `resolved_producer_dependencies` 记录 rule、source buff、实际 producer、实际 consumer、目标房、关系和有效贡献；hard Plan relation 也先规范化为同一结构，`shift_binds` 和 αβγ 只消费这些 resolved facts。
 - `vina_lungmen` fixed System、`meta_vina` role、按名字推断八幡/戴菲恩/灵知的 rotation 路径已删除；`gsl_vina_lungmen` 仅保留实际同房组合结算。
 - 涤火杰西卡关系为 `none`：每班按实际黑钢 workforce 重算，不与水月、香草、杰西卡或标准化组合固定 team / `shift_bind`。

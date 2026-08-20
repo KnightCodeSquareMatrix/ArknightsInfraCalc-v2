@@ -656,10 +656,7 @@ fn build_recommendations(
             ) {
                 continue;
             }
-            if member.role == KnowledgeRole::Core
-                && member.progress == MemberProgress::Missing
-                && (!important_side_owned || core_gaps > 2)
-            {
+            if member.role == KnowledgeRole::Core && (!important_side_owned || core_gaps > 2) {
                 continue;
             }
             let tailor = is_tailor(entry, &member.operator);
@@ -1221,6 +1218,10 @@ mod tests {
                 ("八幡海铃", 2, 1, 6),
                 ("贝洛内", 0, 1, 5),
                 ("乌有", 0, 5, 6),
+                ("重岳", 2, 1, 6),
+                ("令", 2, 1, 6),
+                ("桑葚", 2, 1, 5),
+                ("琴柳", 2, 1, 5),
             ]),
             &knowledge,
             &PlayerAdviceContext::default(),
@@ -1544,7 +1545,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_untrained_core_takes_state_precedence_over_missing_important() {
+    fn owned_untrained_core_requires_the_important_side_to_be_owned() {
         let mut knowledge = load_knowledge();
         knowledge.newbie.clear();
         knowledge
@@ -1564,7 +1565,45 @@ mod tests {
         assert!(report
             .recommendations
             .iter()
+            .all(|item| item.operator != "伺夜"));
+
+        let important_owned = build_player_training_advice(
+            &operbox(&[
+                ("伺夜", 0, 1, 6),
+                ("八幡海铃", 2, 1, 6),
+                ("贝洛内", 2, 1, 5),
+            ]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+        assert!(important_owned
+            .recommendations
+            .iter()
             .any(|item| { item.operator == "伺夜" && item.action == PlayerAction::Train }));
+    }
+
+    #[test]
+    fn human_fireworks_and_perception_untrained_cores_do_not_bypass_c2() {
+        let mut knowledge = load_knowledge();
+        knowledge.newbie.clear();
+        knowledge.combinations.retain(|entry| {
+            matches!(
+                entry.id.as_str(),
+                "human_fireworks" | "perception_information"
+            )
+        });
+        knowledge.standalone.clear();
+
+        let report = build_player_training_advice(
+            &operbox(&[("乌有", 0, 1, 5), ("黑键", 0, 1, 6)]),
+            &knowledge,
+            &PlayerAdviceContext::default(),
+        );
+
+        assert!(report
+            .recommendations
+            .iter()
+            .all(|item| { !matches!(item.operator.as_str(), "乌有" | "黑键") }));
     }
 
     #[test]
