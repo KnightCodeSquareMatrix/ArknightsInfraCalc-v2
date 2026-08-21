@@ -129,6 +129,20 @@ impl RoomEfficiencySnapshot {
     pub fn is_power(&self) -> bool {
         !self.power_final_efficiency.is_zero()
     }
+
+    /// New room projections may reuse only snapshots carrying their direct
+    /// station components. Older assignments are recalculated by the solver.
+    pub fn has_trade_breakdown(&self) -> bool {
+        !self.trade_paper_efficiency.is_zero()
+            && !self.trade_occupancy_efficiency.is_zero()
+            && !self.trade_final_efficiency.is_zero()
+            && !self.trade_unit_output_multiplier.is_zero()
+    }
+
+    pub fn has_manufacture_breakdown(&self) -> bool {
+        !self.manufacture_final_efficiency.is_zero()
+            && !self.manufacture_occupancy_efficiency.is_zero()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

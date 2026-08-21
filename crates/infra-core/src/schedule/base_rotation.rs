@@ -130,7 +130,10 @@ pub fn evaluate_base_assignment_efficiencies(
             order_multiplier: Efficiency::ONE,
             ..RoomEfficiencyLine::default()
         };
-        if let Some(snapshot) = assignment.efficiency_in(&room.id).filter(|s| s.is_trade()) {
+        if let Some(snapshot) = assignment
+            .efficiency_in(&room.id)
+            .filter(|s| s.has_trade_breakdown())
+        {
             trade_efficiency += snapshot.trade_final_efficiency;
             line.trade_efficiency = snapshot.trade_final_efficiency;
             line.trade_skill_efficiency = snapshot.trade_skill_efficiency;
@@ -140,18 +143,7 @@ pub fn evaluate_base_assignment_efficiencies(
             } else {
                 snapshot.trade_unit_output_multiplier
             };
-            line.total_efficiency = if snapshot.trade_paper_efficiency.is_zero()
-                && !snapshot.trade_unit_output_multiplier.is_zero()
-            {
-                snapshot.trade_final_efficiency.scale_ratio(
-                    i64::from(Efficiency::SCALE),
-                    i64::from(snapshot.trade_unit_output_multiplier.millis()),
-                )
-            } else if snapshot.trade_paper_efficiency.is_zero() {
-                snapshot.trade_final_efficiency
-            } else {
-                snapshot.trade_paper_efficiency
-            };
+            line.total_efficiency = snapshot.trade_paper_efficiency;
             line.final_efficiency = snapshot.trade_final_efficiency;
             line.station_efficiency = if snapshot.trade_occupancy_efficiency.is_zero()
                 && snapshot.trade_control_efficiency.is_zero()
@@ -199,7 +191,7 @@ pub fn evaluate_base_assignment_efficiencies(
         };
         if let Some(snapshot) = assignment
             .efficiency_in(&room.id)
-            .filter(|s| s.is_manufacture())
+            .filter(|s| s.has_manufacture_breakdown())
         {
             manufacture_efficiency += snapshot.manufacture_final_efficiency;
             line.manufacture_efficiency = snapshot.manufacture_final_efficiency;
@@ -294,7 +286,7 @@ mod tests {
     use crate::instances::default_instances_path;
 
     #[test]
-    fn evaluate_base_assignment_uses_room_efficiency_snapshot() {
+    fn evaluate_base_assignment_recalculates_incomplete_snapshot() {
         let (blueprint, instances, table) = fixtures_243_2gold();
         let mut assignment = BaseAssignment::default();
         assignment.set_room_with_efficiency(
@@ -305,7 +297,7 @@ mod tests {
                 crate::layout::AssignedOperator::new("泡普卡", 1),
             ],
             Some(RoomEfficiencySnapshot {
-                manufacture_final_efficiency: Efficiency::from_decimal(3.330),
+                manufacture_final_efficiency: Efficiency::from_decimal(9.999),
                 manufacture_skill_efficiency: Efficiency::from_decimal(0.300),
                 ..RoomEfficiencySnapshot::default()
             }),
