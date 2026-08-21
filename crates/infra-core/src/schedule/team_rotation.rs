@@ -1170,6 +1170,7 @@ fn assign_gamma_half(
     table: &SkillTable,
     options: &AssignBaseOptions,
     half: &FacilityHalf,
+    required_manu_by_room: &HashMap<RoomId, Vec<String>>,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -1200,6 +1201,7 @@ fn assign_gamma_half(
         &half.trade,
         &half.manu,
         &half.power,
+        required_manu_by_room,
         assignment,
         used,
     )
@@ -1433,6 +1435,36 @@ fn production_half_from_peak(peak: &BaseAssignment, half: &FacilityHalf) -> Base
         }
     }
     half_assignment
+}
+
+fn active_dependency_required_manu_by_room(
+    blueprint: &BaseBlueprint,
+    peak: &BaseAssignment,
+    dependencies: &[crate::layout::ActiveDependency],
+) -> HashMap<RoomId, Vec<String>> {
+    let required: HashSet<&str> = dependencies
+        .iter()
+        .flat_map(|dependency| dependency.required.iter().map(String::as_str))
+        .collect();
+    let mut by_room = HashMap::new();
+    for room in &peak.rooms {
+        if !blueprint
+            .room(&room.room_id)
+            .is_some_and(|blueprint_room| blueprint_room.kind == FacilityKind::Factory)
+        {
+            continue;
+        }
+        let names: Vec<String> = room
+            .operators
+            .iter()
+            .filter(|operator| required.contains(operator.name.as_str()))
+            .map(|operator| operator.name.clone())
+            .collect();
+        if !names.is_empty() {
+            by_room.insert(room.room_id.clone(), names);
+        }
+    }
+    by_room
 }
 
 fn bound_control_operators_for_half(
@@ -2020,6 +2052,7 @@ struct AbyssalBuildCtx<'a> {
     beta: &'a BaseAssignment,
     gamma_h1: &'a BaseAssignment,
     mutable_manu_rooms: &'a [RoomId],
+    required_manu_by_room: &'a HashMap<RoomId, Vec<String>>,
 }
 
 fn abyssal_control_producer(
@@ -2147,10 +2180,15 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         let mut next_hunter = 0;
         let mut ok = true;
         for (room_idx, count) in counts.iter().copied().enumerate() {
-            if count == 0 {
+            let room_id = &ctx.mutable_manu_rooms[room_idx];
+            let required = ctx
+                .required_manu_by_room
+                .get(room_id)
+                .cloned()
+                .unwrap_or_default();
+            if count == 0 && required.is_empty() {
                 continue;
             }
-            let room_id = &ctx.mutable_manu_rooms[room_idx];
             let Some(room) = ctx.blueprint.room(room_id) else {
                 ok = false;
                 break;
@@ -2159,7 +2197,15 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
                 ok = false;
                 break;
             };
-            let anchors = hunter_entries[next_hunter..next_hunter + count].to_vec();
+            let mut anchors: Vec<ManuPoolEntry> = required
+                .iter()
+                .filter_map(|name| ctx.manu_pool.entry(name).cloned())
+                .collect();
+            anchors.extend(
+                hunter_entries[next_hunter..next_hunter + count]
+                    .iter()
+                    .cloned(),
+            );
             next_hunter += count;
             if assign_manu_room_with_anchors(
                 &mut candidate,
@@ -2865,6 +2911,8 @@ fn schedule_abc_rotation(
     // 班次绑定（上2休1）来自统一 plan，不再硬编码具体体系。
     let [h1, h2] =
         split_production_facilities(blueprint, &peak, &shift_binds, &peak_plan.rotation_reserves)?;
+    let required_manu_by_room =
+        active_dependency_required_manu_by_room(blueprint, &peak, &peak_plan.active_dependencies);
 
     // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ 走贸易 role 替补。
     let alpha = production_half_from_peak(&peak, &h1);
@@ -2912,6 +2960,7 @@ fn schedule_abc_rotation(
         table,
         &gamma_h1_options,
         &h1,
+        &required_manu_by_room,
         &mut gamma_h1,
         &mut used_g1,
     )?;
@@ -2948,6 +2997,7 @@ fn schedule_abc_rotation(
         table,
         &gamma_h2_options,
         &h2,
+        &required_manu_by_room,
         &mut gamma_h2,
         &mut used_g2,
     )?;
@@ -3531,6 +3581,7 @@ fn schedule_abc_rotation(
                 beta: &beta,
                 gamma_h1: &gamma_h1,
                 mutable_manu_rooms: &h1.manu,
+                required_manu_by_room: &required_manu_by_room,
             });
             let mut best_abyssal: Option<(
                 AbyssalCandidate,
@@ -6956,6 +7007,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(!candidates.is_empty());
@@ -7029,6 +7081,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(!candidates.is_empty());
@@ -7078,6 +7131,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(!candidates.is_empty());
@@ -7190,6 +7244,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(
@@ -7272,6 +7327,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(
@@ -7351,6 +7407,7 @@ mod tests {
             beta: &beta,
             gamma_h1: &gamma_h1,
             mutable_manu_rooms: &[RoomId::from("manu_1"), RoomId::from("manu_3")],
+            required_manu_by_room: &HashMap::new(),
         });
 
         assert!(

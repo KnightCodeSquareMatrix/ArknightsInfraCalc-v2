@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::error::{Error, Result};
 use crate::layout::assignment::BaseAssignment;
@@ -9,7 +9,8 @@ use crate::skill_table::SkillTable;
 
 use super::commit::{commit_manu_room, commit_trade_room};
 use super::manufacture_fill::{
-    manu_options, manufacture_candidate_pool_for_demand, pick_capacity_manu_hit, pick_manu_hit,
+    assign_manu_room_with_anchors, manu_options, manufacture_candidate_pool_for_demand,
+    pick_capacity_manu_hit, pick_manu_hit,
 };
 use super::power_fill::assign_power_rooms;
 use super::trade_fill::{pick_trade_meta_then_plain, trade_order_from_room};
@@ -55,6 +56,7 @@ pub fn assign_team_producer_rooms(
         layout,
         options,
         manu_rooms,
+        &HashMap::new(),
         assignment,
         used,
     )?;
@@ -78,6 +80,7 @@ pub fn assign_team_gamma_half(
     trade_rooms: &[RoomId],
     manu_rooms: &[RoomId],
     power_rooms: &[RoomId],
+    required_manu_by_room: &HashMap<RoomId, Vec<String>>,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -103,6 +106,7 @@ pub fn assign_team_gamma_half(
         layout,
         options,
         manu_rooms,
+        required_manu_by_room,
         assignment,
         used,
     )?;
@@ -203,6 +207,7 @@ fn assign_team_manu_rooms(
     _layout: &LayoutContext,
     options: &AssignBaseOptions,
     manu_rooms: &[RoomId],
+    required_manu_by_room: &HashMap<RoomId, Vec<String>>,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -238,21 +243,53 @@ fn assign_team_manu_rooms(
         )?
         .layout;
         let opts = manu_options(&current_layout, options, recipe, room.level);
-        let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
-            .or_else(|_| pick_manu_hit(manu_pool, table, opts, used, options.top_k))
-            .or_else(|_| {
-                pick_capacity_manu_hit(
-                    manu_pool,
-                    table,
-                    &current_layout,
-                    options,
-                    recipe,
-                    used,
-                    room.level,
-                )
-            })
-            .map_err(|e| Error::msg(format!("team manu {}: {e}", room_id.0)))?;
-        commit_manu_room(assignment, room_id, &hit, manu_pool, used)?;
+        if let Some(required) = required_manu_by_room.get(room_id) {
+            let anchors = required
+                .iter()
+                .map(|name| {
+                    manu_pool.entry(name).cloned().ok_or_else(|| {
+                        Error::msg(format!(
+                            "team manu {} required operator {} missing from pool",
+                            room_id.0, name
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let mut room_used = used.clone();
+            for name in required {
+                room_used.remove(name);
+            }
+            assign_manu_room_with_anchors(
+                assignment,
+                room_id,
+                anchors,
+                manu_pool,
+                table,
+                &current_layout,
+                options,
+                recipe,
+                room.level,
+                &mut room_used,
+                &[],
+            )?;
+            *used = room_used;
+        } else {
+            let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
+                .or_else(|_| pick_manu_hit(manu_pool, table, opts, used, options.top_k))
+                .or_else(|_| {
+                    pick_capacity_manu_hit(
+                        manu_pool,
+                        table,
+                        &current_layout,
+                        options,
+                        recipe,
+                        used,
+                        room.level,
+                    )
+                })
+                .map_err(|e| Error::msg(format!("team manu {}: {e}", room_id.0)))?;
+            commit_manu_room(assignment, room_id, &hit, manu_pool, used)?;
+        }
     }
     Ok(())
 }
@@ -448,6 +485,7 @@ mod tests {
                 &LayoutContext::search_baseline(),
                 &AssignBaseOptions::default(),
                 std::slice::from_ref(&manu_id),
+                &HashMap::new(),
                 &mut assignment,
                 &mut used,
             )
@@ -603,6 +641,7 @@ mod tests {
                 &LayoutContext::search_baseline(),
                 &AssignBaseOptions::default(),
                 &[first.clone(), second.clone()],
+                &HashMap::new(),
                 &mut assignment,
                 &mut used,
             )
