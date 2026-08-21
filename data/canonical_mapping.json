@@ -1,0 +1,588 @@
+{
+  "mapping_version": "1.0.0",
+  "locale": "zh-CN",
+  "operators": {
+    "Castle-3": {
+      "name": "Castle-3",
+      "aliases": []
+    },
+    "Lancet-2": {
+      "name": "Lancet-2",
+      "aliases": []
+    },
+    "Miss.Christine": {
+      "name": "Miss.Christine",
+      "aliases": []
+    },
+    "乌尔比安": {
+      "name": "乌尔比安",
+      "aliases": []
+    },
+    "乌有": {
+      "name": "乌有",
+      "aliases": []
+    },
+    "令": {
+      "name": "令",
+      "aliases": []
+    },
+    "伺夜": {
+      "name": "伺夜",
+      "aliases": []
+    },
+    "但书": {
+      "name": "但书",
+      "aliases": []
+    },
+    "八幡海铃": {
+      "name": "八幡海铃",
+      "aliases": []
+    },
+    "冬时": {
+      "name": "冬时",
+      "aliases": []
+    },
+    "凯尔希·思衡托": {
+      "name": "凯尔希·思衡托",
+      "aliases": []
+    },
+    "刻俄柏": {
+      "name": "刻俄柏",
+      "aliases": []
+    },
+    "卡夫卡": {
+      "name": "卡夫卡",
+      "aliases": []
+    },
+    "古米": {
+      "name": "古米",
+      "aliases": []
+    },
+    "可露希尔": {
+      "name": "可露希尔",
+      "aliases": []
+    },
+    "史都华德": {
+      "name": "史都华德",
+      "aliases": []
+    },
+    "吉星": {
+      "name": "吉星",
+      "aliases": []
+    },
+    "图耶": {
+      "name": "图耶",
+      "aliases": []
+    },
+    "圣约送葬人": {
+      "name": "圣约送葬人",
+      "aliases": []
+    },
+    "地灵": {
+      "name": "地灵",
+      "aliases": []
+    },
+    "塑心": {
+      "name": "塑心",
+      "aliases": []
+    },
+    "夕": {
+      "name": "夕",
+      "aliases": []
+    },
+    "多萝西": {
+      "name": "多萝西",
+      "aliases": []
+    },
+    "夜刀": {
+      "name": "夜刀",
+      "aliases": []
+    },
+    "夜烟": {
+      "name": "夜烟",
+      "aliases": []
+    },
+    "娜仁图亚": {
+      "name": "娜仁图亚",
+      "aliases": []
+    },
+    "娜斯提": {
+      "name": "娜斯提",
+      "aliases": []
+    },
+    "孑": {
+      "name": "孑",
+      "aliases": []
+    },
+    "安哲拉": {
+      "name": "安哲拉",
+      "aliases": []
+    },
+    "崖心": {
+      "name": "崖心",
+      "aliases": []
+    },
+    "巫恋": {
+      "name": "巫恋",
+      "aliases": []
+    },
+    "帕拉斯": {
+      "name": "帕拉斯",
+      "aliases": []
+    },
+    "幽灵鲨": {
+      "name": "幽灵鲨",
+      "aliases": []
+    },
+    "异客": {
+      "name": "异客",
+      "aliases": []
+    },
+    "弑君者": {
+      "name": "弑君者",
+      "aliases": []
+    },
+    "德克萨斯": {
+      "name": "德克萨斯",
+      "aliases": []
+    },
+    "怒潮凛冬": {
+      "name": "怒潮凛冬",
+      "aliases": []
+    },
+    "慕斯": {
+      "name": "慕斯",
+      "aliases": []
+    },
+    "截云": {
+      "name": "截云",
+      "aliases": []
+    },
+    "戴菲恩": {
+      "name": "戴菲恩",
+      "aliases": []
+    },
+    "承曦格雷伊": {
+      "name": "承曦格雷伊",
+      "aliases": []
+    },
+    "折光": {
+      "name": "折光",
+      "aliases": []
+    },
+    "拉普兰德": {
+      "name": "拉普兰德",
+      "aliases": []
+    },
+    "掠风": {
+      "name": "掠风",
+      "aliases": []
+    },
+    "推进之王": {
+      "name": "推进之王",
+      "aliases": []
+    },
+    "摩根": {
+      "name": "摩根",
+      "aliases": []
+    },
+    "斑点": {
+      "name": "斑点",
+      "aliases": []
+    },
+    "斩业星熊": {
+      "name": "斩业星熊",
+      "aliases": []
+    },
+    "断罪者": {
+      "name": "断罪者",
+      "aliases": []
+    },
+    "斯卡蒂": {
+      "name": "斯卡蒂",
+      "aliases": []
+    },
+    "明椒": {
+      "name": "明椒",
+      "aliases": []
+    },
+    "月见夜": {
+      "name": "月见夜",
+      "aliases": []
+    },
+    "机械师": {
+      "name": "机械师",
+      "aliases": []
+    },
+    "杜林": {
+      "name": "杜林",
+      "aliases": []
+    },
+    "杰西卡": {
+      "name": "杰西卡",
+      "aliases": []
+    },
+    "柏喙": {
+      "name": "柏喙",
+      "aliases": []
+    },
+    "桃金娘": {
+      "name": "桃金娘",
+      "aliases": []
+    },
+    "桑葚": {
+      "name": "桑葚",
+      "aliases": []
+    },
+    "森蚺": {
+      "name": "森蚺",
+      "aliases": []
+    },
+    "槐琥": {
+      "name": "槐琥",
+      "aliases": []
+    },
+    "歌蕾蒂娅": {
+      "name": "歌蕾蒂娅",
+      "aliases": []
+    },
+    "水月": {
+      "name": "水月",
+      "aliases": []
+    },
+    "泡泡": {
+      "name": "泡泡",
+      "aliases": []
+    },
+    "洋灰": {
+      "name": "洋灰",
+      "aliases": []
+    },
+    "涤火杰西卡": {
+      "name": "涤火杰西卡",
+      "aliases": []
+    },
+    "淬羽赫默": {
+      "name": "淬羽赫默",
+      "aliases": []
+    },
+    "深巡": {
+      "name": "深巡",
+      "aliases": []
+    },
+    "清流": {
+      "name": "清流",
+      "aliases": []
+    },
+    "温蒂": {
+      "name": "温蒂",
+      "aliases": []
+    },
+    "火神": {
+      "name": "火神",
+      "aliases": []
+    },
+    "灰毫": {
+      "name": "灰毫",
+      "aliases": []
+    },
+    "灵知": {
+      "name": "灵知",
+      "aliases": []
+    },
+    "炎熔": {
+      "name": "炎熔",
+      "aliases": []
+    },
+    "焰尾": {
+      "name": "焰尾",
+      "aliases": []
+    },
+    "爱丽丝": {
+      "name": "爱丽丝",
+      "aliases": []
+    },
+    "特克诺": {
+      "name": "特克诺",
+      "aliases": []
+    },
+    "琳琅诗怀雅": {
+      "name": "琳琅诗怀雅",
+      "aliases": []
+    },
+    "琴柳": {
+      "name": "琴柳",
+      "aliases": []
+    },
+    "白雪": {
+      "name": "白雪",
+      "aliases": []
+    },
+    "石英": {
+      "name": "石英",
+      "aliases": []
+    },
+    "砾": {
+      "name": "砾",
+      "aliases": []
+    },
+    "稀音": {
+      "name": "稀音",
+      "aliases": []
+    },
+    "空弦": {
+      "name": "空弦",
+      "aliases": []
+    },
+    "空爆": {
+      "name": "空爆",
+      "aliases": []
+    },
+    "絮雨": {
+      "name": "絮雨",
+      "aliases": []
+    },
+    "红云": {
+      "name": "红云",
+      "aliases": []
+    },
+    "红豆": {
+      "name": "红豆",
+      "aliases": []
+    },
+    "绮良": {
+      "name": "绮良",
+      "aliases": []
+    },
+    "维娜·维多利亚": {
+      "name": "维娜·维多利亚",
+      "aliases": []
+    },
+    "罗比菈塔": {
+      "name": "罗比菈塔",
+      "aliases": []
+    },
+    "能天使": {
+      "name": "能天使",
+      "aliases": []
+    },
+    "至简": {
+      "name": "至简",
+      "aliases": []
+    },
+    "艾雅法拉": {
+      "name": "艾雅法拉",
+      "aliases": []
+    },
+    "苍苔": {
+      "name": "苍苔",
+      "aliases": []
+    },
+    "蕾缪安": {
+      "name": "蕾缪安",
+      "aliases": []
+    },
+    "薄绿": {
+      "name": "薄绿",
+      "aliases": []
+    },
+    "薇薇安娜": {
+      "name": "薇薇安娜",
+      "aliases": []
+    },
+    "蛇屠箱": {
+      "name": "蛇屠箱",
+      "aliases": []
+    },
+    "裁度": {
+      "name": "裁度",
+      "aliases": []
+    },
+    "裂响": {
+      "name": "裂响",
+      "aliases": []
+    },
+    "褐果": {
+      "name": "褐果",
+      "aliases": []
+    },
+    "诗怀雅": {
+      "name": "诗怀雅",
+      "aliases": []
+    },
+    "调香师": {
+      "name": "调香师",
+      "aliases": []
+    },
+    "谬因": {
+      "name": "谬因",
+      "aliases": []
+    },
+    "豆苗": {
+      "name": "豆苗",
+      "aliases": []
+    },
+    "贝娜": {
+      "name": "贝娜",
+      "aliases": []
+    },
+    "贝洛内": {
+      "name": "贝洛内",
+      "aliases": []
+    },
+    "车尔尼": {
+      "name": "车尔尼",
+      "aliases": []
+    },
+    "远牙": {
+      "name": "远牙",
+      "aliases": []
+    },
+    "迷迭香": {
+      "name": "迷迭香",
+      "aliases": []
+    },
+    "酒神": {
+      "name": "酒神",
+      "aliases": []
+    },
+    "重岳": {
+      "name": "重岳",
+      "aliases": []
+    },
+    "野鬃": {
+      "name": "野鬃",
+      "aliases": []
+    },
+    "钼铅": {
+      "name": "钼铅",
+      "aliases": []
+    },
+    "银灰": {
+      "name": "银灰",
+      "aliases": []
+    },
+    "阿罗玛": {
+      "name": "阿罗玛",
+      "aliases": []
+    },
+    "陈": {
+      "name": "陈",
+      "aliases": []
+    },
+    "霜叶": {
+      "name": "霜叶",
+      "aliases": []
+    },
+    "食铁兽": {
+      "name": "食铁兽",
+      "aliases": []
+    },
+    "香草": {
+      "name": "香草",
+      "aliases": []
+    },
+    "鸿雪": {
+      "name": "鸿雪",
+      "aliases": []
+    },
+    "黍": {
+      "name": "黍",
+      "aliases": []
+    },
+    "黑角": {
+      "name": "黑角",
+      "aliases": []
+    },
+    "黑键": {
+      "name": "黑键",
+      "aliases": []
+    },
+    "龙舌兰": {
+      "name": "龙舌兰",
+      "aliases": []
+    }
+  },
+  "combinations": {
+    "abyssal_hunters": {
+      "name": "深海猎人组",
+      "aliases": []
+    },
+    "automation": {
+      "name": "自动化组",
+      "aliases": []
+    },
+    "bubble_group": {
+      "name": "泡泡组",
+      "aliases": []
+    },
+    "deepcolor_ulpianus": {
+      "name": "深巡＋乌尔比安",
+      "aliases": []
+    },
+    "exusiai_group": {
+      "name": "能天使组",
+      "aliases": []
+    },
+    "glasgow": {
+      "name": "格拉斯哥帮组",
+      "aliases": []
+    },
+    "human_fireworks": {
+      "name": "人间烟火组",
+      "aliases": []
+    },
+    "kaltsit_omertosa": {
+      "name": "凯尔希·思衡托",
+      "aliases": []
+    },
+    "karlan_trade": {
+      "name": "喀兰贸易组",
+      "aliases": []
+    },
+    "lungmen_control": {
+      "name": "龙门中枢组",
+      "aliases": []
+    },
+    "metalwork": {
+      "name": "赤金工艺组",
+      "aliases": []
+    },
+    "mizuki_standardization": {
+      "name": "水月标准化组",
+      "aliases": []
+    },
+    "penguin_logistics": {
+      "name": "企鹅物流",
+      "aliases": []
+    },
+    "perception_information": {
+      "name": "感知信息组",
+      "aliases": []
+    },
+    "pozyomka_durin": {
+      "name": "鸿雪杜林组",
+      "aliases": []
+    },
+    "red_pine": {
+      "name": "红松林骑士组",
+      "aliases": []
+    },
+    "rhine_lab": {
+      "name": "莱茵科技",
+      "aliases": []
+    },
+    "siracusa": {
+      "name": "叙拉古",
+      "aliases": []
+    },
+    "tequila_group": {
+      "name": "龙舌兰组",
+      "aliases": []
+    },
+    "vermeil": {
+      "name": "红云组",
+      "aliases": []
+    }
+  }
+}

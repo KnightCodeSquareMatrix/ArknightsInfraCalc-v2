@@ -1,13 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "arknightsinfracalc-v2"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.9",
     "openai>=2.43.0",
     "pandas>=3.0.3",
     "sentence-transformers>=5.6.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["arknights_narrator*"]
+
+[tool.setuptools.package-data]
+arknights_narrator = ["*.md"]
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
