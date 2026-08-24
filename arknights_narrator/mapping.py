@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
+from types import MappingProxyType
 from typing import Any
 
 
@@ -46,9 +47,9 @@ class CanonicalMapping:
         return cls(
             version=version,
             locale=locale,
-            operators=operators,
-            combinations=combinations,
-            operator_ids_by_name={entry["name"]: identifier for identifier, entry in operators.items()},
+            operators=MappingProxyType({key: MappingProxyType(entry) for key, entry in operators.items()}),
+            combinations=MappingProxyType({key: MappingProxyType(entry) for key, entry in combinations.items()}),
+            operator_ids_by_name=MappingProxyType({entry["name"]: identifier for identifier, entry in operators.items()}),
             content_hash=hashlib.sha256(source).hexdigest(),
         )
 

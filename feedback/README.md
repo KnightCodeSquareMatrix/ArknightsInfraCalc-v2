@@ -24,8 +24,8 @@ Each case normally contains:
 
 ## Current-runtime rerun
 
-For a successful `version=beta-test-bundle-v2-next-serve`, legacy `method=plan` bundle, use the
-repository adapter instead of executing the recorded online command or paths:
+For a successful `version=beta-test-bundle-v2-next-serve` bundle with `method=plan` or
+`method=plan.compute`, use the repository adapter instead of executing the recorded online command or paths:
 
 ```bash
 cargo run -q -p infra-cli -- debug rerun \
@@ -43,7 +43,8 @@ The output directory must not already exist. Extracted layout, operbox, assignme
 private local evidence and must not be committed. Stdout contains only a sanitized hash/status summary;
 the complete rotation, focused room/operator projection, source name, and recorded projection are written
 only to the explicit private output directory. Explicit `--top` or `--rotation` overrides disable recorded
-result comparison.
+result comparison. Historical `plan.compute` snapshots may contain a `rarity=1` unknown-rarity sentinel;
+the rerun adapter preserves their recorded `elite`/`level` facts and records the compatibility count.
 
 ## Status Values
 

@@ -1,7 +1,7 @@
 ---
 description: 只读提取日志、文档、表格和稳定字段；适合边界明确的分类、去重、对照和摘要，不负责开放式架构判断。
 mode: subagent
-model: apigate/deepseek-v4-flash
+model: codesonline/gpt-5.6-luna
 steps: 99
 permission:
   edit: deny

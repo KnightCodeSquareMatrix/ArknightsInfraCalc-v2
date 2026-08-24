@@ -77,6 +77,21 @@ pub struct ControlGlobalRecovery {
     /// 是否把中枢内笑脸类技能的总回复扩散到生产/功能设施（玛恩纳）。
     #[serde(default)]
     pub spread_smiley: bool,
+    /// 指定干员同在中枢时额外增加的全局恢复值（维什戴尔 + 魔王）。
+    #[serde(default)]
+    pub bonus_when_control_contains: Option<String>,
+    #[serde(default)]
+    pub bonus_value: f64,
+}
+
+/// 中枢候选补位使用的全局回复摘要。它不参与实际心情结算，实际取最高仍由
+/// `drain` 读取相同的 `control_global_recovery` 数据完成。
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ControlGlobalRecoverySummary {
+    pub effective_value: f64,
+    pub effective_owner_count: usize,
+    pub redundant_owner_count: usize,
+    pub faction_recovery_value: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -92,6 +107,19 @@ pub struct ControlSmileyRecovery {
     pub per_provider: f64,
     #[serde(default)]
     pub providers: Vec<ControlSmileyProvider>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ControlFactionRecovery {
+    pub id: String,
+    pub providers: Vec<String>,
+    pub members: Vec<String>,
+    #[serde(default = "default_faction_recovery_per_member")]
+    pub per_member: f64,
+}
+
+fn default_faction_recovery_per_member() -> f64 {
+    0.05
 }
 
 /// 宿舍回复技能。`kind` ∈ {self, single, group, pool}。
@@ -155,6 +183,8 @@ pub struct MoodModel {
     #[serde(default)]
     pub control_smiley_recovery: Option<ControlSmileyRecovery>,
     #[serde(default)]
+    pub control_faction_recovery: Vec<ControlFactionRecovery>,
+    #[serde(default)]
     pub dorm_recovery_skills: Vec<DormRecoverySkill>,
 }
 
@@ -194,6 +224,59 @@ impl MoodModel {
     /// 从满心情工作到休息阈值之间可消耗的心情值。
     pub fn workable_mood(&self) -> f64 {
         self.mood_cap - self.rest_threshold
+    }
+
+    pub fn control_global_recovery_summary(
+        &self,
+        control_operators: &[(String, u8)],
+    ) -> ControlGlobalRecoverySummary {
+        let active: Vec<_> = self
+            .control_global_recovery
+            .iter()
+            .filter(|entry| {
+                control_operators
+                    .iter()
+                    .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
+            })
+            .collect();
+        let effective_value = active
+            .iter()
+            .map(|entry| control_global_recovery_value(entry, control_operators))
+            .fold(0.0_f64, f64::max);
+        let effective_owner_count = active
+            .iter()
+            .filter(|entry| {
+                (control_global_recovery_value(entry, control_operators) - effective_value).abs()
+                    < f64::EPSILON
+            })
+            .count();
+        ControlGlobalRecoverySummary {
+            effective_value,
+            effective_owner_count,
+            // Equal maximum sources settle as tied winners, but represent
+            // duplicate control filler ownership for the same recovery fact.
+            redundant_owner_count: active.len().saturating_sub(1),
+            faction_recovery_value: self.control_faction_recovery_value(control_operators),
+        }
+    }
+
+    pub fn control_faction_recovery_value(&self, control_operators: &[(String, u8)]) -> f64 {
+        self.control_faction_recovery
+            .iter()
+            .map(|entry| {
+                let providers = entry
+                    .providers
+                    .iter()
+                    .filter(|name| control_operators.iter().any(|(active, _)| active == *name))
+                    .count();
+                let members = entry
+                    .members
+                    .iter()
+                    .filter(|name| control_operators.iter().any(|(active, _)| active == *name))
+                    .count();
+                providers as f64 * members as f64 * entry.per_member
+            })
+            .sum()
     }
 
     /// 当前进驻人数减免（仅 trade/factory；1/2/3 人对应 0/0.05/0.1）。
@@ -289,6 +372,21 @@ impl MoodModel {
     }
 }
 
+pub(crate) fn control_global_recovery_value(
+    entry: &ControlGlobalRecovery,
+    control_operators: &[(String, u8)],
+) -> f64 {
+    let bonus_active = entry
+        .bonus_when_control_contains
+        .as_ref()
+        .is_some_and(|name| {
+            control_operators
+                .iter()
+                .any(|(operator, _)| operator == name)
+        });
+    entry.value + if bonus_active { entry.bonus_value } else { 0.0 }
+}
+
 pub fn default_mood_model() -> Result<&'static MoodModel> {
     static MODEL: OnceLock<std::result::Result<MoodModel, String>> = OnceLock::new();
     match MODEL.get_or_init(|| MoodModel::load_default().map_err(|error| error.to_string())) {
@@ -322,6 +420,37 @@ mod tests {
         // 发电/办公不按进驻人数减免。
         assert_eq!(m.occupancy_reduction(FacilityKind::PowerPlant, 3), 0.0);
         assert_eq!(m.occupancy_reduction(FacilityKind::Office, 3), 0.0);
+    }
+
+    #[test]
+    fn wisadel_global_recovery_summary_includes_civilight_bonus() {
+        let m = model();
+        let ew_only = vec![("维什戴尔".to_string(), 2u8)];
+        let boosted = vec![("维什戴尔".to_string(), 2u8), ("魔王".to_string(), 2u8)];
+        assert_eq!(
+            m.control_global_recovery_summary(&ew_only).effective_value,
+            0.1
+        );
+        assert_eq!(
+            m.control_global_recovery_summary(&boosted).effective_value,
+            0.2
+        );
+    }
+
+    #[test]
+    fn faction_recovery_summary_uses_provider_times_member_count() {
+        let m = model();
+        let control = vec![
+            ("灰烬".to_string(), 2),
+            ("战车".to_string(), 2),
+            ("闪击".to_string(), 2),
+            ("霜华".to_string(), 2),
+        ];
+        assert_eq!(
+            m.control_global_recovery_summary(&control)
+                .faction_recovery_value,
+            0.8
+        );
     }
 
     #[test]

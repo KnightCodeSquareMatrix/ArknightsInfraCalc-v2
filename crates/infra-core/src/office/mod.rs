@@ -36,7 +36,7 @@ pub fn apply_office_to_layout(
     table: &SkillTable,
     mood: f64,
 ) {
-    let mut best = layout.office_hire_spd_pct;
+    let mut best = layout.control_office_hire_spd_pct;
     for room in blueprint
         .rooms
         .iter()
@@ -58,7 +58,7 @@ pub fn apply_office_to_layout(
             },
             table,
         );
-        best = best.max(result.hire_spd_pct);
+        best = best.max(layout.control_office_hire_spd_pct + result.hire_spd_pct);
     }
     layout.office_hire_spd_pct = best;
 }

@@ -240,13 +240,14 @@ mod tests {
                 ..Default::default()
             },
             breakdown: ManuEfficiencyBreakdown {
-                base_efficiency: Efficiency::ONE,
+                base_efficiency: Efficiency::from_decimal(1.030),
                 occupancy_efficiency: Efficiency::from_decimal(0.030),
                 skill_efficiency: Efficiency::from_decimal(1.270),
                 global_efficiency: Efficiency::ZERO,
                 final_efficiency: Efficiency::from_decimal(2.300),
                 storage_limit: 20,
                 recipe: "gold".to_string(),
+                ..Default::default()
             },
         }
     }

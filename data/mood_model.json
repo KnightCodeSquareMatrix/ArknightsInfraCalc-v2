@@ -81,6 +81,8 @@
     { "name": "水灯心", "facility": "office", "elite": 0, "scope": "self", "drain_delta": 1.0, "skill": "永不停歇·α" },
     { "name": "水灯心", "facility": "office", "elite": 2, "scope": "self", "drain_delta": 1.0, "skill": "永不停歇·β" },
 
+    { "name": "见行者", "facility": "reception", "elite": 2, "scope": "self", "drain_delta": 2.0, "skill": "逻辑推理" },
+
     { "name": "涤火杰西卡", "facility": "control", "elite": 2, "scope": "self", "drain_delta": 0.5, "skill": "老友相聚" },
     { "name": "阿", "facility": "control", "elite": 0, "scope": "room", "drain_delta": 1.5, "skill": "神经质", "note": "中枢内所有干员" },
     { "name": "惊蛰", "facility": "control", "elite": 0, "scope": "room", "drain_delta": 0.5, "skill": "至察", "note": "中枢内所有干员" },
@@ -92,7 +94,7 @@
   ],
   "control_global_recovery": [
     { "name": "玛恩纳", "elite": 2, "skill": "公事公办", "value": 0.1, "covers": ["power", "office", "reception"], "spread_smiley": true, "note": "取最高不叠加；把发电/办公/会客补齐-0.1，并把中枢笑脸类技能扩散全局" },
-    { "name": "维什戴尔", "elite": 2, "skill": "巴别塔之帜", "value": 0.1, "covers": ["power", "factory", "trade", "office", "reception"], "note": "取最高不叠加；魔王同在中枢时额外+0.1(总0.2)，见 todo" },
+    { "name": "维什戴尔", "elite": 2, "skill": "巴别塔之帜", "value": 0.1, "covers": ["power", "factory", "trade", "office", "reception"], "bonus_when_control_contains": "魔王", "bonus_value": 0.1, "note": "取最高不叠加；魔王同在中枢时额外+0.1(总0.2)" },
     { "name": "重岳", "elite": 2, "skill": "孤光共照", "value": 0.05, "covers": ["power", "factory", "trade", "office", "reception"], "note": "取最高不叠加；每20人间烟火额外+0.05，见 todo" }
   ],
   "control_smiley_recovery": {
@@ -109,6 +111,7 @@
       { "name": "灰喉", "elite": 0 },
       { "name": "暴雨", "elite": 0 },
       { "name": "焰尾", "elite": 0 },
+      { "name": "三角初华", "elite": 2 },
       { "name": "玛恩纳", "elite": 0 },
       { "name": "冰酿", "elite": 0 },
       { "name": "薇薇安娜", "elite": 0 },
@@ -119,6 +122,26 @@
       { "name": "夕", "elite": 0 }
     ]
   },
+  "control_faction_recovery": [
+    {
+      "id": "rainbow_six",
+      "providers": ["灰烬", "战车", "闪击", "霜华"],
+      "members": ["灰烬", "战车", "闪击", "霜华"]
+    },
+    {
+      "id": "altered_operators",
+      "providers": ["寒芒克洛丝", "炎狱炎熔", "濯尘芙蓉"],
+      "members": [
+        "缄默德克萨斯", "酒神", "百炼嘉维尔", "维娜·维多利亚", "维什戴尔",
+        "凯尔希·思衡托", "承曦格雷伊", "赤刃明霄陈", "撷英调香师", "纯烬艾雅法拉",
+        "雷狼龙S空爆", "新约能天使", "淬羽赫默", "历阵锐枪芬", "琳琅诗怀雅",
+        "焰狐龙梓兰", "凛御银灰", "焰影苇草", "涤火杰西卡", "炎狱炎熔", "怒潮凛冬",
+        "耀骑士临光", "归溟幽灵鲨", "引星棘刺", "予愿安洁莉娜", "麒麟R夜刀",
+        "寒芒克洛丝", "荒芜拉普兰德", "斩业星熊", "火龙S黑角", "圣聆初雪", "烛煌",
+        "圣约送葬人", "濯尘芙蓉", "司霆惊蛰", "浊心斯卡蒂", "假日威龙陈", "溯光星源"
+      ]
+    }
+  ],
   "dorm_recovery_skills": [
     { "name": "赫拉格", "elite": 0, "kind": "self", "value": 0.55, "skill": "超脱" },
     { "name": "赫拉格", "elite": 1, "kind": "group", "value": 0.1, "skill": "挣脱", "note": "除自身以外所有干员" },
@@ -233,7 +256,6 @@
     { "category": "control_enthusiasm_conditional_drain", "text": "丰川祥子 生活的重压 E0：热情40+时自身消耗+0.05" },
     { "category": "control_pair_conditional_drain", "text": "祐天寺若麦 成效优先 E2：当与丰川祥子同中枢，丰川消耗+0.05，会客线索+5%" },
     { "category": "abyssal_special_drain", "text": "歌蕾蒂娅 潮汐守望 E0：每宿舍外深海猎人自身消耗+0.5；反之恢复+0.5；宿舍内满心情深海额外+0.5。满深海约3.2/h，最长约7h" },
-    { "category": "control_global_recovery_conditional", "text": "维什戴尔 巴别塔之帜 E2：魔王在中枢时额外+0.1(总0.2)" },
     { "category": "control_global_recovery_count", "text": "重岳 孤光共照 E2：每20人间烟火额外+0.05" },
     { "category": "control_provides_dorm_recovery", "text": "三角初华 羁绊相生 E2 / 焰影苇草 领袖 E1 / 红隼 战纹 E0 / 妮芙 巡心 E2：进驻中枢时所有宿舍所有干员心情恢复+0.05(同种取最高)" },
     { "category": "control_provides_dorm_recovery", "text": "电弧 无言的慈爱 E2：进驻中枢时所有宿舍精英干员心情恢复+0.1(同种取最高)" },

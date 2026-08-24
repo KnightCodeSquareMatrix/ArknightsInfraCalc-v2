@@ -5,7 +5,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::control::{
-    solve_control, solve_control_with_trace, ControlOperator, ControlRoomInput,
+    solve_control, solve_control_with_trace, ControlEffectKey, ControlOperator, ControlRoomInput,
     ControlSettlementTrace, ControlTraceOutcome,
 };
 use crate::error::Result;
@@ -187,8 +187,14 @@ fn control_inject_sort_key(hit: &ControlSearchHit) -> f64 {
 #[derive(Debug)]
 struct RankedControlSearchHit {
     hit: ControlSearchHit,
+    trade_global_pct: f64,
+    manufacture_global_pct: f64,
+    office_global_pct: f64,
+    meeting_global_pct: f64,
     replacement_preference: i32,
     suppressed_replacement_sources: usize,
+    redundant_effect_sources: usize,
+    redundant_global_recovery_sources: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -289,12 +295,26 @@ fn compare_ranked_control_hits(
             value
         }
     };
-    key(b)
-        .total_cmp(&key(a))
-        .then_with(|| b.replacement_preference.cmp(&a.replacement_preference))
+    // Cross-domain effects are selected in their declared order. The legacy
+    // raw inject key only resolves candidates equal in every migrated region.
+    b.trade_global_pct
+        .total_cmp(&a.trade_global_pct)
+        .then_with(|| {
+            b.manufacture_global_pct
+                .total_cmp(&a.manufacture_global_pct)
+        })
+        .then_with(|| b.office_global_pct.total_cmp(&a.office_global_pct))
+        .then_with(|| b.meeting_global_pct.total_cmp(&a.meeting_global_pct))
+        .then_with(|| a.redundant_effect_sources.cmp(&b.redundant_effect_sources))
         .then_with(|| {
             a.suppressed_replacement_sources
                 .cmp(&b.suppressed_replacement_sources)
+        })
+        .then_with(|| key(b).total_cmp(&key(a)))
+        .then_with(|| b.replacement_preference.cmp(&a.replacement_preference))
+        .then_with(|| {
+            a.redundant_global_recovery_sources
+                .cmp(&b.redundant_global_recovery_sources)
         })
         .then_with(|| a.hit.names.cmp(&b.hit.names))
 }
@@ -440,20 +460,74 @@ impl ControlFillTierScores {
 fn control_layered_fill_scores(
     operators: &[ControlOperator],
     table: &SkillTable,
+    mood_model: &crate::mood::MoodModel,
+    global_recovery: crate::mood::ControlGlobalRecoverySummary,
 ) -> ControlFillTierScores {
     let mut scores = ControlFillTierScores::default();
+    let control_names: Vec<_> = operators
+        .iter()
+        .map(|operator| (operator.name.clone(), operator.elite))
+        .collect();
+    let active_global_owners: Vec<_> = mood_model
+        .control_global_recovery
+        .iter()
+        .filter(|entry| {
+            control_names
+                .iter()
+                .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
+        })
+        .collect();
+    let has_wisadel = active_global_owners
+        .iter()
+        .any(|entry| entry.name == "维什戴尔");
+    let has_mlynar = active_global_owners
+        .iter()
+        .any(|entry| entry.name == "玛恩纳");
+    let has_smiley = |name: &str, elite: u8| {
+        mood_model
+            .control_smiley_recovery
+            .as_ref()
+            .is_some_and(|smiley| {
+                smiley
+                    .providers
+                    .iter()
+                    .any(|provider| provider.name == name && elite >= provider.elite)
+            })
+    };
     for op in operators {
+        if has_wisadel && op.name == "魔王" {
+            scores.mood += 50.0;
+        } else if has_mlynar && has_smiley(&op.name, op.elite) {
+            scores.mood += 50.0;
+        } else if active_global_owners.is_empty()
+            && (has_smiley(&op.name, op.elite)
+                || mood_model.control_faction_recovery_value(&control_names)
+                    > mood_model.control_faction_recovery_value(
+                        &control_names
+                            .iter()
+                            .filter(|(name, _)| name != &op.name)
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                    ))
+        {
+            scores.mood += 10.0;
+        }
         for bid in &op.buff_ids {
             match bid.as_str() {
                 // 跨设施入口本身不预支人工估值；实际收益由完整编制的 solver 结算。
                 "control_tra_limit&spd[000]" | "control_hire_spd&bd[000]" => {}
                 // 中枢内全员心情 +0.05/h；EW / 玛恩纳等也归心情层。
                 "control_mp_cost[007]"
+                | "control_mp_cost[008]"
                 | "control_mp_cost[010]"
                 | "control_mp_cost[012]"
                 | "control_mp_psk[000]"
                 | "control_mp_lonely[000]"
-                | "control_mp_expand_double[000]" => scores.mood += 5.0,
+                | "control_mp_expand_double[000]" => {
+                    if bid != "control_mp_cost[008]" && bid != "control_mp_expand_double[000]" {
+                        scores.mood += 5.0;
+                    }
+                }
                 // 宿舍全员心情 +0.05/h（低于中枢内恢复）
                 "control_dorm_rec2[000]" => scores.mood += 2.0,
                 _ => {
@@ -472,7 +546,35 @@ fn control_layered_fill_scores(
             };
         }
     }
+    if global_recovery.effective_value > 0.0 {
+        scores.mood += 5.0;
+    }
+    if global_recovery.faction_recovery_value > 0.0 {
+        // Faction/count recovery is a lower-priority mood filler than global recovery.
+        scores.mood += 1.0;
+    }
     scores
+}
+
+fn control_global_recovery_redundancy(
+    global_recovery: crate::mood::ControlGlobalRecoverySummary,
+) -> usize {
+    global_recovery.redundant_owner_count
+}
+
+fn active_global_recovery_owner_count(
+    mood_model: &crate::mood::MoodModel,
+    operators: &[ControlOperator],
+) -> usize {
+    mood_model
+        .control_global_recovery
+        .iter()
+        .filter(|entry| {
+            operators
+                .iter()
+                .any(|operator| operator.name == entry.name && operator.elite >= entry.elite)
+        })
+        .count()
 }
 
 /// 中枢搜索排序：当前为贸易/制造注入%之和。
@@ -489,7 +591,9 @@ fn evaluate_control_policy(
     result: &crate::control::ControlCenterResult,
     operators: &[ControlOperator],
     table: &SkillTable,
+    mood_model: &crate::mood::MoodModel,
     options: &ControlSearchOptions,
+    global_recovery: crate::mood::ControlGlobalRecoverySummary,
 ) -> ControlPolicyBreakdown {
     let mood_penalty: f64 = result
         .operator_mood_drains
@@ -498,7 +602,8 @@ fn evaluate_control_policy(
         .sum();
 
     if options.fill_policy == ControlFillPolicy::LayeredFill {
-        let fill_scores = control_layered_fill_scores(operators, table);
+        let fill_scores =
+            control_layered_fill_scores(operators, table, mood_model, global_recovery);
         let trade_inject = result
             .inject
             .trade_eff_pct_with_tag_counts(&options.layout.trade_tagged_count_sum);
@@ -905,6 +1010,7 @@ pub fn search_control_combos(
 
     let layout = options.layout.clone();
     let mood = options.mood;
+    let mood_model = crate::mood::MoodModel::load_default()?;
 
     let mut hits: Vec<RankedControlSearchHit> = combos
         .par_iter()
@@ -928,7 +1034,25 @@ pub fn search_control_combos(
                 } else {
                     (solve_control(&input, table), 0, 0)
                 };
-            let breakdown = evaluate_control_policy(&result, &operators, table, options);
+            let global_recovery = mood_model.control_global_recovery_summary(
+                &operators
+                    .iter()
+                    .map(|operator| (operator.name.clone(), operator.elite))
+                    .collect::<Vec<_>>(),
+            );
+            if global_recovery.effective_owner_count > 0
+                && active_global_recovery_owner_count(&mood_model, &operators) > 1
+            {
+                return None;
+            }
+            let breakdown = evaluate_control_policy(
+                &result,
+                &operators,
+                table,
+                &mood_model,
+                options,
+                global_recovery,
+            );
             Some(RankedControlSearchHit {
                 hit: ControlSearchHit {
                     trade_inject_pct: result
@@ -938,8 +1062,32 @@ pub fn search_control_combos(
                     names,
                     breakdown,
                 },
+                trade_global_pct: result
+                    .effect_ledger
+                    .value(ControlEffectKey::TRADE_GLOBAL_EFFICIENCY),
+                manufacture_global_pct: result
+                    .effect_ledger
+                    .value(ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY),
+                office_global_pct: (layout.office_room_count > 0)
+                    .then(|| {
+                        result
+                            .effect_ledger
+                            .value(ControlEffectKey::OFFICE_HIRE_SPEED)
+                    })
+                    .unwrap_or(0.0),
+                meeting_global_pct: (layout.meeting_room_count > 0)
+                    .then(|| {
+                        result
+                            .effect_ledger
+                            .value(ControlEffectKey::MEETING_CLUE_SPEED)
+                    })
+                    .unwrap_or(0.0),
                 replacement_preference,
                 suppressed_replacement_sources,
+                redundant_effect_sources: result.effect_ledger.redundant_effect_source_count(),
+                redundant_global_recovery_sources: control_global_recovery_redundancy(
+                    global_recovery,
+                ),
             })
         })
         .collect();
@@ -1132,25 +1280,32 @@ mod tests {
     fn control_score_is_pure_inject_sum() {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let (result, ops) = monhun_control_ops(&table);
+        let global_recovery = crate::mood::MoodModel::load_default()
+            .unwrap()
+            .control_global_recovery_summary(&[]);
         assert!(result.global.get(GlobalResourceKey::Matatabi) > 0.0);
 
         let without = evaluate_control_policy(
             &result,
             &ops,
             &table,
+            &crate::mood::MoodModel::load_default().unwrap(),
             &ControlSearchOptions {
                 matatabi_consumer_active: false,
                 ..Default::default()
             },
+            global_recovery,
         );
         let with = evaluate_control_policy(
             &result,
             &ops,
             &table,
+            &crate::mood::MoodModel::load_default().unwrap(),
             &ControlSearchOptions {
                 matatabi_consumer_active: true,
                 ..Default::default()
             },
+            global_recovery,
         );
         // 纯注入评分：matatabi consumer 不影响 score（木天蓼不在中枢评分里预支）
         assert!(
@@ -1269,6 +1424,98 @@ mod tests {
     }
 
     #[test]
+    fn control_layered_fill_counts_global_recovery_once() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("重岳", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let operators = ["重岳"]
+            .into_iter()
+            .map(|name| pool.entry(name).unwrap().to_control_operator())
+            .collect::<Vec<_>>();
+        let mood_model = crate::mood::MoodModel::load_default().unwrap();
+        let summary = mood_model.control_global_recovery_summary(
+            &operators
+                .iter()
+                .map(|operator| (operator.name.clone(), operator.elite))
+                .collect::<Vec<_>>(),
+        );
+
+        let scores = control_layered_fill_scores(&operators, &table, &mood_model, summary);
+        assert_eq!(scores.mood, 5.0);
+        assert_eq!(control_global_recovery_redundancy(summary), 0);
+
+        let e2_roster = Roster::from_elite_map(
+            [("玛恩纳", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let e2_pool = build_control_pool(&e2_roster, &instances, &table).unwrap();
+        let e2_operators = ["玛恩纳"]
+            .into_iter()
+            .map(|name| e2_pool.entry(name).unwrap().to_control_operator())
+            .collect::<Vec<_>>();
+        let e2_summary = mood_model.control_global_recovery_summary(
+            &e2_operators
+                .iter()
+                .map(|operator| (operator.name.clone(), operator.elite))
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            control_layered_fill_scores(&e2_operators, &table, &mood_model, e2_summary).mood,
+            60.0
+        );
+        assert_eq!(control_global_recovery_redundancy(e2_summary), 0);
+    }
+
+    #[test]
+    fn control_search_prefers_one_global_recovery_source_on_equal_fill_score() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [
+                ("玛恩纳", 0),
+                ("维什戴尔", 2),
+                ("阿米娅", 2),
+                ("诗怀雅", 2),
+                ("红", 0),
+            ]
+            .into_iter()
+            .map(|(name, elite)| (name.to_string(), elite))
+            .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 2,
+                top_k: 20,
+                fill_policy: ControlFillPolicy::LayeredFill,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let top = &hits[0];
+        assert!(top.breakdown.mood_fill_sort_component >= 5.0);
+        assert!(
+            top.names.contains(&"玛恩纳".to_string())
+                || top.names.contains(&"维什戴尔".to_string())
+        );
+        assert!(
+            !(top.names.contains(&"玛恩纳".to_string())
+                && top.names.contains(&"维什戴尔".to_string()))
+        );
+    }
+
+    #[test]
     fn control_search_prefers_declared_replacements_on_equal_outputs() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -1340,7 +1587,7 @@ mod tests {
     }
 
     #[test]
-    fn control_search_excludes_a_replacement_source_suppressed_by_a_stronger_family_winner() {
+    fn control_search_excludes_competing_global_recovery_sources() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = Roster::from_elite_map(
@@ -1362,11 +1609,13 @@ mod tests {
             },
         )
         .unwrap();
-
         assert_eq!(hits[0].manu_gold_inject_pct, 3.0);
         assert!(hits[0].names.iter().any(|name| name == "斩业星熊"));
         assert!(hits[0].names.iter().any(|name| name == "诗怀雅"));
-        assert!(!hits[0].names.iter().any(|name| name == "Mon3tr"));
+        assert!(
+            !(hits[0].names.iter().any(|name| name == "玛恩纳")
+                && hits[0].names.iter().any(|name| name == "维什戴尔"))
+        );
     }
 
     fn ranked_hit_for_test(
@@ -1387,6 +1636,12 @@ mod tests {
             },
             replacement_preference,
             suppressed_replacement_sources,
+            trade_global_pct: 0.0,
+            manufacture_global_pct: 0.0,
+            office_global_pct: 0.0,
+            meeting_global_pct: 0.0,
+            redundant_global_recovery_sources: 0,
+            redundant_effect_sources: 0,
         }
     }
 
@@ -1453,11 +1708,45 @@ mod tests {
     }
 
     #[test]
+    fn control_comparator_prefers_lower_global_recovery_redundancy() {
+        let mut one = ranked_hit_for_test("one", 5.0, 0, 0);
+        let mut two = ranked_hit_for_test("two", 5.0, 0, 0);
+        one.redundant_global_recovery_sources = 0;
+        two.redundant_global_recovery_sources = 1;
+        assert_eq!(
+            compare_ranked_control_hits(&one, &two),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_ranked_control_hits(&two, &one),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn control_comparator_prefers_fewer_tied_effect_sources() {
+        let mut one = ranked_hit_for_test("one", 5.0, 0, 0);
+        let mut two = ranked_hit_for_test("two", 5.0, 0, 0);
+        one.redundant_effect_sources = 0;
+        two.redundant_effect_sources = 1;
+
+        assert_eq!(
+            compare_ranked_control_hits(&one, &two),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_ranked_control_hits(&two, &one),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
     fn control_replacement_provenance_does_not_mix_winner_and_suppressed_atoms() {
         let replacement = CONTROL_REPLACEMENT_RULES[0];
         let event = |status| ControlTraceEvent {
             source_operator: "Mon3tr".to_string(),
             source_buff_id: replacement.source_buff_id.to_string(),
+            atom_id: "test_atom".to_string(),
             phase: Phase::GlobalInject,
             phase_order: 10,
             condition: None,

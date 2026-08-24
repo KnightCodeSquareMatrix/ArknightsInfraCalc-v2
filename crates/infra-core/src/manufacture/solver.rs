@@ -18,6 +18,7 @@ pub struct ManuProdBreakdown {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ManuLineEfficiency {
+    #[serde(rename = "total_efficiency")]
     pub final_efficiency: Efficiency,
     pub per_station: ManuProdBreakdown,
     pub storage: ManuStorageBreakdown,
@@ -43,7 +44,10 @@ pub struct ManuResult {
     pub occupancy_efficiency: Efficiency,
     pub skill_efficiency: Efficiency,
     pub global_efficiency: Efficiency,
+    #[serde(rename = "total_efficiency")]
     pub final_efficiency: Efficiency,
+    pub unit_output_per_day: f64,
+    pub output_per_day: f64,
     pub storage_limit: i32,
     pub mood_drain: Vec<OperatorMoodDrain>,
 }
@@ -118,6 +122,7 @@ pub fn solve_manufacture_with_shift(
     let mut occupancy = 0.0;
     let mut skill = 0.0;
     let mut global = 0.0;
+    let mut output = 0.0;
     let mut mood_drain = Vec::new();
     for window in boundaries.windows(2) {
         let duration = window[1] - window[0];
@@ -139,6 +144,7 @@ pub fn solve_manufacture_with_shift(
         occupancy += result.occupancy_efficiency.as_f64() * duration;
         skill += result.skill_efficiency.as_f64() * duration;
         global += result.global_efficiency.as_f64() * duration;
+        output += result.output_per_day * duration;
         mood_drain = result.mood_drain;
     }
 
@@ -162,10 +168,9 @@ pub fn solve_manufacture_with_shift(
         occupancy_efficiency,
         skill_efficiency,
         global_efficiency,
-        final_efficiency: base_efficiency
-            + occupancy_efficiency
-            + skill_efficiency
-            + global_efficiency,
+        final_efficiency: base_efficiency + skill_efficiency + global_efficiency,
+        unit_output_per_day: unit_output_per_day(input.active_recipe),
+        output_per_day: output / shift_hours,
         storage_limit: end.storage_limit,
         mood_drain,
     })
@@ -190,16 +195,18 @@ fn solve_manufacture_at_gaps(
     let global_efficiency = Efficiency::from_percent_points(
         ctx.prod_total(recipe) - ctx.prod_base() - ctx.prod_skill(recipe),
     );
+    let unit_output_per_day = unit_output_per_day(recipe);
+    let final_efficiency =
+        Efficiency::ONE + occupancy_efficiency + skill_efficiency + global_efficiency;
     Ok(ManuResult {
         active_recipe: recipe,
-        base_efficiency: Efficiency::ONE,
+        base_efficiency: Efficiency::ONE + occupancy_efficiency,
         occupancy_efficiency,
         skill_efficiency,
         global_efficiency,
-        final_efficiency: Efficiency::ONE
-            + occupancy_efficiency
-            + skill_efficiency
-            + global_efficiency,
+        final_efficiency,
+        unit_output_per_day,
+        output_per_day: unit_output_per_day * final_efficiency.as_f64(),
         storage_limit: ctx.storage_limit(recipe),
         mood_drain: ctx
             .mood_drain_summary()
@@ -210,6 +217,15 @@ fn solve_manufacture_at_gaps(
             })
             .collect(),
     })
+}
+
+pub fn unit_output_per_day(recipe: RecipeKind) -> f64 {
+    match recipe {
+        RecipeKind::Gold => 10_000.0,
+        RecipeKind::BattleRecord => 8_000.0,
+        RecipeKind::Originium => 24.0,
+        RecipeKind::All => 0.0,
+    }
 }
 
 fn room_has_mood_gap_effect(input: &ManuRoomInput, table: &SkillTable) -> bool {
@@ -305,6 +321,11 @@ mod tests {
 
     fn table() -> SkillTable {
         SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn originium_recipe_produces_24_shards_per_day_at_one_efficiency() {
+        assert_eq!(unit_output_per_day(RecipeKind::Originium), 24.0);
     }
 
     #[test]

@@ -333,19 +333,25 @@ fn assign_meeting_rooms(
                     .map(|op| crate::support_facility::SupportOperator {
                         name: op.name.clone(),
                         elite: op.elite,
+                        rarity: op.rarity,
                         level: op.level,
+                        mood: f64::from(op.work_mood.unwrap_or(options.mood.max(0.0) as u8)),
                     })
                     .chain(std::iter::once(crate::support_facility::SupportOperator {
                         name: name.clone(),
                         elite: progress.elite,
+                        rarity: progress.rarity,
                         level: progress.level,
+                        mood: options.mood.max(0.0),
                     }))
                     .collect();
                 if support_ops.len() < room.operator_capacity() {
                     support_ops.push(crate::support_facility::SupportOperator {
                         name: "\0meeting-partner-sentinel".to_string(),
                         elite: 0,
+                        rarity: 0,
                         level: 1,
+                        mood: options.mood.max(0.0),
                     });
                 }
                 let score = crate::meeting::evaluate_meeting(

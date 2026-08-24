@@ -74,6 +74,14 @@ pub struct LayoutContext {
     pub training_room_level: u8,
     /// 人力办公室联络速度加成 %（闪击·语言学等；不影响贸易/制造算分）。
     pub office_hire_spd_pct: f64,
+    /// 中枢写入的人力办公室联络速度加成 %。
+    pub control_office_hire_spd_pct: f64,
+    /// 中枢写入的会客室线索搜集速度加成 %。
+    pub control_meeting_speed_pct: f64,
+    /// 当前布局中的办公室数量；用于忽略没有目标设施的中枢注入候选价值。
+    pub office_room_count: u8,
+    /// 当前布局中的会客室数量；用于忽略没有目标设施的中枢注入候选价值。
+    pub meeting_room_count: u8,
 }
 
 impl Default for LayoutContext {
@@ -112,6 +120,10 @@ impl Default for LayoutContext {
             manu_tagged_count_sum: HashMap::new(),
             training_room_level: 0,
             office_hire_spd_pct: 0.0,
+            control_office_hire_spd_pct: 0.0,
+            control_meeting_speed_pct: 0.0,
+            office_room_count: 0,
+            meeting_room_count: 0,
         }
     }
 }

@@ -74,13 +74,30 @@ pub fn solve_power(input: &PowerRoomInput, table: &SkillTable) -> Result<PowerRe
         .copied()
         .unwrap_or(0.0);
 
-    let skill_efficiency = Efficiency::from_percent_points(base);
-    let ramp_efficiency = Efficiency::from_percent_points(ramp);
+    let zero_mood_work = input.operator.work_mood == Some(0.0);
+    let skill_efficiency = if zero_mood_work {
+        Efficiency::ZERO
+    } else {
+        Efficiency::from_percent_points(base)
+    };
+    let ramp_efficiency = if zero_mood_work {
+        Efficiency::ZERO
+    } else {
+        Efficiency::from_percent_points(ramp)
+    };
     Ok(PowerResult {
-        base_efficiency: Efficiency::ONE,
+        base_efficiency: if zero_mood_work {
+            Efficiency::ZERO
+        } else {
+            Efficiency::ONE
+        },
         skill_efficiency,
         ramp_efficiency,
-        final_efficiency: Efficiency::ONE + skill_efficiency + ramp_efficiency,
+        final_efficiency: if zero_mood_work {
+            Efficiency::ZERO
+        } else {
+            Efficiency::ONE + skill_efficiency + ramp_efficiency
+        },
         mood_drain_delta: ctx.operator.mood_drain_delta,
         virtual_power_produced: (after_vp - before_vp).max(0.0),
     })
@@ -146,6 +163,30 @@ mod tests {
         let input = PowerRoomInput::with_operator(PowerOperator::new("格雷伊", 0, buff_ids));
         let result = solve_power(&input, &table).unwrap();
         assert_eq!(result.final_efficiency, Efficiency::from_decimal(1.200));
+    }
+
+    #[test]
+    fn zero_mood_work_has_no_power_efficiency() {
+        let table = table();
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let mut operator = PowerOperator::new(
+            "Lancet-2",
+            0,
+            instances.resolve_power_buff_ids("Lancet-2", PromotionTier::Tier0),
+        );
+        operator.work_mood = Some(0.0);
+        let result = solve_power(
+            &PowerRoomInput {
+                operator,
+                mood: 0.0,
+                shift_hours: 12.0,
+                layout: LayoutContext::default(),
+            },
+            &table,
+        )
+        .unwrap();
+        assert_eq!(result.final_efficiency, Efficiency::ZERO);
+        assert_eq!(result.skill_efficiency, Efficiency::ZERO);
     }
 
     #[test]

@@ -128,6 +128,10 @@ pub enum SupportEffect {
         operator: String,
         value: f64,
     },
+    SpeedIfOperatorInControl {
+        operator: String,
+        value: f64,
+    },
     SpeedRampAverage {
         initial: f64,
         per_hour: f64,
@@ -145,7 +149,9 @@ pub enum SupportEffect {
 pub struct SupportOperator {
     pub name: String,
     pub elite: u8,
+    pub rarity: u8,
     pub level: u32,
+    pub mood: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +238,29 @@ pub fn evaluate_support_room(
     }
 
     let active = active_entries(input, registry);
-    let mut skill_speed = 0.0;
+    let mut skill_speed = if input.facility == SupportFacility::Meeting {
+        input
+            .operators
+            .iter()
+            .map(|operator| {
+                let mood_bonus = if operator.mood > 0.0 { 5.0 } else { 0.0 };
+                let rarity_bonus = match operator.rarity {
+                    4 => 2.0,
+                    5 => 4.0,
+                    6 => 5.0,
+                    _ => 0.0,
+                };
+                let elite_bonus = match operator.elite {
+                    1 => 8.0,
+                    2 => 16.0,
+                    _ => 0.0,
+                };
+                mood_bonus + rarity_bonus + elite_bonus
+            })
+            .sum()
+    } else {
+        0.0
+    };
     let mut meeting_inject = 0.0;
     let mut mood = input
         .operators
@@ -392,6 +420,19 @@ fn effect_value(
                 active,
             )
         }
+        SupportEffect::SpeedIfOperatorInControl { operator, value } => {
+            let active = input
+                .layout
+                .control_workforce
+                .iter()
+                .any(|name| name == operator);
+            (
+                "speed_if_operator_in_control",
+                if active { *value } else { 0.0 },
+                EffectTarget::Speed,
+                active,
+            )
+        }
         SupportEffect::SpeedRampAverage {
             initial,
             per_hour,
@@ -448,7 +489,9 @@ mod tests {
         SupportOperator {
             name: name.into(),
             elite,
+            rarity: 0,
             level: 0,
+            mood: 0.0,
         }
     }
 
@@ -465,6 +508,46 @@ mod tests {
             external_speed_bonus_pct: 0.0,
             layout: LayoutContext::default(),
         }
+    }
+
+    #[test]
+    fn meeting_base_efficiency_adds_mood_rarity_and_elite() {
+        let registry = registry();
+        let result = evaluate_support_room(
+            &input(
+                SupportFacility::Meeting,
+                vec![SupportOperator {
+                    name: "基础测试干员".into(),
+                    elite: 2,
+                    rarity: 6,
+                    level: 0,
+                    mood: 24.0,
+                }],
+            ),
+            &registry,
+        )
+        .unwrap();
+        assert!((result.skill_speed_bonus_pct - 26.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn meeting_base_efficiency_keeps_rarity_and_elite_at_zero_mood() {
+        let registry = registry();
+        let result = evaluate_support_room(
+            &input(
+                SupportFacility::Meeting,
+                vec![SupportOperator {
+                    name: "基础测试干员".into(),
+                    elite: 1,
+                    rarity: 5,
+                    level: 0,
+                    mood: 0.0,
+                }],
+            ),
+            &registry,
+        )
+        .unwrap();
+        assert!((result.skill_speed_bonus_pct - 12.0).abs() < 1e-9);
     }
 
     #[test]
@@ -508,20 +591,66 @@ mod tests {
     }
 
     #[test]
+    fn office_skill_reads_operator_in_control_center_condition() {
+        let mut with_yin_hui = input(SupportFacility::Office, vec![op("圣聆初雪", 2)]);
+        with_yin_hui.layout.control_workforce = vec!["凛御银灰".into()];
+        let active = evaluate_support_room(&with_yin_hui, &registry()).unwrap();
+        assert_eq!(active.skill_speed_bonus_pct, 45.0);
+        assert!(active.unsupported.is_empty());
+
+        let inactive = evaluate_support_room(
+            &input(SupportFacility::Office, vec![op("圣聆初雪", 2)]),
+            &registry(),
+        )
+        .unwrap();
+        assert_eq!(inactive.skill_speed_bonus_pct, 35.0);
+        assert!(inactive.contributions.iter().any(|contribution| {
+            contribution.buff_id == "hire_spd_cost&char[001]" && !contribution.active
+        }));
+    }
+
+    #[test]
     fn meeting_solo_and_partner_conditions_use_actual_room() {
         let solo = evaluate_support_room(
             &input(SupportFacility::Meeting, vec![op("和弦", 2)]),
             &registry(),
         )
         .unwrap();
-        assert_eq!(solo.skill_speed_bonus_pct, 50.0);
+        assert_eq!(solo.skill_speed_bonus_pct, 66.0);
 
         let duo = evaluate_support_room(
             &input(SupportFacility::Meeting, vec![op("凛视", 2), op("提丰", 2)]),
             &registry(),
         )
         .unwrap();
-        assert_eq!(duo.skill_speed_bonus_pct, 35.0);
+        assert_eq!(duo.skill_speed_bonus_pct, 67.0);
+    }
+
+    #[test]
+    fn wish_angelina_only_gains_speed_when_working_alone() {
+        let solo = evaluate_support_room(
+            &input(SupportFacility::Meeting, vec![op("予愿安洁莉娜", 2)]),
+            &registry(),
+        )
+        .unwrap();
+        assert_eq!(solo.skill_speed_bonus_pct, 66.0);
+        assert_eq!(solo.mood[0].delta_per_hour, 2.0);
+        assert_eq!(solo.ignored.len(), 1);
+
+        let duo = evaluate_support_room(
+            &input(
+                SupportFacility::Meeting,
+                vec![op("予愿安洁莉娜", 2), op("阿米娅", 2)],
+            ),
+            &registry(),
+        )
+        .unwrap();
+        assert_eq!(duo.skill_speed_bonus_pct, 32.0);
+        assert!(duo.contributions.iter().any(|contribution| {
+            contribution.buff_id == "meet_spd&cost_condChar[002]"
+                && contribution.kind == "speed_if_solo"
+                && !contribution.active
+        }));
     }
 
     #[test]
@@ -532,14 +661,14 @@ mod tests {
             .global
             .set(GlobalResourceKey::IntelligenceReserve, 3.0);
         let state = evaluate_support_room(&state_input, &registry()).unwrap();
-        assert_eq!(state.skill_speed_bonus_pct, 20.0);
+        assert_eq!(state.skill_speed_bonus_pct, 36.0);
 
         let ramp = evaluate_support_room(
             &input(SupportFacility::Meeting, vec![op("伊内丝", 2)]),
             &registry(),
         )
         .unwrap();
-        assert!((ramp.skill_speed_bonus_pct - 27.9166666667).abs() < 1e-9);
+        assert!((ramp.skill_speed_bonus_pct - 43.9166666667).abs() < 1e-9);
     }
 
     #[test]
@@ -549,7 +678,7 @@ mod tests {
             &registry(),
         )
         .unwrap();
-        assert_eq!(result.skill_speed_bonus_pct, 10.0);
+        assert_eq!(result.skill_speed_bonus_pct, 26.0);
         assert_eq!(result.unsupported.len(), 1);
         assert_eq!(result.unsupported[0].row_id, 344);
     }
@@ -571,7 +700,7 @@ mod tests {
             &registry(),
         )
         .unwrap();
-        assert_eq!(result.total_speed_bonus_pct, 0.0);
+        assert_eq!(result.total_speed_bonus_pct, 16.0);
         assert_eq!(result.mood[0].operator, "阿米娅");
     }
 

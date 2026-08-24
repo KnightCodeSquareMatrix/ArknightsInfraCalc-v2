@@ -2,6 +2,50 @@
   "version": 1,
   "rules": [
     {
+      "id": "mujica_fallback",
+      "priority": -10,
+      "tier": "cross_station",
+      "exclusive_group": "control_fallback",
+      "alternatives": [
+        {
+          "id": "full_mujica",
+          "explicit_only": true,
+          "gates": [
+            { "kind": "operator_available", "name": "若叶睦", "elite": 0 },
+            { "kind": "operator_available", "name": "三角初华", "elite": 0 },
+            { "kind": "operator_available", "name": "丰川祥子", "elite": 2 },
+            { "kind": "operator_available", "name": "祐天寺若麦", "elite": 0 },
+            { "kind": "operator_available", "name": "八幡海铃", "elite": 0 }
+          ],
+          "roles": [
+            {
+              "id": "mujica_control",
+              "facility": "control_center",
+              "candidates": [
+                { "name": "若叶睦", "elite": 0 },
+                { "name": "三角初华", "elite": 0 },
+                { "name": "丰川祥子", "elite": 2 },
+                { "name": "祐天寺若麦", "elite": 0 },
+                { "name": "八幡海铃", "elite": 0 }
+              ],
+              "min_count": 5,
+              "max_count": 5,
+              "selection": "all_available",
+              "same_room": true
+            }
+          ],
+          "exclude_control_when_inactive": [
+            "若叶睦",
+            "三角初华",
+            "丰川祥子",
+            "祐天寺若麦"
+          ],
+          "exclude_operators": [],
+          "bind_all": true
+        }
+      ]
+    },
+    {
       "id": "trade_core",
       "priority": 1000,
       "tier": "cross_station",
@@ -34,7 +78,7 @@
               "id": "core",
               "facility": "trade_post",
               "trade_order": "gold",
-              "candidates": [{ "name": "但书", "elite": 2 }]
+              "candidates": [{ "name": "但书", "elite": 0 }]
             }
           ],
           "continuous": true,
@@ -52,7 +96,7 @@
               "facility": "trade_post",
               "trade_order": "gold",
               "room_level_preference": "lowest_level",
-              "candidates": [{ "name": "但书", "elite": 2 }]
+              "candidates": [{ "name": "但书", "elite": 0 }]
             }
           ],
           "continuous": true,
@@ -301,18 +345,20 @@
           "gates": [{ "kind": "facility_count", "facility": "power_plant", "min": 2, "max": 2 }],
           "roles": [
             { "id": "control", "facility": "control_center", "candidates": [{ "name": "森蚺", "elite": 2 }] },
+            { "id": "virtual_power", "facility": "power_plant", "candidates": [{ "name": "承曦格雷伊", "elite": 2 }], "min_count": 0 },
             {
               "id": "lancet",
               "facility": "power_plant",
               "candidates": [{ "name": "Lancet-2", "elite": 0 }],
               "work_mood": 0,
+              "work_mood_if_operator_present": "承曦格雷伊",
               "rest_facility": "workshop"
             },
-            { "id": "virtual_power", "facility": "power_plant", "candidates": [{ "name": "承曦格雷伊", "elite": 2 }], "min_count": 0 },
             {
               "id": "gold_pair",
               "facility": "factory",
               "recipe": "gold",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "清流", "elite": 1 }, { "name": "温蒂", "elite": 2 }],
               "min_count": 2,
               "max_count": 2,
@@ -323,7 +369,7 @@
               "id": "gold_third",
               "facility": "factory",
               "recipe": "gold",
-              "candidates": [{ "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }, { "name": "冬时", "elite": 2 }],
+              "candidates": [{ "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }, { "name": "冬时", "elite": 1 }],
               "min_count": 0,
               "max_count": 1,
               "selection": "manufacture_objective",
@@ -343,13 +389,14 @@
             {
               "id": "wendy_core",
               "facility": "factory",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "温蒂", "elite": 2 }],
               "room_group": "automation_factory"
             },
             {
               "id": "general_peers",
               "facility": "factory",
-              "candidates": [{ "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 1,
               "max_count": 2,
               "selection": "ordered",
@@ -361,9 +408,9 @@
               "facility": "power_plant",
               "candidates": [{ "name": "Lancet-2", "elite": 0 }],
               "work_mood": 0,
+              "work_mood_if_operator_present": "承曦格雷伊",
               "rest_facility": "workshop"
-            },
-            { "id": "virtual_power", "facility": "power_plant", "candidates": [{ "name": "承曦格雷伊", "elite": 2 }], "min_count": 0 }
+            }
           ],
           "bind_all": true
         },
@@ -379,6 +426,7 @@
               "id": "gold_team",
               "facility": "factory",
               "recipe": "gold",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "清流", "elite": 1 }, { "name": "温蒂", "elite": 2 }, { "name": "森蚺", "elite": 2 }],
               "min_count": 3,
               "max_count": 3,
@@ -400,13 +448,14 @@
             {
               "id": "wendy_core",
               "facility": "factory",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "温蒂", "elite": 2 }],
               "room_group": "automation_factory"
             },
             {
               "id": "general_peers",
               "facility": "factory",
-              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 1,
               "max_count": 2,
               "selection": "ordered",
@@ -427,6 +476,7 @@
               "id": "wendy_core",
               "facility": "factory",
               "recipe": "gold",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "温蒂", "elite": 2 }],
               "room_group": "automation_factory"
             },
@@ -434,7 +484,7 @@
               "id": "gold_peers",
               "facility": "factory",
               "recipe": "gold",
-              "candidates": [{ "name": "清流", "elite": 1 }, { "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "清流", "elite": 1 }, { "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 1,
               "max_count": 2,
               "selection": "ordered",
@@ -454,13 +504,14 @@
             {
               "id": "wendy_core",
               "facility": "factory",
+              "room_level_preference": "level_2_first",
               "candidates": [{ "name": "温蒂", "elite": 2 }],
               "room_group": "automation_factory"
             },
             {
               "id": "general_peers",
               "facility": "factory",
-              "candidates": [{ "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 1,
               "max_count": 2,
               "selection": "ordered",
@@ -495,7 +546,7 @@
               "id": "third",
               "facility": "factory",
               "recipe": "gold",
-              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "room_group": "automation_factory"
             },
             { "id": "virtual_power", "facility": "power_plant", "candidates": [{ "name": "承曦格雷伊", "elite": 2 }], "min_count": 0 }
@@ -518,7 +569,7 @@
             {
               "id": "general_peers",
               "facility": "factory",
-              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 2,
               "max_count": 2,
               "selection": "ordered",
@@ -541,7 +592,7 @@
             {
               "id": "general_peers",
               "facility": "factory",
-              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 2 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
+              "candidates": [{ "name": "森蚺", "elite": 2 }, { "name": "冬时", "elite": 1 }, { "name": "异客", "elite": 2 }, { "name": "掠风", "elite": 2 }],
               "min_count": 2,
               "max_count": 2,
               "selection": "ordered",

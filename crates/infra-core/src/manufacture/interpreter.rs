@@ -132,7 +132,11 @@ impl ManuContext {
     }
 
     pub fn prod_base(&self) -> f64 {
-        self.operators.len() as f64
+        if self.mood <= 0.0 {
+            0.0
+        } else {
+            self.operators.len() as f64
+        }
     }
 
     fn effective_rhine_life_in_base(&self) -> u8 {

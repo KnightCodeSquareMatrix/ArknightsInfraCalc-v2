@@ -10,8 +10,8 @@ use crate::layout::{
 };
 use crate::operbox::OperBox;
 use crate::schedule::{
-    DormRestPlan, DroneAction, ShiftTransition, TeamLabel, TeamRotationReport,
-    TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
+    fiammetta_return_priority, DormRestPlan, DroneAction, ShiftTransition, TeamLabel,
+    TeamRotationReport, TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
 };
 use crate::trade::input::TradeOrderKind;
 use crate::types::RecipeKind;
@@ -56,6 +56,13 @@ impl MaaExportOptions {
     /// 启用公孙长乐确认的菲亚梅塔常规目标顺序。
     pub fn enable_gongsun_fiammetta_priority(&mut self) {
         self.fiammetta_priority = FIAMMETTA_RETURN_PRIORITY
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+    }
+
+    pub fn enable_fiammetta_priority_for_blueprint(&mut self, blueprint: &BaseBlueprint) {
+        self.fiammetta_priority = fiammetta_return_priority(blueprint)
             .into_iter()
             .map(str::to_owned)
             .collect();
@@ -1057,6 +1064,39 @@ mod tests {
     }
 
     #[test]
+    fn blueprint_fiammetta_priority_promotes_purestream_only_for_three_trade_layouts() {
+        let mut blueprint = sample_blueprint();
+        blueprint.rooms.extend([
+            RoomBlueprint {
+                id: RoomId::new("trade_2"),
+                kind: FacilityKind::TradePost,
+                level: 3,
+                product: Some(RoomProduct::Trade {
+                    order: TradeOrderKind::Gold,
+                }),
+                dorm_beds: None,
+                dorm_ambience_level: None,
+            },
+            RoomBlueprint {
+                id: RoomId::new("trade_3"),
+                kind: FacilityKind::TradePost,
+                level: 3,
+                product: Some(RoomProduct::Trade {
+                    order: TradeOrderKind::Gold,
+                }),
+                dorm_beds: None,
+                dorm_ambience_level: None,
+            },
+        ]);
+        let mut options = MaaExportOptions::for_blueprint(&blueprint);
+        options.enable_fiammetta_priority_for_blueprint(&blueprint);
+        assert_eq!(
+            options.fiammetta_priority,
+            vec!["但书", "可露希尔", "清流", "巫恋", "龙舌兰"]
+        );
+    }
+
+    #[test]
     fn resolve_fiammetta_falls_back_and_empty_priority_disables_it() {
         let blueprint = sample_blueprint();
         let mut assignment = BaseAssignment::default();
@@ -1072,7 +1112,7 @@ mod tests {
 
         let fallback = resolve_fiammetta(&opts.fiammetta_priority, &assignment);
         assert!(fallback.enable);
-        assert_eq!(fallback.target, "清流");
+        assert_eq!(fallback.target, "可露希尔");
 
         let disabled = resolve_fiammetta(&[], &assignment);
         assert!(!disabled.enable);

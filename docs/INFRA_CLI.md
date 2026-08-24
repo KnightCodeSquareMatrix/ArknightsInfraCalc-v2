@@ -142,7 +142,7 @@ crates/infra-cli/src/
 | `search trade` | `main.rs` | `output::emit_trade_search` | roster / operbox |
 | `bench` | `main.rs` | `output::emit_bench` | 必选 `--operbox`；布局固定 `search_baseline`（`243_use_this_.json`） |
 | **`layout test`** | `commands/layout.rs` | `output::emit_bench` | 必选 `--layout` + `--operbox`；默认调用 `assign_base_greedy` |
-| **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation`；可选 prefix shadow JSON | 必选 `--layout` + `--operbox`；支持默认 ABC、二班与两个具名四班；仅排班时用 |
+| **`layout team-rotation`** | `commands/layout.rs` | `output::emit_team_rotation`；可选 prefix shadow JSON | 必选 `--layout` + `--operbox`；支持默认 ABC、ABC `12/12/12`、二班与两个具名特殊四班；仅排班时用 |
 | **`layout analyze`** | `commands/layout.rs` | `print_box_profile_report` | 必选 `--layout` + `--operbox`；练度概况分析 |
 | **`layout eval`** | `commands/layout.rs` | stderr 文本 / 默认汇总 JSON；`--explain-json` 输出 versioned 结算诊断 | 必选 `--layout` + `--operbox` + `--assignment`；评估指定编制 |
 | `profile layout-full` | `commands/profile.rs` | stderr 性能报告 | 开发辅助；默认路径为历史性能夹具，用户模拟不要用 |
@@ -191,7 +191,7 @@ cargo run -q -p infra-cli -- debug rerun \
 
 | 参数 | 说明 |
 |---|---|
-| `--bundle` | 必填；当前只支持 `version=beta-test-bundle-v2-next-serve`、`serveRequest.method=plan` 且线上调用成功的 bundle |
+| `--bundle` | 必填；支持 `version=beta-test-bundle-v2-next-serve`、成功的 `serveRequest.method=plan` 或 `plan.compute` bundle |
 | `--top` / `--rotation` | 可选显式覆盖；未提供时优先读取 recorded request，否则记录为 historical default |
 | `--room` / `--operator` | 互斥的结果聚焦投影；只过滤结果、不改变求解输入；因包含私人编制，必须同时使用 `--output-dir` |
 | `--shift` | 1-based；必须与 `--room` 或 `--operator` 一起使用 |
@@ -209,7 +209,11 @@ canonical hash 一致，缺失内联值时才回退 sibling。bundle 中的 `com
 
 stdout 只输出不含 source name、排班名单、focus 或 recorded projection 的脱敏摘要。完整 rotation、
 focus、原结果投影和 operbox 只进入 `--output-dir`；该目录固定以私有 evidence 处理，不提交。
-当前不支持 `plan.compute` bundle、失败调用重跑、全候选日志或“未选中候选为什么失败”的解释。
+当前不支持失败调用重跑、全候选日志或“未选中候选为什么失败”的解释。`plan.compute` bundle 的
+layout/operbox 以请求和 bundle 顶层的内联快照为准；同目录旧 sibling 快照不覆盖这两个请求快照。
+历史 `plan.compute` bundle 可能把 `rarity=1` 作为未知星级哨兵，但仍保留真实 `elite/level`；重放只在
+私有 debug 适配层放宽这项历史输入校验并记录数量，不会把 E1/E2 降级。正常运行时的 `plan.compute`
+契约校验仍保持严格。
 
 ---
 
@@ -261,7 +265,7 @@ cargo run -p infra-cli -- plan \
 |------|------|
 | `--operbox` | **必填**。`OperBox` JSON 或一图流练度 xlsx |
 | `--layout` | 可选。默认 `data/fixtures/243/layout.json` |
-| `--rotation` | 可选。`2` / `3` / `12/12/12` / `fiammetta-8844` / `abyssal-7575`；省略为 `3`，裸 `4` 报错 |
+| `--rotation` | 可选。`2` / `3` / `12/12/12` / `fiammetta-8844` / `abyssal-7575`；省略为 `3`，裸 `4` 和自由时长数组报错 |
 | `--no-fiammetta` | 可选。关闭菲亚梅塔主力回岗覆盖；关闭后 MAA 输出的 `Fiammetta.enable` 全部为 `false`。与 `--rotation fiammetta-8844` 组合直接硬错误 |
 | `--maa-out` | 写出 MAA 基建排班 JSON |
 | `--profile-out` | 可选。账号画像 JSON 路径（默认同目录 `*_profile.json`） |

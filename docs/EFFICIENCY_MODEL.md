@@ -15,7 +15,7 @@
 `155%`。调用方可以直接用它预估产出：
 
 ```text
-expected_output = reference_output_per_day × final_efficiency × minutes / 1440
+expected_output = unit_output_per_day × total_efficiency × minutes / 1440
 ```
 
 代码不再公开 `trade_pct`、`gold_pct`、`prod_total`、`charge_speed_pct`、匿名
@@ -42,56 +42,93 @@ bake schema v12 直接保存 `*_efficiency_millis: i32`，加载后还原为
 
 ### 3.1 统一展示口径
 
-生产房间统一展示四个分量：
+贸易和制造房间统一展示三层效率分量：
 
 ```text
-operator_efficiency = 白字，干员本人及直接作用于干员的效率
-station_efficiency  = 绿字，入驻人数与中枢/其他设施全局加成
-total_efficiency    = 1.000 + operator_efficiency + station_efficiency
+base_efficiency    = 1.000 + nonzero_mood_operator_count × 0.010
+global_efficiency  = 中枢或其他设施写入当前生产域的全局加成
+skill_efficiency   = 当前房间干员组合技能最终结算的效率
+total_efficiency   = base_efficiency + global_efficiency + skill_efficiency
 ```
 
-贸易站再按订单倍率生成实际产出效率：
+`occupancy_efficiency` 仍作为诊断分量返回，但它已包含在 `base_efficiency` 中，不能再次相加。
+`control_efficiency` 是贸易接口中的历史字段别名，新的统一接口使用 `global_efficiency`。
+
+实际产出不再伪装成效率倍率：
 
 ```text
-final_efficiency = total_efficiency × order_multiplier
-equivalent_efficiency = final_efficiency - 1.000 - station_efficiency
+output = unit_output_per_day × total_efficiency × work_time / 24
 ```
 
-没有订单倍率的制造和发电站使用 `order_multiplier = 1.000`，其 `final_efficiency` 等于
-`total_efficiency`。跨站汇总只累加 `final_efficiency`，不重复累加白字或绿字。
+`final_efficiency` 不再出现在公开 JSON/CLI 协议；内部 Rust 排序仍复用同一数值，但公开字段统一命名为 `total_efficiency`。
 
 ### 3.2 贸易
 
 ```text
-paper_efficiency
-  = base_efficiency
-  + occupancy_efficiency
-  + skill_efficiency
-  + control_efficiency
-
-unit_output_multiplier
-  = community_unit_output_per_day / reference_unit_output_per_day
-
-final_efficiency = paper_efficiency × unit_output_multiplier
+total_efficiency = base_efficiency + global_efficiency + skill_efficiency
+trade_output_per_day = trade_unit_output_per_day × total_efficiency
+gold_output_per_day = gold_unit_output_per_day × total_efficiency
 ```
 
-三级普通赤金贸易站基准日产出为 `10265`。但书、可露希尔、龙舌兰、巫恋等使用
-社区已确认的单位产出换算，不还原逐笔订单逻辑。但书三级站即整个房间纸面效率整体乘
-`1.550`；例如 `1.230 × 1.550 = 1.907`。
+普通龙门币贸易单位日产出：一级 `10000`，二级 `10141`，三级 `10265`。仅三级贸易站可选择
+“开采协力”：每 2h 消耗 `2` 源石碎片、获得 `20` 合成玉，因此每 `1.0` 效率、24h 的基准产出为
+`240` 合成玉，订单消耗为 `24` 源石碎片。它没有随机订单档位，也不产生龙门币。特殊组合直接提供其贸易和赤金单位日产出，不把倍率乘回 `total_efficiency`。
 
-`mechanic_equivalent_efficiency` 只解释社区机制，不参与第二次乘法。
-`equivalent_skill_efficiency` 也是从最终效率反算的展示分量。唯一排序和产出真源是
-`final_efficiency`。
+普通赤金订单分布按贸易站等级为：一级 `2 金 100%`；二级 `2 金 60% / 3 金 40%`；三级
+`2 金 30% / 3 金 50% / 4 金 20%`。二级的 `60% / 40%` 只更新订单机制分布，不改变二级
+社区单位产出锚点 `10141`。本次变更仅涉及普通赤金订单，源石订单规则不在本次范围内。
+
+当前单位产出锚点：
+
+| 组合 | 贸易单位日产出 | 赤金单位日产出 |
+|---|---:|---:|
+| 可露希尔 | 12000 | 2000 |
+| 龙舌兰 + 裁缝 β | 12739.73 | 2328.77 |
+| 巫恋 E2 + 龙舌兰 E2 + 裁缝 α | 12030.46 | 1675.127 |
+| 巫恋 E2 + 龙舌兰 E0 + 裁缝 α | 11192.9 | 837.56 |
+| 龙舌兰 + 但书 + 纯效率 | 16637.17 | 707.96 |
+| 但书 E2，一级站 | 20000 | 0 |
+| 但书 E2，二级站 | 18591.55 | 0 |
+| 但书 E2，三级站 | 15929.2 | 0 |
+| 但书 E0，一级站 | 15000 | 0 |
+| 但书 E0，二级站 | 14366.197 | 0 |
+| 但书 E0，三级站 | 13097.345 | 0 |
+
+例如三级普通站中，组合总效率为 `2.020`、可露希尔贸易单位日产出为 `12000`，则贸易产出为：
+
+```text
+12000 × 2.020 × 工作时间占比
+```
+
+贸易产出和订单赤金消耗分别返回，不能把订单消耗折算成赤金产出。
+
+完整轮换报告额外返回 `daily.production`。它按各班次、各房间的产出率累加后，使用
+`sum(班次时长)` 归一到 24h 平均值；`lmd` 是龙门币订单产出，`pure_gold` 是赤金制造产出，
+`battle_records` 是作战记录，`orundum` 是贸易站「开采协力」合成玉订单产出，
+`originium_shards` 是制造站源石碎片产出。贸易订单交付赤金和源石碎片投入不进入产物汇总。
+
+等效效率只用于把特殊组合与普通纯效率干员比较。对每条产出分别计算：
+
+```text
+trade_equivalent_efficiency = total_efficiency × trade_role_multiplier
+                              - base_efficiency
+                              - global_efficiency
+gold_equivalent_efficiency = total_efficiency × gold_role_multiplier
+```
+
+贸易等效效率用于比较“需要多少普通贸易技能效率”，所以扣除基础和中枢加成。赤金等效效率只如实还原特殊组合具备的赤金产能，不扣除基础效率、中枢加成或贸易订单消耗。贸易和赤金各有独立的 `role_multiplier`、`equivalent_efficiency`、`unit_output_per_day` 和实际产出。
 
 ### 3.3 制造
 
 ```text
-final_efficiency
-  = 1.000
-  + occupancy_efficiency   // 每名进驻干员 0.010
-  + skill_efficiency
-  + global_efficiency
+base_efficiency = 1.000 + nonzero_mood_operator_count × 0.010
+total_efficiency = base_efficiency + skill_efficiency + global_efficiency
+output = unit_output_per_day × total_efficiency × work_time / 24
 ```
+
+制造“源石材料”配方的 `unit_output_per_day` 为 `24` 源石碎片：每个碎片无加速生产耗时 1h，消耗
+`2` 固源岩与 `1600` 龙门币，或以 `1` 装置与 `1000` 龙门币替代。这里的 `24` 与贸易站开采协力的
+`240` 合成玉是不同产物、不同单位，不能混用。
 
 单配方搜索按 `final_efficiency` 排序。多产线结果是各产线直接效率之和，仍保持制造域
 量纲，不写入贸易或发电的结果字段。具名编制 policy 可以显式消费各域分量做候选排序，
@@ -134,8 +171,8 @@ L1 技能解释（原始机制数值）
 
 | 域 | 最终字段 | 主要分解字段 |
 |---|---|---|
-| 贸易 | `total_efficiency`（纸面）/ `final_efficiency`（订单倍率后） | `operator_efficiency`、`station_efficiency`、`order_multiplier`、`equivalent_efficiency` |
-| 制造 | `total_efficiency` = `final_efficiency` | `operator_efficiency`、`station_efficiency` |
+| 贸易 | `total_efficiency` | `base_efficiency`、`global_efficiency`、`skill_efficiency`、贸易/赤金单位产出、贸易/赤金等效效率、实际产出 |
+| 制造 | `total_efficiency` | `base_efficiency`、`global_efficiency`、`skill_efficiency`、配方单位日产出和实际产出 |
 | 发电 | `total_efficiency` = `final_efficiency` | `operator_efficiency` |
 | 班次 | `trade_efficiency` / `manufacture_efficiency` / `power_efficiency` | `room_lines`；每房输出 `operator_efficiency`、`station_efficiency`、`total_efficiency`、`order_multiplier`、`equivalent_efficiency` |
 | 日汇总 | `trade` / `manufacture` / `power` | 各自为按时长加权后的直接效率 |
@@ -154,7 +191,7 @@ schema，也不自动成为其他 System / Rule alternative 的 comparator。
 
 ## 6. 回归要求
 
-- `REGRESSION_CASES.csv` 直接锚定三位小数 `expect_final_efficiency`；
+ - `REGRESSION_CASES.csv` 的旧列仍用于内部回归兼容；新增回归应锚定 `total_efficiency`、单位日产出和实际产出；
 - `UNIT_OUTPUT_ANCHORS.csv` 独立锚定社区单位产出；
 - `verify --all` 同时验证最终效率、机制解释、规则 ID 与单位产出；
 - bake 需要 schema v12，旧 schema 不兼容，必须重新生成；

@@ -110,7 +110,7 @@ infra-cli plan \
 |------|------|------|
 | `--operbox <path>` | 是 | `OperBox` JSON 数组，或一图流导出的 **xlsx** |
 | `--layout <path>` | 否 | 默认 `data/fixtures/243/layout.json` |
-| `--rotation <profile>` | 否 | 默认 `3`；可选 `2`、`12/12/12`、`fiammetta-8844`、`abyssal-7575`；裸 `4` 硬错误 |
+| `--rotation <profile>` | 否 | 默认 `3`；可选 `2`、`12/12/12`、`fiammetta-8844`、`abyssal-7575`；裸 `4` 和自由时长数组硬错误 |
 | `--maa-out <path>` | 否* | MAA 自定义基建排班 JSON；一次性 CLI 集成应传入已知临时路径 |
 | `--profile-out <path>` | 否 | 账号画像 JSON；一次性 CLI 集成应传入已知临时路径 |
 | `--baseline <operbox>` | 否 | 对比基准练度盒（画像用） |
@@ -243,7 +243,7 @@ infra-cli layout team-rotation \
 |------|------|------|
 | `--layout <path>` | 是 | `BaseBlueprint` JSON（见 §5.1） |
 | `--operbox <path>` | 是 | `OperBox` JSON 数组（见 §5.2） |
-| `--rotation <profile>` | 否 | 与 `plan` 相同；省略保持 ABC `12/6/6` |
+| `--rotation <profile>` | 否 | 与 `plan` 相同；省略保持 ABC `12/6/6`；当前不接受自由时长数组 |
 | `--maa-out <path>` | 否* | 写出 MAA 自定义基建 JSON；**前端集成建议始终带上** |
 | `--maa-title <text>` | 否 | 覆盖 JSON 顶层 `title` |
 | `--top <n>` | 否 | 编制搜索候选深度，默认 `20` |
@@ -278,7 +278,7 @@ infra-cli layout team-rotation \
 {"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
-响应 `result.schema_version` 等于请求参数的 schema 版本，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。练卡字段的完整契约见下一节。
+响应 `result.schema_version` 等于请求参数的 schema 版本，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。v3 响应可选返回 `training_room`（schema v1）；该字段缺失时前端按“当前 Worker 未提供训练室结果”处理，不视为错误。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。练卡字段的完整契约见下一节。
 
 `plan.compute` v1/v2/v3 参数的机器契约分别是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)、[`contracts/plan-compute-v2.schema.json`](../contracts/plan-compute-v2.schema.json) 与 [`contracts/plan-compute-v3.schema.json`](../contracts/plan-compute-v3.schema.json)，人类可读契约见对应的 `plan-compute-v1.md` / `plan-compute-v2.md` / `plan-compute-v3.md`。Worker 在 Serde 反序列化前执行对应 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 保持原语义，`abc_12_12_12` 通过 v2 请求使用，`options.fiammetta_enable`（默认 `true`）通过 v3 请求使用；`fiammetta_enable=false` 与 `rotation: fiammetta_8_8_4_4` 组合直接失败。
 
@@ -408,7 +408,24 @@ infra-cli layout team-rotation \
 - `recommendations` 是行动待办；`combinations` 是全量组合状态。不要从前者反推后者，也不要把灰色组合缺口计入 10 人限制。
 - 前端不得把旧 `training_recommendations.json`、legacy `advice` 的 `now`/`conditional` 输出或自然语言 `--answer` 混入本 schema。
 
-### 4.6 stderr 提示示例
+### 4.6 `training_room`（训练室排班附带结果）
+
+`training_room` 是 `plan.compute` 成功结果中的可选响应字段，不改变总体 `plan_schema_version: 3`，也不要求旧 Worker 升级。当前协议为：
+
+```json
+{
+  "training_room": {
+    "schema_version": 1,
+    "shifts": [
+      { "trainee": "干员名或 null", "trainer": "干员名或 null" }
+    ]
+  }
+}
+```
+
+`shifts` 与 `result.rotation.shifts` 按位置对应。没有训练任务时 `trainee` 必须为 `null`；没有协助位时 `trainer` 为 `null`。字段缺失表示 Worker 尚未提供训练室结果，前端必须兼容读取，不得把缺失解释为训练室空配置或协议错误。实现任务见 [训练室输出与 plan.compute 协议](TODO/训练室输出与plan.compute协议.md)。
+
+### 4.7 stderr 提示示例
 
 ```
 MAA 排班 JSON 已写入: out/243_maa.json

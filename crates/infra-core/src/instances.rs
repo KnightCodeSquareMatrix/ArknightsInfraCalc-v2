@@ -216,6 +216,22 @@ mod tests {
     }
 
     #[test]
+    fn jie_tier_up_keeps_both_trade_skills() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        assert_eq!(
+            instances.resolve_trade_buff_ids("孑", PromotionTier::Tier0),
+            vec!["trade_ord_limit_diff[000]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_trade_buff_ids("孑", PromotionTier::TierUp),
+            vec![
+                "trade_ord_limit_diff[000]".to_string(),
+                "trade_ord_limit_count[000]".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn merge_stepwise_replaces_same_stem() {
         let t0 = vec!["trade_ord_against[000]".into(), "trade_ord_law[000]".into()];
         let up = vec!["trade_ord_against[010]".into(), "trade_ord_law[000]".into()];
@@ -277,6 +293,43 @@ mod tests {
             instances.resolve_manufacture_buff_ids("裁度", PromotionTier::TierUp),
             vec!["manu_prod_spd&limit&cost[100]".to_string()],
             "裁度精2应替换为得心应手 25%+仓库，不应与量体裁衣叠加"
+        );
+    }
+
+    #[test]
+    fn updated_support_and_trade_bindings_resolve_by_tier() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+
+        assert_eq!(
+            instances.resolve_office_buff_ids("圣聆初雪", PromotionTier::TierUp),
+            vec!["hire_spd_cost&char[001]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_trade_buff_ids("琳琅诗怀雅", PromotionTier::Tier0),
+            vec!["trade_ord_spd[000]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_trade_buff_ids("琳琅诗怀雅", PromotionTier::TierUp),
+            vec![
+                "trade_ord_spd[000]".to_string(),
+                "trade_ord_spd_variable[000]".to_string(),
+            ]
+        );
+        assert_eq!(
+            instances.resolve_control_buff_ids("阿", PromotionTier::TierUp),
+            vec!["control_clue_cost[000]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_control_buff_ids("艾拉", PromotionTier::TierUp),
+            vec!["control_clue_cost&faction[990]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_dorm_buff_ids("闪灵", PromotionTier::Tier0),
+            vec!["dorm_rec_single[010]".to_string()]
+        );
+        assert_eq!(
+            instances.resolve_dorm_buff_ids("闪灵", PromotionTier::TierUp),
+            vec!["dorm_rec_single[020]".to_string()]
         );
     }
 }

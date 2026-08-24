@@ -2,6 +2,7 @@
 
 mod input;
 mod interpreter;
+mod ledger;
 
 pub use crate::global_resource::{
     GlobalInjectManifest, INJECT_FAMILY_MANU_GLOBAL_ALL, INJECT_FAMILY_TRADE_GLOBAL_FLAT,
@@ -10,6 +11,10 @@ pub use input::{ControlOperator, ControlRoomInput};
 pub use interpreter::{
     solve_control, solve_control_with_trace, ControlCenterResult, ControlConditionStatus,
     ControlSettlementTrace, ControlStateValue, ControlTraceEvent, ControlTraceOutcome,
+};
+pub use ledger::{
+    ControlEffectDomain, ControlEffectKey, ControlEffectLedger, ControlEffectRecord,
+    ControlEffectStatus, ControlEffectUnit,
 };
 
 use crate::layout::LayoutContext;
@@ -30,6 +35,8 @@ pub fn apply_control_to_layout(
     let result = solve_control(&input, table);
     layout.global = result.global.clone();
     layout.global_inject = result.inject.clone();
+    layout.control_office_hire_spd_pct = result.office_hire_spd_pct;
+    layout.control_meeting_speed_pct = result.meeting_speed_pct;
     result
 }
 
@@ -47,5 +54,7 @@ pub fn apply_control_to_layout_with_trace(
     let (result, trace) = solve_control_with_trace(&input, table);
     layout.global = result.global.clone();
     layout.global_inject = result.inject.clone();
+    layout.control_office_hire_spd_pct = result.office_hire_spd_pct;
+    layout.control_meeting_speed_pct = result.meeting_speed_pct;
     (result, trace)
 }

@@ -37,7 +37,7 @@ class NarrativeInput:
             "locale": self.locale,
             "mapping_version": self.mapping_version,
             "mapping_hash": self.mapping_hash,
-            "sections": list(SECTION_IDS),
+            "required_section_ids": list(SECTION_IDS),
             "report": self.report,
             "completed_combinations": self.completed_combinations,
             "incomplete_combinations": self.incomplete_combinations,
@@ -57,7 +57,6 @@ def project_report(report: dict[str, Any], mapping: CanonicalMapping) -> Narrati
         raise ValueError("report.recommendations must be a list")
     recommendations = recommendations[:10]
 
-    references: dict[str, dict[str, Any]] = {"combinations": {}, "operators": {}, "facts": {}}
     seen_ids: set[str] = set()
     normalized: list[tuple[int, dict[str, Any]]] = []
     for index, combination in enumerate(combinations):
@@ -68,20 +67,47 @@ def project_report(report: dict[str, Any], mapping: CanonicalMapping) -> Narrati
         seen_ids.add(identifier)
         if mapping.combination_name(identifier) != name:
             raise MappingError(f"mapping mismatch for combination {identifier}")
-        references["combinations"][identifier] = {"name": name}
+        normalized.append((index, combination))
+
+    completed = [
+        item
+        for _, item in sorted(normalized, key=lambda pair: (-pair[1]["completion_percent"], pair[0]))
+        if item.get("state") == "complete"
+    ][:6]
+    incomplete = [
+        item
+        for _, item in sorted(normalized, key=lambda pair: (-pair[1]["completion_percent"], pair[0]))
+        if item.get("state") != "complete" and item.get("state") != "needs_review"
+    ][:6]
+    combinations_by_id = {item["id"]: item for _, item in normalized}
+    references: dict[str, dict[str, Any]] = {"combinations": {}, "operators": {}, "facts": {}}
+
+    # Only selected summaries and recommendation-linked combinations are visible to the model.
+    selected = {item["id"]: item for item in [*completed, *incomplete]}
+    for recommendation in recommendations:
+        combination_id = recommendation.get("combination_id")
+        if combination_id is not None:
+            if combination_id not in combinations_by_id:
+                raise ValueError(f"recommendation references unknown combination: {combination_id}")
+            selected[combination_id] = combinations_by_id[combination_id]
+    for identifier, combination in selected.items():
+        references["combinations"][identifier] = {"name": combination["name"]}
         references["facts"][f"completion:{identifier}"] = {
             "value": f"{combination['completion_percent']}%"
         }
-        normalized.append((index, combination))
 
-        for member in combination.get("members", []):
-            _register_operator(member.get("operator"), references["operators"], mapping)
+    newbie_items = report.get("incomplete_newbie", [])
+    if not isinstance(newbie_items, list):
+        raise ValueError("report.incomplete_newbie must be a list")
+    references["facts"]["newbie_count"] = {"value": str(len(newbie_items))}
+    references["facts"]["newbie_status"] = {
+        "value": str(report.get("newbie_section_status", "shown"))
+    }
 
+    projected_recommendations: list[dict[str, Any]] = []
     for recommendation_index, recommendation in enumerate(recommendations):
-        _register_operator(recommendation.get("operator"), references["operators"], mapping)
+        operator_id = _register_operator(recommendation.get("operator"), references["operators"], mapping)
         combination_id = recommendation.get("combination_id")
-        if combination_id is not None and combination_id not in references["combinations"]:
-            raise ValueError(f"recommendation references unknown combination: {combination_id}")
         if combination_id is not None and recommendation.get("combination_name") not in {
             None,
             references["combinations"][combination_id]["name"],
@@ -95,46 +121,55 @@ def project_report(report: dict[str, Any], mapping: CanonicalMapping) -> Narrati
         }
         facilities = []
         if combination_id is not None:
-            combination = next(item for _, item in normalized if item["id"] == combination_id)
+            combination = combinations_by_id[combination_id]
             facilities = combination.get("facilities", [])
         references["facts"][f"facility:{recommendation_index}"] = {
             "value": _facility_text(facilities)
         }
+        projected_recommendation = {
+            "operator_ref": f"operator:{operator_id}",
+            "action": recommendation.get("action"),
+            "target_ref": f"fact:target:{recommendation_index}",
+            "facility_ref": f"fact:facility:{recommendation_index}",
+        }
+        if combination_id is not None:
+            projected_recommendation["combination_ref"] = f"combination:{combination_id}"
+        if recommendation.get("product") is not None:
+            projected_recommendation["product"] = recommendation["product"]
+        if recommendation.get("acquisition") is not None:
+            projected_recommendation["acquisition"] = recommendation["acquisition"]
+        if recommendation.get("efficiency") is not None:
+            projected_recommendation["efficiency"] = recommendation["efficiency"]
+        projected_recommendations.append(projected_recommendation)
 
-    completed = [
-        item
-        for _, item in sorted(normalized, key=lambda pair: (-pair[1]["completion_percent"], pair[0]))
-        if item.get("state") == "complete"
-    ][:6]
-    incomplete = [
-        item
-        for _, item in sorted(normalized, key=lambda pair: (-pair[1]["completion_percent"], pair[0]))
-        if item.get("state") != "complete" and item.get("state") != "needs_review"
-    ][:6]
     return NarrativeInput(
         schema_version=1,
         locale="zh-CN",
         mapping_version=mapping.version,
         mapping_hash=mapping.content_hash,
-        report={
-            "context": report.get("context", {}),
-            "newbie_section_status": report.get("newbie_section_status"),
-            "incomplete_newbie": report.get("incomplete_newbie", []),
-        },
-        completed_combinations=completed,
-        incomplete_combinations=incomplete,
-        recommendations=recommendations,
+        report={"newbie_section_status": report.get("newbie_section_status")},
+        completed_combinations=[_summary(item) for item in completed],
+        incomplete_combinations=[_summary(item) for item in incomplete],
+        recommendations=projected_recommendations,
         references=references,
     )
 
 
-def _register_operator(operator: Any, target: dict[str, dict[str, str]], mapping: CanonicalMapping) -> None:
+def _register_operator(operator: Any, target: dict[str, dict[str, str]], mapping: CanonicalMapping) -> str:
     if not isinstance(operator, str) or not operator.strip():
         raise ValueError("operator names must be non-empty strings")
     identifier = mapping.operator_ids_by_name.get(operator)
     if identifier is None:
         raise MappingError(f"mapping mismatch for operator {operator}")
     target[identifier] = {"name": operator}
+    return identifier
+
+
+def _summary(combination: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "combination_ref": f"combination:{combination['id']}",
+        "completion_ref": f"fact:completion:{combination['id']}",
+    }
 
 
 def _target_text(target: dict[str, Any]) -> str:

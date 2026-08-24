@@ -68,7 +68,11 @@ pub fn collect_global_atoms(
                         owner_elite: op.elite,
                         owner_tags: tags.clone(),
                         room_kind: room.kind,
-                        room_level: room.level,
+                        room_level: if room.kind == FacilityKind::Dormitory {
+                            room.dorm_skill_level()
+                        } else {
+                            room.level
+                        },
                         room_id: room.id.clone(),
                     });
                 }

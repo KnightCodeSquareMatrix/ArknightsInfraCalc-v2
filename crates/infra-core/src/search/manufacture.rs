@@ -30,11 +30,15 @@ use crate::FacilityKind;
 /// `occupancy_efficiency` 为每名进驻干员 0.010，技能与全局注入也按小数效率表示。
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct ManuEfficiencyBreakdown {
+    /// 基础效率：100% + 非 0 心情入驻人数 × 1%。
     pub base_efficiency: Efficiency,
     pub occupancy_efficiency: Efficiency,
     pub skill_efficiency: Efficiency,
     pub global_efficiency: Efficiency,
+    #[serde(rename = "total_efficiency")]
     pub final_efficiency: Efficiency,
+    pub unit_output_per_day: f64,
+    pub output_per_day: f64,
     /// 仓库上限
     pub storage_limit: i32,
     /// 配方类型
@@ -54,12 +58,11 @@ impl ManuEfficiencyBreakdown {
             out.occupancy_efficiency += breakdown.occupancy_efficiency.scale_ratio(count_i64, 1);
             out.skill_efficiency += breakdown.skill_efficiency.scale_ratio(count_i64, 1);
             out.global_efficiency += breakdown.global_efficiency.scale_ratio(count_i64, 1);
+            out.output_per_day += breakdown.output_per_day * f64::from(*count);
             out.storage_limit += breakdown.storage_limit * i32::from(*count);
         }
-        out.final_efficiency = out.base_efficiency
-            + out.occupancy_efficiency
-            + out.skill_efficiency
-            + out.global_efficiency;
+        out.final_efficiency = out.base_efficiency + out.skill_efficiency + out.global_efficiency;
+        out.unit_output_per_day = 0.0;
         out
     }
 }
@@ -75,6 +78,7 @@ pub struct ManuSearchHit {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub battle_record_names: Vec<String>,
     /// 排序主键；多产线时为各产线直接效率之和。
+    #[serde(rename = "total_efficiency")]
     pub final_efficiency: Efficiency,
     pub per_station: ManuProdBreakdown,
     pub storage: ManuStorageBreakdown,
@@ -537,6 +541,8 @@ fn evaluate_manufacture_room_with_shift(
         skill_efficiency: result.skill_efficiency,
         global_efficiency: result.global_efficiency,
         final_efficiency: result.final_efficiency,
+        unit_output_per_day: result.unit_output_per_day,
+        output_per_day: result.output_per_day,
         storage_limit: result.storage_limit,
         recipe: recipe_str.to_string(),
     };
@@ -788,28 +794,32 @@ mod tests {
     #[test]
     fn aggregate_line_breakdown_sums_to_final_efficiency() {
         let gold = ManuEfficiencyBreakdown {
-            base_efficiency: Efficiency::ONE,
+            base_efficiency: Efficiency::from_decimal(1.030),
             occupancy_efficiency: Efficiency::from_decimal(0.030),
             skill_efficiency: Efficiency::from_decimal(1.230),
             global_efficiency: Efficiency::from_decimal(0.030),
             final_efficiency: Efficiency::from_decimal(2.290),
             storage_limit: 20,
             recipe: "gold".to_string(),
+            unit_output_per_day: 10_000.0,
+            output_per_day: 22_900.0,
         };
         let battle_record = ManuEfficiencyBreakdown {
-            base_efficiency: Efficiency::ONE,
+            base_efficiency: Efficiency::from_decimal(1.030),
             occupancy_efficiency: Efficiency::from_decimal(0.030),
             skill_efficiency: Efficiency::from_decimal(1.100),
             global_efficiency: Efficiency::from_decimal(0.030),
             final_efficiency: Efficiency::from_decimal(2.160),
             storage_limit: 20,
             recipe: "battle_record".to_string(),
+            unit_output_per_day: 8_000.0,
+            output_per_day: 17_280.0,
         };
 
         let aggregate =
             ManuEfficiencyBreakdown::aggregate_lines(&[(&gold, 2), (&battle_record, 2)]);
 
-        assert_eq!(aggregate.base_efficiency, Efficiency::from_decimal(4.000));
+        assert_eq!(aggregate.base_efficiency, Efficiency::from_decimal(4.120));
         assert_eq!(
             aggregate.occupancy_efficiency,
             Efficiency::from_decimal(0.120)

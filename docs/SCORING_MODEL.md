@@ -13,7 +13,7 @@
 
 | 模块 | 排序字段 | 单位 | 说明 |
 |---|---|---|---|
-| 贸易搜索 | `TradeSearchHit.final_efficiency` | 直接效率 | 可直接乘三级贸易基准日产出与时长 |
+| 贸易搜索 | 内部 Rust 排序值 | 不公开 | 新接口返回 `total_efficiency` 与贸易/赤金单位产出；实际产出按单位日产出 × 总效率 × 时长 |
 | 制造搜索 | `ManuSearchHit.final_efficiency` | 直接效率 | 单线为房间效率，多线为各产线效率和 |
 | 发电搜索 | `PowerSearchHit.final_efficiency` | 直接效率 | 基础、技能与爬升后的充能效率 |
 

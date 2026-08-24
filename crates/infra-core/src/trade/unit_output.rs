@@ -18,6 +18,7 @@ pub use super::order_mechanic::baseline_unit_trade_lv3_regular;
 pub const DRONE_TRADE_FACTOR: f64 = 0.685;
 /// 工具人表「单位赤金产出」与内部日消耗量的换算（closure 锚点 20→2000）。
 pub const GSL_GOLD_UNIT_SCALE: f64 = 100.0;
+pub const GOLD_OUTPUT_REFERENCE_PER_DAY: f64 = 10_000.0;
 
 pub fn regular_trade_unit_output_per_day(level: u8) -> f64 {
     match level {
@@ -35,6 +36,9 @@ pub struct TradeUnitOutput {
     pub unit_trade_per_day: f64,
     /// 24h、效率总和=100% 时的日赤金消耗。
     pub unit_gold_per_day: f64,
+    /// 24h、效率总和=100% 时的特殊赤金生产能力；普通贸易订单为 0。
+    #[serde(skip_serializing)]
+    pub gold_consumption_per_day: f64,
     /// 24h、效率总和=100% 时的日固源岩消耗（源石订单轨）。
     #[serde(default, skip_serializing_if = "is_zero")]
     pub unit_originium_per_day: f64,
@@ -68,6 +72,7 @@ impl TradeUnitOutput {
 
     pub fn replace_gsl_gold_unit_output(&mut self, gsl_unit_gold: f64) {
         self.unit_gold_per_day = gsl_unit_gold / GSL_GOLD_UNIT_SCALE;
+        self.gold_consumption_per_day = self.unit_gold_per_day;
         self.drone_unit_gold_per_day = self.unit_gold_per_day * DRONE_TRADE_FACTOR;
     }
 }
@@ -76,37 +81,42 @@ impl TradeUnitOutput {
 pub struct TradeDailyYield {
     pub trade_lmd: f64,
     pub gold_spent: f64,
+    /// 新口径：该贸易站对应的赤金日产出（特殊贸易组合时非零）。
+    #[serde(skip_serializing)]
+    pub gold_consumption: f64,
     pub drone_trade_lmd: f64,
     pub drone_gold_spent: f64,
     pub shift_hours: f64,
     pub paper_efficiency: Efficiency,
+    #[serde(skip_serializing)]
     pub final_efficiency: Efficiency,
+    pub total_efficiency: Efficiency,
     pub time_factor: f64,
 }
 
-/// 公孙工具人表产出口径：产出 = 三级基准日产出 × 最终效率 × (上班/24)。
+/// 统一产出口径：产出 = 单位日产出 × 总效率 × (上班/24)。
 pub fn daily_yield(
     unit: &TradeUnitOutput,
     efficiency: &TradeEfficiency,
     shift_hours: f64,
 ) -> TradeDailyYield {
     let time_factor = shift_hours / 24.0;
-    let final_factor = efficiency.final_efficiency.as_f64() * time_factor;
+    let total_factor = efficiency.total_efficiency.as_f64() * time_factor;
     let paper_factor = if efficiency.applies_paper_efficiency {
         efficiency.paper.paper_efficiency.as_f64()
     } else {
         1.0
     };
     TradeDailyYield {
-        trade_lmd: efficiency.production_basis.reference_unit_output_per_day * final_factor,
+        trade_lmd: unit.unit_trade_per_day * total_factor,
         gold_spent: unit.unit_gold_per_day * paper_factor * time_factor,
-        drone_trade_lmd: efficiency.production_basis.reference_unit_output_per_day
-            * final_factor
-            * DRONE_TRADE_FACTOR,
+        gold_consumption: unit.gold_consumption_per_day * GSL_GOLD_UNIT_SCALE * total_factor,
+        drone_trade_lmd: unit.unit_trade_per_day * total_factor * DRONE_TRADE_FACTOR,
         drone_gold_spent: unit.drone_unit_gold_per_day * paper_factor * time_factor,
         shift_hours,
         paper_efficiency: efficiency.paper.paper_efficiency,
-        final_efficiency: efficiency.final_efficiency,
+        final_efficiency: efficiency.total_efficiency,
+        total_efficiency: efficiency.total_efficiency,
         time_factor,
     }
 }
@@ -117,15 +127,15 @@ pub fn compute_unit_output(
     caps: &MechanicCaps,
     mechanic: &OrderMechanicResult,
 ) -> TradeUnitOutput {
-    let (trade_per_slot_day, gold_per_slot_day, originium_per_slot_day) =
+    let (trade_per_slot_day, gold_per_slot_day, originium_per_slot_day, gold_consumption_per_day) =
         match mechanic.dominant_kind {
             SpecialOrderKind::ClosureSpecial => {
                 let (t, g) = closure_unit_per_slot_day();
-                (t, g, 0.0)
+                (t, g, 0.0, g)
             }
             SpecialOrderKind::PepeExclusive => {
                 let (t, g) = pepe_unit_per_slot_day();
-                (t, g, 0.0)
+                (t, g, 0.0, 0.0)
             }
             SpecialOrderKind::NormalOriginium => {
                 let ori_dist = mechanic
@@ -133,15 +143,15 @@ pub fn compute_unit_output(
                     .as_ref()
                     .expect("originium distribution");
                 let (t, s) = super::order_mechanic::originium_unit_per_slot_per_day(ori_dist);
-                (t, 0.0, s)
+                (t, 0.0, s, 0.0)
             }
             SpecialOrderKind::NormalGold if caps.closure => {
                 let (t, g) = closure_unit_per_slot_day();
-                (t, g, 0.0)
+                (t, g, 0.0, g)
             }
             SpecialOrderKind::NormalGold => {
                 let (t, g) = unit_per_slot_per_day(dist, caps, ctx.order_lmd_bonus);
-                (t, g, 0.0)
+                (t, g, 0.0, 0.0)
             }
         };
 
@@ -160,6 +170,7 @@ pub fn compute_unit_output(
     TradeUnitOutput {
         unit_trade_per_day: trade_per_slot_day,
         unit_gold_per_day: gold_per_slot_day,
+        gold_consumption_per_day,
         unit_originium_per_day: originium_per_slot_day,
         multiplier_vs_lv3_regular: multiplier,
         drone_unit_trade_per_day: trade_per_slot_day * DRONE_TRADE_FACTOR,
@@ -186,7 +197,10 @@ fn closure_unit_per_slot_day() -> (f64, f64) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
+    use crate::instances::OperatorInstances;
     use crate::skill_table::SkillTable;
     use crate::trade::input::{TradeOperator, TradeRoomInput};
     use crate::trade::interpreter::TradeContext;
@@ -202,6 +216,13 @@ mod tests {
             result.production.unit.clone(),
             result.efficiency.final_efficiency,
         )
+    }
+
+    #[test]
+    fn regular_trade_unit_output_keeps_lv2_community_anchor() {
+        let (unit, _) = solve_unit(2, vec![]);
+        assert_eq!(regular_trade_unit_output_per_day(2), 10_141.0);
+        assert_eq!(unit.unit_trade_per_day, 10_141.0);
     }
 
     #[test]
@@ -229,7 +250,57 @@ mod tests {
             "closure gsl gold got {:.1}",
             unit.gsl_unit_gold()
         );
+        assert!((daily.gold_consumption - 2_060.0).abs() < 250.0);
         assert!(daily.drone_trade_lmd > 0.0);
+    }
+
+    #[test]
+    fn closure_with_exusiai_and_lemuen_reports_unified_12h_values() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
+        let operator = |name: &str| {
+            TradeOperator::new(
+                name,
+                2,
+                instances.resolve_trade_buff_ids(name, crate::tier::PromotionTier::TierUp),
+            )
+        };
+        let input = TradeRoomInput {
+            level: 3,
+            operators: vec![operator("可露希尔"), operator("能天使"), operator("蕾缪安")],
+            order_count: None,
+            mood: 24.0,
+            gold_production_lines: Some(2),
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: Arc::new(crate::layout::LayoutContext::search_baseline()),
+            active_order_kind: crate::trade::input::TradeOrderKind::Gold,
+        };
+        let result = crate::trade::solve_trade_with_shift(&input, &table, 12.0).unwrap();
+        println!("{:#?}", result);
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("total_efficiency"));
+        assert!(!json.contains("final_efficiency"));
+        assert_eq!(
+            result.efficiency.total_efficiency,
+            result.efficiency.paper.paper_efficiency
+        );
+        assert!((result.efficiency.trade_equivalent_efficiency.as_f64() - 1.226).abs() < 0.001);
+        assert!((result.efficiency.gold_equivalent_efficiency.as_f64() - 0.386).abs() < 0.001);
+        assert!(
+            (result.production.daily_at_shift.trade_lmd
+                - 12_000.0 * result.efficiency.total_efficiency.as_f64() * 0.5)
+                .abs()
+                < 0.01
+        );
+        assert!(
+            (result.production.daily_at_shift.gold_consumption
+                - 2_000.0 * result.efficiency.total_efficiency.as_f64() * 0.5)
+                .abs()
+                < 0.01
+        );
     }
 
     #[test]
@@ -248,17 +319,82 @@ mod tests {
         let (u3, _) = solve_unit(3, vec![docus(2)]);
         let (u2, _) = solve_unit(2, vec![docus(2)]);
         let (u1, _) = solve_unit(1, vec![docus(0)]);
-        assert!(
-            u1.unit_trade_per_day > u2.unit_trade_per_day
-                && u2.unit_trade_per_day > u3.unit_trade_per_day,
-            "lv1={:.0} lv2={:.0} lv3={:.0}",
-            u1.unit_trade_per_day,
-            u2.unit_trade_per_day,
-            u3.unit_trade_per_day
-        );
-        assert!((u3.unit_trade_per_day - 15_910.75).abs() < 0.01);
+        assert!(u1.unit_trade_per_day < u2.unit_trade_per_day);
+        assert!(u3.unit_trade_per_day < u2.unit_trade_per_day);
+        assert!((u3.unit_trade_per_day - 15_929.2).abs() < 0.01);
         assert!((u2.unit_trade_per_day - 18_591.55).abs() < 0.01);
-        assert!((u1.unit_trade_per_day - 20_000.0).abs() < 0.01);
+        assert!((u1.unit_trade_per_day - 15_000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn docus_e0_uses_per_level_unit_output_mapping() {
+        let docus_e0 = TradeOperator::new(
+            "但书",
+            0,
+            vec!["trade_ord_law[000]".into(), "trade_ord_against[000]".into()],
+        );
+        let expected = [(1, 15_000.0), (2, 14_366.197), (3, 13_097.345)];
+        for (level, unit_output) in expected {
+            let (unit, _) = solve_unit(level, vec![docus_e0.clone()]);
+            assert!((unit.unit_trade_per_day - unit_output).abs() < 0.001);
+        }
+    }
+
+    #[test]
+    fn witch_alpha_unit_output_uses_tequila_elite_mapping() {
+        let witch = TradeOperator::new(
+            "巫恋",
+            2,
+            vec![
+                "trade_ord_vodfox[000]".into(),
+                "trade_ord_wt&cost[000]".into(),
+            ],
+        );
+        let tailor = TradeOperator::new("柏喙", 0, vec!["trade_ord_wt&cost[000]".into()]);
+        let (e0, _) = solve_unit(
+            3,
+            vec![
+                witch.clone(),
+                TradeOperator::new("龙舌兰", 0, vec!["trade_ord_long[000]".into()]),
+                tailor.clone(),
+            ],
+        );
+        assert!((e0.unit_trade_per_day - 11_192.9).abs() < 0.001);
+        assert!((e0.gsl_unit_gold() - 837.56).abs() < 0.001);
+
+        let (e2, _) = solve_unit(
+            3,
+            vec![
+                witch,
+                TradeOperator::new("龙舌兰", 2, vec!["trade_ord_long[010]".into()]),
+                tailor,
+            ],
+        );
+        assert!((e2.unit_trade_per_day - 12_030.46).abs() < 0.001);
+        assert!((e2.gsl_unit_gold() - 1_675.127).abs() < 0.001);
+    }
+
+    #[test]
+    fn lv3_originium_trade_uses_fixed_orundum_unit_output() {
+        let table =
+            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
+        let input = TradeRoomInput {
+            level: 3,
+            operators: Vec::new(),
+            order_count: None,
+            mood: 24.0,
+            gold_production_lines: None,
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: Arc::new(crate::layout::LayoutContext::default()),
+            active_order_kind: crate::trade::input::TradeOrderKind::Originium,
+        };
+        let result = solve_trade(&input, &table).unwrap();
+        assert_eq!(result.production.unit.unit_trade_per_day, 240.0);
+        assert_eq!(result.production.unit.unit_originium_per_day, 24.0);
+        let mut invalid = input;
+        invalid.level = 2;
+        assert!(solve_trade(&invalid, &table).is_err());
     }
 
     #[test]

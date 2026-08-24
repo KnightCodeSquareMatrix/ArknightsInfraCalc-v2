@@ -66,13 +66,14 @@ Debug 任务按以下原则处理：
 | 贸易 / 制造池缺人 | `cargo run -q -p infra-cli -- pool --trade --manufacture --operbox <operbox> --text` |
 | 性能回退 | `cargo run -q -p infra-cli -- profile layout-full --layout <layout> --operbox <operbox>` |
 
-A-B-A 的 `layout rotation` / `schedule rotation` 已移除；当前默认 ABC、二班和具名四班 bug 都只走 `plan` 或 `layout team-rotation` 复现，并显式记录 `--rotation`。
+A-B-A 的 `layout rotation` / `schedule rotation` 已移除；当前默认 ABC、ABC `12/12/12`、二班和具名特殊四班 bug 都只走 `plan` 或 `layout team-rotation` 复现，并显式记录 `--rotation`。
 
 `debug rerun` 是当前运行时重跑，不证明与线上旧二进制等价。它不会执行 bundle 中的线上命令或
 绝对路径；原结果可转换时只比较排除 elapsed/路径的稳定 assignment 投影。写出的 layout、
 operbox 和 assignment 均为私有 evidence，保留在任务专属 `target/codex-runs/` 或 `out/`，不得
 提交；stdout 只有脱敏 hash/状态摘要，完整编制只在显式私有目录。显式覆盖 top/rotation 后不再
-与 recorded result 宣称可比。`plan.compute` bundle、失败调用和 selection reject trace 尚未进入该入口。
+与 recorded result 宣称可比。成功的 legacy `plan` 与 `plan.compute` bundle 均可进入该入口；失败调用和
+selection reject trace 尚未进入该入口。
 
 固定编制的 `layout eval --explain-json` 只解释已选结果的结算：贸易/制造/发电使用正式 solver
 分量，中枢 EffectAtom 使用同一 apply loop 记录 condition、state write 与 GlobalInject merge。

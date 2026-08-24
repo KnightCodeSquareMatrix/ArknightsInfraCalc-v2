@@ -47,7 +47,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
-                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Err(Error::msg(format!(
                 "unknown layout command {:?}",
@@ -114,7 +114,7 @@ fn system_preferences_from_args(
 fn maa_export_options(args: &[String], blueprint: &BaseBlueprint) -> MaaExportOptions {
     let mut opts = MaaExportOptions::for_blueprint(blueprint);
     if !args.iter().any(|arg| arg == "--no-fiammetta") {
-        opts.enable_gongsun_fiammetta_priority();
+        opts.enable_fiammetta_priority_for_blueprint(blueprint);
     }
     if let Some(title) = args
         .windows(2)
@@ -565,7 +565,7 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
             active_order_kind: room.order,
         };
         let result = solve_trade_with_shift(&input, &table, 24.0)?;
-        trade_total += result.efficiency.final_efficiency;
+        trade_total += result.efficiency.total_efficiency;
         if explain_json {
             trade_explain.push(serde_json::json!({
                 "room_id": room.id.0.clone(),
@@ -579,13 +579,21 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         if text {
             let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
             eprintln!(
-                "  trade {} {:?} ops={:?} final_efficiency={} paper_efficiency={} mechanic_efficiency={} rule_id={:?}",
+                "  trade {} {:?} ops={:?} total_efficiency={} base_efficiency={} global_efficiency={} skill_efficiency={} trade_output_per_day={:.2} gold_consumption_per_day={:.2} trade_equivalent={} gold_equivalent={} rule_id={:?}",
                 room.id.0,
                 room.order,
                 names,
-                result.efficiency.final_efficiency,
-                result.efficiency.paper.paper_efficiency,
-                result.order_mechanic.mechanic_equivalent_efficiency,
+                result.efficiency.total_efficiency,
+                result.efficiency.paper.base_efficiency,
+                result.efficiency.paper.control_efficiency,
+                result.efficiency.paper.skill_efficiency,
+                result.production.unit.unit_trade_per_day
+                    * result.efficiency.total_efficiency.as_f64(),
+                result.production.unit.gold_consumption_per_day
+                    * infra_core::trade::unit_output::GSL_GOLD_UNIT_SCALE
+                    * result.efficiency.total_efficiency.as_f64(),
+                result.efficiency.trade_equivalent_efficiency,
+                result.efficiency.gold_equivalent_efficiency,
                 result.rule_id
             );
         }
@@ -628,7 +636,7 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         if text {
             let names: Vec<_> = room.operators.iter().map(|o| o.name.as_str()).collect();
             eprintln!(
-                "  manu {} {:?} ops={:?} final_efficiency={} storage={}",
+                "  manu {} {:?} ops={:?} total_efficiency={} storage={}",
                 room.id.0, room.recipe, names, result.final_efficiency, result.storage_limit
             );
         }

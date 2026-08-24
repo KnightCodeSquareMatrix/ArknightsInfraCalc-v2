@@ -5,7 +5,7 @@
 > 当前真源：docs/排班模式.md；docs/定时换班.md；docs/Fiammetta.md
 > 摘要：记录当前定时换班 profiles、ABC 默认实现和入口
 
-> **当前实现参考**：`schedule_timed_rotation` 支持默认 αβγ `12/6/6`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 保留为默认 ABC 薄包装。Agent 默认经 `plan` 触发，仅排班入口为 `layout team-rotation`。模式边界由 [排班模式](排班模式.md) 裁决，定时换班规则由 [定时换班](定时换班.md) 裁决。A-B-A 的 CLI、core API 与 MAA 导出已移除。
+> **当前实现参考**：`schedule_timed_rotation` 支持默认 αβγ `12/6/6`、ABC `12/12/12`、普通二班 `12/12`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 保留为默认 ABC 薄包装。Agent 默认经 `plan` 触发，仅排班入口为 `layout team-rotation`。模式边界由 [排班模式](排班模式.md) 裁决，定时换班规则由 [定时换班](定时换班.md) 裁决。A-B-A 的 CLI、core API 与 MAA 导出已移除。
 
 > 动态 producer 的统一搜索与 resolved dependency 见 [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md)；完整条件响应行与 Bake 加速继续由 [A+ TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) 跟踪。
 
@@ -18,10 +18,16 @@
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
 | `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；最多每个休息班一次菲亚回岗，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
 | `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
+| `fiammetta_witch_12_12` | `--rotation fiammetta-witch-1212` | 两个预认领 Plan owner 共享巫恋+龙舌兰，同一三级赤金贸易站内由两只不同裁缝 β 按 AB 轮换；每班一个菲亚目标 | 缺菲亚、完整龙巫、两只裁缝 β、合法房间或完整 owner 即报错；不回退普通二班 |
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
 | `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；main 填充后独立替补交替两次，5h 恢复态固定 dorm_rest | hard claims 或替补不可满足即报错；办公室/会客室缺员仅 warnings |
 
-所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
+所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；普通二班的 Team 仍全员互斥，只有 `fiammetta_witch_12_12` 具名允许巫恋、龙舌兰属于两个 Team 并跨班连续工作。默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
+
+`DailyTotals.production` 对传入的全部 `shifts` 做时长加权，并按总周期归一到 24h：
+`sum(产出率 × 班次时长) / sum(班次时长) × 24`。因此汇总器本身不依赖固定班次数量或固定时长；但当前 `TimedRotationProfile` 仍是闭集，CLI 和 `schedule_timed_rotation` 尚不能接受任意自定义班次数组。当前六个已落地 profile 均复用该汇总路径。
+
+办公室和会客室的普通未绑定成员以“满足心情约束下尽量少换人”为轮换策略：无额外心情消耗时，`12/12/12` 允许两人 `AAB`，主力可连续工作两个 12h 班，替补工作一个 12h 班；`12/6/6` 同样允许跨班复用，不因班次边界强制新增角色。存在额外消耗时，候选必须同时满足当前班次最长工作时长和本轮累计工作时长；例如地灵 E1（约 8.72h）不得进入 12h 办公室班，见行者 E2（同为约 8.72h）不得进入 12h 会客室班，斥罪（约 19.2h 累计上限）不得作为 `12/12/12` 的 24h 主力。绑定成员仍优先服从 `shift_bind`，不因普通少换人策略脱离绑定 cohort。
 
 办公室与会客室不要求「必须满编」：候选不足可空置，但实际人数不得超过容量，缺额必须经 `TeamRotationReport.warnings`（及 serve `rotation.warnings`）逐班提示（shift、设施、room id、缺额）。roster 充足时仍须满编且 warnings 为空。该容错覆盖 ABC、二班、菲亚与深海全部 profile（见 [ADR 0006](ADR/0006-rotation-shortfall-tolerance-and-validation.md)）。
 
@@ -37,7 +43,7 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 | 核心 API | `schedule_team_rotation` |
 | 班次结构 | 12h + 6h + 6h；每班 **两队上岗、一队休息** |
 | 生产设施 | 切成 H1/H2 两半；α/β 来自 peak 切半，γ 替补 |
-| 中枢 / 宿舍 / 办公室 | `12/6/6` 中办公室按 S1 与 S2+S3 两个连续 12h 段轮换，普通成员在 S2/S3 保持同一房间和成员，是唯一允许跨 cohort 复用的例外；绑定成员仍随消费方体系同上同下；中枢按 αβγ 轮休重分配，每班补满 5 人；宿舍暂保持共享 |
+| 中枢 / 宿舍 / 办公室 | `12/6/6` 中办公室按 S1 与 S2+S3 两个连续 12h 段轮换，普通成员在 S2/S3 保持同一房间和成员，是唯一允许跨 cohort 复用的例外；绑定成员仍随消费方体系同上同下；中枢仅在 ABC profile 中按活跃两队轮休重分配，每班补满 5 人；`main_backup_12_12` 的普通日周期中枢独立生成两套 12h 状态，不参与生产切半；宿舍暂保持共享 |
 | 设施空转 | 生产/中枢 **禁止**（每班满编）；办公室/会客室候选不足可空置，但必须经报告级 `warnings` 显式提示缺额 |
 
 用户说「跑一遍模拟」「三班模拟」时，Agent 默认用 **`plan`** + `--maa-out`（账号分析 + αβγ 排班）；只有用户明确要求“仅排班”时才用 **`layout team-rotation`**。见 [INFRA_CLI.md](INFRA_CLI.md)。
@@ -76,7 +82,17 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 
 ## 3. 中枢轮休规则
 
-中枢现行规则是**按队伍轮休**，不是三班钉死同一套 5 人。目标：
+### 3.1 普通日周期二班
+
+`main_backup_12_12` 下，普通中枢使用两个固定的 12h 状态，不复用 ABC 的生产切半和 αβγ 中枢轮休逻辑。主状态与替状态各自独立求解、各自填满 5 个合法席位，并遵守二班完整状态互斥策略。
+
+中枢效果账本在每个 12h 状态内独立结算。同一种全局效果只允许其 `Winner` / `TiedWinner` 来源获得该状态的有效候选价值；`Suppressed` 来源不得与 winner 同班。因此，阿米娅和阿斯卡纶可以分别承担两个状态的贸易全局效果，但不能同时进入同一个 12h 中枢状态。
+
+该模型不适用于歌蕾蒂娅深海心情方案。歌蕾蒂娅作为中枢 producer 时，按 canonical 的 `abyssal_7_5_7_5` 单独处理，不因普通中枢规则改成两班。
+
+### 3.2 ABC 中枢轮休
+
+仅对 `abc_12_6_6` / `abc_12_12_12` 保留按队伍轮休规则，而不是三班钉死同一套 5 人。目标：
 
 - 每班中枢满编 5 人。
 - 休息队的中枢干员不进入当班中枢。
@@ -114,9 +130,9 @@ S2 有深海短班特例：运行时按稳定 control buff capability 找 produc
 Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交给 γ reserve。下面编号记录当前
 代码入口、房间等级偏好和 required 条件。
 
-1. `docus`：只在蓝图实际有至少 2 间贸易站且至少 1 间为龙门币订单时成为首个 required core；全源石单不启用。anchor 优先解析到最低等级的可用金单站，再从所有可用干员中按最终效率选择队友。叙拉古不注册固定体系：八幡海铃、伺夜、贝洛内均可不入选，伺夜与贝洛内可单走、同上且跨站、或自然同站；包含八幡海铃的中枢候选只有在最终实际贸易成员使其动态收益胜出时才采用。shortcut 仅按最终实际同房组合自然结算。
+1. `docus`：精0/精二但书均可在金单站成为核心；蓝图实际有至少 2 间贸易站且至少 1 间为龙门币订单时，作为首个 required core；全源石单不启用。anchor 优先解析到最低等级的可用金单站，再从所有可用干员中按最终效率选择队友。叙拉古不注册固定体系：八幡海铃、伺夜、贝洛内均可不入选，伺夜与贝洛内可单走、同上且跨站、或自然同站；包含八幡海铃的中枢候选只有在最终实际贸易成员使其动态收益胜出时才采用。shortcut 仅按最终实际同房组合自然结算。
 2. `closure`：蓝图实际恰有 1 间贸易站且为龙门币订单时是 required core；多贸时排在但书之后、完整龙巫之前，并优先剩余的最高等级金单站。完整 Rosemary/黑键 alternative 激活时则是该双贸 alternative 的条件 required core。有黑键时可命中 `gsl_blackkey_closure`，缺黑键时仍保留可露希尔。
-3. `witch`：多贸龙门币默认第三核心；必须由巫恋 + 龙舌兰 + 裁缝 β/α 组成并进入三级金单站，普通白板和二人组不得进入自动龙巫站。
+3. `witch`：多贸龙门币默认第三核心；必须由精二巫恋 + 已持有的龙舌兰组成并进入三级金单站。龙舌兰精二时优先使用裁缝 β/α；龙舌兰精0/精1允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank` 的低练度排班路径。普通白板和缺少龙舌兰的二人组不得进入自动龙巫站。
 4. `witch_fallback`：无龙舌兰时的巫恋兜底。
 5. `karlan` / `penguin` / plain：灵知孑、企鹅、散件工具人；格拉斯哥成员在这些正常候选中按实际 `final_efficiency` 竞争。
 
@@ -126,7 +142,7 @@ Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交�
 |--------|--------|----------|
 | A | 但书核心站 | 但书 + 正式效率搜索选中的两名队友；full-E2 期望伺夜+贝洛内 |
 | B | Rosemary 黑键站 | 可露希尔 + 黑键 + 正式搜索第三人 |
-| C | 自动龙巫站 | 巫恋 + 龙舌兰 + 裁缝 β/α |
+| C | 自动龙巫站 | 精二巫恋 + 持有龙舌兰；精二龙舌兰优先 β/α，低练度龙舌兰可走 long0 alpha/blank fallback |
 
 菲亚后处理之前的基础 rotation 必须容纳三组，组合为 `A+B → B+C → C+A`；房号、H1/H2、αβγ 标签不固定。可露希尔与黑键同组是该完整 Rosemary alternative 的声明式 packing 结果，不是全局“黑键固定可露”；B 的第三人和 A 的叙拉古成员仍由正式搜索决定，C 仍只接受合法裁缝。A/B 若被已有 exact bind 连成不可分分量，或自然 H1/H2 打包不能让两边各有目标，计划阶段事务性降级，不得到 schedule 再搬房或报错。缺可露、缺完整龙巫或 Rosemary 未激活时同样分别降级，不得把降级态伪报成完整三组。单测：
 
@@ -228,17 +244,17 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 
 ### 7.2 菲亚梅塔主力回岗覆盖
 
-回岗覆盖默认启用，可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；关闭后不生成回岗动作，与显式 `fiammetta-8844` 组合直接失败。启用时：默认 12/6/6 每个 24h 周期一次，12/12/12 最多三个 12h 休息班各一次；每个班次至多一次且不强行凑满：
+回岗覆盖默认启用，可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；关闭后不生成回岗动作，与显式 `fiammetta-8844` 或 `fiammetta-witch-1212` 组合直接失败。启用时：默认 12/6/6 每个 24h 周期一次，12/12/12 最多三个 12h 班各一次；每个班次至多一次且不强行凑满：
 
 1. 账号必须拥有菲亚梅塔；
-2. 从 peak 主力按 `但书 > 巫恋 > 龙舌兰 > 清流 > 可露希尔` 查找目标；
+2. 从 peak 主力按布局分支查找目标：153 为 `可露希尔 > 巫恋+龙舌兰 > 但书（精0/精二）`；243/252 为 `但书（精0/精二） > 可露希尔 > 巫恋+龙舌兰 > 清流`；333/342 为 `但书（精0/精二） > 可露希尔 > 清流 > 巫恋+龙舌兰`；巫恋+龙舌兰必须同时使用并搭配两只不同裁缝 β；
 3. 定位该主力所属队伍的休息班；
 4. 将主力放回 peak 原房间，在所有合法替换位中选择该设施最终效率最高的一种；
 5. 被换下的干员离开当班工作 assignment；具体宿舍安排由 MAA 执行，本项目不保证写入某个宿舍槽位；
 6. 重新计算该班直接效率、加权效率与全日 totals；
 7. MAA 只在实际发生回岗的 plan 中输出 `Fiammetta.enable=true`。
 
-该步骤是基础 rotation 之后唯一允许改写生产房成员的后处理：它可以让但书回岗并换下 B 或 C 中的一名当班人员，因此最终 assignment / MAA 不再承诺精确 `A+B → B+C → C+A`，也不承诺 C 在两个最终班次中保持完全相同；reserve 只证明菲亚前的基础 γ 正确。12/12/12 的多次事件仍是固定优先级下的轻量序列，不是完整实时心情排班器。
+ABC 后处理可让但书、可露希尔或清流保留核心并逐班重新搜索队友；完整龙巫组在 `12/12/12` 中保持巫恋+龙舌兰原子同房并以两只裁缝 β 形成 AAB。具名 `fiammetta-witch-1212` 不走该后处理，而由两个 owner Plan 在求解前预认领龙巫房间并形成 AB。两条路径都是固定周期策略，不是完整实时心情排班器。
 
 当前固定业务优先级高于单班瞬时效率门槛：系统会在合法替换位中选最终效率最高者，
 但不会用当前仍待校正的局部效率数值取消已确认的主力回岗。全周期收益仍应结合
@@ -264,7 +280,8 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 ## 9. Agent 提示
 
 - **跑模拟** → 默认 `plan`，需要纯排班时才用 `layout team-rotation`；`layout test` 只做单班探测。
-- **改中枢轮休 / 补位** → `schedule/team_rotation.rs` + `layout/assign.rs` + `search/control.rs`；不要把中枢重新放回 `pinned_assignment`。
+- **改普通二班中枢** → `schedule/team_rotation.rs` 的 `main_backup_12_12` 状态构造 + 中枢独立求解入口；不要复用 ABC 的 `build_team_control_map` 或生产切半结果。
+- **改 ABC 中枢轮休 / 补位** → `schedule/team_rotation.rs` + `layout/assign.rs` + `search/control.rs`；不要把中枢重新放回 `pinned_assignment`。
 - **改迷迭香/黑键同休** → `shift_bind.rs` + `team_rotation.rs`。
 - **改但书 / 可露希尔 / 龙巫 meta 取舍** → `trade_segments.json` 的 `roles` + `search/role_pick.rs`；不要把 core priority 写回 fixed registry。
 - **改 peak 编制** → 编排层 / `assign_shift`，见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)。

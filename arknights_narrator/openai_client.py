@@ -9,7 +9,9 @@ class OpenAICompatibleClient:
             from openai import OpenAI
         except ImportError as exc:  # pragma: no cover - deployment dependency.
             raise RuntimeError("openai package is required for configured LLM calls") from exc
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        # The adapter owns one explicit retry. Disable SDK retries so a timed-out
+        # provider request cannot silently multiply token usage.
+        self._client = OpenAI(api_key=api_key, base_url=base_url, max_retries=0)
         self._model = model
 
     def generate(self, system_prompt: str, user_payload: str, *, timeout: float, max_tokens: int) -> str:

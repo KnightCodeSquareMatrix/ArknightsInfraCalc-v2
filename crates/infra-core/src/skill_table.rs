@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
@@ -31,6 +31,22 @@ impl SkillTable {
                     "skill_table id {} uses legacy skill_* namespace; use unpack buff_id",
                     skill.id
                 )));
+            }
+            let mut atom_ids = HashSet::new();
+            for atom in &skill.atoms {
+                if let Some(atom_id) = atom.atom_id.as_deref().filter(|id| !id.trim().is_empty()) {
+                    if !atom_ids.insert(atom_id) {
+                        return Err(Error::msg(format!(
+                            "skill {} has duplicate atom id {}",
+                            skill.id, atom_id
+                        )));
+                    }
+                } else if skill.facility == "control" {
+                    return Err(Error::msg(format!(
+                        "control skill {} has non-empty atom without stable id",
+                        skill.id
+                    )));
+                }
             }
             if by_id.insert(skill.id.clone(), skill.clone()).is_some() {
                 return Err(Error::msg(format!("duplicate skill id {}", skill.id)));
@@ -621,6 +637,68 @@ mod tests {
             "expected constant manufacture skills to have atoms: {:?}",
             empty_constants
         );
+    }
+
+    #[test]
+    fn control_atom_without_id_is_rejected() {
+        let path = write_skill_table_fixture(
+            r#"{"version":1,"skills":[{"id":"control_test","skill_name":"test","facility":"control","tier":"tier_0","atoms":[{"action":{"kind":"state_produce","params":{"key":"Passion","amount":1.0}},"phase":"state_write","phase_order":10}]}]}"#,
+        );
+        let error = SkillTable::load(&path).unwrap_err().to_string();
+        remove_skill_table_fixture(&path);
+        assert!(error.contains("without stable id"), "{error}");
+    }
+
+    #[test]
+    fn duplicate_control_atom_id_is_rejected() {
+        let path = write_skill_table_fixture(
+            r#"{"version":1,"skills":[{"id":"control_test","skill_name":"test","facility":"control","tier":"tier_0","atoms":[{"id":"same","action":{"kind":"state_produce","params":{"key":"Passion","amount":1.0}},"phase":"state_write","phase_order":10},{"id":"same","action":{"kind":"state_produce","params":{"key":"Passion","amount":1.0}},"phase":"state_write","phase_order":11}]}]}"#,
+        );
+        let error = SkillTable::load(&path).unwrap_err().to_string();
+        remove_skill_table_fixture(&path);
+        assert!(error.contains("duplicate atom id"), "{error}");
+    }
+
+    #[test]
+    fn duplicate_non_control_atom_id_is_rejected() {
+        let path = write_skill_table_fixture(
+            r#"{"version":1,"skills":[{"id":"trade_test","skill_name":"test","facility":"trade","tier":"tier_0","atoms":[{"id":"same","action":{"kind":"add_flat_eff","params":{"value":1.0}},"phase":"constant","phase_order":10},{"id":"same","action":{"kind":"add_flat_eff","params":{"value":2.0}},"phase":"constant","phase_order":11}]}]}"#,
+        );
+        let error = SkillTable::load(&path).unwrap_err().to_string();
+        remove_skill_table_fixture(&path);
+        assert!(error.contains("duplicate atom id"), "{error}");
+    }
+
+    #[test]
+    fn existing_multi_atom_control_ids_are_loaded() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let skill = table.get("control_mp_psk[000]").unwrap();
+        let ids: Vec<_> = skill
+            .atoms
+            .iter()
+            .map(|atom| atom.atom_id.as_deref())
+            .collect();
+        assert_eq!(
+            ids,
+            vec![
+                Some("control_mp_psk[000]:pinus_battle_record"),
+                Some("control_mp_psk[000]:pinus_gold")
+            ]
+        );
+    }
+
+    fn write_skill_table_fixture(raw: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "arknights-skill-table-test-{}-{}.json",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        std::fs::write(&path, raw).unwrap();
+        path
+    }
+
+    fn remove_skill_table_fixture(path: &std::path::Path) {
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

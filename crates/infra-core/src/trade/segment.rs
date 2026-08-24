@@ -161,7 +161,14 @@ pub fn match_registered_trade_segment(
         if !segment_consumer_matches(&seg.consumer, ops, table, inject) {
             continue;
         }
-        let entry = trade_shortcut_cache()?.get_by_id(&seg.shortcut_id)?.clone();
+        let shortcut_id = if seg.shortcut_id == "gsl_docus_syracusa"
+            && !crate::trade::shortcut::docus_operator_is_e2(ops, table)
+        {
+            "gsl_docus_solo_e0"
+        } else {
+            seg.shortcut_id.as_str()
+        };
+        let entry = trade_shortcut_cache()?.get_by_id(shortcut_id)?.clone();
         return Some(TradeShortcutMatch { entry });
     }
     None

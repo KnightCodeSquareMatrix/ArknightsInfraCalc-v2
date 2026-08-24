@@ -148,7 +148,12 @@ pub fn ling_jie_fixture(level: u8) -> TradeRoomInput {
     let mut input = TradeRoomInput::with_operators(
         level,
         vec![
-            op("孑", 2, vec!["trade_ord_limit_count[000]"], vec![]),
+            op(
+                "孑",
+                2,
+                vec!["trade_ord_limit_diff[000]", "trade_ord_limit_count[000]"],
+                vec![],
+            ),
             op(
                 "银灰",
                 2,

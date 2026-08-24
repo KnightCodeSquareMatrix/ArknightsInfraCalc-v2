@@ -15,7 +15,7 @@
 
 use crate::layout::FacilityKind;
 
-use super::MoodModel;
+use super::{control_global_recovery_value, MoodModel};
 
 /// 计算净消耗所需的房间上下文。所有名字用干员本名（与 assignment 一致）。
 #[derive(Clone, Copy)]
@@ -63,7 +63,7 @@ fn control_global_recovery_hit(model: &MoodModel, inputs: &DrainInputs<'_>) -> f
                 .iter()
                 .any(|(n, e)| n == &g.name && *e >= g.elite)
         })
-        .map(|g| g.value)
+        .map(|g| control_global_recovery_value(g, inputs.control_ops))
         .fold(0.0, f64::max)
 }
 
@@ -148,6 +148,9 @@ pub fn operator_net_drain(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
     }
     x -= model.occupancy_reduction(inputs.facility, inputs.room_ops.len());
     x -= control_global_recovery_hit(model, inputs);
+    if inputs.facility == FacilityKind::ControlCenter {
+        x -= model.control_faction_recovery_value(inputs.control_ops);
+    }
     x -= control_smiley_recovery_hit(model, inputs);
     x += self_skill_delta(model, inputs);
     x += room_skill_delta(model, inputs);
@@ -324,6 +327,106 @@ mod tests {
         };
         let x = operator_net_drain(&m, &inputs);
         assert!((x - 0.3).abs() < 1e-9, "x={x}");
+    }
+
+    #[test]
+    fn wisadel_with_civilight_eternals_doubles_global_recovery() {
+        let m = model();
+        let room = solo("空构", 0);
+        let ew_only = vec![("维什戴尔".to_string(), 2u8)];
+        let ew_with_civilight = vec![("维什戴尔".to_string(), 2u8), ("魔王".to_string(), 2u8)];
+        let base = DrainInputs {
+            name: "空构",
+            elite: 0,
+            facility: FacilityKind::PowerPlant,
+            room_ops: &room,
+            full_control: true,
+            control_ops: &ew_only,
+            recipe: None,
+        };
+        assert!((operator_net_drain(&m, &base) - 0.35).abs() < 1e-9);
+        let boosted = DrainInputs {
+            control_ops: &ew_with_civilight,
+            ..base
+        };
+        assert!((operator_net_drain(&m, &boosted) - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn faction_recovery_scales_provider_count_times_member_count() {
+        let m = model();
+        let room = vec![
+            ("能天使".to_string(), 2),
+            ("灰烬".to_string(), 2),
+            ("战车".to_string(), 2),
+            ("闪击".to_string(), 2),
+            ("霜华".to_string(), 2),
+        ];
+        let control = vec![
+            ("灰烬".to_string(), 2),
+            ("战车".to_string(), 2),
+            ("闪击".to_string(), 2),
+            ("霜华".to_string(), 2),
+        ];
+        let inputs = DrainInputs {
+            name: "能天使",
+            elite: 2,
+            facility: FacilityKind::ControlCenter,
+            room_ops: &room,
+            full_control: true,
+            control_ops: &control,
+            recipe: None,
+        };
+        // 0.05 * 4 providers * 4 members = 0.8; full control adds -0.25,
+        // so an otherwise neutral member reaches zero net drain.
+        assert_eq!(operator_net_drain(&m, &inputs), 0.0);
+    }
+
+    #[test]
+    fn faction_recovery_is_limited_to_control_center() {
+        let m = model();
+        let room = solo("能天使", 2);
+        let control = vec![
+            ("灰烬".to_string(), 2),
+            ("战车".to_string(), 2),
+            ("闪击".to_string(), 2),
+            ("霜华".to_string(), 2),
+        ];
+        let base = DrainInputs {
+            name: "能天使",
+            elite: 2,
+            facility: FacilityKind::TradePost,
+            room_ops: &room,
+            full_control: false,
+            control_ops: &control,
+            recipe: None,
+        };
+        let control_case = DrainInputs {
+            facility: FacilityKind::ControlCenter,
+            full_control: true,
+            ..base
+        };
+        assert!((operator_net_drain(&m, &base) - 1.0).abs() < 1e-9);
+        assert!((operator_net_drain(&m, &control_case) - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn global_recovery_and_full_control_reduction_stack() {
+        let m = model();
+        let room = solo("空构", 0);
+        let control = vec![("维什戴尔".to_string(), 2u8)];
+        let inputs = DrainInputs {
+            name: "空构",
+            elite: 0,
+            facility: FacilityKind::PowerPlant,
+            room_ops: &room,
+            full_control: true,
+            control_ops: &control,
+            recipe: None,
+        };
+        // 1.0 - 0.25 (full control) - 0.1 (Wisadel) - 0.3 (Konggou self)
+        // = 0.35/h; each source remains additive.
+        assert!((operator_net_drain(&m, &inputs) - 0.35).abs() < 1e-9);
     }
 
     /// recipe 门限：阿罗玛的 +0.25 只在贵金属配方生效；非贵金属时不加。

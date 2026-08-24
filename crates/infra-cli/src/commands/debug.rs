@@ -5,14 +5,19 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use infra_core::instances::{default_instances_path, OperatorInstances};
-use infra_core::layout::{AssignBaseOptions, BaseBlueprint};
+use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
-use infra_core::schedule::{schedule_timed_rotation, TeamRotationReport, TimedRotationProfile};
+use infra_core::schedule::{TeamRotationReport, TimedRotationProfile};
 use infra_core::skill_table::{data_path, default_skill_table_path, SkillTable};
 use infra_core::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+
+use super::plan_compute::{
+    compute_plan, inline_operbox_for_debug_rerun, PlanComputeInput, PlanComputeParams,
+    PlanResources, RequestedOutputs,
+};
 
 use crate::output::emit_debug_json;
 
@@ -231,42 +236,123 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             bundle_path.display()
         ))
     })?;
-    validate_legacy_bundle(&bundle)?;
+    validate_supported_bundle(&bundle)?;
 
     let bundle_dir = bundle_path.parent().unwrap_or_else(|| Path::new("."));
-    let layout_value = select_snapshot(
-        bundle.layout.as_ref(),
-        &bundle_dir.join("layout.json"),
-        "layout",
-    )?;
-    let operbox_value = select_snapshot(
-        bundle.operbox.as_ref(),
-        &bundle_dir.join("operbox.json"),
-        "operbox",
-    )?;
-    let blueprint: BaseBlueprint = serde_json::from_value(layout_value.clone())
-        .map_err(|error| Error::msg(format!("debug bundle layout parse: {error}")))?;
-    let mut entries: Vec<OperBoxEntry> = serde_json::from_value(operbox_value.clone())
-        .map_err(|error| Error::msg(format!("debug bundle operbox parse: {error}")))?;
-    let legacy_progress_normalized_entries = normalize_legacy_operbox_progress(&mut entries);
-    let operbox = OperBox::from_entries(entries)?;
+    let request = bundle
+        .serve_request
+        .as_ref()
+        .ok_or_else(|| Error::msg("debug bundle missing serveRequest"))?;
+    let layout_value = if request.method == "plan.compute" {
+        select_compute_snapshot(
+            bundle.layout.as_ref(),
+            request.params.get("layout"),
+            &bundle_dir.join("layout.json"),
+            "layout",
+        )?
+    } else {
+        select_snapshot(
+            bundle.layout.as_ref(),
+            &bundle_dir.join("layout.json"),
+            "layout",
+        )?
+    };
+    let operbox_value = if request.method == "plan.compute" {
+        select_compute_snapshot(
+            bundle.operbox.as_ref(),
+            request.params.get("operbox"),
+            &bundle_dir.join("operbox.json"),
+            "operbox",
+        )?
+    } else {
+        select_snapshot(
+            bundle.operbox.as_ref(),
+            &bundle_dir.join("operbox.json"),
+            "operbox",
+        )?
+    };
+    let (
+        blueprint,
+        operbox,
+        legacy_progress_normalized_entries,
+        system_preferences,
+        fiammetta_enable,
+        labels,
+    ) = if request.method == "plan.compute" {
+        let params: PlanComputeParams = serde_json::from_value(request.params.clone())
+            .map_err(|error| Error::msg(format!("plan.compute params parse: {error}")))?;
+        if !(1..=3).contains(&params.schema_version) {
+            return Err(Error::msg(format!(
+                "unsupported plan schema version {}; expected 1, 2 or 3",
+                params.schema_version
+            )));
+        }
+        let labels = (
+            params
+                .labels
+                .layout
+                .unwrap_or_else(|| "inline-layout".to_string()),
+            params
+                .labels
+                .operbox
+                .unwrap_or_else(|| "inline-operbox".to_string()),
+        );
+        let options = params.options;
+        let mut entries = params.operbox;
+        let legacy_progress_normalized_entries =
+            normalize_plan_compute_operbox_compat(&mut entries);
+        (
+            params.layout,
+            inline_operbox_for_debug_rerun(entries)?,
+            legacy_progress_normalized_entries,
+            options.system_preferences,
+            options.fiammetta_enable,
+            labels,
+        )
+    } else {
+        let blueprint: BaseBlueprint = serde_json::from_value(layout_value.clone())
+            .map_err(|error| Error::msg(format!("debug bundle layout parse: {error}")))?;
+        let mut entries: Vec<OperBoxEntry> = serde_json::from_value(operbox_value.clone())
+            .map_err(|error| Error::msg(format!("debug bundle operbox parse: {error}")))?;
+        let legacy_progress_normalized_entries = normalize_legacy_operbox_progress(&mut entries);
+        (
+            blueprint,
+            OperBox::from_entries(entries)?,
+            legacy_progress_normalized_entries,
+            std::collections::HashMap::new(),
+            true,
+            ("legacy-layout".to_string(), "legacy-operbox".to_string()),
+        )
+    };
 
     let top_k = rerun_top_k(args, &bundle)?;
     let rotation = rerun_rotation(args, &bundle)?;
     let current_runtime = current_runtime_fingerprint();
     let instances = OperatorInstances::load(&default_instances_path()?)?;
     let table = SkillTable::load(&default_skill_table_path()?)?;
-    let report = schedule_timed_rotation(
-        &blueprint,
-        &operbox,
-        &instances,
-        &table,
-        &AssignBaseOptions {
-            top_k: top_k.value,
-            ..AssignBaseOptions::default()
+    let computed = compute_plan(
+        PlanResources {
+            instances: &instances,
+            table: &table,
         },
-        rotation.value,
+        PlanComputeInput {
+            blueprint: &blueprint,
+            operbox: &operbox,
+            layout_label: &labels.0,
+            operbox_label: &labels.1,
+            baseline_operbox: None,
+            top_k: top_k.value,
+            rotation_profile: rotation.value,
+            system_preferences: &system_preferences,
+            maa_title: None,
+            fiammetta_enable,
+        },
+        RequestedOutputs {
+            profile: false,
+            maa: false,
+        },
     )?;
+    let report = computed.current.rotation;
 
     let projection = projection_from_report(&report)?;
     let expected_projection = bundle
@@ -379,7 +465,21 @@ fn normalize_legacy_operbox_progress(entries: &mut [OperBoxEntry]) -> usize {
     normalized
 }
 
-fn validate_legacy_bundle(bundle: &DebugBundleEnvelope) -> Result<(), Error> {
+fn normalize_plan_compute_operbox_compat(entries: &mut [OperBoxEntry]) -> usize {
+    let mut normalized = 0;
+    for entry in entries {
+        // Historical plan.compute payloads used rarity=1 as an unknown-rarity
+        // sentinel while preserving the real elite and level fields. Record the
+        // compatibility case; the dedicated replay constructor accepts it
+        // without demoting E1/E2 operators.
+        if entry.rarity <= 2 && (entry.elite > 0 || entry.level > 30) {
+            normalized += 1;
+        }
+    }
+    normalized
+}
+
+fn validate_supported_bundle(bundle: &DebugBundleEnvelope) -> Result<(), Error> {
     let version = bundle
         .version
         .as_deref()
@@ -393,9 +493,9 @@ fn validate_legacy_bundle(bundle: &DebugBundleEnvelope) -> Result<(), Error> {
         .serve_request
         .as_ref()
         .ok_or_else(|| Error::msg("debug bundle missing serveRequest"))?;
-    if request.method != "plan" {
+    if request.method != "plan" && request.method != "plan.compute" {
         return Err(Error::msg(format!(
-            "debug rerun currently supports legacy method=plan bundles; got {:?}",
+            "debug rerun supports method=plan and method=plan.compute bundles; got {:?}",
             request.method
         )));
     }
@@ -449,6 +549,26 @@ fn select_snapshot(inline: Option<&Value>, sibling: &Path, label: &str) -> Resul
     }
 }
 
+fn select_compute_snapshot(
+    inline: Option<&Value>,
+    request: Option<&Value>,
+    sibling: &Path,
+    label: &str,
+) -> Result<Value, Error> {
+    if let (Some(inline), Some(request)) = (inline, request) {
+        if canonical_sha256(inline)? != canonical_sha256(request)? {
+            return Err(Error::msg(format!(
+                "plan.compute {label} conflicts between bundle and request"
+            )));
+        }
+        return Ok(inline.clone());
+    }
+    if let Some(value) = inline.or(request) {
+        return Ok(value.clone());
+    }
+    select_snapshot(None, sibling, label)
+}
+
 fn rerun_top_k(
     args: &[String],
     bundle: &DebugBundleEnvelope,
@@ -464,7 +584,14 @@ fn rerun_top_k(
     if let Some(top) = bundle
         .serve_request
         .as_ref()
-        .and_then(|request| request.params.get("top"))
+        .and_then(|request| {
+            request.params.get("top").or_else(|| {
+                request
+                    .params
+                    .get("options")
+                    .and_then(|options| options.get("top"))
+            })
+        })
         .and_then(Value::as_u64)
     {
         return Ok(OptionWithOrigin {
@@ -488,11 +615,14 @@ fn rerun_rotation(
             origin: "explicit_override",
         });
     }
-    if let Some(value) = bundle
-        .serve_request
-        .as_ref()
-        .and_then(|request| request.params.get("rotation"))
-    {
+    if let Some(value) = bundle.serve_request.as_ref().and_then(|request| {
+        request.params.get("rotation").or_else(|| {
+            request
+                .params
+                .get("options")
+                .and_then(|options| options.get("rotation"))
+        })
+    }) {
         // serve 侧协议名（serde wire name）只通过 serde 反序列化，不走 CLI FromStr 别名。
         let profile = TimedRotationProfile::deserialize(value)?;
         return Ok(OptionWithOrigin {
@@ -552,11 +682,19 @@ fn projection_from_report(report: &TeamRotationReport) -> Result<BehaviorProject
 }
 
 fn projection_from_recorded_result(result: &Value) -> Result<BehaviorProjection, Error> {
-    let rotation = required_str(result, "rotation")?.to_string();
-    let shifts_value = result
-        .get("shifts")
-        .and_then(Value::as_array)
-        .ok_or_else(|| Error::msg("recorded result missing shifts array"))?;
+    if result.get("rotation").and_then(Value::as_object).is_some() {
+        return projection_from_plan_compute_result(result);
+    }
+    let (rotation, shifts_value, daily_trade, daily_manufacture, daily_power) = (
+        required_str(result, "rotation")?.to_string(),
+        result
+            .get("shifts")
+            .and_then(Value::as_array)
+            .ok_or_else(|| Error::msg("recorded result missing shifts array"))?,
+        required_f64(result, "daily_trade_efficiency")?,
+        required_f64(result, "daily_manufacture_efficiency")?,
+        required_f64(result, "daily_power_efficiency")?,
+    );
     let mut shifts = Vec::with_capacity(shifts_value.len());
     for shift in shifts_value {
         let index = required_u64(shift, "index")? as usize;
@@ -592,11 +730,107 @@ fn projection_from_recorded_result(result: &Value) -> Result<BehaviorProjection,
     shifts.sort_by_key(|shift| shift.index);
     Ok(BehaviorProjection {
         rotation,
-        daily_trade: required_f64(result, "daily_trade_efficiency")?,
-        daily_manufacture: required_f64(result, "daily_manufacture_efficiency")?,
-        daily_power: required_f64(result, "daily_power_efficiency")?,
+        daily_trade,
+        daily_manufacture,
+        daily_power,
         shifts,
     })
+}
+
+fn projection_from_plan_compute_result(result: &Value) -> Result<BehaviorProjection, Error> {
+    let rotation_result = result
+        .get("rotation")
+        .ok_or_else(|| Error::msg("recorded result missing rotation"))?;
+    let rotation = required_str(rotation_result, "profile")?.to_string();
+    let shifts_value = rotation_result
+        .get("shifts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| Error::msg("recorded rotation missing shifts array"))?;
+    let plans = result
+        .get("maa")
+        .and_then(|maa| maa.get("plans"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| Error::msg("recorded plan.compute result missing maa.plans"))?;
+    let daily = rotation_result
+        .get("daily")
+        .ok_or_else(|| Error::msg("recorded rotation missing daily"))?;
+    let mut shifts = Vec::with_capacity(shifts_value.len());
+    for shift in shifts_value {
+        let index = required_u64(shift, "index")? as usize;
+        let plan = plans
+            .get(index)
+            .ok_or_else(|| Error::msg(format!("recorded MAA result missing plan {index}")))?;
+        shifts.push(ShiftProjection {
+            index,
+            duration_hours: required_f64(shift, "duration_hours")?,
+            // plan.compute exposes the stable MAA assignment but not this internal transition enum.
+            transition: "replace_rooms".to_string(),
+            rooms: maa_rooms(plan)?,
+        });
+    }
+    shifts.sort_by_key(|shift| shift.index);
+    Ok(BehaviorProjection {
+        rotation,
+        daily_trade: required_f64(daily, "trade")?,
+        daily_manufacture: required_f64(daily, "manufacture")?,
+        daily_power: required_f64(daily, "power")?,
+        shifts,
+    })
+}
+
+fn maa_rooms(plan: &Value) -> Result<Vec<RoomProjection>, Error> {
+    let rooms = plan
+        .get("rooms")
+        .and_then(Value::as_object)
+        .ok_or_else(|| Error::msg("recorded MAA plan missing rooms"))?;
+    let mut projections = Vec::new();
+    for (category, values) in rooms {
+        let values = values
+            .as_array()
+            .ok_or_else(|| Error::msg(format!("recorded MAA room {category} is not an array")))?;
+        for (index, value) in values.iter().enumerate() {
+            let operators = value
+                .get("operators")
+                .and_then(Value::as_array)
+                .ok_or_else(|| {
+                    Error::msg(format!("recorded MAA room {category} missing operators"))
+                })?
+                .iter()
+                .map(|operator| {
+                    operator
+                        .as_str()
+                        .map(str::to_string)
+                        .or_else(|| {
+                            operator
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .map(str::to_string)
+                        })
+                        .ok_or_else(|| Error::msg("recorded MAA operator is not a name"))
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            projections.push(RoomProjection {
+                room_id: maa_room_id(category, index),
+                operators,
+            });
+        }
+    }
+    projections.sort_by(|left, right| left.room_id.cmp(&right.room_id));
+    Ok(projections)
+}
+
+fn maa_room_id(category: &str, index: usize) -> String {
+    match category {
+        "control" => "control".to_string(),
+        "trading" => format!("trade_{}", index + 1),
+        "manufacture" => format!("manu_{}", index + 1),
+        "power" => format!("power_{}", index + 1),
+        "dormitory" => format!("dorm_{}", index + 1),
+        "meeting" => "meeting".to_string(),
+        "hire" => "office".to_string(),
+        "training" => "training_room".to_string(),
+        other => format!("{other}_{}", index + 1),
+    }
 }
 
 fn compare_projection(
@@ -1005,6 +1239,48 @@ mod tests {
     }
 
     #[test]
+    fn plan_compute_projection_reads_rotation_and_maa_assignments() {
+        let recorded = json!({
+            "rotation": {
+                "profile": "abc_12_6_6",
+                "daily": {"trade": 1.0, "manufacture": 2.0, "power": 3.0},
+                "shifts": [{"index": 0, "duration_hours": 12.0}]
+            },
+            "maa": {
+                "plans": [{
+                    "rooms": {
+                        "control": [{"operators": ["斩业星熊", "夕"]}],
+                        "trading": [{"operators": ["A"]}],
+                        "manufacture": [],
+                        "power": []
+                    }
+                }]
+            }
+        });
+        let projection = projection_from_recorded_result(&recorded).unwrap();
+        assert_eq!(projection.rotation, "abc_12_6_6");
+        assert_eq!(projection.daily_trade, 1.0);
+        assert_eq!(
+            projection.shifts[0]
+                .rooms
+                .iter()
+                .find(|room| room.room_id == "control")
+                .unwrap()
+                .operators,
+            vec!["斩业星熊", "夕"]
+        );
+        assert_eq!(
+            projection.shifts[0]
+                .rooms
+                .iter()
+                .find(|room| room.room_id == "trade_1")
+                .unwrap()
+                .operators,
+            vec!["A"]
+        );
+    }
+
+    #[test]
     fn inline_snapshot_conflict_is_rejected() {
         let root = std::env::temp_dir().join(format!(
             "infra-debug-conflict-{}-{}",
@@ -1042,6 +1318,10 @@ mod tests {
             ("abc_12_6_6", TimedRotationProfile::Abc12_6_6),
             ("abc_12_12_12", TimedRotationProfile::Abc12_12_12),
             ("main_backup_12_12", TimedRotationProfile::MainBackup12_12),
+            (
+                "fiammetta_witch_12_12",
+                TimedRotationProfile::FiammettaWitch12_12,
+            ),
             ("fiammetta_8_8_4_4", TimedRotationProfile::Fiammetta8_8_4_4),
             ("abyssal_7_5_7_5", TimedRotationProfile::Abyssal7_5_7_5),
         ] {
@@ -1092,6 +1372,23 @@ mod tests {
         let comparison = compare_projection(&projection, Some(Ok(projection.clone())), true);
         assert_eq!(comparison.status, "not_comparable");
         assert!(comparison.reason.unwrap().contains("overrides"));
+    }
+
+    #[test]
+    fn plan_compute_compat_keeps_elite_when_rarity_is_unknown_sentinel() {
+        let mut entries = vec![OperBoxEntry {
+            id: "char_4208_wintim".to_string(),
+            name: "冬时".to_string(),
+            elite: 1,
+            level: 60,
+            own: true,
+            potential: 6,
+            rarity: 1,
+        }];
+        assert_eq!(normalize_plan_compute_operbox_compat(&mut entries), 1);
+        assert_eq!(entries[0].elite, 1);
+        assert_eq!(entries[0].level, 60);
+        assert_eq!(entries[0].rarity, 1);
     }
 
     #[test]

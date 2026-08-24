@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Instant;
 
-use super::plan_compute::{compute_plan, PlanComputeInput, PlanResources, RequestedOutputs};
+use super::plan_compute::{
+    compute_plan, inline_operbox, PlanComputeInput, PlanComputeParams, PlanResources,
+    RequestedOutputs,
+};
 use infra_core::bake::{
     bake_catalogs, default_baked_out_dir, set_runtime_bake_in_progress, validate_baked_catalog,
     warm_runtime_baked_table, BakeGeneratorFingerprint, BakeOptions, BakeProgressEvent,
@@ -14,9 +16,7 @@ use infra_core::box_profile::{baseline_path_or_default, BoxProfile};
 use infra_core::export::MaaSchedule;
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::BaseBlueprint;
-use infra_core::operbox::{
-    default_layout_243_path, default_operbox_full_e2_path, OperBox, OperBoxEntry,
-};
+use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::schedule::{
     DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
     TimedRotationProfile,
@@ -42,7 +42,6 @@ const PLAN_COMPUTE_SCHEMA_V2_JSON: &str =
 const PLAN_COMPUTE_SCHEMA_V3_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v3.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
-const MAX_OPERBOX_ENTRIES: usize = 1000;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
 const MAX_TOP_K: usize = 100;
@@ -401,50 +400,6 @@ struct PlanParams {
     maa_title: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PlanComputeParams {
-    schema_version: u32,
-    layout: BaseBlueprint,
-    operbox: Vec<OperBoxEntry>,
-    #[serde(default)]
-    labels: PlanComputeLabels,
-    #[serde(default)]
-    options: PlanComputeOptions,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PlanComputeLabels {
-    #[serde(default)]
-    layout: Option<String>,
-    #[serde(default)]
-    operbox: Option<String>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PlanComputeOptions {
-    #[serde(default)]
-    rotation: TimedRotationProfile,
-    #[serde(default = "default_top_k")]
-    top: usize,
-    #[serde(default)]
-    system_preferences: HashMap<String, String>,
-    #[serde(default)]
-    maa_title: Option<String>,
-    #[serde(default = "default_fiammetta_enable")]
-    fiammetta_enable: bool,
-}
-
-fn default_top_k() -> usize {
-    20
-}
-
-fn default_fiammetta_enable() -> bool {
-    true
-}
-
 #[derive(Debug, Serialize)]
 struct PlanResult {
     layout: String,
@@ -765,40 +720,6 @@ fn validated_label(value: Option<String>, fallback: &str, field: &str) -> Result
     Ok(value.to_string())
 }
 
-fn inline_operbox(mut entries: Vec<OperBoxEntry>) -> Result<OperBox, Error> {
-    if entries.is_empty() || entries.len() > MAX_OPERBOX_ENTRIES {
-        return Err(Error::msg(format!(
-            "operbox must contain between 1 and {MAX_OPERBOX_ENTRIES} entries"
-        )));
-    }
-
-    let mut ids = HashSet::new();
-    let mut names = HashSet::new();
-    for (index, entry) in entries.iter_mut().enumerate() {
-        entry.id = entry.id.trim().to_string();
-        entry.name = entry.name.trim().to_string();
-        if entry.id.is_empty() || entry.name.is_empty() {
-            return Err(Error::msg(format!(
-                "operbox entry {} must have non-empty id and name",
-                index + 1
-            )));
-        }
-        if !ids.insert(entry.id.clone()) {
-            return Err(Error::msg(format!("duplicate operbox id {}", entry.id)));
-        }
-        if !names.insert(entry.name.clone()) {
-            return Err(Error::msg(format!("duplicate operbox name {}", entry.name)));
-        }
-        if !(1..=6).contains(&entry.potential) {
-            return Err(Error::msg(format!(
-                "{} potential must be between 1 and 6",
-                entry.name
-            )));
-        }
-    }
-    OperBox::from_entries(entries)
-}
-
 fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_json::Value, Error> {
     let params: PlanParams = serde_json::from_value(params)?;
     let top = params.top.unwrap_or(20);
@@ -906,6 +827,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use infra_core::operbox::OperBoxEntry;
 
     fn operbox_entry(id: &str, name: &str) -> OperBoxEntry {
         OperBoxEntry {
@@ -1046,6 +968,20 @@ mod tests {
         let params: PlanComputeParams = serde_json::from_value(value).unwrap();
         assert!(!params.options.fiammetta_enable);
         assert_eq!(plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON).len(), 64);
+    }
+
+    #[test]
+    fn plan_compute_schema_v3_accepts_fiammetta_witch_12_12() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(3);
+        value["options"]["rotation"] = serde_json::json!("fiammetta_witch_12_12");
+        validate_plan_compute_params(&schema, &value, 3).unwrap();
+        let params: PlanComputeParams = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            params.options.rotation,
+            TimedRotationProfile::FiammettaWitch12_12
+        );
     }
 
     #[test]

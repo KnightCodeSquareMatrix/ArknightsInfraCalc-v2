@@ -7,6 +7,7 @@ use crate::layout::blueprint::BaseBlueprint;
 use crate::layout::shift::AssignShiftMode;
 use crate::layout::system::select_registry_systems;
 use crate::layout::system::SlotFillMode;
+use crate::layout::tier::OperatorTier;
 use crate::operbox::OperBox;
 use crate::skill_table::{default_skill_table_path, SkillTable};
 
@@ -203,6 +204,97 @@ fn compile_plan_once(
         disabled_conditional_packs,
         i32::MIN..=18,
     )?;
+    let mut late = late;
+    let has_other_cross_station = registry_claims
+        .iter()
+        .any(|claim| claim.tier == OperatorTier::CrossStation && claim.system_id != "trade_core")
+        || compiled
+            .activated
+            .iter()
+            .chain(late.activated.iter())
+            .any(|system| {
+                system.tier == OperatorTier::CrossStation && system.system_id != "trade_core"
+            });
+    let mut mujica_catalog = catalog.clone();
+    mujica_catalog
+        .rules
+        .retain(|rule| rule.id == "mujica_fallback");
+    let mujica_inactive = compile_rules(
+        &mujica_catalog,
+        &RuleCompileContext {
+            blueprint,
+            operbox,
+            instances,
+            table,
+            mode,
+            mood,
+            preferences: &std::collections::HashMap::new(),
+        },
+        &late.scratch,
+        &inherited_excluded,
+        &compiled
+            .claimed_exclusive_groups
+            .iter()
+            .cloned()
+            .chain(
+                registry_claims
+                    .iter()
+                    .filter_map(|claim| claim.exclusive_group.clone()),
+            )
+            .collect(),
+        &registry_skip,
+        disabled_conditional_packs,
+        i32::MIN..=i32::MAX,
+    )?;
+    late.inactive_control_exclusions
+        .extend(mujica_inactive.inactive_control_exclusions);
+
+    if !has_other_cross_station {
+        let mut mujica_preferences = preferences.clone();
+        mujica_preferences.insert("mujica_fallback".to_string(), "full_mujica".to_string());
+        let mujica = compile_rules(
+            &mujica_catalog,
+            &RuleCompileContext {
+                blueprint,
+                operbox,
+                instances,
+                table,
+                mode,
+                mood,
+                preferences: &mujica_preferences,
+            },
+            &late.scratch,
+            &inherited_excluded,
+            &compiled
+                .claimed_exclusive_groups
+                .iter()
+                .cloned()
+                .chain(
+                    registry_claims
+                        .iter()
+                        .filter_map(|claim| claim.exclusive_group.clone()),
+                )
+                .collect(),
+            &registry_skip,
+            disabled_conditional_packs,
+            i32::MIN..=i32::MAX,
+        )?;
+        late.activated.extend(mujica.activated);
+        late.selected.extend(mujica.selected);
+        late.anchors.extend(mujica.anchors);
+        late.constraints.extend(mujica.constraints);
+        late.excluded_operators.extend(mujica.excluded_operators);
+        late.inactive_control_exclusions
+            .extend(mujica.inactive_control_exclusions);
+        late.shift_binds.extend(mujica.shift_binds);
+        late.active_dependencies.extend(mujica.active_dependencies);
+        late.continuous_roles.extend(mujica.continuous_roles);
+        late.rotation_reserves.extend(mujica.rotation_reserves);
+        late.skip_registry_ids.extend(mujica.skip_registry_ids);
+        late.claimed_exclusive_groups
+            .extend(mujica.claimed_exclusive_groups);
+        late.scratch = mujica.scratch;
+    }
     let final_scratch = late.scratch.clone();
     compiled.activated.extend(late.activated);
     compiled.selected.extend(late.selected);
@@ -242,6 +334,13 @@ fn compile_plan_once(
         for operator in &claim.control_allowed_operators {
             control_exclusions.remove(operator);
         }
+    }
+    for anchor in compiled
+        .anchors
+        .iter()
+        .filter(|anchor| anchor.facility == crate::layout::FacilityKind::ControlCenter)
+    {
+        control_exclusions.remove(&anchor.operator);
     }
     control_exclusions.extend(compiled.excluded_operators.iter().cloned());
     let plan = AssignmentPlan {

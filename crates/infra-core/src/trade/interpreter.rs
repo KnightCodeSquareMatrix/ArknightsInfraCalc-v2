@@ -137,16 +137,11 @@ impl TradeContext {
     }
 
     pub fn order_eff_base(&self) -> f64 {
-        if self.has_jie_market() {
-            return 0.0;
+        if self.mood <= 0.0 {
+            0.0
+        } else {
+            self.operators.len() as f64
         }
-        self.operators.len() as f64
-    }
-
-    fn has_jie_market(&self) -> bool {
-        self.operators
-            .iter()
-            .any(|o| o.buff_ids.iter().any(|b| b == JIE_LIMIT_COUNT_BUFF))
     }
 
     pub fn order_eff_skill(&self) -> f64 {
@@ -422,6 +417,7 @@ fn condition_met(
             ctx.layout.field_momentum() > ctx.layout.external_momentum()
         }
         Condition::PlatformCountGte { min } => ctx.layout.platform_count_in_power >= *min,
+        Condition::OfficeHireSpeedBelow { .. } => false,
     }
 }
 
@@ -675,20 +671,9 @@ fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner
         }
         Some(Selector::DormOccupantCount) => f64::from(ctx.layout.dorm_occupant_count),
         Some(Selector::OrderGap) => ctx.order_gap() as f64,
-        // 市井之道「每持有 1 笔订单 +4%」：并行订单数不超过当前订单上限。
-        // 稳态满槽时按 effective limit 计（工具人表 / 灵知市井孑）；否则用输入 order_count。
-        Some(Selector::OrderCount) => {
-            let has_jie_market = ctx
-                .operators
-                .iter()
-                .any(|o| o.buff_ids.iter().any(|b| b == JIE_LIMIT_COUNT_BUFF));
-            let raw = if has_jie_market {
-                ctx.final_order_limit
-            } else {
-                ctx.order_count
-            };
-            raw.min(ctx.final_order_limit) as f64
-        }
+        // 市井之道读取实际订单数；与摊贩经济共存时，两者分别覆盖
+        // current_count 与 final_limit-current_count，合计恒为 final_limit × 4%。
+        Some(Selector::OrderCount) => ctx.order_count.min(ctx.final_order_limit) as f64,
         Some(Selector::PeerSettledEffSum) => ctx.peer_settled_eff_sum(),
         Some(Selector::PeerSkillEffSum) => 0.0,
         Some(Selector::OtherOpsSettledEff) => ctx.other_ops_settled_eff(owner),
@@ -1888,7 +1873,10 @@ mod tests {
         TradeOperator {
             name: "孑".into(),
             elite: 2,
-            buff_ids: vec!["trade_ord_limit_count[000]".into()],
+            buff_ids: vec![
+                "trade_ord_limit_diff[000]".into(),
+                "trade_ord_limit_count[000]".into(),
+            ],
             tags: vec![],
             ..Default::default()
         }
@@ -1961,7 +1949,7 @@ mod tests {
         apply_trade_phases(&mut ctx, &table);
 
         assert_eq!(ctx.final_order_limit, 18);
-        assert!((ctx.order_eff_base() - 0.0).abs() < 0.01);
+        assert!((ctx.order_eff_base() - 3.0).abs() < 0.01);
         assert!((ctx.order_eff_skill() - 129.0).abs() < 0.01);
         let jie = ctx.operators.iter().find(|o| o.name == "孑").unwrap();
         assert!(
@@ -1995,11 +1983,9 @@ mod tests {
         assert_eq!(r.rule_id.as_deref(), None);
         assert_eq!(r.final_order_limit, 18);
         assert!(
-            (((r.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0) - 129.0).abs() < 0.01
+            (((r.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0) - 132.0).abs() < 0.01
         );
-        assert!(
-            (((r.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0) - 129.0).abs() < 0.01
-        );
+        assert!((r.efficiency.total_efficiency.as_f64() - 2.32).abs() < 0.01);
     }
 
     #[test]
@@ -2008,8 +1994,8 @@ mod tests {
 
         let table = load_table();
         for (label, third, expect_trade, expect_limit) in [
-            ("崖心", cliffheart_karlan_op(), 125.0, 30),
-            ("讯使", courier_karlan_op(), 117.0, 28),
+            ("崖心", cliffheart_karlan_op(), 128.0, 30),
+            ("讯使", courier_karlan_op(), 120.0, 28),
         ] {
             let input = ling_jie_input(third);
             let r = solve_trade_with_shift(&input, &table, 24.0).unwrap();
@@ -2094,5 +2080,50 @@ mod tests {
             ctx2.final_order_limit,
             jie2.variable_eff
         );
+    }
+
+    #[test]
+    fn jaye_dual_skills_partition_orders_without_double_counting_gap() {
+        let table = load_table();
+        for order_count in [2, 12] {
+            let input = TradeRoomInput {
+                level: 3,
+                operators: vec![
+                    TradeOperator {
+                        name: "孑".into(),
+                        elite: 2,
+                        buff_ids: vec![
+                            "trade_ord_limit_diff[000]".into(),
+                            "trade_ord_limit_count[000]".into(),
+                        ],
+                        tags: vec![],
+                        ..Default::default()
+                    },
+                    trade_peer("a", "trade_ord_spd[000]"),
+                    trade_peer("b", "trade_ord_spd[000]"),
+                ],
+                order_count: Some(order_count),
+                mood: 24.0,
+                gold_production_lines: None,
+                durin_virtual_lines: None,
+                human_fireworks: None,
+                layout: Default::default(),
+                active_order_kind: TradeOrderKind::Gold,
+            };
+            let mut ctx = TradeContext::from_room(&input);
+            apply_trade_phases(&mut ctx, &table);
+            let jaye = ctx
+                .operators
+                .iter()
+                .find(|operator| operator.name == "孑")
+                .unwrap();
+            assert_eq!(ctx.final_order_limit, 6);
+            assert!(
+                (jaye.variable_eff - f64::from(ctx.final_order_limit) * 4.0).abs() < 0.01,
+                "orders={order_count} limit={} var={}",
+                ctx.final_order_limit,
+                jaye.variable_eff
+            );
+        }
     }
 }

@@ -157,7 +157,7 @@ pub fn pick_trade_role_hit_requiring(
     )))
 }
 
-/// 精二但书核心站：只约束必须包含但书，队友按最终效率统一排序。
+/// 但书核心站：精0/精二均可作为核心，队友按最终效率统一排序。
 ///
 /// `gsl_docus_*` shortcut 只参与组合结算，不参与候选优先级。
 pub fn pick_docus_trade_hit(
@@ -168,8 +168,8 @@ pub fn pick_docus_trade_hit(
     used: &HashSet<String>,
     top_k: usize,
 ) -> Result<TradeSearchHit> {
-    if pool.entry("但书").is_none_or(|entry| entry.elite < 2) {
-        return Err(crate::error::Error::msg("docus role requires elite 2 但书"));
+    if pool.entry("但书").is_none() {
+        return Err(crate::error::Error::msg("docus role requires owned 但书"));
     }
     pick_trade_role_hit("docus", pool, table, search_opts, layout, used, top_k)
 }
@@ -247,7 +247,12 @@ fn named_hit_filter(filter_id: &str) -> Option<fn(&TradeSearchHit) -> bool> {
 fn hit_witch_with_tailor(hit: &TradeSearchHit) -> bool {
     matches!(
         hit.rule_id.as_deref(),
-        Some("gsl_witch_long_beta" | "gsl_witch_long_alpha")
+        Some(
+            "gsl_witch_long_beta"
+                | "gsl_witch_long_alpha"
+                | "gsl_witch_long0_alpha"
+                | "gsl_witch_long0_blank"
+        )
     )
 }
 
@@ -337,6 +342,24 @@ mod tests {
             err.to_string().contains("docus"),
             "docus role should fail without docus instead of returning plain: {err}"
         );
+    }
+
+    #[test]
+    fn docus_role_accepts_e0_docus_and_uses_final_efficiency_teammates() {
+        let (pool, table, layout) =
+            fixtures(&[("但书", 0), ("可露希尔", 2), ("能天使", 2), ("德克萨斯", 2)]);
+        let hit = pick_trade_role_hit(
+            "docus",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+        assert!(hit.names.iter().any(|name| name == "但书"), "{hit:?}");
+        assert!(hit.final_efficiency > Efficiency::ZERO, "{hit:?}");
     }
 
     #[test]
@@ -455,6 +478,25 @@ mod tests {
     }
 
     #[test]
+    fn witch_role_accepts_owned_e0_tequila() {
+        let (pool, table, layout) =
+            fixtures(&[("巫恋", 2), ("龙舌兰", 0), ("古米", 2), ("夜刀", 2)]);
+        let hit = pick_trade_role_hit(
+            "witch",
+            &pool,
+            &table,
+            gold_opts(&layout),
+            &layout,
+            &HashSet::new(),
+            20,
+        )
+        .unwrap();
+        assert!(hit.names.iter().any(|n| n == "巫恋"), "{hit:?}");
+        assert!(hit.names.iter().any(|n| n == "龙舌兰"), "{hit:?}");
+        assert_eq!(hit.rule_id.as_deref(), Some("gsl_witch_long0_blank"));
+    }
+
+    #[test]
     fn karlan_role_requires_market_jie_and_karlan_peer() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
@@ -545,9 +587,9 @@ mod tests {
     }
 
     #[test]
-    fn docus_role_requires_elite_two_docus() {
+    fn docus_role_accepts_elite_zero_docus() {
         let (pool, table, layout) = fixtures(&[("但书", 1), ("空弦", 2), ("石英", 2)]);
-        let err = pick_docus_trade_hit(
+        let hit = pick_docus_trade_hit(
             &pool,
             &table,
             gold_opts(&layout),
@@ -555,9 +597,10 @@ mod tests {
             &HashSet::new(),
             20,
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(err.to_string().contains("elite 2 但书"), "{err}");
+        assert!(hit.names.iter().any(|name| name == "但书"), "{hit:?}");
+        assert_eq!(hit.rule_id.as_deref(), Some("gsl_docus_solo"));
     }
 
     #[test]

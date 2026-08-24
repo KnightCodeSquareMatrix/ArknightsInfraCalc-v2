@@ -20,7 +20,7 @@ pub struct RuntimeShiftBind {
 
 /// 从统一 plan 提取运行期绑定组。plan 的 shift_binds 仅在体系激活时产出，已隐含 ownership gate。
 pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
-    let mut normalized: Vec<_> = plan
+    let mut raw: Vec<_> = plan
         .resolved_producer_dependencies
         .iter()
         .filter(|dependency| {
@@ -43,18 +43,37 @@ pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
         let mut operators = bind.operators.clone();
         operators.sort();
         operators.dedup();
-        if operators.len() < 2
-            || normalized
-                .iter()
-                .any(|existing| existing.operators == operators)
-        {
+        if operators.len() < 2 {
             continue;
         }
-        normalized.push(RuntimeShiftBind {
+        raw.push(RuntimeShiftBind {
             operators,
             on_shifts: bind.on_shifts,
             off_shifts: bind.off_shifts,
         });
+    }
+
+    // Exact-presence dependencies and explicit system binds may overlap. They describe
+    // one same-team closure, not competing teams, so merge connected operator sets.
+    let mut normalized: Vec<RuntimeShiftBind> = Vec::new();
+    for bind in raw {
+        let mut merged = bind;
+        let mut index = 0;
+        while index < normalized.len() {
+            if normalized[index]
+                .operators
+                .iter()
+                .any(|operator| merged.operators.contains(operator))
+            {
+                let existing = normalized.remove(index);
+                merged.operators.extend(existing.operators);
+                merged.operators.sort();
+                merged.operators.dedup();
+                continue;
+            }
+            index += 1;
+        }
+        normalized.push(merged);
     }
     normalized
 }

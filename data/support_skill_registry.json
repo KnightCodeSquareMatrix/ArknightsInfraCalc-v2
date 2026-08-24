@@ -535,10 +535,15 @@
         {
           "kind": "mood_delta",
           "value": -0.25
+        },
+        {
+          "kind": "speed_if_operator_in_control",
+          "operator": "凛御银灰",
+          "value": 10.0
         }
       ],
       "ignored": null,
-      "unsupported": "operator-in-control-center condition"
+      "unsupported": null
     },
     {
       "row_id": 197,
@@ -1153,6 +1158,28 @@
       "operator": "和弦",
       "skill": "双面间谍",
       "buff_id": "meet_spd&cost_condChar[000]",
+      "slot": 1,
+      "min_elite": 2,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_if_solo",
+          "value": 50.0
+        },
+        {
+          "kind": "mood_delta",
+          "value": 2.0
+        }
+      ],
+      "ignored": null,
+      "unsupported": null
+    },
+    {
+      "row_id": 337,
+      "facility": "meeting",
+      "operator": "予愿安洁莉娜",
+      "skill": "我自己的愿望",
+      "buff_id": "meet_spd&cost_condChar[002]",
       "slot": 1,
       "min_elite": 2,
       "min_level": 1,
@@ -2371,6 +2398,19 @@
       "operator": "赤刃明霄陈",
       "skill": "萍踪浪迹",
       "buff_id": "meet_spd_notOwned[003]",
+      "slot": 0,
+      "min_elite": 0,
+      "min_level": 1,
+      "effects": [],
+      "ignored": "unknown missing-clue probability",
+      "unsupported": null
+    },
+    {
+      "row_id": 384,
+      "facility": "meeting",
+      "operator": "予愿安洁莉娜",
+      "skill": "资深信使",
+      "buff_id": "meet_spd_notOwned[004]",
       "slot": 0,
       "min_elite": 0,
       "min_level": 1,

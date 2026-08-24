@@ -78,24 +78,46 @@ fn is_zero_efficiency(v: &Efficiency) -> bool {
     v.is_zero()
 }
 
+fn is_zero_f64(v: &f64) -> bool {
+    *v == 0.0
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RoomEfficiencySnapshot {
-    /// 完整纸面效率，包含基础 100%、人头、技能与中枢。
+    /// 统一口径的基础效率：100% + 非 0 心情入驻人数 × 1%。
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_base_efficiency: Efficiency,
+    /// 完整总效率：基础 + 技能 + 中枢/全局。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_paper_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_occupancy_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_control_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_total_efficiency: Efficiency,
     /// 社区加强单位产出相对三级普通贸易站的倍率。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_unit_output_multiplier: Efficiency,
     /// 贸易最终效率；排班与产出预估的正式真源。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    #[serde(skip_serializing)]
     pub trade_final_efficiency: Efficiency,
     /// 从最终效率反算的等效技能加成。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_equivalent_skill_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_equivalent_trade_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_equivalent_gold_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub trade_output_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    #[serde(skip_serializing)]
+    pub gold_consumption_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    #[serde(skip_serializing)]
+    pub trade_originium_shards_per_day: f64,
     /// 命中的社区规则或 shortcut ID，用于产出审计。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trade_rule_id: Option<String>,
@@ -104,16 +126,26 @@ pub struct RoomEfficiencySnapshot {
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_mechanic_equivalent_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    #[serde(skip_serializing)]
     pub manufacture_final_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub manufacture_base_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_occupancy_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_global_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub manufacture_skill_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub manufacture_total_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manufacture_unit_output_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manufacture_output_per_day: f64,
     #[serde(default, skip_serializing_if = "is_zero_i32")]
     pub manufacture_storage_limit: i32,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    #[serde(skip_serializing)]
     pub power_final_efficiency: Efficiency,
 }
 

@@ -55,7 +55,7 @@ pub fn jie_e0_trade_operator(
     Some(op)
 }
 
-/// 精1+ 孑（市井之道）；默认不进通用池，仅在灵知精密计算等明确场景中注入。
+/// 精1+ 孑（摊贩经济 + 市井之道）；默认不进通用池，仅在灵知精密计算等明确场景中注入。
 pub fn jie_market_trade_operator(
     instances: &OperatorInstances,
     table: &SkillTable,
@@ -65,11 +65,6 @@ pub fn jie_market_trade_operator(
     if !buff_ids.iter().any(|b| b == JIE_MARKET_BUFF) {
         return None;
     }
-    // 市井之道与摊贩经济是精0/精1替换关系，但它们的 buff stem 不同，通用
-    // stepwise 合并会把两者都带上。灵知线注入的精1+ 孑必须只使用市井之道。
-    let buff_ids = vec![JIE_MARKET_BUFF.to_string()];
-    // BaseAssignment only stores `elite`, and resolve currently maps unknown rarity
-    // tier_up by elite>=2. Keep the injected 市井孑 stable across search -> assign -> resolve.
     let mut op = TradeOperator::new(JIE_TRADE_NAME, 2, buff_ids);
     op.compiled_atoms = compile_operator_atoms(&op.buff_ids, table);
     Some(op)
@@ -610,15 +605,18 @@ mod tests {
     }
 
     #[test]
-    fn jie_market_injection_uses_market_skill_only() {
+    fn jie_market_injection_keeps_both_tier_up_skills() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let op = jie_market_trade_operator(&instances, &table).expect("市井孑");
 
         assert_eq!(
             op.buff_ids,
-            vec!["trade_ord_limit_count[000]".to_string()],
-            "灵知线注入的是精1 市井之道，不能同时叠精0 摊贩经济"
+            vec![
+                "trade_ord_limit_diff[000]".to_string(),
+                "trade_ord_limit_count[000]".to_string()
+            ],
+            "精1+ 孑同时拥有摊贩经济和市井之道"
         );
         assert_eq!(
             op.elite, 2,

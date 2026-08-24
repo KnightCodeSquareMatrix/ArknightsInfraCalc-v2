@@ -115,7 +115,7 @@ shortcut 的责任到此为止：它不能因为某个组合很强，就在编�
 1.550 = 基础效率的 155%
 ```
 
-贸易最终效率由纸面效率和单位产出倍率共同决定；制造和发电各有自己的直接效率公式。`mechanic_equivalent_efficiency` 解释社区机制，但不会再乘一次。
+贸易和制造统一先结算 `total_efficiency = base + global + skill`，再以对应配方的单位日产出和工作时间计算实际产出。特殊贸易的贸易/赤金单位产出与等效效率分别返回；`mechanic_equivalent_efficiency` 只解释机制，不参与二次乘法。
 
 排班始终分开保存：
 
@@ -212,7 +212,7 @@ WorkforceIndex
 
 ## 9. Timed profiles 与默认 αβγ ABC
 
-`schedule_timed_rotation` 在默认 ABC、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 四个具名 profile 中分派。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
+`schedule_timed_rotation` 在默认 ABC、ABC `12/12/12`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 五个具名 profile 中分派。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
 
 ```text
 α = peak 的 H1
@@ -235,7 +235,7 @@ S3  6h：γ + α 上岗，β 休息
 
 生产设施容量、满编和同班人员互斥主要由候选构造、全局 `used` 与分层回归保证；它们仍属于端到端验收项，但当前不是全部集中在同一个 final validator 中。
 
-当前报告还会计算 peak 主力的心情 ETA 锚点，并支持一次轻量菲亚梅塔主力回岗覆盖；默认 ABC 的 `12h + 6h + 6h` 不会根据 ETA 自动改写。显式 `--rotation` 另支持二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`，均以具名 profile 和硬失败语义进入。完整契约见 [SCHEDULE_ROTATION](SCHEDULE_ROTATION.md)。
+当前报告还会计算 peak 主力的心情 ETA 锚点，并支持一次轻量菲亚梅塔主力回岗覆盖；默认 ABC 的 `12h + 6h + 6h` 不会根据 ETA 自动改写。显式 `--rotation` 另支持 ABC `12/12/12`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`，均以具名 profile 和硬失败语义进入。产物汇总对已生成的全部班次按实际时长归一到 24h，但 profile 入口仍不接受自由班次数组。完整契约见 [SCHEDULE_ROTATION](SCHEDULE_ROTATION.md)。
 
 ## 10. CLI、账号画像与 MAA
 

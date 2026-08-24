@@ -194,6 +194,8 @@ pub(super) enum RoomLevelPreference {
     #[default]
     BlueprintOrder,
     LowestLevel,
+    #[serde(rename = "level_2_first")]
+    Level2First,
     HighestLevel,
 }
 
@@ -232,6 +234,10 @@ pub(super) struct RoleSpec {
     pub competitive: bool,
     #[serde(default)]
     pub work_mood: Option<u8>,
+    /// Apply the explicit work mood only when this operator is already in the
+    /// same resolved alternative.
+    #[serde(default)]
+    pub work_mood_if_operator_present: Option<String>,
     #[serde(default)]
     pub rest_facility: Option<FacilityKind>,
 }
@@ -917,6 +923,11 @@ fn place_role_recursive(
         enumerate_role_placements(role, ctx, &state, existing_constraints, new_constraints)
     {
         let mut next = state.clone();
+        let work_mood = role.work_mood.filter(|_| {
+            role.work_mood_if_operator_present
+                .as_ref()
+                .is_none_or(|required| next.used.contains(required))
+        });
         if let Some(group) = &role.room_group {
             if let Some((room_id, _, _)) = placement.first() {
                 next.room_groups
@@ -928,7 +939,7 @@ fn place_role_recursive(
             let mut operators = next.assignment.operators_in(&room_id).to_vec();
             operators.push(
                 AssignedOperator::from_progress(&candidate.name, progress)
-                    .with_work_mood(role.work_mood),
+                    .with_work_mood(work_mood),
             );
             next.assignment.set_room(room_id.clone(), operators);
             next.used.insert(candidate.name.clone());
@@ -944,7 +955,7 @@ fn place_role_recursive(
                 room_id: Some(room_id.clone()),
                 recipe: role.recipe,
                 trade_order: role.trade_order,
-                work_mood: role.work_mood,
+                work_mood,
                 rest_facility: role.rest_facility,
                 fill_policy: match role.facility {
                     FacilityKind::TradePost => AnchorFillPolicy::TradeRole { role_id: None },
@@ -1204,6 +1215,9 @@ fn matching_rooms<'a>(
         .collect();
     rooms.sort_by(|left, right| match role.room_level_preference {
         RoomLevelPreference::BlueprintOrder => left.id.0.cmp(&right.id.0),
+        RoomLevelPreference::Level2First => (right.level == 2)
+            .cmp(&(left.level == 2))
+            .then_with(|| left.id.0.cmp(&right.id.0)),
         RoomLevelPreference::LowestLevel => left
             .level
             .cmp(&right.level)
@@ -1817,7 +1831,7 @@ mod tests {
                 .map(|(index, (name, elite))| {
                     let rarity = match *name {
                         "Lancet-2" => 1,
-                        "清流" => 4,
+                        "清流" | "冬时" => 4,
                         _ => 6,
                     };
                     OperBoxEntry {
@@ -2200,6 +2214,17 @@ mod tests {
         let multi = compile(&multi_gold, &roster, &BaseAssignment::default());
         assert_eq!(selected(&multi, "trade_core"), Some("multi_trade_docus"));
         assert!(multi.anchors.iter().any(|anchor| anchor.operator == "但书"));
+
+        let multi_e0 = compile(
+            &multi_gold,
+            &operbox(&[("可露希尔", 2), ("但书", 0)]),
+            &BaseAssignment::default(),
+        );
+        assert_eq!(selected(&multi_e0, "trade_core"), Some("multi_trade_docus"));
+        assert!(multi_e0
+            .anchors
+            .iter()
+            .any(|anchor| anchor.operator == "但书" && anchor.elite == 0));
 
         let all_originium = blueprint(vec![room(
             "only",
@@ -2847,6 +2872,116 @@ mod tests {
         assert!(factory
             .iter()
             .all(|anchor| anchor.room_id == factory[0].room_id));
+        assert!(factory.iter().any(|anchor| anchor.operator == "冬时"));
+        assert!(factory.iter().all(|anchor| anchor.operator != "异客"));
+    }
+
+    #[test]
+    fn automation_lancet_keeps_normal_power_efficiency_without_chengxi() {
+        let roster = operbox(&[
+            ("清流", 1),
+            ("温蒂", 2),
+            ("森蚺", 2),
+            ("Lancet-2", 0),
+            ("冬时", 1),
+        ]);
+        let compiled = compile(&two_power_blueprint(), &roster, &BaseAssignment::default());
+        assert!(compiled
+            .anchors
+            .iter()
+            .any(|anchor| anchor.operator == "Lancet-2" && anchor.work_mood.is_none()));
+    }
+
+    #[test]
+    fn automation_two_power_prefers_level_two_gold_room() {
+        let mut bp = two_power_blueprint();
+        bp.rooms
+            .iter_mut()
+            .find(|room| room.id.0 == "gold")
+            .unwrap()
+            .level = 3;
+        bp.rooms.push(room(
+            "gold-low",
+            FacilityKind::Factory,
+            2,
+            Some(RoomProduct::Factory {
+                recipe: RecipeKind::Gold,
+            }),
+        ));
+        bp.rooms.push(room(
+            "gold-level-one",
+            FacilityKind::Factory,
+            1,
+            Some(RoomProduct::Factory {
+                recipe: RecipeKind::Gold,
+            }),
+        ));
+        let roster = operbox(&[
+            ("清流", 1),
+            ("温蒂", 2),
+            ("森蚺", 2),
+            ("Lancet-2", 0),
+            ("冬时", 1),
+            ("异客", 2),
+            ("承曦格雷伊", 2),
+        ]);
+        let compiled = compile(&bp, &roster, &BaseAssignment::default());
+        assert_eq!(
+            selected(&compiled, "automation_group"),
+            Some("two_power_control_eunectes")
+        );
+        let factory: Vec<_> = compiled
+            .anchors
+            .iter()
+            .filter(|anchor| {
+                anchor.system_id == "automation_group" && anchor.facility == FacilityKind::Factory
+            })
+            .collect();
+        assert_eq!(factory.len(), 2);
+        assert!(factory.iter().all(|anchor| anchor
+            .room_id
+            .as_ref()
+            .is_some_and(|room| room.0 == "gold-low")));
+        assert_eq!(
+            compiled
+                .anchors
+                .iter()
+                .find(|anchor| anchor.operator == "Lancet-2")
+                .and_then(|anchor| anchor.work_mood),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn automation_two_power_control_accepts_e1_winter_as_third_factory_candidate() {
+        let mut bp = two_power_blueprint();
+        bp.rooms
+            .iter_mut()
+            .find(|room| room.id.0 == "gold")
+            .unwrap()
+            .level = 3;
+        let roster = operbox(&[
+            ("清流", 1),
+            ("温蒂", 2),
+            ("森蚺", 2),
+            ("Lancet-2", 0),
+            ("冬时", 1),
+            ("异客", 2),
+            ("承曦格雷伊", 2),
+        ]);
+        let compiled = compile(&bp, &roster, &BaseAssignment::default());
+        assert_eq!(
+            selected(&compiled, "automation_group"),
+            Some("two_power_control_eunectes")
+        );
+        let factory: Vec<_> = compiled
+            .anchors
+            .iter()
+            .filter(|anchor| {
+                anchor.system_id == "automation_group" && anchor.facility == FacilityKind::Factory
+            })
+            .collect();
+        assert_eq!(factory.len(), 3);
         assert!(factory.iter().any(|anchor| anchor.operator == "冬时"));
         assert!(factory.iter().all(|anchor| anchor.operator != "异客"));
     }

@@ -149,6 +149,8 @@ fn resolve_base_inner(
         trade_station_count: blueprint.count_facility(FacilityKind::TradePost),
         power_station_count: blueprint.count_facility(FacilityKind::PowerPlant),
         manufacture_station_count: blueprint.count_facility(FacilityKind::Factory),
+        office_room_count: blueprint.count_facility(FacilityKind::Office),
+        meeting_room_count: blueprint.count_facility(FacilityKind::MeetingRoom),
         global: blueprint.initial_global_pool(),
         drone_cap: blueprint.drone_cap,
         ..Default::default()
@@ -239,7 +241,7 @@ fn resolve_base_inner(
 
     layout.global.run_conversions(&active_global_buffs);
 
-    let (office_rooms, meeting_rooms) = build_support_rooms(blueprint, assignment, &layout)?;
+    let (office_rooms, meeting_rooms) = build_support_rooms(blueprint, assignment, &layout, mood)?;
 
     let trade_rooms = build_trade_rooms(blueprint, assignment, instances, table, &layout);
     let manu_rooms = build_manu_rooms(blueprint, assignment, instances, table, &layout);
@@ -264,6 +266,7 @@ fn build_support_rooms(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
     layout: &LayoutContext,
+    mood: f64,
 ) -> Result<(Vec<ResolvedSupportRoom>, Vec<ResolvedSupportRoom>)> {
     use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
 
@@ -276,13 +279,13 @@ fn build_support_rooms(
         .max()
         .unwrap_or(0);
     let mut office_rooms = Vec::new();
-    let mut meeting_inject = 0.0;
+    let mut meeting_inject = layout.control_meeting_speed_pct;
     for room in blueprint
         .rooms
         .iter()
         .filter(|room| room.kind == FacilityKind::Office)
     {
-        let operators = support_operators(assignment.operators_in(&room.id));
+        let operators = support_operators(assignment.operators_in(&room.id), mood);
         if operators.is_empty() {
             office_rooms.push(ResolvedSupportRoom {
                 id: room.id.clone(),
@@ -303,7 +306,7 @@ fn build_support_rooms(
             },
             &registry,
         )?;
-        meeting_inject += result.meeting_speed_inject_pct;
+        meeting_inject = meeting_inject.max(result.meeting_speed_inject_pct);
         office_rooms.push(ResolvedSupportRoom {
             id: room.id.clone(),
             result: Some(result),
@@ -317,7 +320,7 @@ fn build_support_rooms(
         .iter()
         .filter(|room| room.kind == FacilityKind::MeetingRoom)
     {
-        let operators = support_operators(assignment.operators_in(&room.id));
+        let operators = support_operators(assignment.operators_in(&room.id), mood);
         if operators.is_empty() {
             meeting_rooms.push(ResolvedSupportRoom {
                 id: room.id.clone(),
@@ -349,13 +352,16 @@ fn build_support_rooms(
 
 fn support_operators(
     operators: &[AssignedOperator],
+    mood: f64,
 ) -> Vec<crate::support_facility::SupportOperator> {
     operators
         .iter()
         .map(|operator| crate::support_facility::SupportOperator {
             name: operator.name.clone(),
             elite: operator.elite,
+            rarity: operator.rarity,
             level: operator.level,
+            mood: f64::from(operator.work_mood.unwrap_or(mood.max(0.0) as u8)),
         })
         .collect()
 }
@@ -619,20 +625,11 @@ fn build_power_rooms(
 fn to_trade_operator(
     instances: Option<&OperatorInstances>,
     table: Option<&SkillTable>,
-    layout: &LayoutContext,
+    _layout: &LayoutContext,
     op: &AssignedOperator,
 ) -> Result<TradeOperator> {
-    const JIE_MARKET_BUFF: &str = "trade_ord_limit_count[000]";
     let tier = op.tier();
-    let mut buff_ids = resolve_buff_ids(instances, op, "trade")?;
-    if op.name == "孑"
-        && layout.global_inject.karlan_precision().is_some()
-        && buff_ids.iter().any(|b| b == JIE_MARKET_BUFF)
-    {
-        // 孑的精0摊贩与精1市井是替换关系，但当前 assignment 只保存 elite，
-        // 无法表达“四星精1”。灵知线落位后重解时必须与搜索注入保持一致。
-        buff_ids = vec![JIE_MARKET_BUFF.to_string()];
-    }
+    let buff_ids = resolve_buff_ids(instances, op, "trade")?;
     let compiled_atoms = table
         .map(|t| compile_operator_atoms(&buff_ids, t))
         .unwrap_or_else(|| Arc::from([]));
@@ -802,8 +799,11 @@ mod tests {
         let jie = trade.operators.iter().find(|o| o.name == "孑").unwrap();
         assert_eq!(
             jie.buff_ids,
-            vec!["trade_ord_limit_count[000]".to_string()],
-            "灵知线 assignment round-trip 不应把精0摊贩叠回市井孑"
+            vec![
+                "trade_ord_limit_diff[000]".to_string(),
+                "trade_ord_limit_count[000]".to_string(),
+            ],
+            "孑精1+必须同时保留摊贩经济与市井之道"
         );
 
         let result = solve_trade(
@@ -823,11 +823,43 @@ mod tests {
         .unwrap();
         assert_eq!(result.rule_id, None);
         assert!(
-            (((result.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0) - 129.0).abs()
+            (((result.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0) - 132.0).abs()
                 < 0.01,
-            "灵知+市井孑+银灰+琳琅应自然算出 129，got {}",
+            "灵知+双技能孑+银灰+琳琅应自然算出 132% 基础外加成，got {}",
             ((result.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0)
         );
+    }
+
+    #[test]
+    fn control_support_injects_reach_office_and_meeting_results() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            "control",
+            vec![
+                AssignedOperator::new("若叶睦", 2),
+                AssignedOperator::new("三角初华", 2),
+                AssignedOperator::new("丰川祥子", 2),
+                AssignedOperator::new("祐天寺若麦", 2),
+                AssignedOperator::new("八幡海铃", 2),
+            ],
+        );
+        assignment.set_room("office_1", vec![AssignedOperator::new("芬", 0)]);
+        assignment.set_room("meeting", vec![AssignedOperator::new("芬", 0)]);
+
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        assert_eq!(resolved.layout.office_hire_spd_pct, 10.0);
+        let meeting = resolved.meeting_rooms[0].result.as_ref().unwrap();
+        assert_eq!(meeting.external_speed_bonus_pct, 5.0);
     }
 
     #[test]
@@ -1124,6 +1156,67 @@ mod tests {
     }
 
     #[test]
+    fn siracusa_control_inject_counts_lappland_in_trade() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("control", vec![AssignedOperator::new("八幡海铃", 2)]);
+        assignment.set_room("trade_1", vec![AssignedOperator::new("拉普兰德", 2)]);
+
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let trade = resolved
+            .trade_rooms
+            .iter()
+            .find(|room| room.id.0 == "trade_1")
+            .unwrap();
+        assert_eq!(
+            trade.layout.trade_tagged_count_sum.get("cc.g.siracusa"),
+            Some(&1)
+        );
+        assert!((trade.layout.global_inject.trade_eff_pct() - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn viviana_control_inject_counts_gravel_as_knight_manufacturer() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("control", vec![AssignedOperator::new("薇薇安娜", 2)]);
+        assignment.set_room("manu_4", vec![AssignedOperator::new("砾", 1)]);
+
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            resolved.layout.manu_tagged_count_sum.get("cc.g.knight"),
+            Some(&1)
+        );
+        assert!(
+            (resolved
+                .layout
+                .global_inject
+                .manu_eff_for(crate::types::RecipeKind::Gold)
+                - 7.0)
+                .abs()
+                < f64::EPSILON
+        );
+    }
+
+    #[test]
     fn snhunt_elite2_baseline_global_inject() {
         let layout = resolve_snhunt_elite2_baseline_layout().unwrap();
         assert!((layout.global.get(GlobalResourceKey::Matatabi) - 12.0).abs() < f64::EPSILON);
@@ -1191,6 +1284,107 @@ mod tests {
             layout.dorm_occupant_count, 20,
             "宿舍 producer 上岗不应把 dorm_occupant_count 压成上岗人数"
         );
+    }
+
+    #[test]
+    fn senxi_uses_dorm_ambience_level_for_monster_cuisine() {
+        let (instances, table) = pair();
+        let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        for room in &mut blueprint.rooms {
+            if room.kind == FacilityKind::Dormitory {
+                room.dorm_ambience_level = Some(1);
+            }
+        }
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("dorm_1", vec![AssignedOperator::new("森西", 2)]);
+        let layout = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap()
+        .layout;
+        assert_eq!(layout.global.get(GlobalResourceKey::MonsterCuisine), 1.0);
+    }
+
+    #[test]
+    fn naren_tuya_uses_dorm_level_sum_for_gold_only() {
+        let (instances, table) = pair();
+        let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        for room in &mut blueprint.rooms {
+            if room.kind == FacilityKind::Dormitory {
+                room.dorm_ambience_level = Some(1);
+            }
+        }
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("manu_4", vec![AssignedOperator::new("娜仁图亚", 2)]);
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let room = resolved
+            .manu_rooms
+            .iter()
+            .find(|room| room.id.0 == "manu_4")
+            .unwrap()
+            .clone();
+        let result = crate::manufacture::solve_manufacture(
+            &crate::manufacture::ManuRoomInput {
+                level: room.level,
+                operators: room.operators,
+                active_recipe: crate::types::RecipeKind::Gold,
+                mood: 24.0,
+                layout: std::sync::Arc::new(room.layout),
+            },
+            &table,
+        )
+        .unwrap();
+        assert!(result.skill_efficiency.as_f64() >= 0.04);
+        assert!(result.skill_efficiency.as_f64() < 0.05);
+    }
+
+    #[test]
+    fn naren_tuya_e0_adds_storage_and_reduces_mood_drain() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("manu_4", vec![AssignedOperator::new("娜仁图亚", 0)]);
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+        let room = resolved
+            .manu_rooms
+            .iter()
+            .find(|room| room.id.0 == "manu_4")
+            .unwrap()
+            .clone();
+        let result = crate::manufacture::solve_manufacture(
+            &crate::manufacture::ManuRoomInput {
+                level: room.level,
+                operators: room.operators,
+                active_recipe: crate::types::RecipeKind::Gold,
+                mood: 24.0,
+                layout: std::sync::Arc::new(room.layout),
+            },
+            &table,
+        )
+        .unwrap();
+        assert_eq!(result.storage_limit, 30);
+        assert_eq!(result.mood_drain[0].drain_delta_per_hour, -0.25);
     }
 
     #[test]

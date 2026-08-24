@@ -99,6 +99,8 @@ crates/infra-core/src/layout/orchestrate/
 - `gates`：设施数、订单数、配方数、可用/不可用干员，以及由临时 assignment 正式 resolve 的 global resource 门槛；
 - `skip_registry_ids` / `skip_registry_ids_when_inactive`：与 legacy registry 的激活/关闭互斥，不在 `select.rs` 写体系 id 分支。
 
+Mujica 是例外明确的低优先级中枢 fallback：正常 Rule、registry 与 late Rule 都未选中跨站体系时，才尝试完整五人（若叶睦、三角初华、丰川祥子、祐天寺若麦、八幡海铃）控制中枢 role。五人必须全部拥有，祥子必须精二，其余按实际练度结算；成功后五个 control anchor 和一条 `2/1` bind 同时进入 Plan。Mujica 不是普通候选比较器的体系评分，也不与已有跨站体系竞争；其余四人未成组时由 `control_exclusions` 阻止回流普通中枢，八幡海铃仍保留独立动态贸易 producer 路径。
+
 Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 的独立声明式 rule：实际感知 ≥50 后仍必须让重岳、令、乌有三人完整落位并生成 bind；容量不足时自然关闭。不能在 select/rotation 另写 Rosemary id 分支。
 
 `AssignmentPlan.rotation_reserves` 保存正式 role/solver 解析、但不进入 peak 的实际成员集合。`ResolvedRoleReserve.reuse_policy=once` 只在 H1/H2 中首个可行目标房使用一次；`reuse_policy=every_eligible_half` 要求两个 half 都存在目标，并在菲亚后处理前把同一组成员分别写入两个 gamma half。声明了 `require_pre_split_halves=true` 的 conditional pack 还必须在全部 exact bind 落位后的自然 H1/H2 打包结果中两边已有目标；否则计划编译器事务性重编译并降级为基础 alternative，不提交 pack 的 anchors、relations 或 reserve。已经提交的 reserve 若在基础 fill 中被覆盖仍是 schedule 不变量错误。reserve 不保护 `apply_fiammetta_return` 后的最终房间成员；最终 assignment / MAA 可以包含一次合法菲亚换人。
@@ -170,7 +172,7 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 |-----------|------|-------------|------------|
 | 多贸但书 required anchor + 叙拉古动态注入 | 条件硬锚点 + 自然中枢/贸易候选 | `gsl_docus_syracusa` / `gsl_docus_solo` | 多贸龙门币布局先预留但书本人；八幡海铃、伺夜、贝洛内均不固定，伺夜/贝洛内不要求同站，也不要求入编 |
 | `closure` | 可露希尔核心优先 | `gsl_blackkey_closure` / `gsl_closure_*` | 强制包含可露希尔；多贸中排在但书之后、完整龙巫之前，并优先可用的最高等级金单站；优先黑键可露锚点，缺黑键仍保留可露 |
-| `witch` / `witch_fallback` | 龙巫 / 巫恋兜底 | `gsl_witch_*` | `witch` 强制包含精二巫恋 + 龙舌兰；无龙舌兰时 `witch_fallback` 低于推王组，只做巫恋兜底 |
+| `witch` / `witch_fallback` | 龙巫 / 巫恋兜底 | `gsl_witch_*` | `witch` 强制包含精二巫恋 + 已持有龙舌兰；精二龙舌兰优先 β/α，精0/精1允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank`；无龙舌兰时 `witch_fallback` 低于推王组，只做巫恋兜底 |
 | `ling_jie_karlan` | control producer + L1 自然搜索 | `gsl_ling_jie_yaxin` 仅参考 | 只认领灵知 E2 中枢；精1孑由贸易搜索注入 |
 | 格拉斯哥自然候选 / `penguin_*` | 普通贸易候选 / 企鹅 segment | `gsl_vina_lungmen` / `gsl_penguin_*` | Vina shortcut 只结算实际组合，不参与选型；企鹅仍按独立 role policy 处理 |
 | `rosemary_perception` | 声明式跨设施 Rule + global resource gate | — | 核心、路径成员与实际 producer 先形成临时 assignment；`resolve_base` 得到感知 ≥50 后才提交 plan |
@@ -181,7 +183,7 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 
 1. 一贸龙门币布局由可露希尔 required anchor 先占位；多贸龙门币布局由但书 required anchor 先占位。核心所在房的其余位置按 `final_efficiency` 搜索；`gsl_docus_solo` / `gsl_docus_syracusa` 只结算实际组合。
 2. 默认多贸龙门币的第二核心是 `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用组合。可露希尔优先进入剩余的最高等级金单站。
-3. 默认第三核心是 `witch`：必须同时包含精二巫恋、精二龙舌兰和裁缝 β/α，并进入三级金单站；blank shortcut 不进入自动 role。
+3. 默认第三核心是 `witch`：必须同时包含精二巫恋、已持有龙舌兰并进入三级金单站；精二龙舌兰优先裁缝 β/α，精0/精1允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank`，其他普通 blank shortcut 不进入自动 role。
 4. `witch_fallback` / `karlan` / `penguin` / plain：无龙舌兰巫恋兜底、灵知孑、企鹅、散件工具人三人组，且排除黑键与巫恋同房冲突。格拉斯哥成员作为普通合法候选参与实际 `final_efficiency` 搜索。
 
 Rosemary/黑键体系 alternative 激活时，在选定 alternative 的同一 Plan 决策中把双贸易站
@@ -268,7 +270,7 @@ peak 固定为但书 A + 可露希尔/黑键 B，并让完整龙巫进入 γ res
 
 #### 巫恋 role
 
-- **核心**：`witch` 是龙巫，强制包含精二巫恋 + 龙舌兰。
+- **核心**：`witch` 是龙巫，强制包含精二巫恋 + 已持有龙舌兰；龙舌兰精0/精1也可进入排班 admission。
 - **fallback**：自动龙巫内部仅裁缝 β → 裁缝 α；`gsl_witch_long_blank` 只保留单站结算兼容。
 - **兜底**：无龙舌兰时走 `witch_fallback`，只强制包含巫恋；格拉斯哥不占独立 role 顺序。
 - **编排**：不再把 `witch_long_beta` 当固定三人组早占站；由 role policy 在贸易余站搜索里强制包含龙巫锚点。

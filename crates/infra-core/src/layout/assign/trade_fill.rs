@@ -18,6 +18,7 @@ use crate::search::{
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
+use crate::types::Action;
 
 use super::commit::{commit_trade_room, pick_disjoint_from_report, trade_hit_names};
 use super::AssignBaseOptions;
@@ -235,16 +236,188 @@ pub(super) fn assign_trade_remainder(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn refill_trade_room_with_core(
+    blueprint: &BaseBlueprint,
+    room_id: &RoomId,
+    core: &str,
+    pool: &TradePool,
+    table: &SkillTable,
+    instances: &OperatorInstances,
+    options: &AssignBaseOptions,
+    durin_dorm_planning: Option<u8>,
+    assignment: &mut BaseAssignment,
+) -> Result<()> {
+    let room = blueprint
+        .room(room_id)
+        .ok_or_else(|| Error::msg(format!("Fiammetta trade room {} disappeared", room_id.0)))?;
+    if room.kind != FacilityKind::TradePost || trade_order_from_room(room)? != TradeOrderKind::Gold
+    {
+        return Err(Error::msg(format!(
+            "Fiammetta core {core} requires a gold trade room"
+        )));
+    }
+
+    for assigned_room in &mut assignment.rooms {
+        assigned_room
+            .operators
+            .retain(|operator| operator.name != core);
+    }
+    assignment.set_room(room_id.clone(), Vec::new());
+    let used = assignment.operator_names();
+    let layout = crate::layout::resolve_base(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        durin_dorm_planning,
+    )?
+    .layout;
+    let role_id = match core {
+        DOCUS_TRADE_NAME => "docus",
+        CLOSURE_TRADE_NAME => "closure",
+        other => {
+            return Err(Error::msg(format!(
+                "unsupported single-core Fiammetta trade target {other}"
+            )))
+        }
+    };
+    let hit = pick_trade_role_hit_requiring(
+        role_id,
+        pool,
+        table,
+        trade_room_options(
+            &layout,
+            blueprint.gold_manu_line_count(),
+            options,
+            TradeOrderKind::Gold,
+            room.level,
+        ),
+        &layout,
+        &used,
+        options.top_k,
+        &[core.to_string()],
+    )?;
+    let operators = hit
+        .names
+        .iter()
+        .map(|name| {
+            pool.entry(name)
+                .map(|entry| crate::layout::AssignedOperator::from_progress(name, entry.progress))
+                .ok_or_else(|| Error::msg(format!("Fiammetta trade candidate {name} missing")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    assignment.set_room(room_id.clone(), operators);
+    Ok(())
+}
+
+pub(crate) fn beta_tailor_names(pool: &TradePool, table: &SkillTable) -> Vec<String> {
+    let mut names: Vec<_> = pool
+        .entries
+        .iter()
+        .filter(|entry| {
+            entry.buff_ids.iter().any(|buff_id| {
+                matches!(
+                    buff_id.as_str(),
+                    "trade_ord_wt&cost[010]" | "trade_ord_wt&cost[011]" | "trade_ord_wt&cost[012]"
+                ) || table.get(buff_id).is_some_and(|skill| {
+                    skill.atoms.iter().any(|atom| {
+                        matches!(&atom.action, Action::TagOrder { tag } if tag == "tailor_beta")
+                    })
+                })
+            })
+        })
+        .map(|entry| entry.name.clone())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn refill_witch_room_with_tailor(
+    blueprint: &BaseBlueprint,
+    room_id: &RoomId,
+    tailor: &str,
+    pool: &TradePool,
+    table: &SkillTable,
+    instances: &OperatorInstances,
+    options: &AssignBaseOptions,
+    durin_dorm_planning: Option<u8>,
+    assignment: &mut BaseAssignment,
+) -> Result<crate::Efficiency> {
+    let room = blueprint
+        .room(room_id)
+        .ok_or_else(|| Error::msg(format!("Witch trade room {} disappeared", room_id.0)))?;
+    if room.kind != FacilityKind::TradePost
+        || room.level != 3
+        || trade_order_from_room(room)? != TradeOrderKind::Gold
+    {
+        return Err(Error::msg(
+            "Fiammetta Witch group requires a level-3 gold trade room",
+        ));
+    }
+    for assigned_room in &mut assignment.rooms {
+        assigned_room.operators.retain(|operator| {
+            !matches!(
+                operator.name.as_str(),
+                WITCH_TRADE_NAME | TEQUILA_TRADE_NAME
+            ) && operator.name != tailor
+        });
+    }
+    assignment.set_room(room_id.clone(), Vec::new());
+    let used = assignment.operator_names();
+    let layout = crate::layout::resolve_base(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        durin_dorm_planning,
+    )?
+    .layout;
+    let required = vec![
+        WITCH_TRADE_NAME.to_string(),
+        TEQUILA_TRADE_NAME.to_string(),
+        tailor.to_string(),
+    ];
+    let hit = pick_trade_role_hit_requiring(
+        "witch",
+        pool,
+        table,
+        trade_room_options(
+            &layout,
+            blueprint.gold_manu_line_count(),
+            options,
+            TradeOrderKind::Gold,
+            room.level,
+        ),
+        &layout,
+        &used,
+        options.top_k,
+        &required,
+    )?;
+    let operators = hit
+        .names
+        .iter()
+        .map(|name| {
+            pool.entry(name)
+                .map(|entry| crate::layout::AssignedOperator::from_progress(name, entry.progress))
+                .ok_or_else(|| Error::msg(format!("Witch candidate {name} missing")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    assignment.set_room(room_id.clone(), operators);
+    Ok(hit.final_efficiency)
+}
+
 pub(super) fn take_next_trade_room<'a>(
     rooms: &mut Vec<&'a RoomBlueprint>,
     pool: &TradePool,
     assignment: &BaseAssignment,
     used: &HashSet<String>,
 ) -> Option<&'a RoomBlueprint> {
-    let docus_pending = !used.contains(DOCUS_TRADE_NAME)
-        && pool
-            .entry(DOCUS_TRADE_NAME)
-            .is_some_and(|entry| entry.elite >= 2);
+    let docus_pending = !used.contains(DOCUS_TRADE_NAME) && pool.entry(DOCUS_TRADE_NAME).is_some();
     rooms.sort_by(|left, right| {
         let left_gold = trade_order_from_room(left).ok() == Some(TradeOrderKind::Gold);
         let right_gold = trade_order_from_room(right).ok() == Some(TradeOrderKind::Gold);
@@ -321,6 +494,7 @@ pub(super) fn refresh_trade_efficiency_snapshots(
             room.id,
             operators,
             Some(crate::layout::RoomEfficiencySnapshot {
+                trade_base_efficiency: solved.efficiency.paper.base_efficiency,
                 trade_paper_efficiency: solved.efficiency.paper.paper_efficiency,
                 trade_occupancy_efficiency: solved.efficiency.paper.occupancy_efficiency,
                 trade_control_efficiency: solved.efficiency.paper.control_efficiency,
@@ -329,7 +503,17 @@ pub(super) fn refresh_trade_efficiency_snapshots(
                     .production_basis
                     .unit_output_multiplier,
                 trade_final_efficiency: solved.efficiency.final_efficiency,
+                trade_total_efficiency: solved.efficiency.total_efficiency,
                 trade_equivalent_skill_efficiency: solved.efficiency.equivalent_skill_efficiency,
+                trade_equivalent_trade_efficiency: solved.efficiency.trade_equivalent_efficiency,
+                trade_equivalent_gold_efficiency: solved.efficiency.gold_equivalent_efficiency,
+                trade_output_per_day: solved.production.unit.unit_trade_per_day
+                    * solved.efficiency.total_efficiency.as_f64(),
+                gold_consumption_per_day: solved.production.unit.gold_consumption_per_day
+                    * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
+                    * solved.efficiency.total_efficiency.as_f64(),
+                trade_originium_shards_per_day: solved.production.unit.unit_originium_per_day
+                    * solved.efficiency.total_efficiency.as_f64(),
                 trade_rule_id: solved.rule_id,
                 trade_skill_efficiency: solved.efficiency.paper.skill_efficiency,
                 trade_mechanic_equivalent_efficiency: solved
@@ -393,9 +577,7 @@ pub(super) fn pick_trade_meta_then_plain(
     }
     if order == TradeOrderKind::Gold
         && !role_used.contains(DOCUS_TRADE_NAME)
-        && pool
-            .entry(DOCUS_TRADE_NAME)
-            .is_some_and(|entry| entry.elite >= 2)
+        && pool.entry(DOCUS_TRADE_NAME).is_some()
     {
         if let Ok(hit) = pick_trade_role_hit_requiring(
             "docus",

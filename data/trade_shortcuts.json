@@ -23,12 +23,29 @@
       "label": "巫恋Ⅱ+龙舌兰Ⅱ + 裁缝a",
       "mechanic_equivalent_efficiency": 0.38,
       "tailor_tier": "alpha",
+      "unit_gsl_gold_anchor": 1675.127,
       "unit_output": {
         "kind": "enhanced_unit_output_per_day",
-        "value": 12339.274611
+        "value": 12030.46
       },
       "unit_output_source": "工具人表26.5 (2).xlsx!Sheet1 B41：等效129%贸；按需求文档等效公式，以纸面1.93、非技能1.03反算",
       "unit_output_precision": "derived_from_rounded_equivalent",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long0_alpha",
+      "label": "巫恋Ⅱ+龙舌兰0/1 + 裁缝a",
+      "mechanic_equivalent_efficiency": 0.0,
+      "tailor_tier": "alpha",
+      "unit_gsl_gold_anchor": 837.56,
+      "unit_output": {
+        "kind": "enhanced_unit_output_per_day",
+        "value": 11192.9
+      },
+      "unit_output_source": "用户裁决：三级贸易站、精0/精1龙舌兰+裁缝a",
+      "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
       }
@@ -135,9 +152,9 @@
         "kind": "enhanced_unit_output_by_level",
         "lv1": 20000.0,
         "lv2": 18591.55,
-        "lv3": 15910.75
+        "lv3": 15929.2
       },
-      "unit_output_source": "用户确认的社区分级锚点（2026-07-11）：lv1=20000、lv2=18591.55、lv3=15910.75；工具人表26.5 (2).xlsx!Sheet1 E5,E27 标注lv3 1.55与lv2 1.81倍率",
+      "unit_output_source": "用户裁决：但书 E2，各贸易站等级 1.0 效率 24h 单位产出",
       "unit_output_precision": "exact",
       "match": {
         "kind": "docus_syracusa"
@@ -152,9 +169,25 @@
         "kind": "enhanced_unit_output_by_level",
         "lv1": 20000.0,
         "lv2": 18591.55,
-        "lv3": 15910.75
+        "lv3": 15929.2
       },
-      "unit_output_source": "用户确认的社区分级锚点（2026-07-11）：lv1=20000、lv2=18591.55、lv3=15910.75；工具人表26.5 (2).xlsx!Sheet1 E5,E27 标注lv3 1.55与lv2 1.81倍率",
+      "unit_output_source": "用户裁决：但书 E2，各贸易站等级 1.0 效率 24h 单位产出",
+      "unit_output_precision": "exact",
+      "match": {
+        "kind": "docus"
+      }
+    },
+    {
+      "id": "gsl_docus_solo_e0",
+      "label": "但书精0单走（完整纸面效率×社区单位产出倍率）",
+      "mechanic_equivalent_efficiency": 0.55,
+      "unit_output": {
+        "kind": "enhanced_unit_output_by_level",
+        "lv1": 15000.0,
+        "lv2": 14366.197,
+        "lv3": 13097.345
+      },
+      "unit_output_source": "用户裁决：但书 E0，各贸易站等级 1.0 效率 24h 单位产出",
       "unit_output_precision": "exact",
       "match": {
         "kind": "docus"
@@ -162,7 +195,7 @@
     },
     {
       "id": "gsl_ling_jie_yaxin",
-      "label": "灵知+精1孑+银灰+琳琅诗怀雅（参考锚点；现由L1自然计算129%贸）",
+      "label": "灵知+双技能孑+银灰+琳琅诗怀雅（参考锚点；L1总效率232%）",
       "mechanic_equivalent_efficiency": 0.0,
       "tailor_tier": "regular"
     },

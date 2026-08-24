@@ -1,6 +1,32 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "formatter": true,
+  "provider": {
+    "apigate": {
+      "npm": "@ai-sdk/openai",
+      "name": "APIGATE (Responses)",
+      "options": {
+        "baseURL": "https://apigate.online/v1"
+      },
+      "models": {
+        "gpt-5.6-terra": {
+          "name": "gpt-5.6-terra (Responses)"
+        }
+      }
+    },
+    "aabao": {
+      "npm": "@ai-sdk/openai",
+      "name": "AABAO (Responses)",
+      "options": {
+        "baseURL": "https://api.aabao.ai/v1"
+      },
+      "models": {
+        "gpt-5.6-terra": {
+          "name": "gpt-5.6-terra (Responses)"
+        }
+      }
+    }
+  },
   "agent": {
     "build": {
       "permission": {

@@ -88,7 +88,7 @@ None → 走 L2
 
 - 条件：`is_docus_solo_station` — ≥3 人、有但书机制 buff、无巫恋侧。
 - `unit_output` 按贸易站等级提供社区加强日产出；三级站相对 `10265` 为 `×1.55`。
-- 最终得分为完整纸面效率（基础 100% + 人头 + 技能 + 中枢）乘单位产出倍率。
+- 新接口返回完整总效率（基础 + 技能 + 中枢）与单位日产出；实际产出为总效率 × 单位日产出 × 工作时间占比。旧 `final_efficiency` 仅保留给内部排序兼容。
 - `mechanic_equivalent_efficiency=0.550` 仅作解释，不再参与排序或产出乘法。
 
 ## 巫恋核（`gsl_witch_*`）
@@ -110,9 +110,9 @@ None → 走 L2
 ## 灵知市井孑（L1 自然计算）
 
 - 当前不走 active L3：`trade_segments.json` 无 `ling_jie`，`shortcut.rs` 无 `match_ling_jie_shortcut`。
-- `base_systems.json` 的 `ling_jie_karlan` 只认领灵知 E2 中枢；贸易站由 L1 搜索在 `karlan_precision` 激活时注入精1+ 市井孑，再自然选择银灰、琳琅诗怀雅、崖心、讯使等第三人。
-- 回归：`reg_ling_jie_yaxin_natural` 断言中枢灵知 E2 + 精1+孑 / 银灰 / 琳琅诗怀雅的最终直接效率为 **2.290**，且 `rule_id=None`。
-- 129 拆法：银灰受精密计算后 5% + 琳琅 20% = 25%；孑按 18 单上限给 72%；琳琅按超出 10 单的 8 单给 32%；合计 129%。
+- `base_systems.json` 的 `ling_jie_karlan` 只有在灵知 E2、孑和一名 E2 喀兰贸易成员可以共同落位时才认领；三者作为跨站组合绑定到同一排班关系。
+- 用户裁决孑精 1+ 同时保留摊贩经济与市井之道。摊贩读取订单差，市井读取实际订单数，两者合计为最终上限 × 4%，不能重复计算订单差。
+- `reg_ling_jie_yaxin_natural` 锁定双技能孑 / 银灰 / 琳琅诗怀雅：技能效率 `129%`，三人基础效率 `103%`，总效率 **2.320**，`rule_id=None`。
 - `gsl_ling_jie_yaxin` 保留在 `trade_shortcuts.json` 作为参考锚点，不应出现在 solver 输出的 `trade_shortcut`。
 
 ## 可露希尔分档（`match.kind == "closure"`）

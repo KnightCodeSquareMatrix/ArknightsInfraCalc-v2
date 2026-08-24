@@ -297,12 +297,18 @@ impl BaseBlueprint {
             }
             match room.kind {
                 FacilityKind::TradePost => {
-                    let Some(RoomProduct::Trade { .. }) = room.product else {
+                    let Some(RoomProduct::Trade { order }) = room.product else {
                         return Err(Error::msg(format!(
                             "trade room {} requires product.trade",
                             room.id.0
                         )));
                     };
+                    if order == TradeOrderKind::Originium && room.level != 3 {
+                        return Err(Error::msg(format!(
+                            "originium trade room {} requires level 3",
+                            room.id.0
+                        )));
+                    }
                 }
                 FacilityKind::Factory => {
                     let Some(RoomProduct::Factory { .. }) = room.product else {

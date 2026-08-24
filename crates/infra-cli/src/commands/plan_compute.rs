@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use infra_core::box_profile::{
@@ -8,10 +8,108 @@ use infra_core::box_profile::{
 use infra_core::export::{build_from_team_rotation, MaaExportOptions, MaaSchedule};
 use infra_core::instances::OperatorInstances;
 use infra_core::layout::BaseBlueprint;
-use infra_core::operbox::OperBox;
+use infra_core::operbox::{OperBox, OperBoxEntry};
 use infra_core::schedule::TimedRotationProfile;
 use infra_core::skill_table::SkillTable;
 use infra_core::Error;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PlanComputeParams {
+    pub schema_version: u32,
+    pub layout: BaseBlueprint,
+    pub operbox: Vec<OperBoxEntry>,
+    #[serde(default)]
+    pub labels: PlanComputeLabels,
+    #[serde(default)]
+    pub options: PlanComputeOptions,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PlanComputeLabels {
+    #[serde(default)]
+    pub layout: Option<String>,
+    #[serde(default)]
+    pub operbox: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PlanComputeOptions {
+    #[serde(default)]
+    pub rotation: TimedRotationProfile,
+    #[serde(default = "default_top_k")]
+    pub top: usize,
+    #[serde(default)]
+    pub system_preferences: HashMap<String, String>,
+    #[serde(default)]
+    pub maa_title: Option<String>,
+    #[serde(default = "default_fiammetta_enable")]
+    pub fiammetta_enable: bool,
+}
+
+fn default_top_k() -> usize {
+    20
+}
+
+fn default_fiammetta_enable() -> bool {
+    true
+}
+
+pub(super) fn inline_operbox(mut entries: Vec<OperBoxEntry>) -> Result<OperBox, Error> {
+    inline_operbox_inner(&mut entries, false)
+}
+
+pub(super) fn inline_operbox_for_debug_rerun(
+    mut entries: Vec<OperBoxEntry>,
+) -> Result<OperBox, Error> {
+    inline_operbox_inner(&mut entries, true)
+}
+
+fn inline_operbox_inner(
+    entries: &mut Vec<OperBoxEntry>,
+    plan_compute_compat: bool,
+) -> Result<OperBox, Error> {
+    const MAX_OPERBOX_ENTRIES: usize = 1000;
+
+    if entries.is_empty() || entries.len() > MAX_OPERBOX_ENTRIES {
+        return Err(Error::msg(format!(
+            "operbox must contain between 1 and {MAX_OPERBOX_ENTRIES} entries"
+        )));
+    }
+
+    let mut ids = HashSet::new();
+    let mut names = HashSet::new();
+    for (index, entry) in entries.iter_mut().enumerate() {
+        entry.id = entry.id.trim().to_string();
+        entry.name = entry.name.trim().to_string();
+        if entry.id.is_empty() || entry.name.is_empty() {
+            return Err(Error::msg(format!(
+                "operbox entry {} must have non-empty id and name",
+                index + 1
+            )));
+        }
+        if !ids.insert(entry.id.clone()) {
+            return Err(Error::msg(format!("duplicate operbox id {}", entry.id)));
+        }
+        if !names.insert(entry.name.clone()) {
+            return Err(Error::msg(format!("duplicate operbox name {}", entry.name)));
+        }
+        if !(1..=6).contains(&entry.potential) {
+            return Err(Error::msg(format!(
+                "{} potential must be between 1 and 6",
+                entry.name
+            )));
+        }
+    }
+    if plan_compute_compat {
+        OperBox::from_entries_for_plan_compute_compat(std::mem::take(entries))
+    } else {
+        OperBox::from_entries(std::mem::take(entries))
+    }
+}
 
 pub(super) struct PlanResources<'a> {
     pub instances: &'a OperatorInstances,
@@ -87,7 +185,7 @@ pub(super) fn compute_plan(
         .then(|| {
             let mut options = MaaExportOptions::for_blueprint(input.blueprint);
             if input.fiammetta_enable {
-                options.enable_gongsun_fiammetta_priority();
+                options.enable_fiammetta_priority_for_blueprint(input.blueprint);
             }
             if let Some(title) = input.maa_title {
                 options.title = title.to_string();

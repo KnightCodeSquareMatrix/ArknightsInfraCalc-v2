@@ -45,6 +45,13 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 
 根 `AGENTS.md` 是任务分类、真源顺序和项目硬门禁的唯一入口；`docs/INDEX.md` 只负责定位文档与后续阅读，不另行定义 Skill 触发词或真源优先级。
 
+### 影子候选设计入口
+
+凡讨论或实现“能力影子候选”、跨设施/跨产物共享干员归属、同房组合候选延迟占用或冲突分支重算，必须先完整读取
+`docs/TODO/能力影子候选设计.md`。该方案把 capability shadow 与 physical operator
+分离，在冲突闭包内比较候选后才提交真实 assignment；它与挂件 receiver、SupportPool、SupportClaim
+是两个独立问题，不得混为同一抽象或验收项。该文档当前是 `active-change / proposal`，不代表代码已经实现。
+
 ## 3. 所有任务通用硬门禁
 
 - 未授权修改时只读；诊断不自动等于实现。区分用户事实、用户推测、Agent 推断和关键未知项。
@@ -73,6 +80,22 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - Layout 主路径是 `build_plan -> execute_plan -> fill -> resolve`；排班不得绕过 Plan 修 admission。
 - 生产搜索使用各域具名目标；多目标优先显式词典序，中枢或 global heuristic 必须具名。
 - CLI / export 只编排调用和忠实输出，不写机制、公式或重新决策。
+
+### 控制中枢效果账本与顺序选位
+
+- 已授权的中枢 conformance rebuild 唯一执行计划见
+  `docs/TODO/中枢效果账本与顺序选位重构.md`；开始相关写入前必须完整读取该计划和
+  `docs/CONTROL_CENTER_ASSIGNMENT.md`。
+- 中枢同种效果取最高由 atom 级结构化 `EffectKey` 和显式 aggregation 决定；不得按干员名、
+  `buff_id` 前缀、技能名或数值单位推断同类效果。冻结 ledger 是合并、trace、候选、dependency
+  和投影视图的唯一 owner。
+- 中枢跨域不使用综合评分函数。按 Plan hard anchor/原子体系、贸易全局区、制造全局区、训练室、
+  办公室、会客室、心情去重、普通补位的既定顺序选位；后序不得替换前序。条件只读取当前已选
+  成员和当前候选，不引入 witness package、回溯或额外组合搜索。
+- 控制中枢 CSV inventory 必须 fail-closed：每行/tier 显式标记 supported、unsupported、ignored 或
+  delegated。公式不明确的概率/倾向机制不得进入候选、补位、dependency 或 `shift_bind`。
+- `PickOne` / `OptionalFixed` 只由 Plan 编译解析；execute 和 rotation 只能消费 resolved facts。
+  `min_count` 保持候选组 hard constraint。心情实际结算和菲亚、办公室独立轮换不在本轮扩张。
 
 ## 5. Git 与交付
 

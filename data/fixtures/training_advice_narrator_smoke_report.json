@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "context": {},
+  "newbie_section_status": "complete",
+  "incomplete_newbie": [],
+  "combinations": [
+    {
+      "id": "vermeil",
+      "name": "红云组",
+      "state": "complete",
+      "completion_percent": 100,
+      "facilities": ["manufacturing_station"],
+      "members": [{"operator": "红云"}]
+    },
+    {
+      "id": "human_fireworks",
+      "name": "人间烟火组",
+      "state": "needs_training",
+      "completion_percent": 66,
+      "facilities": ["trade_station", "control_center"],
+      "members": [{"operator": "乌有"}]
+    }
+  ],
+  "recommendations": [
+    {
+      "operator": "乌有",
+      "action": "train",
+      "target": {"kind": "explicit", "elite": 2},
+      "combination_id": "human_fireworks",
+      "combination_name": "人间烟火组"
+    }
+  ]
+}

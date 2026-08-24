@@ -226,6 +226,10 @@ pub enum Condition {
     ExternalMomentumGteField {},
     /// 望·权变：实地 > 外势.
     FieldMomentumGtExternal {},
+    /// 当前办公室联络速度（含基础 5%）低于阈值。
+    OfficeHireSpeedBelow {
+        n: u8,
+    },
     /// 发电站作业平台数量 ≥ n（布丁·超频）。
     PlatformCountGte {
         min: u8,
@@ -295,6 +299,11 @@ pub enum Action {
         delta: f64,
         scope: MoodDrainScope,
     },
+    /// 对同一中枢内指定干员施加心情消耗修正。
+    MoodDrainDeltaForOperator {
+        operator: String,
+        delta: f64,
+    },
     /// Per `floor(state / step_size)` steps, apply `delta_per_step` to mood drain (铎铃·人间烟火).
     MoodDrainPerStateStep {
         key: String,
@@ -361,6 +370,18 @@ pub enum Action {
         eff_per_karlan: f64,
         limit_per_karlan: i32,
     },
+    /// 中枢注入：人力办公室联络速度 +%。
+    GlobalInjectOfficeHireSpeed {
+        value: f64,
+    },
+    /// 中枢注入：会客室线索搜集速度 +%。
+    GlobalInjectMeetingSpeed {
+        value: f64,
+    },
+    /// 清除指定范围已累计的中枢心情消耗修正。
+    ClearMoodDrain {
+        scope: MoodDrainScope,
+    },
     /// 进驻后逐时爬升；制造纸面取 20h 效率算术平均（芬/阿罗玛等）。
     AddEffRamp {
         initial: f64,
@@ -396,6 +417,8 @@ pub fn is_room_scope(s: &AtomScope) -> bool {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EffectAtom {
+    #[serde(rename = "id", default, skip_serializing_if = "Option::is_none")]
+    pub atom_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector: Option<Selector>,
     pub action: Action,

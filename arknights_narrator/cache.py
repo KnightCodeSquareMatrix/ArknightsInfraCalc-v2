@@ -43,6 +43,7 @@ class Admission:
     status: AdmissionStatus
     content_hmac: str
     task_id: str | None = None
+    lock_token: str | None = None
     retry_after_ms: int | None = None
     cached_value: str | None = None
     fallback_reason: str | None = None
@@ -138,7 +139,12 @@ def admit(
         return Admission(AdmissionStatus.FALLBACK, digest, fallback_reason="redis_unavailable")
     if acquired is not True:
         return Admission(AdmissionStatus.PROCESSING, digest, retry_after_ms=retry_after_ms)
-    return Admission(AdmissionStatus.ACCEPTED, digest, task_id=str(uuid.uuid4()))
+    return Admission(
+        AdmissionStatus.ACCEPTED,
+        digest,
+        task_id=str(uuid.uuid4()),
+        lock_token=token,
+    )
 
 
 def _decode(value: str | bytes) -> str:

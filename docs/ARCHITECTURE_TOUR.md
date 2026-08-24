@@ -183,7 +183,7 @@ L3 不是候选选型器。它只在真实三人组和 producer manifest 已确�
 
 ## 11. `schedule_timed_rotation`：分派具名定时轮换
 
-[schedule/team_rotation.rs](../crates/infra-core/src/schedule/team_rotation.rs) 以闭集 profile 分派默认 ABC `12/6/6`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`。`schedule_team_rotation` 只是默认 ABC 的薄包装；下面步骤描述 ABC 路径：
+[schedule/team_rotation.rs](../crates/infra-core/src/schedule/team_rotation.rs) 以闭集 profile 分派默认 ABC `12/6/6`、ABC `12/12/12`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`。`schedule_team_rotation` 只是默认 ABC 的薄包装；下面步骤描述 ABC 路径：
 
 独立求解的主力/替补各自保留 `AssignmentPlan`，最终 `shifts[].plan_index` 指向真实 owner。CLI 和 MAA 不参与 profile 选型或机制重算。
 

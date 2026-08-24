@@ -2427,21 +2427,68 @@
       "skill_name": "战阵领袖",
       "facility": "manufacture",
       "tier": "tier_0",
-      "atoms": []
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
     },
     {
       "id": "manu_formula_spd&bd[001]",
-      "skill_name": "战阵领袖",
+      "skill_name": "情同手足",
       "facility": "manufacture",
       "tier": "tier_up",
-      "atoms": []
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
     },
     {
       "id": "manu_formula_spd&cost[000]",
-      "skill_name": "挑大梁",
+      "skill_name": "小奇思",
       "facility": "manufacture",
       "tier": "tier_0",
-      "atoms": []
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 25.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        },
+        {
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": 0.25,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
+        }
+      ]
     },
     {
       "id": "manu_formula_spd&cost[001]",
@@ -2459,6 +2506,78 @@
               "recipe": "gold"
             }
           }
+        }
+      ]
+    },
+    {
+      "id": "control_hire_spd&bd2[000]",
+      "skill_name": "勤学苦练",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "id": "control_hire_spd&bd2[000]:passion",
+          "action": {
+            "kind": "state_produce",
+            "params": {
+              "key": "Passion",
+              "amount": 10.0
+            }
+          },
+          "phase": "state_write",
+          "phase_order": 10
+        },
+        {
+          "id": "control_hire_spd&bd2[000]:meeting_speed",
+          "action": {
+            "kind": "global_inject_meeting_speed",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_mp_cost&bd3[010]",
+      "skill_name": "成效优先",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "id": "control_mp_cost&bd3[010]:mood_delta",
+          "condition": {
+            "partner_in_room": {
+              "name": "丰川祥子"
+            }
+          },
+          "action": {
+            "kind": "mood_drain_delta_for_operator",
+            "params": {
+              "operator": "丰川祥子",
+              "delta": 0.05
+            }
+          },
+          "phase": "mood",
+          "phase_order": 30
+        },
+        {
+          "id": "control_mp_cost&bd3[010]:meeting_speed",
+          "condition": {
+            "partner_in_room": {
+              "name": "丰川祥子"
+            }
+          },
+          "action": {
+            "kind": "global_inject_meeting_speed",
+            "params": {
+              "value": 5.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 20
         }
       ]
     },
@@ -2495,7 +2614,20 @@
       "skill_name": "齐心沙盗",
       "facility": "manufacture",
       "tier": "tier_up",
-      "atoms": []
+      "atoms": [
+        {
+          "selector": "dorm_level_sum",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 1.0,
+              "recipe": "gold"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
     },
     {
       "id": "manu_formula_spd&limit&cost[000]",
@@ -2608,6 +2740,25 @@
     },
     {
       "id": "manu_formula_spd[010]",
+      "skill_name": "作战指导录像",
+      "facility": "manufacture",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0,
+              "recipe": "battle_record"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[011]",
       "skill_name": "作战指导录像",
       "facility": "manufacture",
       "tier": "tier_0",
@@ -2878,6 +3029,25 @@
       "skill_name": "火山学家",
       "facility": "manufacture",
       "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 35.0,
+              "recipe": "originium"
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "manu_formula_spd[214]",
+      "skill_name": "源岩解析",
+      "facility": "manufacture",
+      "tier": "tier_0",
       "atoms": [
         {
           "action": {
@@ -4749,6 +4919,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_tra_spd[000]:trade_efficiency",
           "action": {
             "kind": "global_inject_trade_eff",
             "params": {
@@ -4768,6 +4939,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_tra_spd[010]:trade_efficiency",
           "action": {
             "kind": "global_inject_trade_eff",
             "params": {
@@ -4787,6 +4959,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_tra_spd[020]:trade_efficiency",
           "action": {
             "kind": "global_inject_trade_eff",
             "params": {
@@ -4806,6 +4979,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_tra_spd[030]:trade_efficiency",
           "action": {
             "kind": "global_inject_trade_eff",
             "params": {
@@ -4819,12 +4993,55 @@
       ]
     },
     {
+      "id": "control_hire_spd_all[000]",
+      "skill_name": "办公室年度人物",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "id": "control_hire_spd_all[000]:office_hire_speed",
+          "action": {
+            "kind": "global_inject_office_hire_speed",
+            "params": {"value": 10.0}
+          },
+          "phase": "global_inject",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_hire_spd[000]",
+      "skill_name": "感染力",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "id": "control_hire_spd[000]:office_hire_speed_unique",
+          "condition": {"office_hire_speed_below": {"n": 30}},
+          "action": {
+            "kind": "global_inject_office_hire_speed",
+            "params": {"value": 20.0}
+          },
+          "phase": "global_inject",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "control_train_spd[010]",
+      "skill_name": "S.W.E.E.P.主管",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
       "id": "control_tra_limit&spd[000]",
       "skill_name": "精密计算",
       "facility": "control",
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_tra_limit&spd[000]:karlan_precision",
           "action": {
             "kind": "global_inject_karlan_precision",
             "params": {
@@ -4844,6 +5061,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_prod_spd[000]:manufacture_productivity",
           "action": {
             "kind": "global_inject_manu_eff",
             "params": {
@@ -4863,6 +5081,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_prod_spd[1000]:manufacture_productivity",
           "action": {
             "kind": "global_inject_manu_eff",
             "params": {
@@ -4882,6 +5101,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_pow_bot[000]:virtual_power",
           "condition": {
             "operator_in_power": {
               "name": "Lancet-2"
@@ -4906,6 +5126,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_prod_tra_spd[000]:trade_efficiency",
           "condition": {
             "external_momentum_gte_field": {}
           },
@@ -4920,6 +5141,7 @@
           "tag": "trade_global_flat"
         },
         {
+          "id": "control_prod_tra_spd[000]:manufacture_productivity",
           "condition": {
             "field_momentum_gt_external": {}
           },
@@ -4942,6 +5164,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_costToBD[000]:human_fireworks",
           "condition": {
             "mood_above": {
               "n": 12
@@ -4958,6 +5181,7 @@
           "phase_order": 10
         },
         {
+          "id": "control_costToBD[000]:perception",
           "condition": {
             "mood_below_or_eq": {
               "n": 12
@@ -4982,6 +5206,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_cost&bd1[000]:human_fireworks",
           "condition": {
             "mood_below": {
               "n": 12
@@ -5006,6 +5231,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_cost&bd_up[000]:human_fireworks",
           "selector": {
             "capped_sui_facility_count": {
               "max": 5
@@ -5022,6 +5248,7 @@
           "phase_order": 10
         },
         {
+          "id": "control_mp_cost&bd_up[000]:mood_delta",
           "action": {
             "kind": "mood_drain_delta",
             "params": {
@@ -5041,6 +5268,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_mp_bd[010]:usaut_drink",
           "selector": {
             "tagged_count_in_control": {
               "tag": "cc.g.usaut"
@@ -5065,6 +5293,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_bd2[000]:matatabi",
           "selector": {
             "tagged_count_in_control": {
               "tag": "cc.g.monhun"
@@ -5089,6 +5318,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_cost&bd2[010]:matatabi",
           "action": {
             "kind": "state_produce",
             "params": {
@@ -5100,6 +5330,7 @@
           "phase_order": 10
         },
         {
+          "id": "control_mp_cost&bd2[010]:mood_delta",
           "action": {
             "kind": "mood_drain_delta",
             "params": {
@@ -5119,6 +5350,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_token_tra_spd[000]:trade_efficiency",
           "condition": {
             "peer_tag_in_room": {
               "tag": "cc.g.monhun"
@@ -5143,6 +5375,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_token_prod_spd2[000]:manufacture_productivity",
           "condition": {
             "peer_tag_in_room": {
               "tag": "cc.g.monhun"
@@ -5167,6 +5400,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_cost&bd2[000]:perception",
           "condition": {
             "mood_above_or_eq": {
               "n": 12
@@ -5183,6 +5417,7 @@
           "phase_order": 10
         },
         {
+          "id": "control_mp_cost&bd2[000]:mood_delta",
           "action": {
             "kind": "mood_drain_delta",
             "params": {
@@ -5202,6 +5437,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_tra_limit&spd3[000]:trade_efficiency",
           "selector": {
             "trade_stations_with_tagged_gte": {
               "tag": "cc.g.karlan",
@@ -5227,6 +5463,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_tra_limit&spd[010]:trade_efficiency",
           "selector": {
             "tagged_count_in_current_trade_room": {
               "tag": "cc.g.glasgow"
@@ -5251,6 +5488,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_tra_limit&spd2[000]:trade_efficiency",
           "selector": {
             "tagged_count_in_trade_sum": {
               "tag": "cc.g.siracusa"
@@ -5275,6 +5513,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_token_prod_spd[000]:manufacture_productivity",
           "condition": {
             "platform_count_gte": {
               "min": 2
@@ -5299,6 +5538,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_token_prod_spd3[000]:manufacture_productivity",
           "condition": {
             "peer_tag_in_room": {
               "tag": "cc.g.lgd"
@@ -5323,6 +5563,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_bd_spd[000]:manufacture_productivity",
           "selector": {
             "tagged_count_in_manu_sum": {
               "tag": "cc.g.blacksteel"
@@ -5339,6 +5580,7 @@
           "tag": "manu_blacksteel_scaling"
         },
         {
+          "id": "control_bd_spd[000]:mood_delta",
           "action": {
             "kind": "mood_drain_delta",
             "params": {
@@ -5358,6 +5600,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_mp_bd[000]:intelligence_reserve",
           "selector": {
             "tagged_count_in_control": {
               "tag": "cc.g.rainbow"
@@ -5402,6 +5645,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_dorm_bd[000]:passion",
           "selector": "dorm_occupant_count",
           "action": {
             "kind": "state_produce",
@@ -5422,6 +5666,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_hire_spd&bd[000]:passion",
           "action": {
             "kind": "state_produce",
             "params": {
@@ -5431,6 +5676,17 @@
           },
           "phase": "state_write",
           "phase_order": 10
+        },
+        {
+          "id": "control_hire_spd&bd[000]:office_hire_speed",
+          "action": {
+            "kind": "global_inject_office_hire_speed",
+            "params": {
+              "value": 10.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 20
         }
       ]
     },
@@ -5441,6 +5697,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_prod_bd_spd[000]:manufacture_productivity_1",
           "action": {
             "kind": "global_inject_manu_eff",
             "params": {
@@ -5453,6 +5710,7 @@
           "tag": "manu_gold_flat"
         },
         {
+          "id": "control_prod_bd_spd[000]:manufacture_productivity_2",
           "selector": {
             "state_pool_floored": {
               "key": "Passion",
@@ -5479,6 +5737,7 @@
       "tier": "tier_up",
       "atoms": [
         {
+          "id": "control_prod_bd_spd[010]:manufacture_productivity_1",
           "action": {
             "kind": "global_inject_manu_eff",
             "params": {
@@ -5491,6 +5750,7 @@
           "tag": "manu_gold_flat"
         },
         {
+          "id": "control_prod_bd_spd[010]:manufacture_productivity_2",
           "selector": {
             "state_pool_floored": {
               "key": "Passion",
@@ -5517,6 +5777,7 @@
       "tier": "tier_0",
       "atoms": [
         {
+          "id": "control_mp_bd&trade[000]:passion",
           "action": {
             "kind": "state_produce",
             "params": {
@@ -5528,6 +5789,7 @@
           "phase_order": 10
         },
         {
+          "id": "control_mp_bd&trade[000]:trade_efficiency",
           "selector": {
             "state_pool_floored": {
               "key": "Passion",
@@ -5545,6 +5807,7 @@
           "tag": "trade_passion_muzu"
         },
         {
+          "id": "control_mp_bd&trade[000]:mood_delta",
           "action": {
             "kind": "mood_drain_per_state_step",
             "params": {
@@ -5564,6 +5827,20 @@
       "skill_name": "设施维护",
       "facility": "control",
       "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_clue_cost[000]",
+      "skill_name": "神经质",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": []
+    },
+    {
+      "id": "control_clue_cost&faction[990]",
+      "skill_name": "反抗者",
+      "facility": "control",
+      "tier": "tier_up",
       "atoms": []
     },
     {
@@ -5592,7 +5869,22 @@
       "skill_name": "生活的重压",
       "facility": "control",
       "tier": "tier_0",
-      "atoms": []
+      "atoms": [
+        {
+          "id": "control_mp_cost&bd3[000]:mood_delta",
+          "action": {
+            "kind": "mood_drain_per_state_step",
+            "params": {
+              "key": "Passion",
+              "step_size": 40.0,
+              "delta_per_step": 0.05,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 30
+        }
+      ]
     },
     {
       "id": "control_dorm_rec2[000]",
@@ -5606,7 +5898,24 @@
       "skill_name": "互为半身",
       "facility": "control",
       "tier": "tier_up",
-      "atoms": []
+      "atoms": [
+        {
+          "id": "control_mp_cost_reset[000]:clear_mood",
+          "condition": {
+            "partner_in_room": {
+              "name": "丰川祥子"
+            }
+          },
+          "action": {
+            "kind": "clear_mood_drain",
+            "params": {
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 40
+        }
+      ]
     },
     {
       "id": "control_mp_cost[007]",
@@ -5671,6 +5980,44 @@
       "atoms": []
     },
     {
+      "id": "control_upMeetingSpeed[000]",
+      "skill_name": "世事洞明",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "id": "control_upMeetingSpeed[000]:meeting_speed",
+          "action": {
+            "kind": "global_inject_meeting_speed",
+            "params": {
+              "value": 25.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "control_upMeetingSpeed[100]",
+      "skill_name": "期冀之汇",
+      "facility": "control",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "id": "control_upMeetingSpeed[100]:meeting_speed",
+          "action": {
+            "kind": "global_inject_meeting_speed",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "global_inject",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
       "id": "control_mp_aegir2[000]",
       "skill_name": "集群狩猎·α",
       "facility": "control",
@@ -5713,11 +6060,15 @@
       "atoms": [
         {
           "condition": {
-            "owner_elite_below": { "n": 1 }
+            "owner_elite_below": {
+              "n": 1
+            }
           },
           "action": {
             "kind": "add_flat_eff",
-            "params": { "value": 10.0 }
+            "params": {
+              "value": 10.0
+            }
           },
           "phase": "constant",
           "phase_order": 10
@@ -5732,11 +6083,15 @@
       "atoms": [
         {
           "condition": {
-            "owner_elite_gte": { "n": 1 }
+            "owner_elite_gte": {
+              "n": 1
+            }
           },
           "action": {
             "kind": "add_flat_eff",
-            "params": { "value": 20.0 }
+            "params": {
+              "value": 20.0
+            }
           },
           "phase": "constant",
           "phase_order": 10

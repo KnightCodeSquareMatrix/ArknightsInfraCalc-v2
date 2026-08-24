@@ -46,12 +46,168 @@ mod tests {
     }
 
     #[test]
+    fn mujica_fallback_requires_full_roster_and_no_other_cross_station_plan() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::from_entries(
+            [
+                ("若叶睦", 0),
+                ("三角初华", 0),
+                ("丰川祥子", 2),
+                ("祐天寺若麦", 0),
+                ("八幡海铃", 0),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, elite))| crate::operbox::OperBoxEntry {
+                id: format!("mujica-{index}"),
+                name: name.to_string(),
+                elite,
+                level: 1,
+                own: true,
+                potential: 0,
+                rarity: 6,
+            })
+            .collect(),
+        )
+        .unwrap();
+        let plan = build_plan(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
+
+        let mujica = plan
+            .selected_rules
+            .iter()
+            .find(|selected| selected.rule_id == "mujica_fallback");
+        assert!(
+            mujica.is_some(),
+            "Mujica fallback should be selected: {plan:?}"
+        );
+        assert_eq!(mujica.unwrap().operators.len(), 5);
+        assert_eq!(
+            plan.anchors
+                .iter()
+                .filter(|anchor| anchor.system_id == "mujica_fallback")
+                .count(),
+            5
+        );
+        assert!(plan.shift_binds.iter().any(|bind| {
+            bind.on_shifts == 2
+                && bind.off_shifts == 1
+                && ["若叶睦", "三角初华", "丰川祥子", "祐天寺若麦", "八幡海铃"]
+                    .iter()
+                    .all(|name| bind.operators.iter().any(|operator| operator == name))
+        }));
+
+        let incomplete = OperBox::from_entries(
+            [
+                ("若叶睦", 0),
+                ("三角初华", 0),
+                ("丰川祥子", 2),
+                ("祐天寺若麦", 0),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, elite))| crate::operbox::OperBoxEntry {
+                id: format!("mujica-incomplete-{index}"),
+                name: name.to_string(),
+                elite,
+                level: 1,
+                own: true,
+                potential: 0,
+                rarity: 6,
+            })
+            .collect(),
+        )
+        .unwrap();
+        let incomplete_plan = build_plan(
+            &blueprint,
+            &incomplete,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
+        assert!(!incomplete_plan
+            .selected_rules
+            .iter()
+            .any(|selected| selected.rule_id == "mujica_fallback"));
+        for name in ["若叶睦", "三角初华", "丰川祥子", "祐天寺若麦"] {
+            assert!(
+                incomplete_plan
+                    .control_exclusions
+                    .contains(&name.to_string()),
+                "incomplete Mujica member {name} must not return to normal control fill"
+            );
+        }
+
+        let with_pinuses = OperBox::from_entries(
+            [
+                ("若叶睦", 0),
+                ("三角初华", 0),
+                ("丰川祥子", 2),
+                ("祐天寺若麦", 0),
+                ("八幡海铃", 0),
+                ("焰尾", 2),
+                ("薇薇安娜", 2),
+                ("灰毫", 2),
+                ("远牙", 2),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, elite))| crate::operbox::OperBoxEntry {
+                id: format!("mujica-pinus-{index}"),
+                name: name.to_string(),
+                elite,
+                level: 1,
+                own: true,
+                potential: 0,
+                rarity: 6,
+            })
+            .collect(),
+        )
+        .unwrap();
+        let pinus_plan = build_plan(
+            &blueprint,
+            &with_pinuses,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &std::collections::HashSet::new(),
+        )
+        .unwrap();
+        assert!(pinus_plan
+            .selected_rules
+            .iter()
+            .any(|selected| selected.rule_id == "pinus_sylvestris"));
+        assert!(!pinus_plan
+            .selected_rules
+            .iter()
+            .any(|selected| selected.rule_id == "mujica_fallback"));
+        for name in ["若叶睦", "三角初华", "丰川祥子", "祐天寺若麦"] {
+            assert!(
+                pinus_plan.control_exclusions.contains(&name.to_string()),
+                "Mujica member {name} must stay excluded when another cross-station system wins"
+            );
+        }
+    }
+
+    #[test]
     fn pure_fireworks_declares_solver_candidate_requirement() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let full = OperBox::load(&crate::operbox::default_operbox_full_e2_path().unwrap()).unwrap();
         let operbox = full.excluding(&std::collections::HashSet::from([
             "迷迭香".to_string(),
             "黑键".to_string(),
+            "灵知".to_string(),
+            "孑".to_string(),
+            "银灰".to_string(),
+            "崖心".to_string(),
+            "讯使".to_string(),
+            "角峰".to_string(),
         ]));
         let plan = build_plan(
             &blueprint,

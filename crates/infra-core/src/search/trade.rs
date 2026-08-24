@@ -29,15 +29,24 @@ pub struct TradeEfficiencyBreakdown {
     pub occupancy_efficiency: Efficiency,
     pub skill_efficiency: Efficiency,
     pub control_efficiency: Efficiency,
+    pub global_efficiency: Efficiency,
     pub paper_efficiency: Efficiency,
+    pub total_efficiency: Efficiency,
     pub mechanic_equivalent_efficiency: Efficiency,
     pub unit_output_multiplier: Efficiency,
+    #[serde(skip_serializing)]
     pub final_efficiency: Efficiency,
     pub equivalent_skill_efficiency: Efficiency,
+    pub trade_equivalent_efficiency: Efficiency,
+    pub gold_equivalent_efficiency: Efficiency,
     /// 实际日产量（龙门币/天）
     pub unit_trade_per_day: f64,
     /// 实际日耗赤金
     pub unit_gold_per_day: f64,
+    pub trade_output_per_day: f64,
+    #[serde(skip_serializing)]
+    pub gold_consumption_per_day: f64,
+    pub originium_shards_per_day: f64,
     pub rule_id: Option<String>,
 }
 
@@ -48,6 +57,7 @@ pub struct TradeSearchHit {
     pub gold_names: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub originium_names: Vec<String>,
+    #[serde(rename = "total_efficiency")]
     pub final_efficiency: Efficiency,
     pub mechanic_equivalent_efficiency: Efficiency,
     pub rule_id: Option<String>,
@@ -443,13 +453,24 @@ fn eval_combo_hit(
         occupancy_efficiency: efficiency.paper.occupancy_efficiency,
         skill_efficiency: efficiency.paper.skill_efficiency,
         control_efficiency: efficiency.paper.control_efficiency,
+        global_efficiency: efficiency.paper.control_efficiency,
         paper_efficiency: efficiency.paper.paper_efficiency,
         mechanic_equivalent_efficiency: result.order_mechanic.mechanic_equivalent_efficiency,
         unit_output_multiplier: efficiency.production_basis.unit_output_multiplier,
         final_efficiency: efficiency.final_efficiency,
+        total_efficiency: efficiency.total_efficiency,
         equivalent_skill_efficiency: efficiency.equivalent_skill_efficiency,
+        trade_equivalent_efficiency: efficiency.trade_equivalent_efficiency,
+        gold_equivalent_efficiency: efficiency.gold_equivalent_efficiency,
         unit_trade_per_day: result.production.unit.unit_trade_per_day,
         unit_gold_per_day: result.production.unit.unit_gold_per_day,
+        trade_output_per_day: result.production.unit.unit_trade_per_day
+            * efficiency.total_efficiency.as_f64(),
+        gold_consumption_per_day: result.production.unit.gold_consumption_per_day
+            * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
+            * efficiency.total_efficiency.as_f64(),
+        originium_shards_per_day: result.production.unit.unit_originium_per_day
+            * efficiency.total_efficiency.as_f64(),
         rule_id: result.rule_id.clone(),
     };
 
@@ -555,7 +576,10 @@ pub fn hit_blackkey_closure_shortcut(hit: &TradeSearchHit) -> bool {
 }
 
 pub fn hit_docus_solo_shortcut(hit: &TradeSearchHit) -> bool {
-    hit.rule_id.as_deref() == Some("gsl_docus_solo")
+    matches!(
+        hit.rule_id.as_deref(),
+        Some("gsl_docus_solo" | "gsl_docus_solo_e0")
+    )
 }
 
 #[cfg(test)]
@@ -958,7 +982,7 @@ mod tests {
             best.names
         );
         assert!(
-            (best.final_efficiency.as_f64() - 2.29).abs() < 0.01,
+            (best.final_efficiency.as_f64() - 2.32).abs() < 0.01,
             "best={best:?}"
         );
         assert!(

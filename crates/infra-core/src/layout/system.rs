@@ -540,23 +540,23 @@ fn prioritize_registry_slot_rooms<'a>(
     rooms: &mut Vec<&'a crate::layout::blueprint::RoomBlueprint>,
     slot: &SystemSlotDef,
 ) {
-    if slot.trade_role.as_deref() != Some("meta_docus") {
+    let Some(role) = slot.trade_role.as_deref() else {
         return;
-    }
+    };
     rooms.sort_by_key(|room| {
-        let is_lv2_gold_trade = room.kind == FacilityKind::TradePost
-            && room.level == 2
+        let is_gold_trade = room.kind == FacilityKind::TradePost
             && matches!(
                 room.product,
                 Some(RoomProduct::Trade {
                     order: crate::trade::input::TradeOrderKind::Gold
                 })
             );
-        if is_lv2_gold_trade {
-            0
-        } else {
-            1
-        }
+        let is_preferred = match role {
+            "meta_docus" => is_gold_trade && room.level == 2,
+            "karlan" => is_gold_trade,
+            _ => false,
+        };
+        (!is_preferred, std::cmp::Reverse(room.level))
     });
 }
 
@@ -1220,7 +1220,52 @@ mod tests {
     }
 
     #[test]
-    fn registry_claims_ling_jie_control_only() {
+    fn registry_claims_ling_jie_karlan_trade_pair() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = OperBox::from_entries(
+            ideal_e2_operbox()
+                .entries
+                .into_iter()
+                .filter(|entry| ["灵知", "孑", "银灰"].contains(&entry.name.as_str()))
+                .collect(),
+        )
+        .unwrap();
+        let claims = select_registry_systems(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &HashSet::new(),
+            &HashSet::new(),
+            &HashSet::new(),
+        );
+        let ling = claims
+            .iter()
+            .find(|claim| claim.system_id == "ling_jie_karlan")
+            .expect("灵知 E2 应由 registry 认领中枢位");
+        assert_eq!(ling.slots.len(), 2);
+        assert_eq!(ling.slots[0].facility, FacilityKind::ControlCenter);
+        assert_eq!(
+            ling.slots[0]
+                .operators
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["灵知"]
+        );
+        assert_eq!(ling.slots[1].facility, FacilityKind::TradePost);
+        assert_eq!(
+            ling.slots[1]
+                .operators
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["孑", "银灰"]
+        );
+    }
+
+    #[test]
+    fn registry_does_not_claim_ling_without_karlan_trade_pair() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = OperBox::from_entries(
             ideal_e2_operbox()
@@ -1239,20 +1284,35 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
         );
-        let ling = claims
+        assert!(!claims
             .iter()
-            .find(|claim| claim.system_id == "ling_jie_karlan")
-            .expect("灵知 E2 应由 registry 认领中枢位");
-        assert_eq!(ling.slots.len(), 1);
-        assert_eq!(ling.slots[0].facility, FacilityKind::ControlCenter);
-        assert_eq!(
-            ling.slots[0]
-                .operators
-                .iter()
-                .map(|op| op.name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["灵知"]
+            .any(|claim| claim.system_id == "ling_jie_karlan"));
+    }
+
+    #[test]
+    fn registry_does_not_claim_ling_with_unpromoted_jaye() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut entries: Vec<_> = ideal_e2_operbox()
+            .entries
+            .into_iter()
+            .filter(|entry| ["灵知", "孑", "银灰"].contains(&entry.name.as_str()))
+            .collect();
+        let jaye = entries.iter_mut().find(|entry| entry.name == "孑").unwrap();
+        jaye.elite = 0;
+        jaye.level = 45;
+        let operbox = OperBox::from_entries(entries).unwrap();
+        let claims = select_registry_systems(
+            &blueprint,
+            &operbox,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &HashSet::new(),
+            &HashSet::new(),
+            &HashSet::new(),
         );
+        assert!(!claims
+            .iter()
+            .any(|claim| claim.system_id == "ling_jie_karlan"));
     }
 
     #[test]

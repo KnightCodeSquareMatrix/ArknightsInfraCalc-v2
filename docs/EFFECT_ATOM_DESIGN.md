@@ -28,6 +28,7 @@
 
 ```
 EffectAtom {
+    atom_id: Option<String>,       // 稳定来源身份；JSON 当前字段名为 `id`
     selector: Selector,      // 从哪取数
     action: Action,          // 做什么计算
     condition: Option<Condition>,  // 什么情况下触发
@@ -38,6 +39,42 @@ EffectAtom {
 ```
 
 同一个 BuffDef 可以有多个 EffectAtom，自由组合。
+
+### 2.1 稳定 atom 身份
+
+`atom_id` 只表示一个 atom 的稳定来源身份，不表达机制语义、效果族或聚合规则。
+
+- JSON 使用现有的 `id` 字段；Rust 侧映射为 `atom_id`。
+- 同一个 `SkillDef` 内，非空 atom 的 `atom_id` 必须唯一。
+- 控制中枢的非空 atom 必须提供非空 `atom_id`；其他设施的旧数据在迁移完成前可以暂缺。
+- atom 调整数组顺序、改变 `phase_order` 或扩展运行时编译信息时，不能改变既有 `atom_id`。
+- `CompiledAtom.seq` 只负责当前运行时的稳定执行排序，不能作为持久身份。
+- 运行时来源使用 `source_buff_id + atom_id`；禁止用数组下标、技能名或干员名生成替代身份。
+
+已有多 atom 技能应为每个 atom 提供不同的稳定 ID。例如：
+
+```json
+{
+  "id": "control_mp_psk[000]:pinus_battle_record",
+  "action": { "kind": "global_inject_manu_tagged_eff" }
+}
+```
+
+本节只解决 atom 身份稳定性，不引入中枢 inventory，也不改变 `atoms: []` 的委托语义。
+
+### 2.2 上游建筑技能事实同步
+
+`data/prts_building_skills.csv` 是从
+[`yuanyan3060/ArknightsGameResource`](https://github.com/yuanyan3060/ArknightsGameResource)
+的 `gamedata/excel/character_table.json` 与 `gamedata/excel/building_data.json` 同步的建筑技能事实镜像。
+同步入口为 `scripts/sync_building_skills.py`，记录上游版本、角色、tier、facility、buff_id、技能名、
+原文描述和解锁条件。
+
+- 同步 CSV 可以发现本地 `operator_instances.json` 或 `skill_table.json` 的落后条目。
+- 同步脚本默认只生成 CSV，不自动生成 `EffectAtom`。
+- `--update-skill-table` 只更新已有 skill 的 metadata 并保留 atoms；`--add-missing` 新增项时使用
+  `atoms: []`，表示已发现但尚未完成机制建模。
+- 上游原文是机制事实输入，不替代 canonical 语义审阅，也不允许把概率/条件不明确的技能自动加入候选。
 
 ---
 
@@ -267,8 +304,12 @@ P2 迁移示例：在 `skill_table.json` 中乌有的 `trade_ord_spd_bd_n2[000]`
 - 只结算确定性的技能速度、招募位/宿舍等级/全局资源读数、同房人数或指定搭档、时间爬升平均值和技能自身心情修正。
 - 未知线索概率、下一条线索事件和线索交流状态不算分；结果通过 `ignored` 明确列出。
 - 当前框架不能安全表达的跨中枢、跨宿舍、同房派系条件和心情耗尽资源生命周期不算分；结果通过 `unsupported` 明确列出。
+- 中枢对办公室联络速度、会客室线索速度的确定性全局效果由 `GlobalInjectOfficeHireSpeed`、`GlobalInjectMeetingSpeed` 写入 `LayoutContext`，再由办公室/会客室求值消费；不得在 support facility 或排班层按干员名重算。当前该通道覆盖八幡海铃与祐天寺若麦的 Mujica 相关效果。
+- 三角初华 E2 的中枢群体心情恢复由现有 `mood_model.json` 的 control smiley provider 读取；它不重复写入第二个心情公式。若后续需要将恢复值写入 control trace 或连续 ETA，另立 mood lifecycle 单元。
 - 办公室按一人、会客室按两人容量校验；无设施技能的合法进驻者仍可参与房间人数和搭档条件。
 - `resolve_base` 当前按 24 小时计算时间爬升平均值；直接 `evaluate_office` / `evaluate_meeting` 可传入其他正数时长。
+
+会客室的最终效率在技能效率之外，按每名实际进驻干员加算基础效率：非 0 心情 `+5%`（0 心情失效）；稀有度 1–3 星 `+0%`、4 星 `+2%`、5 星 `+4%`、6 星 `+5%`；精英化 0 `+0%`、精英化 1 `+8%`、精英化 2 `+16%`。稀有度和精英化加成不受 0 心情影响，四类值与干员技能效率直接相加。该规则只属于会客室，不改变办公室效率。
 - 输出是技能速度加成，不包含尚未 canonical 化的设施基础速度和线索概率收益。
 
 会客室自动选人（2026-08-06 裁决）：单班流水线在全部生产域分配后，用剩余空闲干员把会客室填满两人；候选按 `evaluate_meeting` 的线索搜集速度加成排序（搭档条件在两人同房时自然生效），无可用技能干员时兜底任意空闲干员。ABC 轮换中会客室成员与办公室同模式按队轮换；仅当可占用干员不足时才保持空位（导出 `autofill: true`）。该填充只消费生产域剩余的空闲干员，不进入生产域评分，也不声称求得会客室最优编制。

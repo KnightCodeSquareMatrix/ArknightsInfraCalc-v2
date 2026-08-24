@@ -40,12 +40,12 @@
       "members":[
         {"operator":"巫恋","role":"core","target":{"kind":"explicit","elite":2}},
         {"operator":"龙舌兰","role":"core","target":{"kind":"explicit","elite":2}},
-        {"operator":"卡夫卡","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"柏喙","role":"important","target":{"kind":"explicit","elite":2}},
+        {"operator":"折光","role":"important","target":{"kind":"explicit","elite":2}},
         {"operator":"明椒","role":"important","target":{"kind":"explicit","elite":2}},
-        {"operator":"折光","role":"important","target":{"kind":"explicit","elite":2}}
+        {"operator":"卡夫卡","role":"important","target":{"kind":"explicit","elite":2}}
       ],
-      "completion":{"required":["巫恋","龙舌兰"],"choice_groups":[{"id":"tailor_beta","label":"裁缝 β 四选一","minimum":1,"members":["卡夫卡","柏喙","明椒","折光"]}]},
+      "completion":{"required":["巫恋","龙舌兰"],"choice_groups":[{"id":"tailor_beta","label":"裁缝 β 四选一","minimum":1,"members":["柏喙","折光","明椒","卡夫卡"]}]},
       "evidence":[{"path":"docs/练卡推荐相关/组合知识库.md","heading":"4.1 高效率组合"}]
     },
     {

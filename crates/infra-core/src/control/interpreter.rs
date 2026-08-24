@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::control::input::ControlRoomInput;
+use crate::control::{ControlEffectKey, ControlEffectLedger};
 use crate::global_resource::GlobalResourcePool;
 use crate::global_resource::{
     GlobalInjectManifest, InjectMergeExplanation, ManuInjectCandidate, ManuInjectCandidateKind,
@@ -25,6 +26,7 @@ struct ControlContext {
     mood: f64,
     state_pool: HashMap<StateKey, f64>,
     inject: GlobalInjectManifest,
+    effect_ledger: ControlEffectLedger,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +35,12 @@ pub struct ControlCenterResult {
     pub inject: GlobalInjectManifest,
     /// 中枢干员 L1 心情消耗增量（按名；排班非目标，仅供机制记账）。
     pub operator_mood_drains: HashMap<String, f64>,
+    /// 冻结后的中枢全局效果合并事实。
+    pub effect_ledger: ControlEffectLedger,
+    /// 中枢对人力办公室的联络速度注入。
+    pub office_hire_spd_pct: f64,
+    /// 中枢对会客室的线索搜集速度注入。
+    pub meeting_speed_pct: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -47,6 +55,7 @@ pub enum ControlConditionStatus {
 pub struct ControlTraceEvent {
     pub source_operator: String,
     pub source_buff_id: String,
+    pub atom_id: String,
     pub phase: Phase,
     pub phase_order: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,6 +155,7 @@ fn solve_control_inner(
         mood: input.mood,
         state_pool: input.layout.global.to_room_state(),
         inject: GlobalInjectManifest::default(),
+        effect_ledger: ControlEffectLedger::default(),
     };
     for operator in &ctx.operators {
         for buff_id in &operator.buff_ids {
@@ -155,13 +165,14 @@ fn solve_control_inner(
 
     let atoms = collect_control_atoms(&ctx.operators, table);
     let mut trace_events = trace_enabled.then(Vec::new);
-    for (atom, owner, source_buff_id) in atoms {
+    for (atom, atom_id, owner, source_buff_id) in atoms {
         let condition_status = evaluate_condition(&atom.condition, &ctx, &owner);
         if condition_status == ControlConditionStatus::Failed {
             if let Some(events) = &mut trace_events {
                 events.push(ControlTraceEvent {
                     source_operator: owner,
                     source_buff_id,
+                    atom_id,
                     phase: atom.phase,
                     phase_order: atom.phase_order,
                     condition: atom.condition.clone(),
@@ -173,11 +184,19 @@ fn solve_control_inner(
             }
             continue;
         }
-        let outcome = apply_atom(&mut ctx, &atom, &owner, &source_buff_id, trace_enabled);
+        let outcome = apply_atom(
+            &mut ctx,
+            &atom,
+            &atom_id,
+            &owner,
+            &source_buff_id,
+            trace_enabled,
+        );
         if let Some(events) = &mut trace_events {
             events.push(ControlTraceEvent {
                 source_operator: owner,
                 source_buff_id,
+                atom_id,
                 phase: atom.phase,
                 phase_order: atom.phase_order,
                 condition: atom.condition.clone(),
@@ -189,6 +208,7 @@ fn solve_control_inner(
         }
     }
 
+    ctx.effect_ledger.freeze();
     if let Some(events) = &mut trace_events {
         finalize_inject_trace(events, &ctx.inject);
     }
@@ -220,6 +240,11 @@ fn solve_control_inner(
             global,
             inject: ctx.inject,
             operator_mood_drains,
+            office_hire_spd_pct: ctx.effect_ledger.value(ControlEffectKey::OFFICE_HIRE_SPEED),
+            meeting_speed_pct: ctx
+                .effect_ledger
+                .value(ControlEffectKey::MEETING_CLUE_SPEED),
+            effect_ledger: ctx.effect_ledger,
         },
         trace_events.map(|events| ControlSettlementTrace {
             events,
@@ -231,7 +256,7 @@ fn solve_control_inner(
 fn collect_control_atoms<'a>(
     ops: &[ControlOperatorRuntime],
     table: &'a SkillTable,
-) -> Vec<(&'a EffectAtom, String, String)> {
+) -> Vec<(&'a EffectAtom, String, String, String)> {
     let mut atoms = Vec::new();
     for op in ops {
         for bid in &op.buff_ids {
@@ -242,11 +267,14 @@ fn collect_control_atoms<'a>(
                 continue;
             }
             for atom in &skill.atoms {
-                atoms.push((atom, op.name.clone(), bid.clone()));
+                let Some(atom_id) = atom.atom_id.as_deref() else {
+                    continue;
+                };
+                atoms.push((atom, atom_id.to_string(), op.name.clone(), bid.clone()));
             }
         }
     }
-    atoms.sort_by(|(a, _, _), (b, _, _)| {
+    atoms.sort_by(|(a, _, _, _), (b, _, _, _)| {
         let pa = a.phase.sort_key();
         let pb = b.phase.sort_key();
         pa.cmp(&pb).then(a.phase_order.cmp(&b.phase_order))
@@ -296,6 +324,10 @@ fn evaluate_condition(
         Condition::FieldMomentumGtExternal {} => {
             Some(ctx.layout.field_momentum() > ctx.layout.external_momentum())
         }
+        Condition::OfficeHireSpeedBelow { n } => Some(
+            5.0 + ctx.layout.control_office_hire_spd_pct + ctx.layout.office_hire_spd_pct
+                < *n as f64,
+        ),
         Condition::PlatformCountGte { min } => Some(ctx.layout.platform_count_in_power >= *min),
         _ => None,
     };
@@ -317,13 +349,16 @@ fn scaled_inject_value(ctx: &ControlContext, atom: &EffectAtom, base: f64) -> f6
 fn apply_atom(
     ctx: &mut ControlContext,
     atom: &EffectAtom,
+    atom_id: &str,
     owner: &str,
     source_buff_id: &str,
     trace_enabled: bool,
 ) -> Option<ControlTraceOutcome> {
     match atom.phase {
         Phase::StateWrite => apply_state_write(ctx, atom, trace_enabled),
-        Phase::GlobalInject => apply_global_inject(ctx, atom, owner, source_buff_id, trace_enabled),
+        Phase::GlobalInject => {
+            apply_global_inject(ctx, atom, atom_id, owner, source_buff_id, trace_enabled)
+        }
         Phase::Mood => {
             apply_mood_action(ctx, &atom.action, owner);
             trace_enabled.then_some(ControlTraceOutcome::MoodApplied)
@@ -346,6 +381,11 @@ fn apply_mood_action(ctx: &mut ControlContext, action: &Action, owner: &str) {
                 }
             }
         },
+        Action::MoodDrainDeltaForOperator { operator, delta } => {
+            if let Some(op) = ctx.operators.iter_mut().find(|op| op.name == *operator) {
+                op.mood_drain_delta += delta;
+            }
+        }
         Action::MoodDrainPerStateStep {
             key,
             step_size,
@@ -375,6 +415,18 @@ fn apply_mood_action(ctx: &mut ControlContext, action: &Action, owner: &str) {
                 }
             }
         }
+        Action::ClearMoodDrain { scope } => match scope {
+            crate::types::MoodDrainScope::SelfOp => {
+                if let Some(op) = ctx.operators.iter_mut().find(|o| o.name == owner) {
+                    op.mood_drain_delta = 0.0;
+                }
+            }
+            crate::types::MoodDrainScope::RoomOperators => {
+                for op in &mut ctx.operators {
+                    op.mood_drain_delta = 0.0;
+                }
+            }
+        },
         _ => {}
     }
 }
@@ -412,6 +464,7 @@ fn apply_state_write(
 fn apply_global_inject(
     ctx: &mut ControlContext,
     atom: &EffectAtom,
+    atom_id: &str,
     owner: &str,
     source_buff_id: &str,
     trace_enabled: bool,
@@ -421,9 +474,35 @@ fn apply_global_inject(
         Action::GlobalInjectTradeEff { .. } => INJECT_FAMILY_TRADE_GLOBAL_FLAT,
         Action::GlobalInjectManuEff { .. } => INJECT_FAMILY_MANU_GLOBAL_ALL,
         Action::GlobalInjectManuTaggedEff { .. } => "manu_tagged",
+        Action::GlobalInjectOfficeHireSpeed { .. } => "office_hire_speed",
+        Action::GlobalInjectMeetingSpeed { .. } => "meeting_speed",
         _ => "default",
     });
     match &atom.action {
+        Action::GlobalInjectOfficeHireSpeed { value } => {
+            ctx.effect_ledger.record_max(
+                owner,
+                source_buff_id,
+                atom_id,
+                ControlEffectKey::OFFICE_HIRE_SPEED,
+                *value,
+            );
+            return trace_enabled.then_some(ControlTraceOutcome::SpecialRule {
+                rule: "control_office_hire_speed".to_string(),
+            });
+        }
+        Action::GlobalInjectMeetingSpeed { value } => {
+            ctx.effect_ledger.record_max(
+                owner,
+                source_buff_id,
+                atom_id,
+                ControlEffectKey::MEETING_CLUE_SPEED,
+                *value,
+            );
+            return trace_enabled.then_some(ControlTraceOutcome::SpecialRule {
+                rule: "control_meeting_speed".to_string(),
+            });
+        }
         Action::GlobalInjectTradeEff { value } => {
             let tagged_rule = match atom.selector.as_ref() {
                 Some(Selector::TaggedCountInTradeSum { tag }) => Some((
@@ -479,6 +558,13 @@ fn apply_global_inject(
                 let v = scaled_inject_value(ctx, atom, *value);
                 if v != 0.0 {
                     ctx.inject.record_trade(family, v);
+                    ctx.effect_ledger.record_max(
+                        owner,
+                        source_buff_id,
+                        atom_id,
+                        ControlEffectKey::TRADE_GLOBAL_EFFICIENCY,
+                        v,
+                    );
                 }
                 return trace_enabled.then_some(ControlTraceOutcome::TradeInject {
                     family: family.to_string(),
@@ -515,6 +601,15 @@ fn apply_global_inject(
                 let v = scaled_inject_value(ctx, atom, *value);
                 if v != 0.0 {
                     ctx.inject.record_manu(family, *recipe, v);
+                    if recipe.is_none_or(|recipe| recipe == RecipeKind::All) && v > 0.0 {
+                        ctx.effect_ledger.record_max(
+                            owner,
+                            source_buff_id,
+                            atom_id,
+                            ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY,
+                            v,
+                        );
+                    }
                 }
                 return trace_enabled.then_some(ControlTraceOutcome::ManufactureInject {
                     family: family.to_string(),
@@ -757,6 +852,57 @@ mod tests {
     }
 
     #[test]
+    fn ledger_records_stable_control_atom_id() {
+        let result = solve_control(
+            &ControlRoomInput::with_operators(vec![control_op("阿米娅", 0)]),
+            &table(),
+        );
+        let record = result
+            .effect_ledger
+            .records()
+            .iter()
+            .find(|record| record.source_buff_id == "control_tra_spd[000]")
+            .expect("trade ledger record");
+        assert_eq!(record.atom_id, "control_tra_spd[000]:trade_efficiency");
+    }
+
+    #[test]
+    fn office_hire_speed_uses_max_and_saileach_is_conditional_unique_effect() {
+        let base = solve_control(
+            &ControlRoomInput::with_operators(vec![control_op("焰狐龙梓兰", 2)]),
+            &table(),
+        );
+        assert_eq!(base.office_hire_spd_pct, 10.0);
+
+        let max = solve_control(
+            &ControlRoomInput::with_operators(vec![
+                control_op("焰狐龙梓兰", 2),
+                control_op("八幡海铃", 2),
+            ]),
+            &table(),
+        );
+        assert_eq!(max.office_hire_spd_pct, 10.0);
+
+        let saileach = solve_control(
+            &ControlRoomInput::with_operators(vec![control_op("琴柳", 2)]),
+            &table(),
+        );
+        assert_eq!(saileach.office_hire_spd_pct, 20.0);
+
+        let mut layout = LayoutContext::default();
+        layout.office_hire_spd_pct = 25.0;
+        let inactive = solve_control(
+            &ControlRoomInput {
+                operators: vec![control_op("琴柳", 2)],
+                mood: 24.0,
+                layout,
+            },
+            &table(),
+        );
+        assert_eq!(inactive.office_hire_spd_pct, 0.0);
+    }
+
+    #[test]
     fn trade_global_flat_takes_max_not_sum() {
         let input = ControlRoomInput::with_operators(vec![
             control_op("阿米娅", 0),
@@ -777,6 +923,34 @@ mod tests {
             (result.inject.manu_eff_for(crate::types::RecipeKind::Gold) - 3.0).abs() < f64::EPSILON,
             "manu={}",
             result.inject.manu_eff_for(crate::types::RecipeKind::Gold)
+        );
+    }
+
+    #[test]
+    fn ledger_marks_star_bear_as_global_manu_winner_over_kaltsit() {
+        let result = solve_control(
+            &ControlRoomInput::with_operators(vec![
+                control_op("斩业星熊", 2),
+                control_op("陈", 2),
+                control_op("凯尔希", 2),
+            ]),
+            &table(),
+        );
+        assert_eq!(
+            result
+                .effect_ledger
+                .value(ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY),
+            3.0
+        );
+        let kaltsit = result
+            .effect_ledger
+            .records()
+            .iter()
+            .find(|record| record.source_operator == "凯尔希")
+            .expect("凯尔希全制造 atom");
+        assert_eq!(
+            kaltsit.status,
+            crate::control::ControlEffectStatus::Suppressed
         );
     }
 
@@ -1152,6 +1326,76 @@ mod tests {
     }
 
     #[test]
+    fn wakamugi_control_data_produces_passion_and_e2_pair_mood_delta() {
+        let e0 = solve_control(
+            &ControlRoomInput::with_operators(vec![control_op("祐天寺若麦", 0)]),
+            &table(),
+        );
+        assert_eq!(e0.global.get(GlobalResourceKey::Passion), 10.0);
+        assert_eq!(e0.operator_mood_drains["祐天寺若麦"], 0.0);
+        assert_eq!(e0.meeting_speed_pct, 5.0);
+
+        let e2 = solve_control(
+            &ControlRoomInput::with_operators(vec![
+                control_op("祐天寺若麦", 2),
+                control_op("丰川祥子", 2),
+            ]),
+            &table(),
+        );
+        assert_eq!(e2.global.get(GlobalResourceKey::Passion), 10.0);
+        assert_eq!(e2.operator_mood_drains["祐天寺若麦"], 0.0);
+        assert_eq!(e2.operator_mood_drains["丰川祥子"], 0.05);
+        assert_eq!(e2.meeting_speed_pct, 5.0);
+        assert_eq!(
+            e2.effect_ledger
+                .records()
+                .iter()
+                .filter(|record| record.key == ControlEffectKey::MEETING_CLUE_SPEED)
+                .map(|record| record.status)
+                .collect::<Vec<_>>(),
+            vec![
+                crate::control::ControlEffectStatus::TiedWinner,
+                crate::control::ControlEffectStatus::TiedWinner,
+            ]
+        );
+    }
+
+    #[test]
+    fn mujica_control_effects_use_actual_member_tiers() {
+        let result = solve_control(
+            &ControlRoomInput::with_operators(vec![
+                control_op("若叶睦", 2),
+                control_op("三角初华", 2),
+                control_op("丰川祥子", 2),
+                control_op("祐天寺若麦", 2),
+                control_op("八幡海铃", 2),
+            ]),
+            &table(),
+        );
+
+        assert_eq!(
+            result.global.get(GlobalResourceKey::Passion),
+            60.0,
+            "初华按默认 20 名宿舍成员提供 20，睦/若麦/海铃分别提供 20/10/10"
+        );
+        assert_eq!(result.office_hire_spd_pct, 10.0);
+        assert_eq!(result.meeting_speed_pct, 5.0);
+        assert_eq!(
+            result.operator_mood_drains["若叶睦"], 0.0,
+            "E2 睦应在祥子同中枢时清除自身热情消耗"
+        );
+        assert_eq!(
+            result.operator_mood_drains["丰川祥子"], 0.10,
+            "祥子在热情 60 时自身 +0.05，若麦 E2 同中枢再 +0.05"
+        );
+        assert_eq!(
+            result.inject.manu_eff_for(RecipeKind::Gold),
+            4.0,
+            "祥子 E2 的固定 +1 与热情 60 的 +3 应同时结算"
+        );
+    }
+
+    #[test]
     fn pudding_manu_inject_when_two_platforms() {
         let mut layout = LayoutContext::default();
         layout.platform_count_in_power = 2;
@@ -1359,6 +1603,7 @@ mod tests {
                     "facility": "control",
                     "tier": "tier_0",
                     "atoms": [{
+                        "id": "control_debug_unhandled[000]:passion",
                         "condition": {"gold_delivery_below": {"n": 1}},
                         "action": {
                             "kind": "state_produce",

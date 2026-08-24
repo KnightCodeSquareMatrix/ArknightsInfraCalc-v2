@@ -78,7 +78,7 @@ fn run_regressions(run_all: bool, case_id: Option<&str>) -> Result<(), Error> {
 
         if efficiency_ok && mechanic_ok && rule_ok {
             println!(
-                "PASS {} final_efficiency={} mechanic_efficiency={} rule_id={:?}",
+                "PASS {} total_efficiency={} mechanic_efficiency={} rule_id={:?}",
                 case.case_id,
                 result.efficiency.final_efficiency,
                 result.order_mechanic.mechanic_equivalent_efficiency,
@@ -87,7 +87,7 @@ fn run_regressions(run_all: bool, case_id: Option<&str>) -> Result<(), Error> {
         } else {
             any_fail = true;
             eprintln!(
-                "FAIL {} expected final_efficiency={} mechanic_efficiency={} rule_id={} got final_efficiency={} mechanic_efficiency={} rule_id={:?}",
+                "FAIL {} expected total_efficiency={} mechanic_efficiency={} rule_id={} got total_efficiency={} mechanic_efficiency={} rule_id={:?}",
                 case.case_id,
                 case.expect_final_efficiency,
                 case.expect_mechanic_equivalent_efficiency,

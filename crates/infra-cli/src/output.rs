@@ -365,7 +365,7 @@ fn write_trade_search_text(meta: &SearchMeta<'_>, report: &TradeSearchReport) ->
     for (i, hit) in report.top.iter().enumerate() {
         if !hit.gold_names.is_empty() || !hit.originium_names.is_empty() {
             eprintln!(
-                "  #{:<2} final_efficiency={} mechanic_efficiency={}",
+                "  #{:<2} total_efficiency={} mechanic_efficiency={}",
                 i + 1,
                 hit.final_efficiency,
                 hit.mechanic_equivalent_efficiency,
@@ -374,7 +374,7 @@ fn write_trade_search_text(meta: &SearchMeta<'_>, report: &TradeSearchReport) ->
             eprintln!("         ori_ops={:?}", hit.originium_names);
         } else {
             eprintln!(
-                "  #{:<2} final_efficiency={} mechanic_efficiency={} unit_trade={:.0} unit_multiplier={} rule_id={:?} ops={:?}",
+        "  #{:<2} total_efficiency={} mechanic_efficiency={} unit_trade={:.0} unit_multiplier={} rule_id={:?} ops={:?}",
                 i + 1,
                 hit.final_efficiency,
                 hit.mechanic_equivalent_efficiency,
@@ -669,7 +669,7 @@ fn write_bench_text(
     for (i, hit) in manu_report.top.iter().enumerate() {
         if !hit.gold_names.is_empty() || !hit.battle_record_names.is_empty() {
             eprintln!(
-                "  manufacture #{:<2} final_efficiency={} gold_efficiency={} storage={} battle_record_efficiency={} storage={}",
+                "  manufacture #{:<2} total_efficiency={} gold_efficiency={} storage={} battle_record_efficiency={} storage={}",
                 i + 1,
                 hit.final_efficiency,
                 hit.per_station.gold,
@@ -681,7 +681,7 @@ fn write_bench_text(
             eprintln!("         exp_ops={:?}", hit.battle_record_names);
         } else {
             eprintln!(
-                "  manufacture #{:<2} final_efficiency={} gold_efficiency={} storage={} battle_record_efficiency={} storage={} ops={:?}",
+                "  manufacture #{:<2} total_efficiency={} gold_efficiency={} storage={} battle_record_efficiency={} storage={} ops={:?}",
                 i + 1,
                 hit.final_efficiency,
                 hit.per_station.gold,
@@ -709,12 +709,17 @@ pub struct TradeYieldRow<'a> {
     pub level: u8,
     pub shift_hours: f64,
     pub paper_efficiency: Efficiency,
-    pub final_efficiency: Efficiency,
+    pub total_efficiency: Efficiency,
     pub mechanic_equivalent_efficiency: Efficiency,
+    pub trade_equivalent_efficiency: Efficiency,
+    pub gold_equivalent_efficiency: Efficiency,
     pub rule_id: Option<&'a str>,
     pub unit_trade: f64,
     pub unit_gsl_gold: f64,
     pub unit_output_multiplier: Efficiency,
+    pub trade_output_per_day: f64,
+    #[serde(skip_serializing)]
+    pub gold_consumption_per_day: f64,
     pub daily_trade: f64,
     pub daily_gold: f64,
     pub drone_trade: f64,
@@ -738,14 +743,18 @@ fn write_trade_yield_csv(path: Option<&Path>, row: &TradeYieldRow<'_>) -> Result
         "贸易站等级",
         "上班时长",
         "纸面效率",
-        "最终效率",
+        "总效率",
         "机制等效效率",
+        "贸易等效效率",
+        "赤金等效效率",
         "规则ID",
         "日贸易量",
         "日GSL赤金",
         "单位产出倍率",
         "日产贸易",
         "日产赤金",
+        "贸易单位时间产出",
+        "赤金单位时间产出",
         "无人机贸易",
     ])?;
     wtr.write_record([
@@ -753,14 +762,18 @@ fn write_trade_yield_csv(path: Option<&Path>, row: &TradeYieldRow<'_>) -> Result
         &row.level.to_string(),
         &format!("{:.1}", row.shift_hours),
         &row.paper_efficiency.to_string(),
-        &row.final_efficiency.to_string(),
+        &row.total_efficiency.to_string(),
         &row.mechanic_equivalent_efficiency.to_string(),
+        &row.trade_equivalent_efficiency.to_string(),
+        &row.gold_equivalent_efficiency.to_string(),
         row.rule_id.unwrap_or(""),
         &format!("{:.1}", row.unit_trade),
         &format!("{:.1}", row.unit_gsl_gold),
         &row.unit_output_multiplier.to_string(),
         &format!("{:.0}", row.daily_trade),
         &format!("{:.1}", row.daily_gold),
+        &format!("{:.1}", row.trade_output_per_day),
+        &format!("{:.1}", row.gold_consumption_per_day),
         &format!("{:.0}", row.drone_trade),
     ])?;
     flush_csv(wtr)
@@ -768,18 +781,24 @@ fn write_trade_yield_csv(path: Option<&Path>, row: &TradeYieldRow<'_>) -> Result
 
 fn write_trade_yield_text(row: &TradeYieldRow<'_>) -> Result<(), Error> {
     eprintln!(
-        "fixture={} level={} shift={}h paper_efficiency={} final_efficiency={} mechanic_efficiency={} rule_id={:?}",
+        "fixture={} level={} shift={}h paper_efficiency={} total_efficiency={} mechanic_efficiency={} trade_equivalent={} gold_equivalent={} rule_id={:?}",
         row.fixture,
         row.level,
         row.shift_hours,
         row.paper_efficiency,
-        row.final_efficiency,
+        row.total_efficiency,
         row.mechanic_equivalent_efficiency,
+        row.trade_equivalent_efficiency,
+        row.gold_equivalent_efficiency,
         row.rule_id
     );
     eprintln!(
-        "  unit_trade={:.1} unit_gsl_gold={:.1} unit_output_multiplier={}",
-        row.unit_trade, row.unit_gsl_gold, row.unit_output_multiplier
+        "  unit_trade={:.1} unit_gsl_gold={:.1} trade_output_per_day={:.1} gold_consumption_per_day={:.1} unit_output_multiplier={}",
+        row.unit_trade,
+        row.unit_gsl_gold,
+        row.trade_output_per_day,
+        row.gold_consumption_per_day,
+        row.unit_output_multiplier
     );
     eprintln!(
         "  daily_trade={:.0} daily_gold={:.1} drone_trade={:.0}",

@@ -97,7 +97,7 @@ pub struct ResponseDependencyRow {
     pub skill_id: String,
     pub source_facility: String,
     pub target_facility: String,
-    pub atom_index: usize,
+    pub atom_id: Option<String>,
     pub selector: Option<String>,
     pub selector_scope: Option<DependencyScope>,
     pub condition: Option<String>,
@@ -109,6 +109,8 @@ pub struct ResponseDependencyRow {
     pub atom_scope: String,
     pub response_field: ResponseField,
     pub requires_external_state: bool,
+    #[serde(skip)]
+    atom_position: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -137,7 +139,7 @@ pub struct ResourceClosureEdge {
     pub from: Option<String>,
     pub to: String,
     pub skill_id: Option<String>,
-    pub atom_index: Option<usize>,
+    pub atom_id: Option<String>,
     pub source_facility: Option<String>,
     pub provider_buff_id: Option<String>,
     pub converter_buff_id: Option<String>,
@@ -183,7 +185,7 @@ pub enum ResourceReadFormula {
 #[derive(Debug, Clone, Serialize)]
 pub struct ResourceValueDomainFact {
     pub skill_id: String,
-    pub atom_index: usize,
+    pub atom_id: Option<String>,
     pub target_facility: String,
     pub response_field: ResponseField,
     pub resource: String,
@@ -434,9 +436,19 @@ pub fn control_buff_is_automatically_excluded<'a>(
     buff_ids: impl IntoIterator<Item = &'a str>,
 ) -> Result<bool> {
     let requested: BTreeSet<&str> = buff_ids.into_iter().collect();
-    Ok(producer_rule_catalog(table)?.rules.iter().any(|rule| {
+    if producer_rule_catalog(table)?.rules.iter().any(|rule| {
         rule.admission == ProducerAdmission::ExcludedAutomatic
             && requested.contains(rule.source_buff_id.as_str())
+    }) {
+        return Ok(true);
+    }
+    Ok(requested.iter().any(|buff_id| {
+        table.get(buff_id).is_some_and(|skill| {
+            skill
+                .atoms
+                .iter()
+                .any(|atom| matches!(atom.action, Action::GlobalInjectKarlanPrecision { .. }))
+        })
     }))
 }
 
@@ -568,7 +580,7 @@ fn build_response_dependency_report_inner(
 ) -> ResponseDependencyReport {
     let mut rows = Vec::new();
     for skill in table.skills() {
-        for (atom_index, atom) in skill.atoms.iter().enumerate() {
+        for (atom_position, atom) in skill.atoms.iter().enumerate() {
             let selector = atom.selector.as_ref().map(selector_dependency);
             let condition = atom.condition.as_ref().map(condition_dependency);
             let action = action_dependency(&atom.action, atom.scope);
@@ -585,7 +597,7 @@ fn build_response_dependency_report_inner(
                 source_facility: skill.facility.clone(),
                 target_facility: target_facility(&skill.facility, &atom.action, atom.scope)
                     .to_string(),
-                atom_index,
+                atom_id: atom.atom_id.clone(),
                 selector: selector.map(|(name, _)| name.to_string()),
                 selector_scope: selector.map(|(_, scope)| scope),
                 condition: condition.map(|(name, _)| name.to_string()),
@@ -597,6 +609,7 @@ fn build_response_dependency_report_inner(
                 atom_scope: atom_scope.to_string(),
                 response_field: response_field(&atom.action),
                 requires_external_state,
+                atom_position,
             });
         }
     }
@@ -875,12 +888,15 @@ fn build_resource_reverse_closures(
                                 queue.push_back(predecessor.clone());
                             }
                         }
+                        let atom_key = row.atom_id.clone().unwrap_or_else(|| {
+                            format!("legacy_atom_position:{}", row.atom_position)
+                        });
                         let key = (
                             kind,
                             from.clone(),
                             resource.clone(),
                             Some(row.skill_id.clone()),
-                            Some(row.atom_index),
+                            Some(atom_key),
                             None,
                             None,
                         );
@@ -889,7 +905,7 @@ fn build_resource_reverse_closures(
                             from,
                             to: resource.clone(),
                             skill_id: Some(row.skill_id.clone()),
-                            atom_index: Some(row.atom_index),
+                            atom_id: row.atom_id.clone(),
                             source_facility: Some(row.source_facility.clone()),
                             provider_buff_id: None,
                             converter_buff_id: None,
@@ -915,7 +931,7 @@ fn build_resource_reverse_closures(
                         from: Some(conversion.from.clone()),
                         to: resource.clone(),
                         skill_id: None,
-                        atom_index: None,
+                        atom_id: None,
                         source_facility: None,
                         provider_buff_id: Some(conversion.provider_buff_id.clone()),
                         converter_buff_id: Some(conversion.converter_buff_id.clone()),
@@ -937,7 +953,7 @@ fn build_resource_reverse_closures(
 fn build_resource_value_domains(table: &SkillTable) -> Vec<ResourceValueDomainFact> {
     let mut facts = Vec::new();
     for skill in table.skills() {
-        for (atom_index, atom) in skill.atoms.iter().enumerate() {
+        for atom in &skill.atoms {
             let target = target_facility(&skill.facility, &atom.action, atom.scope).to_string();
             let field = closure_response_field(response_field(&atom.action));
             if let Some(Selector::StatePoolFloored { key, div }) = atom.selector.as_ref() {
@@ -950,7 +966,7 @@ fn build_resource_value_domains(table: &SkillTable) -> Vec<ResourceValueDomainFa
                 };
                 facts.push(ResourceValueDomainFact {
                     skill_id: skill.id.clone(),
-                    atom_index,
+                    atom_id: atom.atom_id.clone(),
                     target_facility: target.clone(),
                     response_field: field,
                     resource: normalize_resource(key),
@@ -1001,7 +1017,7 @@ fn build_resource_value_domains(table: &SkillTable) -> Vec<ResourceValueDomainFa
             };
             facts.push(ResourceValueDomainFact {
                 skill_id: skill.id.clone(),
-                atom_index,
+                atom_id: atom.atom_id.clone(),
                 target_facility: target,
                 response_field: field,
                 resource: normalize_resource(resource),
@@ -1011,13 +1027,13 @@ fn build_resource_value_domains(table: &SkillTable) -> Vec<ResourceValueDomainFa
         }
     }
     for skill in table.skills() {
-        for (atom_index, atom) in skill.atoms.iter().enumerate() {
+        for atom in &skill.atoms {
             if atom.selector != Some(Selector::PowerStationCount) {
                 continue;
             }
             facts.push(ResourceValueDomainFact {
                 skill_id: skill.id.clone(),
-                atom_index,
+                atom_id: atom.atom_id.clone(),
                 target_facility: target_facility(&skill.facility, &atom.action, atom.scope)
                     .to_string(),
                 response_field: closure_response_field(response_field(&atom.action)),
@@ -1095,6 +1111,8 @@ fn target_facility<'a>(source: &'a str, action: &Action, atom_scope: AtomScope) 
         Action::GlobalInjectManuEff { .. } | Action::GlobalInjectManuTaggedEff { .. } => {
             "manufacture"
         }
+        Action::GlobalInjectOfficeHireSpeed { .. } => "office",
+        Action::GlobalInjectMeetingSpeed { .. } => "meeting",
         Action::StateProduce { .. } if atom_scope == AtomScope::Global => "global_resource",
         _ => source,
     }
@@ -1112,7 +1130,9 @@ fn action_dependency(action: &Action, atom_scope: AtomScope) -> (&'static str, D
         Action::GlobalInjectTradeEff { .. }
         | Action::GlobalInjectManuEff { .. }
         | Action::GlobalInjectManuTaggedEff { .. }
-        | Action::GlobalInjectKarlanPrecision { .. } => ("global_inject", CrossFacility),
+        | Action::GlobalInjectKarlanPrecision { .. }
+        | Action::GlobalInjectOfficeHireSpeed { .. }
+        | Action::GlobalInjectMeetingSpeed { .. } => ("global_inject", CrossFacility),
         Action::StateProduce { .. } if atom_scope == AtomScope::Global => {
             ("global_resource_produce", CrossFacility)
         }
@@ -1125,6 +1145,8 @@ fn action_dependency(action: &Action, atom_scope: AtomScope) -> (&'static str, D
         | Action::AddFlatEffFromSelector { .. }
         | Action::AddLimitDelta { .. }
         | Action::MoodDrainDelta { .. }
+        | Action::MoodDrainDeltaForOperator { .. }
+        | Action::ClearMoodDrain { .. }
         | Action::AddOrderLmdBonus { .. }
         | Action::PeerEffAbsorb { .. }
         | Action::AddBucketEffFromSelector { .. }
@@ -1152,14 +1174,19 @@ fn response_field(action: &Action) -> ResponseField {
         Action::TagOrder { .. }
         | Action::AddGoldDelivery { .. }
         | Action::AddOrderLmdBonus { .. } => ResponseField::UnitOutput,
-        Action::MoodDrainDelta { .. } | Action::MoodDrainPerStateStep { .. } => ResponseField::Mood,
+        Action::MoodDrainDelta { .. }
+        | Action::MoodDrainDeltaForOperator { .. }
+        | Action::MoodDrainPerStateStep { .. }
+        | Action::ClearMoodDrain { .. } => ResponseField::Mood,
         Action::StateProduce { .. } | Action::StateConsume { .. } | Action::StateConvert { .. } => {
             ResponseField::StateResource
         }
         Action::GlobalInjectTradeEff { .. }
         | Action::GlobalInjectManuEff { .. }
         | Action::GlobalInjectManuTaggedEff { .. }
-        | Action::GlobalInjectKarlanPrecision { .. } => ResponseField::GlobalInject,
+        | Action::GlobalInjectKarlanPrecision { .. }
+        | Action::GlobalInjectOfficeHireSpeed { .. }
+        | Action::GlobalInjectMeetingSpeed { .. } => ResponseField::GlobalInject,
     }
 }
 
@@ -1248,6 +1275,7 @@ fn condition_dependency(condition: &Condition) -> (&'static str, DependencyScope
         Condition::OwnerLacksBuff { .. } => ("owner_lacks_buff", RoomLocal),
         Condition::ExternalMomentumGteField { .. } => ("external_momentum_gte_field", GlobalLayout),
         Condition::FieldMomentumGtExternal { .. } => ("field_momentum_gt_external", GlobalLayout),
+        Condition::OfficeHireSpeedBelow { .. } => ("office_hire_speed_below", CrossFacility),
         Condition::PlatformCountGte { .. } => ("platform_count_gte", CrossFacility),
     }
 }
@@ -1295,6 +1323,9 @@ mod tests {
         assert!(
             control_buff_is_automatically_excluded(&table, ["control_tra_limit&spd3[000]"])
                 .unwrap()
+        );
+        assert!(
+            control_buff_is_automatically_excluded(&table, ["control_tra_limit&spd[000]"]).unwrap()
         );
         assert!(
             !control_buff_is_automatically_excluded(&table, ["control_tra_limit&spd2[000]"])
@@ -1429,6 +1460,82 @@ mod tests {
                 .iter()
                 .any(|item| { item.mechanism == "gold_flow" && item.resource == resource }));
         }
+    }
+
+    #[test]
+    fn response_dependency_keeps_stable_atom_id() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let report = build_response_dependency_report(&table);
+        let row = report
+            .rows
+            .iter()
+            .find(|row| row.skill_id == "control_mp_psk[000]")
+            .expect("Pinus control response rows");
+        assert_eq!(
+            row.atom_id.as_deref(),
+            Some("control_mp_psk[000]:pinus_battle_record")
+        );
+        assert!(report
+            .resource_reverse_closures
+            .iter()
+            .flat_map(|closure| &closure.edges)
+            .any(
+                |edge| edge.kind == ResourceClosureEdgeKind::RegistryConversion
+                    && edge.atom_id.is_none()
+            ));
+    }
+
+    #[test]
+    fn legacy_atoms_without_ids_keep_distinct_internal_closure_edges() {
+        let row = |skill_id: &str,
+                   atom_position: usize,
+                   reads_resources: Vec<String>,
+                   writes_resources: Vec<String>| ResponseDependencyRow {
+            skill_id: skill_id.to_string(),
+            source_facility: "trade".to_string(),
+            target_facility: "trade".to_string(),
+            atom_id: None,
+            selector: None,
+            selector_scope: None,
+            condition: None,
+            condition_scope: None,
+            action_dependency: "test".to_string(),
+            action_scope: DependencyScope::RoomLocal,
+            reads_resources,
+            writes_resources,
+            atom_scope: "room".to_string(),
+            response_field: ResponseField::Efficiency,
+            requires_external_state: false,
+            atom_position,
+        };
+        let rows = vec![
+            row("consumer", 0, vec!["legacy_resource".to_string()], vec![]),
+            row(
+                "legacy_multi",
+                0,
+                vec![],
+                vec!["legacy_resource".to_string()],
+            ),
+            row(
+                "legacy_multi",
+                1,
+                vec![],
+                vec!["legacy_resource".to_string()],
+            ),
+        ];
+        let closures = build_resource_reverse_closures(&rows, &[]);
+        let edges = &closures[0].edges;
+        assert_eq!(
+            edges
+                .iter()
+                .filter(|edge| edge.skill_id.as_deref() == Some("legacy_multi"))
+                .count(),
+            2
+        );
+        assert!(edges
+            .iter()
+            .filter(|edge| edge.skill_id.as_deref() == Some("legacy_multi"))
+            .all(|edge| edge.atom_id.is_none()));
     }
 
     #[test]

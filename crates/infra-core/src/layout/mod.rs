@@ -12,6 +12,8 @@ mod workforce;
 pub(crate) use assign::assign_control;
 pub(crate) use assign::assign_manu_room_with_anchors;
 pub(crate) use assign::assign_shift_with_preclaimed_plan;
+pub(crate) use assign::refill_manu_room_with_core;
+pub(crate) use assign::refill_trade_room_with_core;
 pub use assign::{
     assign_base_greedy, assign_power_rooms, assign_power_stations, assign_shift,
     assign_shift_with_plan, assign_shift_with_plan_skip, assign_team_gamma_half,
@@ -19,6 +21,7 @@ pub use assign::{
     explain_assignment_systems, pinned_assignment, pinned_assignment_excluding, rotating_workers,
     AssignBaseOptions, AssignShiftResult,
 };
+pub(crate) use assign::{beta_tailor_names, refill_witch_room_with_tailor};
 pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment, RoomEfficiencySnapshot};
 pub use blueprint::{
     BaseBlueprint, BlueprintScenario, FacilityKind, RoomBlueprint, RoomId, RoomProduct,

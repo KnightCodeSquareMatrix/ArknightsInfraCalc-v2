@@ -21,14 +21,21 @@ pub struct RoomEfficiencyLine {
     /// White: efficiency supplied directly by operators or their skills.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub operator_efficiency: Efficiency,
+    /// 基础效率：100% + 非 0 心情入驻人数 × 1%。
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub base_efficiency: Efficiency,
     /// Green: occupancy and facility/global environment efficiency.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub station_efficiency: Efficiency,
+    /// 中枢/全局效率；贸易与制造统一使用该分量。
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub global_efficiency: Efficiency,
     /// Paper total before an order-specific multiplier is applied.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub total_efficiency: Efficiency,
     /// Actual efficiency after an order-specific multiplier.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    #[serde(skip_serializing)]
     pub final_efficiency: Efficiency,
     /// Trade order multiplier; 1.000 for non-trade facilities.
     #[serde(default)]
@@ -36,6 +43,23 @@ pub struct RoomEfficiencyLine {
     /// Blue: order-equivalent efficiency after removing base and station terms.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub equivalent_efficiency: Efficiency,
+    /// 贸易/赤金分别计算的单位时间产出。
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub trade_output_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    #[serde(skip_serializing)]
+    pub gold_consumption_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    #[serde(skip_serializing)]
+    pub originium_shards_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manufacture_unit_output_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub manufacture_output_per_day: f64,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_equivalent_efficiency: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub gold_equivalent_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
@@ -52,6 +76,10 @@ pub struct RoomEfficiencyLine {
 
 fn is_zero_efficiency(v: &Efficiency) -> bool {
     v.is_zero()
+}
+
+fn is_zero_f64(v: &f64) -> bool {
+    *v == 0.0
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -138,6 +166,8 @@ pub fn evaluate_base_assignment_efficiencies(
             line.trade_efficiency = snapshot.trade_final_efficiency;
             line.trade_skill_efficiency = snapshot.trade_skill_efficiency;
             line.operator_efficiency = snapshot.trade_skill_efficiency;
+            line.base_efficiency = snapshot.trade_base_efficiency;
+            line.global_efficiency = snapshot.trade_control_efficiency;
             line.order_multiplier = if snapshot.trade_unit_output_multiplier.is_zero() {
                 Efficiency::ONE
             } else {
@@ -145,6 +175,11 @@ pub fn evaluate_base_assignment_efficiencies(
             };
             line.total_efficiency = snapshot.trade_paper_efficiency;
             line.final_efficiency = snapshot.trade_final_efficiency;
+            line.trade_output_per_day = snapshot.trade_output_per_day;
+            line.gold_consumption_per_day = snapshot.gold_consumption_per_day;
+            line.originium_shards_per_day = snapshot.trade_originium_shards_per_day;
+            line.trade_equivalent_efficiency = snapshot.trade_equivalent_trade_efficiency;
+            line.gold_equivalent_efficiency = snapshot.trade_equivalent_gold_efficiency;
             line.station_efficiency = if snapshot.trade_occupancy_efficiency.is_zero()
                 && snapshot.trade_control_efficiency.is_zero()
             {
@@ -171,8 +206,19 @@ pub fn evaluate_base_assignment_efficiencies(
             line.trade_efficiency = result.efficiency.final_efficiency;
             line.trade_skill_efficiency = result.efficiency.paper.skill_efficiency;
             line.operator_efficiency = result.efficiency.paper.skill_efficiency;
+            line.base_efficiency = result.efficiency.paper.base_efficiency;
+            line.global_efficiency = result.efficiency.paper.control_efficiency;
             line.total_efficiency = result.efficiency.paper.paper_efficiency;
             line.final_efficiency = result.efficiency.final_efficiency;
+            line.trade_output_per_day = result.production.unit.unit_trade_per_day
+                * result.efficiency.total_efficiency.as_f64();
+            line.gold_consumption_per_day = result.production.unit.gold_consumption_per_day
+                * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
+                * result.efficiency.total_efficiency.as_f64();
+            line.originium_shards_per_day = result.production.unit.unit_originium_per_day
+                * result.efficiency.total_efficiency.as_f64();
+            line.trade_equivalent_efficiency = result.efficiency.trade_equivalent_efficiency;
+            line.gold_equivalent_efficiency = result.efficiency.gold_equivalent_efficiency;
             line.station_efficiency = result.efficiency.paper.occupancy_efficiency
                 + result.efficiency.paper.control_efficiency;
             line.order_multiplier = result.efficiency.production_basis.unit_output_multiplier;
@@ -197,6 +243,10 @@ pub fn evaluate_base_assignment_efficiencies(
             line.manufacture_efficiency = snapshot.manufacture_final_efficiency;
             line.manufacture_skill_efficiency = snapshot.manufacture_skill_efficiency;
             line.operator_efficiency = snapshot.manufacture_skill_efficiency;
+            line.base_efficiency = snapshot.manufacture_base_efficiency;
+            line.global_efficiency = snapshot.manufacture_global_efficiency;
+            line.manufacture_unit_output_per_day = snapshot.manufacture_unit_output_per_day;
+            line.manufacture_output_per_day = snapshot.manufacture_output_per_day;
             line.station_efficiency = if snapshot.manufacture_occupancy_efficiency.is_zero()
                 && snapshot.manufacture_global_efficiency.is_zero()
             {
@@ -222,6 +272,10 @@ pub fn evaluate_base_assignment_efficiencies(
             line.manufacture_efficiency = result.final_efficiency;
             line.manufacture_skill_efficiency = result.skill_efficiency;
             line.operator_efficiency = result.skill_efficiency;
+            line.base_efficiency = result.base_efficiency;
+            line.global_efficiency = result.global_efficiency;
+            line.manufacture_unit_output_per_day = result.unit_output_per_day;
+            line.manufacture_output_per_day = result.output_per_day;
             line.station_efficiency = result.occupancy_efficiency + result.global_efficiency;
             line.total_efficiency = result.final_efficiency;
             line.final_efficiency = result.final_efficiency;

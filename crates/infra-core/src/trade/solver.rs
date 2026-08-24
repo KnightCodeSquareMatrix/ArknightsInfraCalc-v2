@@ -5,7 +5,7 @@ use crate::skill_table::SkillTable;
 use crate::trade::efficiency::{
     PaperTradeEfficiency, TradeEfficiency, GOLD_TRADE_REFERENCE_OUTPUT_PER_DAY,
 };
-use crate::trade::input::TradeRoomInput;
+use crate::trade::input::{TradeOrderKind, TradeRoomInput};
 use crate::trade::interpreter::{apply_trade_phases, TradeContext};
 use crate::trade::order_mechanic::{self, OrderMechanicResult, SpecialOrderKind};
 use crate::trade::shortcut;
@@ -81,8 +81,18 @@ fn resolve_unit_output(
     };
 
     let community_trade_unit = if docus {
+        let docus_e2 = ctx
+            .operators
+            .iter()
+            .find(|operator| operator.name == "但书")
+            .is_some_and(|operator| operator.elite >= 2);
+        let shortcut_id = if docus_e2 {
+            "gsl_docus_solo"
+        } else {
+            "gsl_docus_solo_e0"
+        };
         Some(shortcut::required_community_unit_trade_per_day_by_id(
-            "gsl_docus_solo",
+            shortcut_id,
             level,
             reference,
         )?)
@@ -121,6 +131,7 @@ fn build_efficiency(
         paper,
         reference,
         unit.unit_trade_per_day,
+        unit.gold_consumption_per_day * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE,
         rule_id,
         !mechanic.ignores_order_eff(),
     )
@@ -155,6 +166,11 @@ fn solve_trade_with_shift_inner(
 ) -> Result<TradeResult> {
     crate::profile::record_trade_solve();
     shortcut::ensure_trade_shortcuts_loaded()?;
+    if input.active_order_kind == TradeOrderKind::Originium && input.level < 3 {
+        return Err(crate::error::Error::msg(
+            "originium trade orders require a level-3 trade post",
+        ));
+    }
     if check_exclusivity && shortcut::trade_station_exclusive_violation(&input.operators, table) {
         return Err(crate::error::Error::msg(
             "trade station violates mechanism exclusivity (docus / closure / witch)",
@@ -593,31 +609,34 @@ mod tests {
         let r_tools = solve_trade(&tools_only, &table).unwrap();
         assert!(solve_trade(&witch_long_docus, &table).is_err());
 
-        for (label, result) in [("e0", &r_e0), ("e2", &r_e2)] {
+        for (label, expected_rule, expected_unit, result) in [
+            ("e0", "gsl_docus_solo_e0", 13_097.345, &r_e0),
+            ("e2", "gsl_docus_solo", 15_929.2, &r_e2),
+        ] {
             assert!(
                 result
                     .rule_id
                     .as_deref()
-                    .is_some_and(|s| s == "gsl_docus_solo"),
+                    .is_some_and(|s| s == expected_rule),
                 "docus {label} tools shortcut {:?}",
                 result.rule_id
             );
             assert!(
-                result.efficiency.production_basis.unit_output_multiplier
-                    == Efficiency::from_decimal(1.550),
+                (result.production.unit.unit_trade_per_day - expected_unit).abs() < 0.001,
                 "docus {label} unit multiplier {:?}",
                 result.efficiency
             );
             assert!(
                 result.efficiency.final_efficiency
-                    == result.efficiency.paper.paper_efficiency * Efficiency::from_decimal(1.550),
+                    == result.efficiency.paper.paper_efficiency
+                        * result.efficiency.production_basis.unit_output_multiplier,
                 "docus {label} final efficiency {:?}",
                 result.efficiency
             );
             assert!(
                 (result.production.daily_at_shift.trade_lmd
-                    - GOLD_TRADE_REFERENCE_OUTPUT_PER_DAY
-                        * result.efficiency.final_efficiency.as_f64())
+                    - result.production.unit.unit_trade_per_day
+                        * result.efficiency.total_efficiency.as_f64())
                 .abs()
                     < 1e-6
             );

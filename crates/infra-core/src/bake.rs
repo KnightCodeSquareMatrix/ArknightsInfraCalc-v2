@@ -1527,6 +1527,7 @@ impl CompleteBakedTradeCatalog {
                 unit_trade_per_day: result.production.unit.unit_trade_per_day,
                 unit_gold_per_day: result.production.unit.unit_gold_per_day,
                 rule_id: result.rule_id,
+                ..TradeEfficiencyBreakdown::default()
             }),
         })
     }
@@ -2318,7 +2319,14 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
         unit_gold_per_day,
         unit_originium_per_day: row.unit_originium_per_day.unwrap_or(0.0),
         breakdown: Some(TradeEfficiencyBreakdown {
-            base_efficiency: row.trade_base_efficiency?,
+            base_efficiency: {
+                let base = row.trade_base_efficiency?;
+                if base == Efficiency::ONE {
+                    base + row.trade_occupancy_efficiency?
+                } else {
+                    base
+                }
+            },
             occupancy_efficiency: row.trade_occupancy_efficiency?,
             skill_efficiency: row.trade_skill_efficiency?,
             control_efficiency: row.trade_control_efficiency?,
@@ -2330,6 +2338,7 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
             unit_trade_per_day,
             unit_gold_per_day,
             rule_id: row.rule_id.clone(),
+            ..TradeEfficiencyBreakdown::default()
         }),
     })
 }
@@ -2369,13 +2378,21 @@ fn row_to_manu_hit(row: &BakedComboRow) -> Option<ManuSearchHit> {
         per_station,
         storage,
         breakdown: ManuEfficiencyBreakdown {
-            base_efficiency: row.manufacture_base_efficiency?,
+            base_efficiency: {
+                let base = row.manufacture_base_efficiency?;
+                if base == Efficiency::ONE {
+                    base + row.manufacture_occupancy_efficiency?
+                } else {
+                    base
+                }
+            },
             occupancy_efficiency: row.manufacture_occupancy_efficiency?,
             skill_efficiency: row.manufacture_skill_efficiency?,
             global_efficiency: row.manufacture_global_efficiency?,
             final_efficiency,
             storage_limit,
             recipe: recipe_label.to_string(),
+            ..ManuEfficiencyBreakdown::default()
         },
     })
 }

@@ -54,7 +54,7 @@
 | `bench --operbox <path>` | 同时 bench 贸易 + 制造搜索 |
 | `search trade` | 仅贸易单站探索；当前没有制造专用 `search` 子命令 |
 | **`layout test`** | 默认调用 `assign_base_greedy` 宏观落位→ `resolve_base` → 制造搜索（含产线拆解） |
-| **`layout team-rotation`** | 默认 ABC、二班与具名四班都要求每个最终状态覆盖全部制造产线，并输出直接效率与时长加权汇总 |
+| **`layout team-rotation`** | 默认 ABC、ABC `12/12/12`、二班与具名特殊四班都要求每个最终状态覆盖全部制造产线，并输出直接效率与时长加权汇总 |
 
 输出在 `infra-cli/output.rs` 的 `emit_bench` / pool 相关段。
 

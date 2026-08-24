@@ -12,10 +12,14 @@ mod trade_fill;
 
 pub(crate) use control_fill::assign_control;
 pub(crate) use manufacture_fill::assign_manu_room_with_anchors;
+pub(crate) use manufacture_fill::refill_manu_room_with_core;
 pub use power_fill::{assign_power_rooms, assign_power_stations};
 pub use team_fill::{assign_team_gamma_half, assign_team_producer_rooms};
 pub use trade_fill::blackkey_witch_same_trade_room;
 use trade_fill::skip_trade_core_registry_systems;
+pub(crate) use trade_fill::{
+    beta_tailor_names, refill_trade_room_with_core, refill_witch_room_with_tailor,
+};
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;

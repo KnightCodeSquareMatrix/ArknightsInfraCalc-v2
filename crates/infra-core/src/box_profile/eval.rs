@@ -371,6 +371,7 @@ fn eval_trade_room(
             unit_trade_per_day: unit.unit_trade_per_day,
             unit_gold_per_day: unit.unit_gold_per_day,
             rule_id: result.rule_id.clone(),
+            ..TradeEfficiencyBreakdown::default()
         }),
     })
 }
@@ -436,6 +437,8 @@ fn eval_manu_room(
             final_efficiency: result.final_efficiency,
             storage_limit: result.storage_limit,
             recipe: recipe_str.to_string(),
+            unit_output_per_day: result.unit_output_per_day,
+            output_per_day: result.output_per_day,
         },
     })
 }
@@ -455,8 +458,7 @@ fn average_manu_hit(hits: &[ManuSearchHit]) -> Option<ManuSearchHit> {
     let base_efficiency = average_efficiency(|b| b.base_efficiency);
     let occupancy_efficiency = average_efficiency(|b| b.occupancy_efficiency);
     let skill_efficiency = average_efficiency(|b| b.skill_efficiency);
-    let global_efficiency =
-        final_efficiency - base_efficiency - occupancy_efficiency - skill_efficiency;
+    let global_efficiency = final_efficiency - base_efficiency - skill_efficiency;
     let breakdown = ManuEfficiencyBreakdown {
         base_efficiency,
         occupancy_efficiency,
@@ -469,6 +471,16 @@ fn average_manu_hit(hits: &[ManuSearchHit]) -> Option<ManuSearchHit> {
             .sum::<i32>()
             / hits.len() as i32,
         recipe: hits[0].breakdown.recipe.clone(),
+        unit_output_per_day: hits
+            .iter()
+            .map(|hit| hit.breakdown.unit_output_per_day)
+            .sum::<f64>()
+            / hits.len() as f64,
+        output_per_day: hits
+            .iter()
+            .map(|hit| hit.breakdown.output_per_day)
+            .sum::<f64>()
+            / hits.len() as f64,
     };
     Some(ManuSearchHit {
         names: hits[0].names.clone(),

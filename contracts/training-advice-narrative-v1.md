@@ -36,7 +36,7 @@ arknights:training_advice:narrative:v1:lock:{content_hmac}
 arknights:training_advice:narrative:v1:task:{task_id}
 ```
 
-锁 value 必须包含 owner/fencing token；发布结果和释放锁使用文档中 adapter 暴露的 compare-and-delete Lua 脚本。BFF 仍需将锁、task state 和入队放入同一 Redis slot 的事务边界。
+锁 value 必须包含 owner/fencing token。`admit(...)=ACCEPTED` 返回的 `lock_token` 是发布结果、续租和 compare-and-delete 释放锁的唯一凭据；BFF 不得重建或猜测该 token。发布结果和释放锁使用 adapter 暴露的 Lua 脚本。BFF 仍需将锁、task state 和入队放入同一 Redis slot 的事务边界。
 
 ## 响应
 

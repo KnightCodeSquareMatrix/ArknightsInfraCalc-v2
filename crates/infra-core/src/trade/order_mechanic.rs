@@ -47,7 +47,7 @@ impl GoldDistribution {
         }
     }
 
-    /// 贸易站等级决定可出现订单档位（公孙：2 级无 4 金，1 级仅 2 金）。
+    /// 贸易站等级决定可出现订单档位（公孙：2 级 2/3 金为 60%/40%，无 4 金；1 级仅 2 金）。
     pub fn for_trade_level(level: u8) -> Self {
         match level {
             1 => Self {
@@ -56,8 +56,8 @@ impl GoldDistribution {
                 p4: 0.0,
             },
             2 => Self {
-                p2: 0.65,
-                p3: 0.35,
+                p2: 0.60,
+                p3: 0.40,
                 p4: 0.0,
             },
             _ => Self::regular_lv3(),
@@ -99,19 +99,22 @@ impl GoldDistribution {
     }
 }
 
-/// 源石（固源岩）订单档位分布。
+/// 三级贸易站“开采协力”固定订单：2 固源岩 → 20 合成玉，耗时 2h。
 #[derive(Debug, Clone, Serialize)]
 pub struct OriginiumDistribution {
-    pub p1: f64,
-    pub p2: f64,
+    pub shards_per_order: u8,
+    pub orundum_per_order: f64,
+    pub minutes_per_order: f64,
+    pub lmd_per_order: f64,
 }
 
 impl OriginiumDistribution {
-    pub fn for_trade_level(level: u8) -> Self {
-        match level {
-            1 => Self { p1: 1.0, p2: 0.0 },
-            2 => Self { p1: 0.65, p2: 0.35 },
-            _ => Self { p1: 0.30, p2: 0.70 },
+    pub fn fixed_lv3() -> Self {
+        Self {
+            shards_per_order: 2,
+            orundum_per_order: 20.0,
+            minutes_per_order: 120.0,
+            lmd_per_order: 0.0,
         }
     }
 }
@@ -336,62 +339,29 @@ fn expected_gold_avg(dist: &GoldDistribution, caps: &MechanicCaps, long_lmd_bonu
     sum
 }
 
-fn originium_tier_params(shards: u8) -> (f64, f64) {
-    match shards {
-        1 => (144.0, 800.0),
-        2 => (210.0, 1600.0),
-        _ => (144.0, 800.0),
-    }
-}
-
-fn weighted_minutes_per_originium_shard(dist: &OriginiumDistribution) -> f64 {
-    let mut sum = 0.0;
-    for (shards, p) in [(1u8, dist.p1), (2, dist.p2)] {
-        if p <= 0.0 {
-            continue;
-        }
-        let (dur, _, cost) = originium_order_params(shards);
-        if cost > 0.0 {
-            sum += p * (dur / cost);
-        }
-    }
-    sum
-}
-
 fn expected_originium_avg(dist: &OriginiumDistribution) -> f64 {
-    let mut sum = 0.0;
-    for (shards, p) in [(1u8, dist.p1), (2, dist.p2)] {
-        if p <= 0.0 {
-            continue;
-        }
-        let (_, _, cost) = originium_order_params(shards);
-        sum += p * cost;
-    }
-    sum
+    dist.orundum_per_order
 }
 
 pub fn originium_order_params(shards: u8) -> (f64, f64, f64) {
-    let (dur, lmd) = originium_tier_params(shards);
-    (dur, lmd, shards as f64)
+    let dist = OriginiumDistribution::fixed_lv3();
+    (
+        dist.minutes_per_order,
+        dist.lmd_per_order,
+        f64::from(shards),
+    )
 }
 
-fn originium_result(level: u8) -> OrderMechanicResult {
-    let dist = OriginiumDistribution::for_trade_level(level);
-    let baseline_mps =
-        weighted_minutes_per_originium_shard(&OriginiumDistribution::for_trade_level(3));
-    let mps = weighted_minutes_per_originium_shard(&dist);
-    let mechanic_equiv = if baseline_mps > 0.0 && mps > 0.0 {
-        (baseline_mps / mps - 1.0) * 100.0
-    } else {
-        0.0
-    };
+fn originium_result(_level: u8) -> OrderMechanicResult {
+    let dist = OriginiumDistribution::fixed_lv3();
+    let mps = dist.minutes_per_order / f64::from(dist.shards_per_order);
     let originium_avg = expected_originium_avg(&dist);
     OrderMechanicResult {
         order_kind: TradeOrderKind::Originium,
         dominant_kind: SpecialOrderKind::NormalOriginium,
-        gold_distribution: GoldDistribution::for_trade_level(level),
+        gold_distribution: GoldDistribution::for_trade_level(3),
         originium_distribution: Some(dist),
-        mechanic_equivalent_efficiency: Efficiency::from_percent_points(mechanic_equiv),
+        mechanic_equivalent_efficiency: Efficiency::ZERO,
         gold_per_order_avg: 0.0,
         originium_per_order_avg: originium_avg,
         minutes_per_gold: 0.0,
@@ -401,22 +371,16 @@ fn originium_result(level: u8) -> OrderMechanicResult {
 }
 
 pub fn originium_unit_per_slot_per_day(dist: &OriginiumDistribution) -> (f64, f64) {
-    let mut lmd_rate = 0.0;
-    let mut shard_rate = 0.0;
-    for (shards, p) in [(1u8, dist.p1), (2, dist.p2)] {
-        if p <= 0.0 {
-            continue;
-        }
-        let (dur, lmd, cost) = originium_order_params(shards);
-        lmd_rate += p * (lmd / dur);
-        shard_rate += p * (cost / dur);
-    }
-    (lmd_rate * MINUTES_PER_DAY, shard_rate * MINUTES_PER_DAY)
+    let orders_per_day = MINUTES_PER_DAY / dist.minutes_per_order;
+    (
+        dist.orundum_per_order * orders_per_day,
+        f64::from(dist.shards_per_order) * orders_per_day,
+    )
 }
 
 /// 3 级站常规源石订单分布、纸面 100% 时的日贸易产出（倍率分母）。
 pub fn baseline_unit_trade_lv3_originium() -> f64 {
-    originium_unit_per_slot_per_day(&OriginiumDistribution::for_trade_level(3)).0
+    originium_unit_per_slot_per_day(&OriginiumDistribution::fixed_lv3()).0
 }
 
 /// 3 级站常规分布、无机制、纸面 100% 时的日贸易产出（倍率分母）。
@@ -456,6 +420,26 @@ mod tests {
     use crate::trade::input::TradeRoomInput;
     use crate::trade::interpreter::{apply_trade_phases, TradeContext};
     use crate::trade::unit_output::compute_unit_output;
+
+    #[test]
+    fn originium_order_is_fixed_to_lv3_two_shards_for_twenty_orundum() {
+        let distribution = OriginiumDistribution::fixed_lv3();
+        assert_eq!(distribution.shards_per_order, 2);
+        assert_eq!(distribution.orundum_per_order, 20.0);
+        assert_eq!(distribution.minutes_per_order, 120.0);
+        assert_eq!(
+            originium_unit_per_slot_per_day(&distribution),
+            (240.0, 24.0)
+        );
+    }
+
+    #[test]
+    fn regular_lv2_uses_60_40_gold_distribution() {
+        let distribution = GoldDistribution::for_trade_level(2);
+        assert!((distribution.p2 - 0.60).abs() < f64::EPSILON);
+        assert!((distribution.p3 - 0.40).abs() < f64::EPSILON);
+        assert!(distribution.p4.abs() < f64::EPSILON);
+    }
 
     #[test]
     fn docus_lv3_unit_trade_near_anchor() {

@@ -56,9 +56,24 @@ impl OperBox {
     }
 
     pub fn from_entries(entries: Vec<OperBoxEntry>) -> Result<Self> {
+        Self::from_entries_inner(entries, false)
+    }
+
+    /// Loads historical `plan.compute` snapshots whose producer used rarity=1
+    /// as an unknown-rarity sentinel while preserving elite/level facts.
+    /// Runtime contract validation remains strict; this is only for local
+    /// debug-bundle replay.
+    pub fn from_entries_for_plan_compute_compat(entries: Vec<OperBoxEntry>) -> Result<Self> {
+        Self::from_entries_inner(entries, true)
+    }
+
+    fn from_entries_inner(
+        entries: Vec<OperBoxEntry>,
+        allow_unreachable_progress: bool,
+    ) -> Result<Self> {
         let mut owned = HashMap::new();
         for e in &entries {
-            validate_entry_progress(e)?;
+            validate_entry_progress(e, allow_unreachable_progress)?;
             if !e.own {
                 continue;
             }
@@ -195,7 +210,7 @@ impl OperBox {
     }
 }
 
-fn validate_entry_progress(entry: &OperBoxEntry) -> Result<()> {
+fn validate_entry_progress(entry: &OperBoxEntry, allow_unreachable_progress: bool) -> Result<()> {
     if !(1..=6).contains(&entry.rarity) {
         return Err(Error::msg(format!(
             "operbox entry {} has invalid rarity {}; expected 1..=6",
@@ -209,13 +224,23 @@ fn validate_entry_progress(entry: &OperBoxEntry) -> Result<()> {
         4..=6 => 2,
         _ => unreachable!(),
     };
-    if entry.elite > max_elite {
+    if !allow_unreachable_progress && entry.elite > max_elite {
         return Err(Error::msg(format!(
             "operbox entry {} has impossible progress: rarity {} cannot reach elite {}",
             entry.name, entry.rarity, entry.elite
         )));
     }
     if !entry.own {
+        return Ok(());
+    }
+
+    if allow_unreachable_progress {
+        if !(1..=90).contains(&entry.level) {
+            return Err(Error::msg(format!(
+                "operbox entry {} has invalid level {} for plan.compute compatibility",
+                entry.name, entry.level
+            )));
+        }
         return Ok(());
     }
 

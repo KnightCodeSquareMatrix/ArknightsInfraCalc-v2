@@ -4,8 +4,9 @@ import threading
 import unittest
 from pathlib import Path
 
-from arknights_narrator.adapter import Narrator, NarratorConfig, validate_and_replace
+from arknights_narrator.adapter import Narrator, NarratorConfig, _provider_failure_reason, validate_and_replace, validate_markdown_report
 from arknights_narrator.cache import AdmissionStatus, RedisKeys, admit, content_hmac
+from arknights_narrator.fallback import render_fallback
 from arknights_narrator.mapping import CanonicalMapping, MappingError, MappingStore
 from arknights_narrator.projection import project_report
 
@@ -63,10 +64,100 @@ class NarratorTests(unittest.TestCase):
         self.value = project_report(report(), self.mapping)
 
     def test_projection_sorts_caps_and_excludes_needs_review(self):
-        self.assertEqual([item["id"] for item in self.value.completed_combinations], ["vermeil"])
-        self.assertEqual([item["id"] for item in self.value.incomplete_combinations], ["human_fireworks"])
+        self.assertEqual(
+            [item["combination_ref"] for item in self.value.completed_combinations],
+            ["combination:vermeil"],
+        )
+        self.assertEqual(
+            [item["combination_ref"] for item in self.value.incomplete_combinations],
+            ["combination:human_fireworks"],
+        )
         self.assertEqual(self.value.references["facts"]["completion:human_fireworks"]["value"], "66%")
         self.assertEqual(self.value.references["facts"]["facility:0"]["value"], "贸易站、控制中枢")
+
+    def test_unselected_combination_is_not_in_reference_whitelist(self):
+        broken = json.loads(json.dumps(report()))
+        broken["combinations"].append({
+            "id": "bubble_group",
+            "name": "泡泡组",
+            "state": "needs_review",
+            "completion_percent": 100,
+            "facilities": ["manufacturing_station"],
+            "members": [{"operator": "泡泡"}],
+        })
+        value = project_report(broken, self.mapping)
+        self.assertNotIn("bubble_group", value.references["combinations"])
+        with self.assertRaises(ValueError):
+            validate_and_replace({
+                "schema_version": 1,
+                "sections": [
+                    {"id": "account_overview", "heading": "账号概况", "paragraphs": []},
+                    {"id": "completed_combinations", "heading": "已成型组合", "paragraphs": ["{{combination:bubble_group}}"]},
+                    {"id": "newbie_requirements", "heading": "基础必练、必收集", "paragraphs": []},
+                    {"id": "incomplete_combinations", "heading": "待完成组合", "paragraphs": []},
+                    {"id": "training_recommendations", "heading": "练卡建议与高效率散件", "items": []},
+                    {"id": "next_base_plan", "heading": "再次使用排班工具的提示", "paragraphs": []},
+                ],
+            }, value)
+
+    def test_fallback_narrative_has_only_contract_fields(self):
+        narrative = render_fallback(self.value, "test")
+        self.assertEqual(set(narrative), {"schema_version", "sections"})
+        self.assertEqual(narrative["schema_version"], 1)
+
+    def test_dynamic_sections_require_backend_reference(self):
+        data = {
+            "schema_version": 1,
+            "sections": [
+                {"id": "account_overview", "heading": "账号概况", "paragraphs": ["概况"]},
+                {"id": "completed_combinations", "heading": "已成型组合", "paragraphs": ["已经成型"]},
+                {"id": "newbie_requirements", "heading": "基础必练、必收集", "paragraphs": []},
+                {"id": "incomplete_combinations", "heading": "待完成组合", "paragraphs": []},
+                {"id": "training_recommendations", "heading": "练卡建议与高效率散件", "items": []},
+                {"id": "next_base_plan", "heading": "再次使用排班工具的提示", "paragraphs": []},
+            ],
+        }
+        with self.assertRaises(ValueError):
+            validate_and_replace(data, self.value)
+
+    def test_unknown_section_field_is_removed(self):
+        data = {
+            "schema_version": 1,
+            "sections": [
+                {"id": "account_overview", "heading": "账号概况", "paragraphs": ["概况"], "debug": "nope"},
+                {"id": "completed_combinations", "heading": "已成型组合", "paragraphs": ["{{combination:vermeil}}已经成型"]},
+                {"id": "newbie_requirements", "heading": "基础必练、必收集", "paragraphs": []},
+                {"id": "incomplete_combinations", "heading": "待完成组合", "paragraphs": []},
+                {"id": "training_recommendations", "heading": "练卡建议与高效率散件", "items": []},
+                {"id": "next_base_plan", "heading": "再次使用排班工具的提示", "paragraphs": []},
+            ],
+        }
+        rendered = validate_and_replace(data, self.value)
+        self.assertNotIn("debug", rendered["sections"][0])
+
+    def test_markdown_rejects_unsupported_mechanism_claim(self):
+        markdown = """## 账号概况
+欢迎访问可露希尔基建终端，当前培养方向清晰。
+## 已成型组合
+红云组 [COMBO:vermeil]
+## 基础必练、必收集
+基础目标仍可继续补齐。
+## 待完成组合
+人间烟火组 [COMBO:human_fireworks]
+## 练卡建议与高效率散件
+[REC:0] 乌有覆盖面广，效率明显提升。
+## 再次使用排班工具的提示
+欢迎下次再来检查排班。"""
+        with self.assertRaises(ValueError):
+            validate_markdown_report({"markdown": markdown}, self.value, 6000)
+
+    def test_admission_returns_lock_token_for_accepted_task(self):
+        result = admit(FakeRedis(), report(), "user-1", "secret", **self.cache_kwargs())
+        self.assertEqual(result.status, AdmissionStatus.ACCEPTED)
+        self.assertTrue(result.lock_token)
+
+    def test_provider_timeout_is_not_reported_as_invalid_output(self):
+        self.assertEqual(_provider_failure_reason(TimeoutError("read timed out")), "provider_timeout")
 
     def test_placeholder_replacement_uses_backend_facts(self):
         data = {

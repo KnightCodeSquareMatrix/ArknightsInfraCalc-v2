@@ -23,7 +23,7 @@
 | 单班编制 | 把 Rule/兼容 System 编译为 `AssignmentPlan`，再 Execute → Fill → Resolve，用全局 `used` 保证一人一岗 |
 | 跨设施机制 | 汇总中枢注入、感知信息、人间烟火、木天蓼、虚拟发电等 producer，再让消费房读取 |
 | 体系编排 | 表达 required anchor、同房 bond、禁止同房、配方限制、降级与班次绑定 |
-| 定时轮换 | 默认生成 αβγ ABC `12h + 6h + 6h`；也支持二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 具名 profile |
+| 定时轮换 | 默认生成 αβγ ABC `12h + 6h + 6h`；也支持 ABC `12/12/12`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 具名 profile |
 | 账号分析 | 对 operbox 生成练度画像，并与基准盒比较 |
 | 导出 | 输出人类可读排班、账号画像 JSON 和 MAA 排班 JSON；core `BaseAssignment` 本身支持 serde |
 

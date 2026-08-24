@@ -19,9 +19,9 @@
 
 L2 产量：`for_trade_level` 裁剪订单档位；违约链在 2/3 金订单上叠加 `DOCUS_SUB4_LMD_BONUS`（与工具人表 2/3 金 +1000 对齐，校准见 `UNIT_OUTPUT_ANCHORS.csv`）。
 
-**排班约束**：但书**单走一站**（但书 + 订单效率工具人）。同房互斥：但书 ↔ 巫恋低语/龙舌兰投资/裁缝 α/β；可露希尔 ↔ 精二巫恋低语；但书 ↔ 可露希尔。
+**排班约束**：但书**单走一站**（但书 + 订单效率工具人），精0和精二都可作为主力 core；精0仅使用 α、精二使用 β。除 153 外，但书 core 优先于可露希尔并选择正式搜索的高效率队友；完整龙巫仍要求巫恋、龙舌兰和对应裁缝组合，不与但书同房。
 
-**L3 但书单走**（`gsl_docus_solo`）：社区单位产出按等级写入 `unit_output`；三级站最终效率为完整纸面效率 × `1.55`。`mechanic_equivalent_efficiency=0.550` 只作机制解释，不二次参与计算。
+**L3 但书单走**（`gsl_docus_solo`）：社区单位日产出按等级写入 `unit_output`；实际产出使用 `total_efficiency × unit_output_per_day × 工作时间占比`。`mechanic_equivalent_efficiency=0.550` 只作机制解释，不二次参与计算。
 
 ## 4.2 可露希尔
 
@@ -37,16 +37,16 @@ L2 产量：`for_trade_level` 裁剪订单档位；违约链在 2/3 金订单上
 | Tier | 技能 | EffectAtom |
 |------|------|------------|
 | Tier0 | 摊贩经济 | Action: `AddPerGapEff(4.0)` |
-| TierUp | 市井之道 | Step1: `OtherOpsSettledEff` → `ReduceLimit(floor(eff/10))` |
+| TierUp | 摊贩经济 + 市井之道 | 保留 Tier0 `AddPerGapEff(4.0)`；Step1: `OtherOpsSettledEff` → `ReduceLimit(floor(eff/10))` |
 | | | Step2: `OrderCount` → `AddFlatEffFromSelector(×4.0)`，`phase=order_var` |
 
-**精0 摊贩**为无灵知时的贸易常用态（`AddPerGapEff`，依赖 order_gap）。**精1+ 市井**默认不进通用贸易池；中枢**灵知 E2·精密计算**激活时注入市井孑，由 L1 搜索与喀兰队友自然上浮。
+**精0 摊贩**为无灵知时的贸易常用态（`AddPerGapEff`，依赖 order_gap）。用户裁决孑精 1+ 的两个技能同时生效，因此 **精1+ 市井同时保留摊贩经济**；该形态默认不进通用贸易池，中枢**灵知 E2·精密计算**激活时注入双技能孑，由 L1 搜索与喀兰队友自然上浮。
 
-`OrderCount` 语义：有市井 buff 时稳态按 `final_order_limit` 计 per-order（满槽假设）；否则用输入 `order_count` 并 clamp 至上限。
+`OrderCount` 读取实际当前订单数并 clamp 至最终上限。孑精1+双技能共存时，摊贩经济读取 `final_order_limit - order_count`，市井之道读取 `order_count`，两项合计恒为 `final_order_limit × 4%`，不得把市井再次按最终上限计算而重复叠加差额。
 
 与雪雉·天道酬勤：`Condition::TiandaoEffVarAllowed` — 同房仅有孑+雪雉且无第三方 settled 时，天道酬勤不生效（市井之道优先）；有第三方贡献时两者均生效。
 
-L1 自然回归：`reg_ling_jie_yaxin_natural` 锁定中枢灵知 E2 + 贸易站精1+孑 / 银灰 / 琳琅诗怀雅 = 129%，且 `trade_shortcut=None`。拆法：银灰受精密计算后 5% + 琳琅 20% = 25%；孑按 18 单上限给 72%；琳琅按超出 10 单的 8 单给 32%；合计 129%。`gsl_ling_jie_yaxin` 保留在 `trade_shortcuts.json` 作为参考锚点，不参与 active L3 匹配。
+L1 自然 winner 为中枢灵知 E2 + 贸易站双技能孑 / 银灰 / 琳琅诗怀雅：技能效率 `129%`，三人基础效率 `103%`，总效率 `2.320`，且 `trade_shortcut=None`。拆法：银灰受精密计算后 `5%`，琳琅固定 `20%`，孑双技能按最终 18 单合计 `72%`，琳琅按超出 10 单的 8 单获得 `32%`。`gsl_ling_jie_yaxin` 只保留为参考锚点，不参与 active L3 匹配。
 
 ### 4.3.1 灵知·精密计算（跨设施 → 贸易房）
 
@@ -73,7 +73,7 @@ L1 自然回归：`reg_ling_jie_yaxin_natural` 锁定中枢灵知 E2 + 贸易站
 
 与佩佩共用 `PeerEffAbsorb` 原语；巫恋 `rate_per_peer=45`，佩佩 `rate=0`（只清零、不吸收）。
 
-**编排**：`trade_segments.roles.witch` 强制包含精二巫恋、龙舌兰精二和一名裁缝 β/α；普通白板第三人不得进入自动龙巫候选。`gsl_witch_*_blank` 仅保留单站结算兼容，`witch_long_beta` 不作为主路径 fixed registry 早占站。
+**编排**：`trade_segments.roles.witch` 强制包含精二巫恋、持有即可的龙舌兰（精0/精1/精2）和合法龙巫候选；精二龙舌兰优先使用裁缝 β/α 路径，低练度龙舌兰允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank` 排班路径。普通白板第三人不得伪造成完整高练度龙巫候选；`witch_long_beta` 不作为主路径 fixed registry 早占站。此处是排班 admission 规则，不改变练卡推荐口径。
 
 ## 4.6 佩佩
 
@@ -91,6 +91,22 @@ L1 自然回归：`reg_ling_jie_yaxin_natural` 锁定中枢灵知 E2 + 贸易站
 | 凯尔希 | Condition: `MoodAbove(12)` → `StateProduce(HumanFireworks, 15)` |
 | | Condition: `MoodBelowOrEq(12)` → `StateProduce(Perception, 10)` |
 | 思衡托 | State: `Consume(HumanFireworks, floor(value/3))` → 写入房间效率 |
+
+### 凯尔希·思衡托办公室挂件规则（当前设计口径）
+
+凯尔希·思衡托的办公室技能要求同班存在指定精英干员：迷迭香、煌、逻各斯、烛煌、电弧、真言、机械师。每个实际不同的设施房间中只要有至少一名指定精英干员，该房间计 1 个精英设施；同一房间内的多名指定干员不重复计数，最多计 5 个房间。凯尔希·思衡托与这些挂件只有在同一班次实际进驻时，才读取对应房间数量并获得额外效率。
+
+使用建议：将“凯尔希·思衡托办公室 + 指定精英挂件”作为一个 late competitive package。先完成生产、中枢和其他 required 体系，再从真实剩余空位中放置挂件；不得为凑挂件抢占更高收益岗位。候选比较应计入挂件原本设施的机会成本，只有完整 package 的全域结果优于不启用凯尔希·思衡托时才启用。由于挂件与凯尔希·思衡托必须同班，该 package 需要生成同班约束；不同班次可以重新选择挂件组合。
+
+上述挂件选择与按不同设施计数的排班接入属于后续实现边界；当前办公室通用候选已能结算思衡托自身技能，但尚未以该 package 规则自动为她配套挂件。
+
+### 跨体系挂件宿主裁决
+
+挂件宿主按“技能合法性”和“策略备选”分开处理：角色已有的加工站、会客室或训练室技能，均保留为对应设施的合法挂件备选；技能角色在该设施的候选排序中优先于无技能角色。所有角色均可作为加工站和训练室的策略性挂件备选，训练室固定保留 1 个挂件位。
+
+宿舍是通用休息 / 恢复宿主，除赫德雷体系中的伊内丝、W 外，其余挂件角色均可进入宿舍备选。伊内丝和 W 作为赫德雷挂件时不得进入宿舍，必须使用会客室、加工站或训练室等其他合法宿主；这条限制只作用于“作为赫德雷挂件”的关系，不改变她们作为普通角色或其他体系支持位的独立设施资格。
+
+当前挂件宿主容量上限按班次策略预留：宿舍 4 人、加工站 1 人、会客室 1 人、训练室 1 人。容量只表示挂件候选上限，实际仍需扣除必休人员和已占用的高价值岗位。挂件收益按相对主角色最佳替代方案的超额效率计算，而不是把主角色触发后的完整效率全部归给挂件；挂件与主角色按同一班次 presence 绑定，不跨班继承收益。
 
 ## 4.8 黑键（宿舍 → 感知 → 无声共鸣）
 

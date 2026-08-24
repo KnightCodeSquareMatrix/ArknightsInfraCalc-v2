@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::error::{Error, Result};
-use crate::layout::assignment::BaseAssignment;
+use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{
     station_operator_capacity, BaseBlueprint, FacilityKind, RoomId, RoomProduct,
 };
@@ -236,6 +236,77 @@ pub(super) fn pick_manu_hit_with_anchor(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn refill_manu_room_with_core(
+    blueprint: &crate::layout::BaseBlueprint,
+    room_id: &RoomId,
+    core: &str,
+    pool: &ManuPool,
+    table: &SkillTable,
+    instances: &crate::instances::OperatorInstances,
+    options: &AssignBaseOptions,
+    durin_dorm_planning: Option<u8>,
+    assignment: &mut BaseAssignment,
+) -> Result<()> {
+    let room = blueprint
+        .room(room_id)
+        .ok_or_else(|| Error::msg(format!("Fiammetta factory {} disappeared", room_id.0)))?;
+    let crate::layout::RoomProduct::Factory { recipe } = room
+        .product
+        .as_ref()
+        .ok_or_else(|| Error::msg("Fiammetta manufacture target lacks a recipe"))?
+    else {
+        return Err(Error::msg("Fiammetta manufacture target is not a factory"));
+    };
+    for assigned_room in &mut assignment.rooms {
+        assigned_room
+            .operators
+            .retain(|operator| operator.name != core);
+    }
+    assignment.set_room(room_id.clone(), Vec::new());
+    let used = assignment.operator_names();
+    let layout = crate::layout::resolve_base(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        durin_dorm_planning,
+    )?
+    .layout;
+    let hit = pick_manu_hit_with_anchor(
+        pool,
+        table,
+        ManuSearchOptions {
+            level: room.level,
+            operator_capacity: room.operator_capacity(),
+            top_k: options.top_k,
+            mood: options.mood,
+            shift_hours: Some(options.shift_hours),
+            layout: std::sync::Arc::new(layout),
+            recipe_mode: crate::manufacture::ManuSearchRecipeMode::Single(*recipe),
+            must_include_name: Some(core.to_string()),
+            full_pool: true,
+            bake_mode: crate::bake::BakeMode::Disabled,
+        },
+        &used,
+        options.top_k,
+        core,
+        &HashSet::new(),
+    )?;
+    let operators = hit
+        .names
+        .iter()
+        .map(|name| {
+            pool.entry(name)
+                .map(|entry| AssignedOperator::from_progress(name, entry.progress))
+                .ok_or_else(|| Error::msg(format!("Fiammetta factory candidate {name} missing")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    assignment.set_room(room_id.clone(), operators);
+    Ok(())
+}
+
 pub(crate) fn assign_manu_room_with_anchors(
     assignment: &mut BaseAssignment,
     room_id: &RoomId,
@@ -414,6 +485,8 @@ fn score_manu_entries(
             skill_efficiency: result.skill_efficiency,
             global_efficiency: result.global_efficiency,
             final_efficiency: result.final_efficiency,
+            unit_output_per_day: result.unit_output_per_day,
+            output_per_day: result.output_per_day,
             storage_limit: result.storage_limit,
             recipe: recipe_label.to_string(),
         },
@@ -499,6 +572,8 @@ pub(super) fn pick_capacity_manu_hit(
             skill_efficiency: result.skill_efficiency,
             global_efficiency: result.global_efficiency,
             final_efficiency: result.final_efficiency,
+            unit_output_per_day: result.unit_output_per_day,
+            output_per_day: result.output_per_day,
             storage_limit: result.storage_limit,
             recipe: recipe_label.to_string(),
         },

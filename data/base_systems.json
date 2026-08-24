@@ -34,7 +34,7 @@
   "systems": [
     {
       "id": "ling_jie_karlan",
-      "label": "喀兰中枢：灵知 E2；贸易侧由 L1 自然搜索",
+      "label": "喀兰跨站：灵知 E2 + 孑 + E2 喀兰贸易成员",
       "tier": "cross_station",
       "priority": 18,
       "exclusive_group": "meta_chain",
@@ -44,6 +44,17 @@
           "facility": "control",
           "operators": [
             { "name": "灵知", "elite": 2 }
+          ]
+        },
+        {
+          "facility": "trade_post",
+          "trade_role": "karlan",
+          "operators": [
+            { "name": "孑", "elite": 1 },
+            {
+              "pick_one": ["银灰", "崖心", "讯使", "角峰"],
+              "elite": 2
+            }
           ]
         }
       ]

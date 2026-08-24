@@ -13,13 +13,30 @@
 
 ## Current State
 
-All 27 imported feedback cases are treated as closed or covered by a sibling case. The remaining work is not feature development; it is keeping the closure evidence easy to find.
+The historical 27-case closure batch is treated as closed or covered by a sibling case. Newer
+reruns are tracked separately below and do not alter that historical closure count.
 
 | State | Count | Meaning |
 |-------|------:|---------|
 | `closed` | 23 | Fixed or made expected by current code/docs/tests |
 | `duplicate-covered` | 4 | Same root as another closed case; retained as evidence |
-| `open` | 0 | No known unresolved production feedback item in this batch |
+| `open` | 0 | No known unresolved production feedback item in the historical batch |
+
+## 2026-08-23 Current-Runtime Rerun
+
+These previously untracked `plan.compute` bundles were rerun after the debug adapter was
+unified with `compute_plan`. `closed` means the reported symptom is absent in the current
+runtime; the full projection may still differ because the recorded response predates later fixes.
+
+| Feedback ID | Status | Area | Reproduction evidence |
+|-------------|--------|------|-----------------------|
+| `40b87086-3aec-4ca9-8717-ceea1d7b8b56` | closed | manufacture / Wintertime producer | `target/codex-runs/control-feedback-repair/winter-final-rerun/rerun-report.json`; current `manu_2` uses `清流+温蒂+冬时` in the affected shifts |
+| `da10579f-b861-4540-9040-1aa04c1f64e2` | closed | office / perception branch | `target/codex-runs/control-feedback-repair/mulberry-final-rerun/rerun-report.json`; current office uses 斥罪 rather than the reported erroneous 桑葚 |
+| `a2940e15-2d23-42bd-9fe3-ff490c902420` | closed | control / Ascalon priority | `target/codex-runs/control-feedback-repair/ascalon-final-rerun/rerun-report.json`; current control rotation matches the recorded Starbear/诗怀雅 ordering |
+| `3c850d62-5f88-4298-8563-e7c3884f2902` | closed | control / mood max conflict | `target/codex-runs/control-feedback-repair/mood-final-rerun/rerun-report.json`; current control rotation no longer places 玛恩纳 and 维什戴尔 together |
+
+The rerun uses request/top-level inline snapshots for `plan.compute` bundles and records
+legacy progress normalization in the private report. No raw feedback JSON was edited.
 
 ## Local Evidence Digests
 
