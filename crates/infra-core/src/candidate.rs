@@ -157,7 +157,13 @@ impl TeamCandidate {
             }
         });
         let mut metrics = vec![
-            TeamMetric::new("trade.final_efficiency", hit.final_efficiency.as_f64()),
+            TeamMetric::new(
+                "trade.total_efficiency",
+                hit.breakdown
+                    .as_ref()
+                    .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency)
+                    .as_f64(),
+            ),
             TeamMetric::new(
                 "trade.mechanic_equivalent_efficiency",
                 hit.mechanic_equivalent_efficiency.as_f64(),
@@ -184,7 +190,11 @@ impl TeamCandidate {
             source,
             source_id: hit.rule_id.clone(),
             system_tags: Vec::new(),
-            final_efficiency: Some(hit.final_efficiency),
+            final_efficiency: Some(
+                hit.breakdown
+                    .as_ref()
+                    .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency),
+            ),
             metrics,
             selected: None,
             rejected: None,
@@ -310,6 +320,7 @@ mod tests {
             unit_originium_per_day: 0.0,
             breakdown: Some(TradeEfficiencyBreakdown {
                 final_efficiency: Efficiency::from_decimal(1.200),
+                total_efficiency: Efficiency::from_decimal(1.100),
                 mechanic_equivalent_efficiency: Efficiency::from_decimal(0.350),
                 rule_id: Some("witch_tequila_bibeak".to_string()),
                 ..Default::default()
@@ -322,11 +333,14 @@ mod tests {
         assert_eq!(candidate.source, CandidateSource::Shortcut);
         assert_eq!(candidate.source_id.as_deref(), Some("witch_tequila_bibeak"));
         assert_eq!(candidate.operators, hit.names);
-        assert_eq!(candidate.final_efficiency, Some(hit.final_efficiency));
+        assert_eq!(
+            candidate.final_efficiency,
+            Some(Efficiency::from_decimal(1.100))
+        );
         assert!(candidate
             .metrics
             .iter()
-            .any(|metric| metric.key == "trade.final_efficiency" && metric.value == 1.200));
+            .any(|metric| metric.key == "trade.total_efficiency" && metric.value == 1.100));
         assert!(candidate.metrics.iter().any(|metric| metric.key
             == "trade.mechanic_equivalent_efficiency"
             && metric.value == 0.350));

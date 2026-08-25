@@ -1,0 +1,7 @@
+{
+  "template": "shadow_operator_extreme_level2",
+  "rooms": [
+    { "id": "trade_1", "kind": "trade_post", "level": 2, "product": { "trade": { "order": "gold" } } },
+    { "id": "manu_1", "kind": "factory", "level": 2, "product": { "factory": { "recipe": "gold" } } }
+  ]
+}

@@ -503,6 +503,37 @@ mod tests {
     }
 
     #[test]
+    fn night_smoke_trade_binding_unlocks_at_elite_one() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+
+        let e0 = Roster::from_progress_map(
+            [(
+                "夜烟".to_string(),
+                crate::roster::OperatorProgress::new(0, 1, 4),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        let e1 = Roster::from_progress_map(
+            [(
+                "夜烟".to_string(),
+                crate::roster::OperatorProgress::new(1, 1, 4),
+            )]
+            .into_iter()
+            .collect(),
+        );
+
+        let e0_pool = build_trade_pool(&e0, &instances, &table).unwrap();
+        let e1_pool = build_trade_pool(&e1, &instances, &table).unwrap();
+        assert!(e0_pool.entry("夜烟").is_none());
+        assert_eq!(
+            e1_pool.entry("夜烟").unwrap().buff_ids,
+            vec!["trade_ord_spd[001]".to_string()]
+        );
+    }
+
+    #[test]
     fn exusiai_e2_expands_stepwise_buffs() {
         let pool = fixture_pool();
         let ex = pool.entry("能天使").expect("能天使");

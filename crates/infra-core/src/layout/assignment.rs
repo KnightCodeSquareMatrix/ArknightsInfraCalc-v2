@@ -99,11 +99,11 @@ pub struct RoomEfficiencySnapshot {
     /// 社区加强单位产出相对三级普通贸易站的倍率。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_unit_output_multiplier: Efficiency,
-    /// 贸易最终效率；排班与产出预估的正式真源。
+    /// 旧贸易倍率后效率，仅保留供旧快照兼容；排班与 policy 不消费该字段。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     #[serde(skip_serializing)]
     pub trade_final_efficiency: Efficiency,
-    /// 从最终效率反算的等效技能加成。
+    /// 旧倍率后效率反算的等效技能加成；新路径仅用于审计兼容。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_equivalent_skill_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
@@ -151,11 +151,11 @@ pub struct RoomEfficiencySnapshot {
 
 impl RoomEfficiencySnapshot {
     pub fn is_trade(&self) -> bool {
-        !self.trade_final_efficiency.is_zero()
+        !self.trade_total_efficiency.is_zero()
     }
 
     pub fn is_manufacture(&self) -> bool {
-        !self.manufacture_final_efficiency.is_zero()
+        !self.manufacture_total_efficiency.is_zero()
     }
 
     pub fn is_power(&self) -> bool {
@@ -167,12 +167,12 @@ impl RoomEfficiencySnapshot {
     pub fn has_trade_breakdown(&self) -> bool {
         !self.trade_paper_efficiency.is_zero()
             && !self.trade_occupancy_efficiency.is_zero()
-            && !self.trade_final_efficiency.is_zero()
+            && !self.trade_total_efficiency.is_zero()
             && !self.trade_unit_output_multiplier.is_zero()
     }
 
     pub fn has_manufacture_breakdown(&self) -> bool {
-        !self.manufacture_final_efficiency.is_zero()
+        !self.manufacture_total_efficiency.is_zero()
             && !self.manufacture_occupancy_efficiency.is_zero()
     }
 }
@@ -263,6 +263,20 @@ impl BaseAssignment {
         self.set_room(room_id, vec![op]);
     }
 
+    /// Normalize presentation and export order without changing room membership.
+    pub fn sort_room_operators_stably(&mut self) {
+        for room in &mut self.rooms {
+            room.operators.sort_by(|left, right| {
+                left.name
+                    .cmp(&right.name)
+                    .then_with(|| right.elite.cmp(&left.elite))
+                    .then_with(|| right.level.cmp(&left.level))
+                    .then_with(|| right.rarity.cmp(&left.rarity))
+                    .then_with(|| left.work_mood.cmp(&right.work_mood))
+            });
+        }
+    }
+
     pub fn control_operators(&self) -> Vec<AssignedOperator> {
         self.rooms
             .iter()
@@ -306,11 +320,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trade_snapshot_uses_direct_efficiency_only() {
+    fn trade_snapshot_exposes_total_efficiency_separately_from_legacy_final() {
         let snapshot = RoomEfficiencySnapshot {
             trade_final_efficiency: Efficiency::from_decimal(1.907),
+            trade_total_efficiency: Efficiency::from_decimal(1.230),
             ..RoomEfficiencySnapshot::default()
         };
+        assert_eq!(
+            snapshot.trade_total_efficiency,
+            Efficiency::from_millis(1230)
+        );
         assert_eq!(
             snapshot.trade_final_efficiency,
             Efficiency::from_millis(1907)
@@ -323,6 +342,7 @@ mod tests {
             trade_paper_efficiency: Efficiency::from_decimal(1.230),
             trade_unit_output_multiplier: Efficiency::from_decimal(1.550),
             trade_final_efficiency: Efficiency::from_decimal(1.907),
+            trade_total_efficiency: Efficiency::from_decimal(1.230),
             trade_equivalent_skill_efficiency: Efficiency::from_decimal(0.807),
             trade_rule_id: Some("gsl_docus_solo".to_string()),
             ..RoomEfficiencySnapshot::default()
@@ -338,9 +358,34 @@ mod tests {
             Efficiency::from_decimal(1.550)
         );
         assert_eq!(
-            decoded.trade_final_efficiency,
-            Efficiency::from_decimal(1.907)
+            decoded.trade_total_efficiency,
+            Efficiency::from_decimal(1.230)
         );
+        assert_eq!(decoded.trade_final_efficiency, Efficiency::ZERO);
         assert_eq!(decoded.trade_rule_id.as_deref(), Some("gsl_docus_solo"));
+    }
+
+    #[test]
+    fn room_operator_order_is_stable_without_changing_membership() {
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            "trade_1",
+            vec![
+                AssignedOperator::new("银灰", 2),
+                AssignedOperator::new("但书", 2),
+                AssignedOperator::new("孑", 2),
+            ],
+        );
+
+        assignment.sort_room_operators_stably();
+
+        assert_eq!(
+            assignment
+                .operators_in(&RoomId::from("trade_1"))
+                .iter()
+                .map(|operator| operator.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["但书", "孑", "银灰"]
+        );
     }
 }

@@ -211,13 +211,9 @@ fn search_trade_split_stations(
     let ori_report =
         search_trade_single_order(pool, table, &ori_opts, TradeOrderKind::Originium, filter)?;
 
-    let composite_efficiency = gold_report
-        .best
-        .final_efficiency
+    let composite_efficiency = trade_efficiency_sort_key(&gold_report.best)
         .scale_ratio(i64::from(scenario.gold_order_stations), 1)
-        + ori_report
-            .best
-            .final_efficiency
+        + trade_efficiency_sort_key(&ori_report.best)
             .scale_ratio(i64::from(scenario.originium_order_stations), 1);
 
     let best = TradeSearchHit {
@@ -248,7 +244,9 @@ fn search_trade_split_stations(
 }
 
 fn trade_efficiency_sort_key(hit: &TradeSearchHit) -> Efficiency {
-    hit.final_efficiency
+    hit.breakdown
+        .as_ref()
+        .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency)
 }
 
 fn search_trade_single_order(
@@ -868,7 +866,7 @@ mod tests {
     }
 
     #[test]
-    fn trade_search_score_is_final_efficiency_sort_key() {
+    fn trade_search_score_is_total_efficiency_sort_key() {
         let hit = TradeSearchHit {
             names: vec!["a".into()],
             gold_names: vec![],
@@ -882,10 +880,14 @@ mod tests {
             breakdown: Some(TradeEfficiencyBreakdown {
                 paper_efficiency: Efficiency::from_decimal(1.230),
                 final_efficiency: Efficiency::from_decimal(1.230),
+                total_efficiency: Efficiency::from_decimal(1.100),
                 ..Default::default()
             }),
         };
-        assert_eq!(trade_efficiency_sort_key(&hit), hit.final_efficiency);
+        assert_eq!(
+            trade_efficiency_sort_key(&hit),
+            Efficiency::from_decimal(1.100)
+        );
         assert_eq!(
             hit.final_efficiency,
             hit.breakdown.as_ref().unwrap().final_efficiency
@@ -1010,8 +1012,10 @@ mod tests {
         assert_eq!(gold.unit_gold_per_day > 0.0, true);
         assert_eq!(ori.unit_originium_per_day > 0.0, true);
         let scenario = TradeStationScenario::standard_three_stations();
-        let expected = f64::from(scenario.gold_order_stations) * gold.final_efficiency.as_f64()
-            + f64::from(scenario.originium_order_stations) * ori.final_efficiency.as_f64();
+        let expected = f64::from(scenario.gold_order_stations)
+            * trade_efficiency_sort_key(gold).as_f64()
+            + f64::from(scenario.originium_order_stations)
+                * trade_efficiency_sort_key(ori).as_f64();
         assert!((report.best.final_efficiency.as_f64() - expected).abs() < 0.001);
     }
 }

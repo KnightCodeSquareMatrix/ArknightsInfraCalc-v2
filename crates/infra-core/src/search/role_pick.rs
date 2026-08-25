@@ -12,7 +12,7 @@ use crate::trade::segment::{segment_producer_active, trade_segment_cache};
 use super::trade::{
     hit_blackkey_closure_shortcut, hit_closure_shortcut, hit_docus_solo_shortcut,
     hit_witch_shortcut, search_trade_triples, search_trade_triples_filtered, SearchTripleFilter,
-    TradeSearchHit, TradeSearchOptions,
+    TradeEfficiencyBreakdown, TradeSearchHit, TradeSearchOptions,
 };
 
 const KARLAN_TRADE_NAMES: &[&str] = &["银灰", "崖心", "讯使", "角峰"];
@@ -277,7 +277,9 @@ fn pick_disjoint_trade_hit(
 }
 
 fn role_pick_sort_key(hit: &TradeSearchHit) -> Efficiency {
-    hit.final_efficiency
+    hit.breakdown
+        .as_ref()
+        .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency)
 }
 
 fn trade_hit_names(hit: &TradeSearchHit) -> &[String] {
@@ -295,7 +297,7 @@ mod tests {
     use super::*;
     use crate::instances::{default_instances_path, OperatorInstances};
     use crate::layout::LayoutContext;
-    use crate::pool::build_trade_pool;
+    use crate::pool::{add_jie_market_to_trade_pool, build_trade_pool};
     use crate::roster::Roster;
     use crate::skill_table::{default_skill_table_path, SkillTable};
     use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
@@ -529,6 +531,67 @@ mod tests {
     }
 
     #[test]
+    fn trade_role_comparison_uses_total_efficiency_not_docus_output_multiplier() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [
+                ("但书", 2),
+                ("德克萨斯", 2),
+                ("拉普兰德", 2),
+                ("孑", 2),
+                ("银灰", 2),
+                ("琳琅诗怀雅", 2),
+            ]
+            .into_iter()
+            .map(|(name, elite)| (name.to_string(), elite))
+            .collect::<HashMap<_, _>>(),
+        );
+        let mut pool = build_trade_pool(&roster, &instances, &table).unwrap();
+        add_jie_market_to_trade_pool(&mut pool, &instances, &table);
+        let mut layout = LayoutContext::search_baseline();
+        layout.global_inject.record_karlan_precision(-15.0, 6);
+
+        let docus = search_trade_triples_filtered(
+            &pool,
+            &table,
+            &gold_opts(&layout),
+            SearchTripleFilter {
+                must_include_names: vec!["但书".into(), "德克萨斯".into(), "拉普兰德".into()],
+                ..SearchTripleFilter::default()
+            },
+        )
+        .unwrap()
+        .best;
+        let karlan = search_trade_triples_filtered(
+            &pool,
+            &table,
+            &gold_opts(&layout),
+            SearchTripleFilter {
+                must_include_names: vec!["孑".into(), "银灰".into(), "琳琅诗怀雅".into()],
+                ..SearchTripleFilter::default()
+            },
+        )
+        .unwrap()
+        .best;
+
+        assert_eq!(
+            docus.breakdown.as_ref().unwrap().total_efficiency,
+            Efficiency::from_decimal(1.680)
+        );
+        assert_eq!(
+            karlan.breakdown.as_ref().unwrap().total_efficiency,
+            Efficiency::from_decimal(2.320)
+        );
+        assert!(
+            karlan.breakdown.as_ref().unwrap().total_efficiency
+                > docus.breakdown.as_ref().unwrap().total_efficiency,
+            "karlan={karlan:?} docus={docus:?}"
+        );
+        assert!(docus.final_efficiency > karlan.final_efficiency);
+    }
+
+    #[test]
     fn penguin_role_can_pick_texas_lappland_bond() {
         let (pool, table, layout) =
             fixtures(&[("德克萨斯", 2), ("拉普兰德", 2), ("空", 2), ("古米", 2)]);
@@ -549,7 +612,7 @@ mod tests {
     }
 
     #[test]
-    fn docus_role_naturally_selects_syracusa_when_final_efficiency_wins() {
+    fn docus_role_naturally_selects_syracusa_when_total_efficiency_wins() {
         let (pool, table, mut layout) = fixtures(&[
             ("但书", 2),
             ("伺夜", 2),
@@ -600,22 +663,25 @@ mod tests {
         .unwrap();
 
         assert!(hit.names.iter().any(|name| name == "但书"), "{hit:?}");
-        assert_eq!(hit.rule_id.as_deref(), Some("gsl_docus_solo"));
+        assert_eq!(hit.rule_id.as_deref(), Some("gsl_docus_solo_e0"));
     }
 
     #[test]
-    fn role_pick_uses_final_efficiency_instead_of_raw_unit_output() {
+    fn role_pick_uses_total_efficiency_instead_of_unit_output_multiplier() {
         let hit = |score: f64, unit_trade_per_day: f64| TradeSearchHit {
             names: vec![format!("score-{score}")],
             gold_names: vec![],
             originium_names: vec![],
-            final_efficiency: Efficiency::from_decimal(score),
+            final_efficiency: Efficiency::from_decimal(score * unit_trade_per_day / 10_000.0),
             mechanic_equivalent_efficiency: Efficiency::ZERO,
             rule_id: None,
             unit_trade_per_day,
             unit_gold_per_day: 0.0,
             unit_originium_per_day: 0.0,
-            breakdown: Some(Default::default()),
+            breakdown: Some(TradeEfficiencyBreakdown {
+                total_efficiency: Efficiency::from_decimal(score),
+                ..Default::default()
+            }),
         };
         let high_unit_low_final = hit(1.8, 20_000.0);
         let low_unit_high_final = hit(2.1, 12_000.0);

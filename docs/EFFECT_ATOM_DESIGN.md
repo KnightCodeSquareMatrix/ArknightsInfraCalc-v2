@@ -239,6 +239,10 @@ L3 组合短路：shortcut + trade_shortcuts.json（表化最优解）
 - `scope: room`（默认）— 现有行为，per-room 求解执行
 - `scope: global` — 由新建的 `cross_facility/` 编排层统一执行，per-room 求解跳过（避免重复计数）
 
+**用户裁决（2026-08-25）**：Global atom 只由全局层执行一次；per-room 不重复执行，
+也不采用“执行后从 room snapshot 扣回”的过渡模型。Global `StateConvert` 是否允许以及
+其资源消耗语义仍需独立裁决；当前数据未发现 Global `StateConvert` 实例。
+
 ```
 resolve_base 执行顺序（新增阶段 5）:
 
@@ -290,7 +294,7 @@ resolve_base 执行顺序（新增阶段 5）:
 |------|------|------|
 | **P1** | 基础设施部署（`AtomScope` + `cross_facility/` + `resolve.rs` 集成） | ✅ 已完成 |
 | **P2** | 迁移 resolve.rs 硬编码到 scope=global atom（乌有/森西/爱丽丝/车尔尼/絮雨） | ⬜ 待做 |
-| **P3** | 删除 resolve.rs 旧硬编码函数 + room_layout 扣回 | ⬜ 待做 |
+| **P3** | 删除 resolve.rs 旧硬编码函数 + per-room Global atom 执行/扣回路径 | ⬜ 待做 |
 
 P2 迁移示例：在 `skill_table.json` 中乌有的 `trade_ord_spd_bd_n2[000]` 的 `state_write` atom 加 `"scope": "global"` 后，`cross_facility` 自动执行该 atom 写入全局池，然后从 `resolve.rs` 删除 `apply_wuyou_human_fireworks_baseline` 函数即可。
 

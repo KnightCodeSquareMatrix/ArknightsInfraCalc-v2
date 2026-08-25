@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "source_repo": "yuanyan3060/ArknightsGameResource",
+  "mappings": [
+    {
+      "operator": "祐天寺若麦",
+      "facility": "control",
+      "local_buff_id": "control_hire_spd&bd2[000]",
+      "source_buff_id": "control_meeting_spd&bd[000]",
+      "status": "accepted",
+      "note": "本地 atom 与上游 phase 0 效果对应"
+    },
+    {
+      "operator": "祐天寺若麦",
+      "facility": "control",
+      "local_buff_id": "control_mp_cost&bd3[010]",
+      "source_buff_id": "control_mp&meet_spd[000]",
+      "status": "accepted",
+      "note": "本地 atom 与上游 phase 2 效果对应"
+    },
+    {
+      "operator": "絮雨",
+      "facility": "office",
+      "local_buff_id": "office_memory_fragment[000]",
+      "source_buff_id": "hire_spd_bd_n1[000]",
+      "status": "pending",
+      "note": "本地 office 命名与上游 HIRE 命名不同"
+    },
+    {
+      "operator": "絮雨",
+      "facility": "office",
+      "local_buff_id": "office_rec_spd[000]",
+      "source_buff_id": "hire_spd_bd_n1_n1[100]",
+      "status": "pending",
+      "note": "本地 office 命名与上游 HIRE 命名不同"
+    },
+    {
+      "operator": "闪击",
+      "facility": "office",
+      "local_buff_id": "office_rec_spd[000]",
+      "source_buff_id": "hire_spd_blitz[000]",
+      "status": "accepted",
+      "note": "本地 atom 与上游 phase 2 效果对应"
+    },
+    {
+      "operator": "雷狼龙S空爆",
+      "facility": "trade",
+      "local_buff_id": "trade_ord_spd3&catap2[000]",
+      "source_buff_id": "trade_ord_spd[022]",
+      "status": "accepted",
+      "note": "本地 trade atom 与上游 phase 2 的 35% 效果对应"
+    },
+    {
+      "operator": "海蒂",
+      "facility": "trade",
+      "local_buff_id": "trade_ord_spd&multiPar[000]",
+      "source_buff_id": "trade_ord_spd[000]",
+      "status": "accepted",
+      "note": "本地 trade atom 与上游 phase 0 的 20% 效果对应"
+    }
+  ]
+}

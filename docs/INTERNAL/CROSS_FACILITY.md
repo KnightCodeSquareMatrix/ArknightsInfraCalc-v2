@@ -60,15 +60,21 @@ resolve_base()
 全基建共享读取状态，不在此扣减；无声共鸣、思维链环、巫术结晶等换算由对应
 consumer 的房间 interpreter 局部完成，因此多个 consumer 可读取同一份全量状态。
 
+**用户裁决（2026-08-25）**：`scope=Global` 的 atom 由 `cross_facility` 全局执行一次；
+per-room interpreter 不再执行 Global atom，也不再通过 `room_layout_for_*` 扣回全局贡献。
+Global `StateConvert` 的具体允许范围和是否进入消耗式转换仍待单独裁决；当前数据未发现
+Global `StateConvert` 实例。
+
 - `resolve.rs` 中 `apply_perception_producers` 已删除；其余硬编码迁移进行中。
-- per-room 求解仍会执行 scope=Room 的 atom（含 scope=Global 的 StateProduce 副本），`room_layout_for_*` 函数扣回全局已计数的部分。
+- per-room 求解只执行 `scope=Room` 的 atom；Global atom 不进入房间解释器。
 
 ## 迁移步骤（按干员）
 
 1. 在 `skill_table.json` 中的对应 atom 加 `"scope": "global"`（仅 `StateWrite` atom）
 2. 从 `resolve.rs` 删除对应的硬编码函数（`apply_wuyou_human_fireworks_baseline` 等）
-3. 更新 `room_layout_for_trade` / `room_layout_for_manu` 扣回逻辑（从按名扣回改为 scope=Global atom 检测）
-4. `cargo test -p infra-core` + `cargo run -p infra-cli -- verify --all`
+3. 删除或改写 `room_layout_for_trade` / `room_layout_for_manu` 中针对 Global atom 的扣回路径
+4. 在 trade/manufacture interpreter 中跳过 `scope=Global` atom
+5. `cargo test -p infra-core` + `cargo run -p infra-cli -- verify --all`
 
 ## 当前已标记 scope=Global 的干员
 

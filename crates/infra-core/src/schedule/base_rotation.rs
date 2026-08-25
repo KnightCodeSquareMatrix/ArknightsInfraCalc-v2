@@ -33,7 +33,7 @@ pub struct RoomEfficiencyLine {
     /// Paper total before an order-specific multiplier is applied.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub total_efficiency: Efficiency,
-    /// Actual efficiency after an order-specific multiplier.
+    /// Legacy compatibility field; current direct efficiency is `total_efficiency`.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     #[serde(skip_serializing)]
     pub final_efficiency: Efficiency,
@@ -162,8 +162,8 @@ pub fn evaluate_base_assignment_efficiencies(
             .efficiency_in(&room.id)
             .filter(|s| s.has_trade_breakdown())
         {
-            trade_efficiency += snapshot.trade_final_efficiency;
-            line.trade_efficiency = snapshot.trade_final_efficiency;
+            trade_efficiency += snapshot.trade_total_efficiency;
+            line.trade_efficiency = snapshot.trade_total_efficiency;
             line.trade_skill_efficiency = snapshot.trade_skill_efficiency;
             line.operator_efficiency = snapshot.trade_skill_efficiency;
             line.base_efficiency = snapshot.trade_base_efficiency;
@@ -174,7 +174,7 @@ pub fn evaluate_base_assignment_efficiencies(
                 snapshot.trade_unit_output_multiplier
             };
             line.total_efficiency = snapshot.trade_paper_efficiency;
-            line.final_efficiency = snapshot.trade_final_efficiency;
+            line.final_efficiency = snapshot.trade_total_efficiency;
             line.trade_output_per_day = snapshot.trade_output_per_day;
             line.gold_consumption_per_day = snapshot.gold_consumption_per_day;
             line.originium_shards_per_day = snapshot.trade_originium_shards_per_day;
@@ -188,7 +188,7 @@ pub fn evaluate_base_assignment_efficiencies(
                 snapshot.trade_occupancy_efficiency + snapshot.trade_control_efficiency
             };
             line.equivalent_efficiency =
-                snapshot.trade_final_efficiency - Efficiency::ONE - line.station_efficiency;
+                snapshot.trade_total_efficiency - Efficiency::ONE - line.station_efficiency;
         } else if !room.operators.is_empty() {
             let input = TradeRoomInput {
                 level: room.level,
@@ -202,14 +202,14 @@ pub fn evaluate_base_assignment_efficiencies(
                 active_order_kind: room.order,
             };
             let result = solve_trade_with_shift(&input, table, shift_hours)?;
-            trade_efficiency += result.efficiency.final_efficiency;
-            line.trade_efficiency = result.efficiency.final_efficiency;
+            trade_efficiency += result.efficiency.total_efficiency;
+            line.trade_efficiency = result.efficiency.total_efficiency;
             line.trade_skill_efficiency = result.efficiency.paper.skill_efficiency;
             line.operator_efficiency = result.efficiency.paper.skill_efficiency;
             line.base_efficiency = result.efficiency.paper.base_efficiency;
             line.global_efficiency = result.efficiency.paper.control_efficiency;
             line.total_efficiency = result.efficiency.paper.paper_efficiency;
-            line.final_efficiency = result.efficiency.final_efficiency;
+            line.final_efficiency = result.efficiency.total_efficiency;
             line.trade_output_per_day = result.production.unit.unit_trade_per_day
                 * result.efficiency.total_efficiency.as_f64();
             line.gold_consumption_per_day = result.production.unit.gold_consumption_per_day
@@ -223,7 +223,7 @@ pub fn evaluate_base_assignment_efficiencies(
                 + result.efficiency.paper.control_efficiency;
             line.order_multiplier = result.efficiency.production_basis.unit_output_multiplier;
             line.equivalent_efficiency =
-                result.efficiency.final_efficiency - Efficiency::ONE - line.station_efficiency;
+                result.efficiency.total_efficiency - Efficiency::ONE - line.station_efficiency;
         }
         room_lines.push(line);
     }
@@ -239,8 +239,8 @@ pub fn evaluate_base_assignment_efficiencies(
             .efficiency_in(&room.id)
             .filter(|s| s.has_manufacture_breakdown())
         {
-            manufacture_efficiency += snapshot.manufacture_final_efficiency;
-            line.manufacture_efficiency = snapshot.manufacture_final_efficiency;
+            manufacture_efficiency += snapshot.manufacture_total_efficiency;
+            line.manufacture_efficiency = snapshot.manufacture_total_efficiency;
             line.manufacture_skill_efficiency = snapshot.manufacture_skill_efficiency;
             line.operator_efficiency = snapshot.manufacture_skill_efficiency;
             line.base_efficiency = snapshot.manufacture_base_efficiency;
@@ -250,13 +250,13 @@ pub fn evaluate_base_assignment_efficiencies(
             line.station_efficiency = if snapshot.manufacture_occupancy_efficiency.is_zero()
                 && snapshot.manufacture_global_efficiency.is_zero()
             {
-                snapshot.manufacture_final_efficiency - Efficiency::ONE - line.operator_efficiency
+                snapshot.manufacture_total_efficiency - Efficiency::ONE - line.operator_efficiency
             } else {
                 snapshot.manufacture_occupancy_efficiency + snapshot.manufacture_global_efficiency
             };
             line.total_efficiency =
                 Efficiency::ONE + line.operator_efficiency + line.station_efficiency;
-            line.final_efficiency = snapshot.manufacture_final_efficiency;
+            line.final_efficiency = snapshot.manufacture_total_efficiency;
             line.equivalent_efficiency =
                 line.manufacture_efficiency - Efficiency::ONE - line.station_efficiency;
         } else if !room.operators.is_empty() {

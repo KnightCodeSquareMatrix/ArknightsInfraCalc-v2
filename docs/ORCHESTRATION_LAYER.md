@@ -181,10 +181,10 @@ Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 �
 
 贸易金单余站按 `pick_trade_meta_then_plain` 尝试：
 
-1. 一贸龙门币布局由可露希尔 required anchor 先占位；多贸龙门币布局由但书 required anchor 先占位。核心所在房的其余位置按 `final_efficiency` 搜索；`gsl_docus_solo` / `gsl_docus_syracusa` 只结算实际组合。
+1. 一贸龙门币布局由可露希尔 required anchor 先占位；多贸龙门币布局由但书 required anchor 先占位。核心所在房的其余位置按 `total_efficiency` 搜索；`gsl_docus_solo` / `gsl_docus_syracusa` 只结算实际组合。
 2. 默认多贸龙门币的第二核心是 `closure`：`gsl_blackkey_closure` 优先；否则 `gsl_closure_*`；否则包含可露希尔的最高可用组合。可露希尔优先进入剩余的最高等级金单站。
 3. 默认第三核心是 `witch`：必须同时包含精二巫恋、已持有龙舌兰并进入三级金单站；精二龙舌兰优先裁缝 β/α，精0/精1允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank`，其他普通 blank shortcut 不进入自动 role。
-4. `witch_fallback` / `karlan` / `penguin` / plain：无龙舌兰巫恋兜底、灵知孑、企鹅、散件工具人三人组，且排除黑键与巫恋同房冲突。格拉斯哥成员作为普通合法候选参与实际 `final_efficiency` 搜索。
+4. `witch_fallback` / `karlan` / `penguin` / plain：无龙舌兰巫恋兜底、灵知孑、企鹅、散件工具人三人组，且排除黑键与巫恋同房冲突。格拉斯哥成员作为普通合法候选参与实际 `total_efficiency` 搜索。
 
 Rosemary/黑键体系 alternative 激活时，在选定 alternative 的同一 Plan 决策中把双贸易站
 peak 固定为但书 A + 可露希尔/黑键 B，并让完整龙巫进入 γ reserve。该特殊 packing 增加

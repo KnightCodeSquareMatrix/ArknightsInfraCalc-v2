@@ -36,6 +36,7 @@
 | 接入 Worker / BFF | [前端对接说明](FRONTEND_CLI.md) | `plan.compute` 请求响应与兼容契约 |
 | 部署长驻服务 | [前端 serve 指南](FRONTEND_SERVE_GUIDE.md) | 启动、探活、超时和部署操作 |
 | 构建发布包 | [release README](../release/README.md) | 发布目录、构建脚本和发布夹具 |
+| 更新 quality-check CLI | [quality-check CLI 更新规则](QUALITY_CHECK_CLI_UPDATE.md) | 构建、验证、上传和远端 bundle 验收 |
 | 使用练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) | 玩家产品语义、结构化输出与旧 v2 诊断边界 |
 
 命令的当前参数以生成/runtime help 和 [INFRA_CLI.md](INFRA_CLI.md) 为准；前端不得从示例输出反推长期 wire schema。
@@ -133,6 +134,8 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 | [ADR 0004: 体系审计裁决与排班责任边界](ADR/0004-scheduling-semantics-audit-rulings.md) | `accepted` | 保存 2026-07 体系审计中确认的领域语义、排班事实所有权与动态 producer 范围 |
 | [ADR 0005: 定时换班语义审计裁决与修复边界](ADR/0005-timed-rotation-semantics-audit-rulings.md) | `accepted` | 保存定时换班连续工作、菲亚执行边界及宿舍、办公室、菲亚目标、调试与无人机偏离的审计裁决 |
 | [ADR 0006: 二班与深海轮换的缺员容错与终验契约](ADR/0006-rotation-shortfall-tolerance-and-validation.md) | `accepted` | 裁决 `main_backup_12_12` 与 `abyssal_7_5_7_5` 的主备求解、办公室与会客室缺员容错、绑定终验、warnings 输出及 ABC 全 profile 一致性 |
+| [ADR 0007: 回退恢复后的中枢与二发电事实边界](ADR/0007-regression-recovery-control-and-two-power-boundaries.md) | `accepted` | 恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界 |
+| [ADR 0008: 办公室连续工作时长预算与通用轮换准入](ADR/0008-office-continuous-work-budget.md) | `proposed` | 规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则 |
 <!-- END GENERATED DECISIONS -->
 
 ## 6. 开发与项目治理

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "instances": {
+    "shadow_trade@tier_up": { "name": "shadow_trade", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_shadow_trade"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_shadow_trade"], "stepwise": false } } },
+    "trade_backup@tier_up": { "name": "trade_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_trade_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_trade_backup"], "stepwise": false } } },
+    "manu_backup_for_trade@tier_up": { "name": "manu_backup_for_trade", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_manu_backup_for_trade"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_manu_backup_for_trade"], "stepwise": false } } },
+    "shadow_manu@tier_up": { "name": "shadow_manu", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_shadow_manu"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_shadow_manu"], "stepwise": false } } },
+    "trade_backup_for_manu@tier_up": { "name": "trade_backup_for_manu", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_trade_backup_for_manu"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_trade_backup_for_manu"], "stepwise": false } } },
+    "manu_backup@tier_up": { "name": "manu_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_manu_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_manu_backup"], "stepwise": false } } },
+    "shadow_tie@tier_up": { "name": "shadow_tie", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_shadow_tie"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_shadow_tie"], "stepwise": false } } },
+    "tie_trade_backup@tier_up": { "name": "tie_trade_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_tie_trade_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_tie_trade_backup"], "stepwise": false } } },
+    "tie_manu_backup@tier_up": { "name": "tie_manu_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_tie_manu_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_tie_manu_backup"], "stepwise": false } } },
+    "shadow_multi_alpha@tier_up": { "name": "shadow_multi_alpha", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_shadow_multi_alpha"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_shadow_multi_alpha"], "stepwise": false } } },
+    "shadow_multi_beta@tier_up": { "name": "shadow_multi_beta", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_shadow_multi_beta"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_shadow_multi_beta"], "stepwise": false } } },
+    "multi_trade_backup@tier_up": { "name": "multi_trade_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_multi_trade_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_multi_trade_backup"], "stepwise": false } } },
+    "multi_manu_backup@tier_up": { "name": "multi_manu_backup", "tier": "tier_up", "facilities": { "trade": { "buff_ids": ["test_trade_multi_manu_backup"], "stepwise": false }, "manufacture": { "buff_ids": ["test_manu_multi_manu_backup"], "stepwise": false } } }
+  }
+}

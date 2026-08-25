@@ -34,6 +34,7 @@
 | 练卡推荐**玩家**语义、名单、组合知识、输出口径、`--answer` 产品行为 | `arknights-feature` 或 `arknights-maintenance` + 先读 `docs/练卡推荐相关/README.md`，再完整读题面相关 canonical（新手/口径/组合/散件/审阅稿） |
 | 练卡推荐**旧 v2 机器诊断**（`training_recommendations.json`、旧 now/conditional 过滤） | 仅兼容/对照；真源已归档见 `docs/ARCHIVE/superseded/练卡推荐规则_v2机器诊断合同.md`；不得用其覆盖 `docs/练卡推荐相关/` |
 | 公孙长乐练卡知识/名单验收、与旧规则表对照 | `gongsun-training-review` |
+| 建筑技能解锁阶段、`tier_0/tier_up`、`operator_instances` 设施绑定审计 | `arknights-building-skill-audit` |
 
 debug / feature / quality Skill 是任务意图的 primary owner；`arknights-system-audit` 和 `arknights-evidence` 在触发时作为附加审计 / 证据协议，不接管任务目标与 scope。
 
@@ -72,6 +73,27 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 代码变化不自动要求文档变化；只在行为语义、接口、持久决策或活动任务状态改变时更新最近的 owner。不得维护摘要复核传播或全仓 docs-impact 声明。
 - 新增面向人类阅读的文档时优先使用清晰的中文文件名；协议固定名、工具约定、代码生成物或外部兼容路径可保留英文。不要仅为改名批量移动现有文档。
 - 新建或恢复 `docs/TODO/` 任务时遵循 `docs/文档生命周期.md`；`docs/TODO/README.md` 只是生成的活动入口，不另行裁决状态。
+
+### Workflow、checkpoint 与 memory 路由
+
+Agent workflow 采用 [AI 编排与 Harness 讨论记录](docs/AI编排与Harness讨论记录.md) 第 8.3 节的已讨论模型，不在此重新发明一套状态机：
+
+```text
+bootstrap_context → classify_task → route_domain_owner → plan / plan-review
+→ parallel research/review → join findings → select one implementation unit
+→ single-writer executor → deterministic evidence verification
+→ fresh-context review → final verification → checkpoint → memory capture → report
+```
+
+维护行为沿用 MiMo/Claude 分析中的分层边界：
+
+- `checkpoint` 记录当前任务、已完成步骤、失败尝试、待处理结果和恢复所需上下文；长任务优先更新 checkpoint，不要求主 Agent 在 debug 中同时维护百科式 memory。
+- `project memory` 只保存跨任务稳定有用的偏好、纠正、导航、进度和候选记忆；`task progress` 保存单任务进度；scratch notes 不晋升为事实。
+- 领域语义、用户裁决、当前实现、架构决策和活动任务仍必须进入版本化 canonical、ADR 或 active-change；memory 不能覆盖它们，也不能成为第二真源。
+- 重复出现且经验证的工作流才沉淀为 skill、command、agent 或 SOP；一次性经验保留为 checkpoint/候选 memory，不自动固化。
+- 当前没有已验证的项目 memory backend 或独立 checkpoint writer 时，不创建隐式 `MEMORY.md` 或伪造自动晋升；把候选内容写入有生命周期的任务/决策文档，并明确标记其状态。
+
+每个实际调查、决策或写入任务结束前，按上述 workflow 做一次维护收尾：检查最近 owner、checkpoint、候选 memory、deferred findings 和未验证风险；文档状态和归档严格服从 `docs/文档生命周期.md`。纯局部实现、测试补充和临时导航不强制新增文档。
 
 ## 4. 核心分层边界
 

@@ -60,7 +60,9 @@ total_efficiency   = base_efficiency + global_efficiency + skill_efficiency
 output = unit_output_per_day × total_efficiency × work_time / 24
 ```
 
-`final_efficiency` 不再出现在公开 JSON/CLI 协议；内部 Rust 排序仍复用同一数值，但公开字段统一命名为 `total_efficiency`。
+`final_efficiency` 不再出现在公开 JSON/CLI 协议；贸易候选排序使用不含特殊单位产出倍率的
+`total_efficiency`。特殊组合的单位产出倍率只通过 `unit_output_per_day × total_efficiency`
+进入实际产出，不得改变房间总效率排序。
 
 ### 3.2 贸易
 

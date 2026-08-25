@@ -10,23 +10,28 @@ use std::collections::HashSet;
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::BaseAssignment;
-use crate::layout::blueprint::BaseBlueprint;
+use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomProduct};
 use crate::layout::orchestrate::{execute_plan, AssignmentPlan};
 use crate::layout::shift::AssignShiftMode;
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
-    build_power_pool, build_trade_pool, karlan_precision_active, ControlPool, PowerPool, TradePool,
+    build_power_pool, build_trade_pool, jie_e0_trade_operator, karlan_precision_active,
+    ControlPool, PowerPool, TradePool,
 };
 use crate::scoring::{evaluate_trade_manufacture_weighted_efficiency, ScoringPolicyId};
 use crate::search::{
     control_entry_deferred_trade_tags, control_inject_policy_sort_key_for_assignment,
-    control_inject_policy_sort_key_upper_bound,
+    control_inject_policy_sort_key_upper_bound, ManuSearchHit, TradeSearchHit,
 };
 use crate::skill_table::SkillTable;
 
+use super::commit::{commit_manu_room, commit_trade_room};
 use super::control_fill::{assign_control, assign_control_matching_dynamic_set};
-use super::manufacture_fill::{assign_manufacture_lines, refresh_manufacture_efficiency_snapshots};
+use super::manufacture_fill::{
+    assign_manufacture_lines, manu_options, manufacture_candidate_pool_for_demand, pick_manu_hit,
+    refresh_manufacture_efficiency_snapshots,
+};
 use super::power_fill::assign_power_stations;
 use super::producer_fill::{
     assign_dorm_producers, assign_sphinx_urrbian_dorm_anchor,
@@ -34,7 +39,8 @@ use super::producer_fill::{
 };
 use super::run::{AssignmentRun, StageTimer};
 use super::trade_fill::{
-    assign_trade_jie_remainder, assign_trade_remainder, refresh_trade_efficiency_snapshots,
+    assign_trade_jie_remainder, assign_trade_remainder, pick_trade_meta_then_plain,
+    refresh_trade_efficiency_snapshots, take_next_trade_room, trade_order_from_room,
 };
 use super::{inject_search_anchor_pool_entries, tag_pool_from_plan, AssignBaseOptions};
 
@@ -194,30 +200,51 @@ fn run_shift_pipeline_with_producer_pruning(
             if karlan_precision_active(&layout.global_inject) {
                 add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
             }
-            assign_trade_jie_remainder(
-                blueprint,
-                &trade_pool,
-                table,
-                instances,
-                gold_lines,
-                options,
-                Some(run.durin_plan),
-                &mut run.assignment,
-                &mut run.used,
-            )?;
+            let shadow_allowed = karlan_precision_active(&layout.global_inject)
+                || jie_e0_trade_operator(instances, table).is_none();
+            let shadow_assignment = if shadow_allowed {
+                apply_shadow_trade_manufacture_pair(
+                    &run,
+                    plan,
+                    &trade_pool,
+                    &manu_pool,
+                    gold_lines,
+                    &forbid_same_room,
+                    AssignShiftMode::Recovery,
+                )?
+            } else {
+                None
+            };
+            if let Some((assignment, used)) = shadow_assignment {
+                run.assignment = assignment;
+                run.used = used;
+            } else {
+                assign_trade_jie_remainder(
+                    blueprint,
+                    &trade_pool,
+                    table,
+                    instances,
+                    gold_lines,
+                    options,
+                    Some(run.durin_plan),
+                    &mut run.assignment,
+                    &mut run.used,
+                )?;
+                let layout = run.resolve_snapshot(true)?;
+                assign_manufacture_lines(
+                    blueprint,
+                    operbox,
+                    instances,
+                    &manu_pool,
+                    table,
+                    &layout,
+                    options,
+                    &forbid_same_room,
+                    &mut run.assignment,
+                    &mut run.used,
+                )?;
+            }
             timer.mark("trade孑余站");
-            assign_manufacture_lines(
-                blueprint,
-                operbox,
-                instances,
-                &manu_pool,
-                table,
-                &layout,
-                options,
-                &forbid_same_room,
-                &mut run.assignment,
-                &mut run.used,
-            )?;
             timer.mark("制造");
             assign_power_stations(
                 blueprint,
@@ -260,12 +287,479 @@ fn run_shift_pipeline_with_producer_pruning(
     )?;
     timer.mark("会客室");
 
+    run.assignment.sort_room_operators_stably();
+
     timer.report();
     Ok(run.assignment)
 }
 
 fn producer_pruning_enabled(requested: bool, policy: ScoringPolicyId) -> bool {
     requested && policy == ScoringPolicyId::ControlInjectRawSumV0
+}
+
+/// Compare the two non-cartesian assignments of the first pair of empty
+/// production rooms. The base assignment is never mutated until a winner is
+/// available, so the physical `used` set remains authoritative.
+#[allow(clippy::too_many_arguments)]
+fn apply_shadow_trade_manufacture_pair(
+    run: &AssignmentRun<'_>,
+    plan: &AssignmentPlan,
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+    mode: AssignShiftMode,
+) -> Result<Option<(BaseAssignment, HashSet<String>)>> {
+    if !has_shadow_candidate_overlap(trade_pool, manu_pool, &run.used) {
+        return Ok(None);
+    }
+
+    let trade_first = shadow_full_branch(
+        run,
+        trade_pool,
+        manu_pool,
+        gold_lines,
+        forbid_same_room,
+        plan,
+        mode,
+        true,
+    );
+    let manu_first = shadow_full_branch(
+        run,
+        trade_pool,
+        manu_pool,
+        gold_lines,
+        forbid_same_room,
+        plan,
+        mode,
+        false,
+    );
+
+    let winner = match (trade_first, manu_first) {
+        (Ok(trade), Ok(manu)) => {
+            if trade.score_millis >= manu.score_millis {
+                trade
+            } else {
+                manu
+            }
+        }
+        (Ok(trade), Err(_)) => trade,
+        (Err(_), Ok(manu)) => manu,
+        (Err(trade_error), Err(manu_error)) => {
+            return Err(Error::msg(format!(
+                "shadow pair has no feasible disjoint branch: trade-first={trade_error}; manufacture-first={manu_error}"
+            )))
+        }
+    };
+    Ok(Some((winner.assignment, winner.used)))
+}
+
+fn has_shadow_candidate_overlap(
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    used: &HashSet<String>,
+) -> bool {
+    let manu_names: HashSet<_> = manu_pool
+        .entries
+        .iter()
+        .filter(|entry| !used.contains(&entry.name))
+        .map(|entry| entry.name.as_str())
+        .collect();
+    trade_pool
+        .entries
+        .iter()
+        .any(|entry| !used.contains(&entry.name) && manu_names.contains(entry.name.as_str()))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shadow_full_branch(
+    run: &AssignmentRun<'_>,
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+    plan: &AssignmentPlan,
+    mode: AssignShiftMode,
+    trade_first: bool,
+) -> Result<ShadowBranch> {
+    let mut assignment = run.assignment.clone();
+    let mut used = run.used.clone();
+
+    if trade_first {
+        fill_shadow_trade(
+            run,
+            trade_pool,
+            gold_lines,
+            plan,
+            mode,
+            &mut assignment,
+            &mut used,
+        )?;
+        cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+        fill_shadow_manufacture(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
+    } else {
+        fill_shadow_manufacture(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
+        fill_shadow_trade(
+            run,
+            trade_pool,
+            gold_lines,
+            plan,
+            mode,
+            &mut assignment,
+            &mut used,
+        )?;
+        cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+    }
+
+    settle_shadow_branch(run, assignment, used)
+}
+
+fn fill_shadow_trade(
+    run: &AssignmentRun<'_>,
+    trade_pool: &TradePool,
+    gold_lines: u32,
+    plan: &AssignmentPlan,
+    mode: AssignShiftMode,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    if mode == AssignShiftMode::Recovery {
+        assign_trade_jie_remainder(
+            run.blueprint,
+            trade_pool,
+            run.table,
+            run.instances,
+            gold_lines,
+            run.options,
+            Some(run.durin_plan),
+            assignment,
+            used,
+        )
+    } else {
+        assign_trade_remainder(
+            run.blueprint,
+            trade_pool,
+            run.table,
+            run.instances,
+            gold_lines,
+            run.options,
+            Some(run.durin_plan),
+            &forbid_trade_station_pairs(plan),
+            assignment,
+            used,
+        )
+    }
+}
+
+fn fill_shadow_manufacture(
+    run: &AssignmentRun<'_>,
+    manu_pool: &crate::pool::ManuPool,
+    forbid_same_room: &[(String, String)],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
+    let layout = crate::layout::resolve_base(
+        run.blueprint,
+        assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?
+    .layout;
+    assign_manufacture_lines(
+        run.blueprint,
+        run.operbox,
+        run.instances,
+        manu_pool,
+        run.table,
+        &layout,
+        run.options,
+        forbid_same_room,
+        assignment,
+        used,
+    )
+}
+
+struct ShadowBranch {
+    assignment: BaseAssignment,
+    used: HashSet<String>,
+    score_millis: i64,
+}
+
+fn first_shadow_rooms<'a>(
+    blueprint: &'a BaseBlueprint,
+    assignment: &BaseAssignment,
+    trade_pool: &TradePool,
+    used: &HashSet<String>,
+) -> Option<(
+    &'a crate::layout::blueprint::RoomBlueprint,
+    &'a crate::layout::blueprint::RoomBlueprint,
+)> {
+    let mut trade_rooms: Vec<_> = blueprint
+        .rooms
+        .iter()
+        .filter(|room| {
+            room.kind == FacilityKind::TradePost
+                && room.operator_capacity() > 0
+                && assignment.operators_in(&room.id).is_empty()
+        })
+        .collect();
+    let trade = take_next_trade_room(&mut trade_rooms, trade_pool, assignment, used)?;
+    let manufacture = blueprint
+        .rooms
+        .iter()
+        .filter(|room| {
+            room.kind == FacilityKind::Factory
+                && room.operator_capacity() > 0
+                && assignment.operators_in(&room.id).is_empty()
+                && matches!(
+                    room.product,
+                    Some(RoomProduct::Factory { recipe })
+                        if recipe != crate::types::RecipeKind::All
+                )
+        })
+        .min_by_key(|room| match room.product {
+            Some(RoomProduct::Factory { recipe }) => match recipe {
+                crate::types::RecipeKind::Gold => (0, room.id.0.as_str()),
+                crate::types::RecipeKind::BattleRecord => (1, room.id.0.as_str()),
+                crate::types::RecipeKind::Originium => (2, room.id.0.as_str()),
+                crate::types::RecipeKind::All => (3, room.id.0.as_str()),
+            },
+            _ => (3, room.id.0.as_str()),
+        })?;
+    Some((trade, manufacture))
+}
+
+fn room_recipe(room: &crate::layout::blueprint::RoomBlueprint) -> Result<crate::types::RecipeKind> {
+    match room.product.as_ref() {
+        Some(RoomProduct::Factory { recipe }) if *recipe != crate::types::RecipeKind::All => {
+            Ok(*recipe)
+        }
+        _ => Err(Error::msg(format!(
+            "shadow target factory {} requires a concrete recipe",
+            room.id.0
+        ))),
+    }
+}
+
+fn pick_shadow_manufacture(
+    pool: &crate::pool::ManuPool,
+    table: &SkillTable,
+    options: crate::search::ManuSearchOptions,
+    used: &HashSet<String>,
+) -> Result<ManuSearchHit> {
+    let top_k = options.top_k;
+    let candidate_pool = manufacture_candidate_pool_for_demand(pool, used);
+    pick_manu_hit(&candidate_pool, table, options.clone(), used, top_k)
+        .or_else(|_| pick_manu_hit(pool, table, options, used, top_k))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shadow_trade_first_branch(
+    run: &AssignmentRun<'_>,
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    trade_hit: &TradeSearchHit,
+    trade_room: &crate::layout::blueprint::RoomBlueprint,
+    manu_room: &crate::layout::blueprint::RoomBlueprint,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+    plan: &AssignmentPlan,
+) -> Result<ShadowBranch> {
+    let mut assignment = run.assignment.clone();
+    let mut used = run.used.clone();
+    commit_trade_room(
+        &mut assignment,
+        &trade_room.id,
+        trade_hit,
+        trade_pool,
+        &mut used,
+    )?;
+    let layout = crate::layout::resolve_base(
+        run.blueprint,
+        &assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?
+    .layout;
+    let manu_hit = pick_shadow_manufacture(
+        manu_pool,
+        run.table,
+        manu_options(
+            &layout,
+            run.options,
+            room_recipe(manu_room)?,
+            manu_room.level,
+        ),
+        &used,
+    )?;
+    commit_manu_room(
+        &mut assignment,
+        &manu_room.id,
+        &manu_hit,
+        manu_pool,
+        &mut used,
+    )?;
+    assign_trade_remainder(
+        run.blueprint,
+        trade_pool,
+        run.table,
+        run.instances,
+        gold_lines,
+        run.options,
+        Some(run.durin_plan),
+        &forbid_trade_station_pairs(plan),
+        &mut assignment,
+        &mut used,
+    )?;
+    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+    let manu_layout = crate::layout::resolve_base(
+        run.blueprint,
+        &assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?
+    .layout;
+    assign_manufacture_lines(
+        run.blueprint,
+        run.operbox,
+        run.instances,
+        manu_pool,
+        run.table,
+        &manu_layout,
+        run.options,
+        forbid_same_room,
+        &mut assignment,
+        &mut used,
+    )?;
+    settle_shadow_branch(run, assignment, used)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shadow_manufacture_first_branch(
+    run: &AssignmentRun<'_>,
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    manu_hit: &ManuSearchHit,
+    trade_room: &crate::layout::blueprint::RoomBlueprint,
+    manu_room: &crate::layout::blueprint::RoomBlueprint,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+    plan: &AssignmentPlan,
+) -> Result<ShadowBranch> {
+    let mut assignment = run.assignment.clone();
+    let mut used = run.used.clone();
+    commit_manu_room(
+        &mut assignment,
+        &manu_room.id,
+        manu_hit,
+        manu_pool,
+        &mut used,
+    )?;
+    let layout = crate::layout::resolve_base(
+        run.blueprint,
+        &assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?
+    .layout;
+    let trade_order = trade_order_from_room(trade_room)?;
+    let mut trade_used = used.clone();
+    let trade_hit = pick_trade_meta_then_plain(
+        trade_pool,
+        run.table,
+        &layout,
+        gold_lines,
+        run.options,
+        trade_order,
+        trade_room.level,
+        &mut trade_used,
+        &forbid_trade_station_pairs(plan),
+        &[],
+    )?;
+    commit_trade_room(
+        &mut assignment,
+        &trade_room.id,
+        &trade_hit,
+        trade_pool,
+        &mut used,
+    )?;
+    assign_trade_remainder(
+        run.blueprint,
+        trade_pool,
+        run.table,
+        run.instances,
+        gold_lines,
+        run.options,
+        Some(run.durin_plan),
+        &forbid_trade_station_pairs(plan),
+        &mut assignment,
+        &mut used,
+    )?;
+    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+    let manu_layout = crate::layout::resolve_base(
+        run.blueprint,
+        &assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?
+    .layout;
+    assign_manufacture_lines(
+        run.blueprint,
+        run.operbox,
+        run.instances,
+        manu_pool,
+        run.table,
+        &manu_layout,
+        run.options,
+        forbid_same_room,
+        &mut assignment,
+        &mut used,
+    )?;
+    settle_shadow_branch(run, assignment, used)
+}
+
+fn settle_shadow_branch(
+    run: &AssignmentRun<'_>,
+    mut assignment: BaseAssignment,
+    used: HashSet<String>,
+) -> Result<ShadowBranch> {
+    refresh_manufacture_efficiency_snapshots(
+        run.blueprint,
+        &mut assignment,
+        run.instances,
+        run.table,
+        run.options,
+        Some(run.durin_plan),
+    )?;
+    refresh_trade_efficiency_snapshots(
+        run.blueprint,
+        &mut assignment,
+        run.instances,
+        run.table,
+        run.options,
+        Some(run.durin_plan),
+    )?;
+    let (trade_total, manufacture_total) = trade_manufacture_efficiency_totals(&assignment);
+    let score = evaluate_trade_manufacture_weighted_efficiency(
+        trade_total,
+        manufacture_total,
+        run.options.trade_manufacture_weights,
+    );
+    Ok(ShadowBranch {
+        assignment,
+        used,
+        score_millis: score.sort_key_millis,
+    })
 }
 
 /// 用未占用干员填满所有会客室（每间两人）。
@@ -591,6 +1085,18 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
+    if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
+        &run,
+        plan,
+        &trade_pool,
+        manu_pool,
+        gold_lines,
+        forbid_same_room,
+        AssignShiftMode::Peak,
+    )? {
+        run.assignment = assignment;
+        run.used = used;
+    }
     let remaining_trade_slots: usize = run
         .blueprint
         .rooms
@@ -691,8 +1197,8 @@ fn trade_manufacture_efficiency_totals(
                 return (trade_total, manufacture_total);
             };
             (
-                trade_total + snapshot.trade_final_efficiency,
-                manufacture_total + snapshot.manufacture_final_efficiency,
+                trade_total + snapshot.trade_total_efficiency,
+                manufacture_total + snapshot.manufacture_total_efficiency,
             )
         },
     )
@@ -936,6 +1442,7 @@ mod tests {
             vec![],
             Some(crate::layout::RoomEfficiencySnapshot {
                 trade_final_efficiency: crate::Efficiency::from_decimal(2.125),
+                trade_total_efficiency: crate::Efficiency::from_decimal(1.680),
                 ..Default::default()
             }),
         );
@@ -944,6 +1451,7 @@ mod tests {
             vec![],
             Some(crate::layout::RoomEfficiencySnapshot {
                 manufacture_final_efficiency: crate::Efficiency::from_decimal(3.250),
+                manufacture_total_efficiency: crate::Efficiency::from_decimal(3.250),
                 ..Default::default()
             }),
         );
@@ -959,7 +1467,7 @@ mod tests {
         assert_eq!(
             trade_manufacture_efficiency_totals(&assignment),
             (
-                crate::Efficiency::from_decimal(2.125),
+                crate::Efficiency::from_decimal(1.680),
                 crate::Efficiency::from_decimal(3.250)
             )
         );
@@ -1338,6 +1846,76 @@ mod tests {
             .collect();
         assert_eq!(trade, HashSet::from(["银灰", "崖心", "讯使"]));
         assert!(dependencies.is_empty());
+    }
+
+    fn shadow_fixture_inputs(
+        names: &[&str],
+    ) -> (BaseBlueprint, OperBox, OperatorInstances, SkillTable) {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = root.join("../../data/fixtures/shadow_operator_extreme");
+        let blueprint = BaseBlueprint::load(&fixture.join("layout.json")).unwrap();
+        let operbox = OperBox::from_entries(names.iter().map(|name| e2(name)).collect()).unwrap();
+        let instances =
+            OperatorInstances::load(&root.join("../../data/operator_instances.json")).unwrap();
+        let table = SkillTable::load(&root.join("../../data/skill_table.json")).unwrap();
+        (blueprint, operbox, instances, table)
+    }
+
+    fn shadow_fixture_assignment(mode: AssignShiftMode, names: &[&str]) -> BaseAssignment {
+        let (blueprint, operbox, instances, table) = shadow_fixture_inputs(names);
+        run_shift_pipeline(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &AssignBaseOptions::default(),
+            mode,
+            &BaseAssignment::default(),
+            &AssignmentPlan::recovery(mode),
+        )
+        .unwrap()
+    }
+
+    fn assert_shadow_assignment_is_unique(assignment: &BaseAssignment) {
+        let names: Vec<_> = assignment
+            .rooms
+            .iter()
+            .flat_map(|room| room.operators.iter().map(|operator| operator.name.as_str()))
+            .collect();
+        assert_eq!(
+            names.len(),
+            assignment.operator_names().len(),
+            "duplicate={names:?}"
+        );
+    }
+
+    #[test]
+    fn recovery_shadow_pair_keeps_trade_winner_and_rehomes_manufacture() {
+        let assignment =
+            shadow_fixture_assignment(AssignShiftMode::Recovery, &["夜烟", "卡夫卡", "赫默"]);
+        assert_eq!(
+            assignment.operators_in(&RoomId::from("trade_1"))[0].name,
+            "夜烟"
+        );
+        assert_eq!(
+            assignment.operators_in(&RoomId::from("manu_1"))[0].name,
+            "赫默"
+        );
+        assert_shadow_assignment_is_unique(&assignment);
+    }
+
+    #[test]
+    fn recovery_without_shared_operator_keeps_existing_fill_order() {
+        let assignment = shadow_fixture_assignment(AssignShiftMode::Recovery, &["卡夫卡", "赫默"]);
+        assert_eq!(
+            assignment.operators_in(&RoomId::from("trade_1"))[0].name,
+            "卡夫卡"
+        );
+        assert_eq!(
+            assignment.operators_in(&RoomId::from("manu_1"))[0].name,
+            "赫默"
+        );
+        assert_shadow_assignment_is_unique(&assignment);
     }
 
     #[test]

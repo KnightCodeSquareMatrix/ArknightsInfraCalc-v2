@@ -2284,7 +2284,10 @@ fn apply_single_core_fiammetta_rotation(
     }
     let max_actions = match profile {
         TimedRotationProfile::Abc12_12_12 => 3,
-        TimedRotationProfile::Abc12_6_6 => 2,
+        // The default 12/6/6 ABC cycle has one Fiammetta event at its
+        // S3 -> S1 boundary. Its target-room refresh is handled below by
+        // attach_fiammetta_cycle_boundary; only 12/12/12 may re-search that
+        // room once per 12h shift.
         _ => return Ok(false),
     };
     let cycle_hours: f64 = shifts.iter().map(|shift| shift.duration_hours).sum();
@@ -2411,6 +2414,7 @@ fn apply_single_core_fiammetta_rotation(
                     instances,
                     &shift_options,
                     Some(durin_plan),
+                    &forbidden_names,
                     &mut shift.assignment,
                 ),
                 _ => Err(Error::msg("unsupported Fiammetta continuous core facility")),
@@ -3805,14 +3809,6 @@ fn schedule_abc_rotation(
         .collect();
     let peak_ctrl_set: HashSet<String> = peak_ctrl.iter().cloned().collect();
     let mut system_ctrl_names = system_control_operators(&peak_plan, &peak_ctrl_set);
-    system_ctrl_names.extend(
-        peak_plan
-            .control_candidate_requirements
-            .iter()
-            .flat_map(|requirement| &requirement.candidates)
-            .filter(|name| peak_ctrl.contains(name))
-            .cloned(),
-    );
     system_ctrl_names.extend(
         shift_binds
             .iter()
@@ -9326,6 +9322,18 @@ mod tests {
                 .contains(&action.target),
             "S3 结束时必须由菲亚为下一周期 S1 的目标换心情"
         );
+        let target_team = crate::schedule::team_of_operator(&report, &action.target)
+            .expect("菲亚目标必须属于一个轮换队伍");
+        for shift in &report.shifts {
+            let target_team_active = shift.active_teams.contains(&target_team);
+            assert_eq!(
+                shift.assignment.operator_names().contains(&action.target),
+                target_team_active,
+                "默认 ABC 不得让菲亚目标跨越休息班持续工作: shift={} target={} active={target_team_active}",
+                shift.index + 1,
+                action.target
+            );
+        }
         for shift in &report.shifts {
             let names: Vec<_> = shift
                 .assignment

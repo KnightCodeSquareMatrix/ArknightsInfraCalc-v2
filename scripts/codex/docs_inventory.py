@@ -255,7 +255,7 @@ def render_canonical_table(documents: Iterable[Document]) -> str:
     for document in documents:
         if document.role != "canonical":
             continue
-        link = Path(document.path).relative_to("docs").as_posix()
+        link = Path(document.path).relative_to("docs").as_posix().replace(" ", "%20")
         for domain in document.domains:
             rows.append((domain, document.title, link))
     lines = ["| 领域键 | 权威入口 |", "|---|---|"]
@@ -267,7 +267,7 @@ def render_active_table(documents: Iterable[Document]) -> str:
     rows = [document for document in documents if document.role == "active-change"]
     lines = ["| 文件 | 状态 | 用途 |", "|---|---|---|"]
     for document in sorted(rows, key=lambda item: item.path):
-        link = Path(document.path).name
+        link = Path(document.path).name.replace(" ", "%20")
         lines.append(f"| [{document.title}]({link}) | `{document.status}` | {document.metadata['摘要']} |")
     return "\n".join(lines)
 
@@ -276,7 +276,7 @@ def render_decision_table(documents: Iterable[Document]) -> str:
     rows = [document for document in documents if document.role == "decision"]
     lines = ["| 决策 | 状态 | 摘要 |", "|---|---|---|"]
     for document in sorted(rows, key=lambda item: item.path):
-        link = Path(document.path).relative_to("docs").as_posix()
+        link = Path(document.path).relative_to("docs").as_posix().replace(" ", "%20")
         lines.append(
             f"| [{document.title}]({link}) | `{document.status}` | {document.metadata['摘要']} |"
         )

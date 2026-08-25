@@ -134,7 +134,7 @@ Plan 进一步固定但书 A + 可露希尔/黑键 B，并把完整龙巫 C 交�
 2. `closure`：蓝图实际恰有 1 间贸易站且为龙门币订单时是 required core；多贸时排在但书之后、完整龙巫之前，并优先剩余的最高等级金单站。完整 Rosemary/黑键 alternative 激活时则是该双贸 alternative 的条件 required core。有黑键时可命中 `gsl_blackkey_closure`，缺黑键时仍保留可露希尔。
 3. `witch`：多贸龙门币默认第三核心；必须由精二巫恋 + 已持有的龙舌兰组成并进入三级金单站。龙舌兰精二时优先使用裁缝 β/α；龙舌兰精0/精1允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank` 的低练度排班路径。普通白板和缺少龙舌兰的二人组不得进入自动龙巫站。
 4. `witch_fallback`：无龙舌兰时的巫恋兜底。
-5. `karlan` / `penguin` / plain：灵知孑、企鹅、散件工具人；格拉斯哥成员在这些正常候选中按实际 `final_efficiency` 竞争。
+5. `karlan` / `penguin` / plain：灵知孑、企鹅、散件工具人；格拉斯哥成员在这些正常候选中按实际 `total_efficiency` 竞争。
 
 双贸易站中 Rosemary/黑键已激活，且但书、可露希尔和完整龙巫均可形成时，三个贸易 cohort 定义为：
 

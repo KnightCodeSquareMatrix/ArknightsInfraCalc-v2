@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arknights-infra-calc.local/contracts/research-wave-v0.schema.json",
+  "title": "Research Wave Specialization v0",
+  "description": "Nested specialization carried by an agent-harness-v0 TaskRecord.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "wave_id", "scope", "join_policy", "result_contracts"],
+  "properties": {
+    "protocol_version": {"const": "research-wave-v0"},
+    "wave_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["writes", "private_inputs", "business_commands", "runtime_start", "data_classification"],
+      "properties": {
+        "writes": {"const": false},
+        "private_inputs": {"const": false},
+        "business_commands": {"const": false},
+        "runtime_start": {"const": false},
+        "data_classification": {"const": "public"}
+      }
+    },
+    "join_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "required_children", "fail_closed"],
+      "properties": {
+        "mode": {"const": "all_required"},
+        "required_children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}
+        },
+        "fail_closed": {"const": true}
+      }
+    },
+    "result_contracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["child_id", "required_output"],
+        "properties": {
+          "child_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+          "required_output": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

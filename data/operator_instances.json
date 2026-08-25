@@ -1489,12 +1489,6 @@
             "manu_formula_spd[100]"
           ],
           "stepwise": false
-        },
-        "trade": {
-          "buff_ids": [
-            "trade_ord_spd[001]"
-          ],
-          "stepwise": false
         }
       }
     },
@@ -2529,8 +2523,7 @@
       "facilities": {
         "dorm": {
           "buff_ids": [
-            "dorm_rec_single_power[001]",
-            "dorm_rec_single_power[100]"
+            "dorm_rec_single_power[001]"
           ],
           "stepwise": true
         },
@@ -3257,10 +3250,22 @@
         "dorm": {
           "buff_ids": [
             "dorm_rec_all[012]",
-            "dorm_rec_single[001]",
-            "dorm_rec_single[010]"
+            "dorm_rec_single[001]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "波登可@tier_0": {
+      "name": "波登可",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -4365,10 +4370,6 @@
       "tier": "tier_0",
       "tags": [],
       "facilities": {
-        "control": {
-          "buff_ids": ["control_hire_spd[000]"],
-          "stepwise": false
-        },
         "dorm": {
           "buff_ids": [
             "dorm_rec_single[031]"
@@ -7029,8 +7030,7 @@
       "facilities": {
         "office": {
           "buff_ids": [
-            "hire_spd_cost[100]",
-            "hire_spd_cost[110]"
+            "hire_spd_cost[100]"
           ],
           "stepwise": false
         }

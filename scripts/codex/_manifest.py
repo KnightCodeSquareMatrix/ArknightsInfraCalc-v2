@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import shlex
@@ -69,6 +70,7 @@ def _merge_metadata(manifest: dict[str, Any], metadata: dict[str, Any]) -> None:
         "scope_expansions",
         "side_findings",
         "reviewer",
+        "approval",
     }
     unknown = sorted(set(metadata) - allowed)
     if unknown:
@@ -103,13 +105,26 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
             os.unlink(temporary)
 
 
-def _parse_artifact(value: str, cwd: Path, run_id: str) -> dict[str, str]:
+def _parse_artifact(value: str, cwd: Path, run_id: str, ordinal: int) -> dict[str, str]:
     if "=" not in value:
         raise ValueError(f"artifact must use kind=path syntax: {value!r}")
     kind, path = value.split("=", 1)
     if not kind or not path:
         raise ValueError(f"artifact must use non-empty kind=path syntax: {value!r}")
-    return {"kind": kind, "path": _absolute(path, cwd), "run_id": run_id}
+    absolute = Path(_absolute(path, cwd))
+    digest = hashlib.sha256(absolute.read_bytes()).hexdigest() if absolute.is_file() else ""
+    artifact_id = f"artifact:{run_id}:{ordinal}:{kind}"
+    return {
+        "id": artifact_id,
+        "kind": kind,
+        "path": str(absolute),
+        "sha256": digest,
+        "visibility": "project",
+        "retention": "run",
+        "producer": "scripts/codex/run_evidence.sh",
+        "run_id": run_id,
+        "status": "registered" if digest else "missing",
+    }
 
 
 def _parse_command_json(value: str) -> list[str]:
@@ -132,6 +147,8 @@ def append_run(args: argparse.Namespace) -> None:
             manifest = _read_manifest(manifest_path)
             if manifest.get("task", {}).get("slug") != args.task:
                 raise ValueError("manifest task slug does not match --task")
+            if args.base_sha and manifest.get("task", {}).get("base_sha") != args.base_sha:
+                raise ValueError("manifest base SHA does not match --base-sha")
         else:
             manifest = _empty_manifest(args.task, args.base_sha, cwd, args.started_at)
 
@@ -141,8 +158,12 @@ def append_run(args: argparse.Namespace) -> None:
         if any(run.get("id") == args.run_id for run in manifest.get("runs", [])):
             raise ValueError(f"duplicate run id: {args.run_id}")
 
-        artifacts = [_parse_artifact(value, cwd, args.run_id) for value in args.artifact]
+        artifacts = [_parse_artifact(value, cwd, args.run_id, index) for index, value in enumerate(args.artifact)]
         result = "PASS" if args.exit_code == 0 else "FAIL"
+        input_sha256 = hashlib.sha256(args.inputs.encode("utf-8")).hexdigest()
+        command_sha256 = hashlib.sha256(
+            json.dumps(args.command, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
         run = {
             "id": args.run_id,
             "category": args.category,
@@ -159,7 +180,16 @@ def append_run(args: argparse.Namespace) -> None:
             "log": _absolute(args.log, cwd),
             "status_file": _absolute(args.status_file, cwd),
             "artifacts": artifacts,
+            "input_sha256": input_sha256,
+            "command_sha256": command_sha256,
+            "base_sha": manifest.get("task", {}).get("base_sha", args.base_sha),
         }
+        for artifact in artifacts:
+            artifact.update(
+                base_sha=run["base_sha"],
+                input_sha256=input_sha256,
+                command_sha256=command_sha256,
+            )
         manifest.setdefault("runs", []).append(run)
         manifest.setdefault("artifacts", []).extend(artifacts)
         _atomic_write(manifest_path, manifest)

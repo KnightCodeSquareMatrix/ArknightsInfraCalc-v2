@@ -1053,6 +1053,7 @@ mod tests {
                 AssignedOperator::new("可露希尔", 2),
             ],
         );
+        assignment.sort_room_operators_stably();
         let mut opts = MaaExportOptions::for_blueprint(&blueprint);
         opts.enable_gongsun_fiammetta_priority();
 

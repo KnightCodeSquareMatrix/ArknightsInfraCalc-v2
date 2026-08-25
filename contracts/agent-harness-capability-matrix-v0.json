@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "protocol_version": "agent-harness-v0",
+  "project_profile": "arknights-infra-calc-solver",
+  "workload": "cpu_bound",
+  "default_policy": {
+    "readonly_wave_size": 3,
+    "writer_count": 1,
+    "benchmark_concurrency": 1,
+    "private_inputs_allowed": false,
+    "remote_provider_private_inputs": "blocked"
+  },
+  "runtimes": [
+    {
+      "id": "opencode-native",
+      "layer": "host",
+      "status": "available",
+      "capabilities": {
+        "spawn": "available",
+        "parallel": "model_directed",
+        "wait": "available",
+        "cancel": "unverified",
+        "resume": "unverified",
+        "structured_result": "prompt_contract",
+        "worktree": "unverified",
+        "sandbox": "available",
+        "trace": "session_dependent",
+        "evidence_execution": "blocked_for_readonly_profiles"
+      },
+      "actual_profiles": [
+        "terra-explorer",
+        "luna-extractor",
+        "sol-reviewer"
+      ],
+      "notes": "Only the four project-configured Task targets are currently allowed."
+    },
+    {
+      "id": "mimo-code",
+      "layer": "coding-harness",
+      "status": "unverified",
+      "capabilities": {
+        "spawn": "documented",
+        "parallel": "documented",
+        "wait": "documented",
+        "cancel": "documented",
+        "resume": "documented",
+        "structured_result": "workflow_defined",
+        "worktree": "documented",
+        "sandbox": "unverified",
+        "trace": "documented",
+        "evidence_execution": "unverified"
+      },
+      "notes": "Compatibility with this repository's profiles, provider gateway, privacy policy and evidence overlay is not tested."
+    },
+    {
+      "id": "claude-agent-sdk",
+      "layer": "agent-runtime",
+      "status": "unverified",
+      "capabilities": {
+        "spawn": "documented",
+        "parallel": "workflow_defined",
+        "wait": "workflow_defined",
+        "cancel": "documented",
+        "resume": "documented",
+        "structured_result": "documented",
+        "worktree": "workflow_defined",
+        "sandbox": "documented",
+        "trace": "documented",
+        "evidence_execution": "adapter_required"
+      },
+      "notes": "Claude API and runtime terms apply; not yet a project worker."
+    },
+    {
+      "id": "openai-responses-multi-agent",
+      "layer": "hosted-orchestration",
+      "status": "unverified",
+      "capabilities": {
+        "spawn": "documented_beta",
+        "parallel": "documented_beta",
+        "wait": "documented_beta",
+        "cancel": "documented_beta",
+        "resume": "documented_beta",
+        "structured_result": "application_defined",
+        "worktree": "application_defined",
+        "sandbox": "application_defined",
+        "trace": "documented_beta",
+        "evidence_execution": "application_defined"
+      },
+      "notes": "Responses beta and provider gateway support are not tested. Private project inputs remain blocked for preflight."
+    }
+  ]
+}
