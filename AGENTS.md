@@ -125,5 +125,6 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 - 只 stage 本任务文件，使用显式路径；禁止 `git add .`。
 - 不自动 amend、rebase、reset、checkout、清理未跟踪文件或执行其他 destructive Git 操作。
 - 本轮形成独立单元时默认提交；同文件与用户改动无法可靠拆分时不强行提交。
+- 发布到 quality-check 的提交标题必须使用中文；提交标题会作为质量网页中的摘要显示。
 - `target/codex-runs/`、兼容日志和 `out/` 证据保留到交付但不提交。
 - 最终说明 changed paths、文档影响、deferred findings、验证类别、未验证风险、commit 和剩余工作区状态。
