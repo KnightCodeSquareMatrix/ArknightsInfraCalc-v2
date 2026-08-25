@@ -246,6 +246,7 @@ pub(crate) fn refill_trade_room_with_core(
     instances: &OperatorInstances,
     options: &AssignBaseOptions,
     durin_dorm_planning: Option<u8>,
+    forbidden_names: &[String],
     assignment: &mut BaseAssignment,
 ) -> Result<()> {
     let room = blueprint
@@ -264,7 +265,8 @@ pub(crate) fn refill_trade_room_with_core(
             .retain(|operator| operator.name != core);
     }
     assignment.set_room(room_id.clone(), Vec::new());
-    let used = assignment.operator_names();
+    let mut used = assignment.operator_names();
+    used.extend(forbidden_names.iter().cloned());
     let layout = crate::layout::resolve_base(
         blueprint,
         assignment,

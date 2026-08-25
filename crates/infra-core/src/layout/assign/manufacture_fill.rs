@@ -246,6 +246,7 @@ pub(crate) fn refill_manu_room_with_core(
     instances: &crate::instances::OperatorInstances,
     options: &AssignBaseOptions,
     durin_dorm_planning: Option<u8>,
+    forbidden_names: &[String],
     assignment: &mut BaseAssignment,
 ) -> Result<()> {
     let room = blueprint
@@ -292,7 +293,7 @@ pub(crate) fn refill_manu_room_with_core(
         &used,
         options.top_k,
         core,
-        &HashSet::new(),
+        &forbidden_names.iter().cloned().collect(),
     )?;
     let operators = hit
         .names

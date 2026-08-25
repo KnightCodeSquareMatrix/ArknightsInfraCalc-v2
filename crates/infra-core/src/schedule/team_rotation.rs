@@ -2043,15 +2043,20 @@ fn first_fiammetta_boundary_target(
 fn attach_fiammetta_cycle_boundary(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    teams: &[TeamAssignment],
     continuous_roles: &[crate::layout::ContinuousRole],
     shift_binds: &[RuntimeShiftBind],
+    cycle_hours: f64,
     shifts: &mut [TeamShiftResult],
-) {
+) -> Result<()> {
     if !operbox.owns("菲亚梅塔") {
-        return;
+        return Ok(());
     }
     if shifts.len() < 3 {
-        return;
+        return Ok(());
     }
     let (first_two, third_slice) = shifts.split_at_mut(2);
     let first = &mut first_two[0];
@@ -2063,23 +2068,165 @@ fn attach_fiammetta_cycle_boundary(
         continuous_roles,
         shift_binds,
     ) {
+        if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
+            return Ok(());
+        }
+        let active_names = active_team_names(teams, &first.active_teams);
+        refresh_fiammetta_target_room(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            first,
+            &target,
+            &room_id,
+            &active_names,
+            cycle_hours,
+        )?;
         first.fiammetta = Some(FiammettaShiftAction {
             target,
             displaced: String::new(),
             room_id,
         });
     }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn refresh_fiammetta_target_room(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    shift: &mut TeamShiftResult,
+    target: &str,
+    room_id: &RoomId,
+    active_names: &HashSet<String>,
+    cycle_hours: f64,
+) -> Result<()> {
+    refill_fiammetta_target_room(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        &mut shift.assignment,
+        target,
+        room_id,
+        shift.duration_hours,
+        active_names,
+    )?;
+    clear_production_efficiencies(blueprint, &mut shift.assignment);
+    shift.efficiencies = evaluate_base_assignment_efficiencies(
+        blueprint,
+        &shift.assignment,
+        instances,
+        table,
+        shift.duration_hours,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?;
+    shift.weighted_trade = shift
+        .efficiencies
+        .weighted_trade_for_cycle(shift.duration_hours, cycle_hours);
+    shift.weighted_manufacture = shift
+        .efficiencies
+        .weighted_manufacture_for_cycle(shift.duration_hours, cycle_hours);
+    shift.weighted_power = shift
+        .efficiencies
+        .weighted_power_for_cycle(shift.duration_hours, cycle_hours);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn refill_fiammetta_target_room(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    assignment: &mut BaseAssignment,
+    target: &str,
+    room_id: &RoomId,
+    shift_hours: f64,
+    active_names: &HashSet<String>,
+) -> Result<()> {
+    let trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
+    let manu_pool =
+        build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
+    let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let mut shift_options = options.clone();
+    shift_options.shift_hours = shift_hours;
+    let room_kind = blueprint
+        .room(room_id)
+        .map(|room| room.kind)
+        .ok_or_else(|| Error::msg(format!("Fiammetta target room {} disappeared", room_id.0)))?;
+    if !active_names.contains(target) {
+        return Err(Error::msg(format!(
+            "Fiammetta target {target} is not in the active team for room {}",
+            room_id.0
+        )));
+    }
+    let forbidden_names: Vec<String> = match room_kind {
+        FacilityKind::TradePost => trade_pool
+            .entries
+            .iter()
+            .filter(|entry| !active_names.contains(&entry.name))
+            .map(|entry| entry.name.clone())
+            .collect(),
+        FacilityKind::Factory => manu_pool
+            .entries
+            .iter()
+            .filter(|entry| !active_names.contains(&entry.name))
+            .map(|entry| entry.name.clone())
+            .collect(),
+        _ => Vec::new(),
+    };
+    match room_kind {
+        FacilityKind::TradePost => refill_trade_room_with_core(
+            blueprint,
+            room_id,
+            target,
+            &trade_pool,
+            table,
+            instances,
+            &shift_options,
+            Some(durin_plan),
+            &forbidden_names,
+            assignment,
+        )?,
+        FacilityKind::Factory if target == "清流" => refill_manu_room_with_core(
+            blueprint,
+            room_id,
+            target,
+            &manu_pool,
+            table,
+            instances,
+            &shift_options,
+            Some(durin_plan),
+            &forbidden_names,
+            assignment,
+        )?,
+        _ => return Ok(()),
+    }
+    Ok(())
 }
 
 fn attach_fiammetta_cycle_boundaries(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    teams: &[TeamAssignment],
     continuous_roles: &[crate::layout::ContinuousRole],
     shift_binds: &[RuntimeShiftBind],
+    cycle_hours: f64,
     shifts: &mut [TeamShiftResult],
-) {
+) -> Result<()> {
     if !operbox.owns("菲亚梅塔") || shifts.len() < 3 {
-        return;
+        return Ok(());
     }
     for index in 0..shifts.len() {
         let previous_index = (index + shifts.len() - 1) % shifts.len();
@@ -2094,12 +2241,29 @@ fn attach_fiammetta_cycle_boundaries(
         ) else {
             continue;
         };
+        if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
+            continue;
+        }
+        let active_names = active_team_names(teams, &shifts[index].active_teams);
+        refresh_fiammetta_target_room(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            &mut shifts[index],
+            &target,
+            &room_id,
+            &active_names,
+            cycle_hours,
+        )?;
         shifts[index].fiammetta = Some(FiammettaShiftAction {
             target,
             displaced: String::new(),
             room_id,
         });
     }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2179,6 +2343,15 @@ fn apply_single_core_fiammetta_rotation(
         let Some(room_kind) = blueprint.room(&room_id).map(|room| room.kind) else {
             continue;
         };
+        if !shifts.iter().all(|shift| {
+            shift
+                .assignment
+                .operators_in(&room_id)
+                .iter()
+                .any(|operator| operator.name == target)
+        }) {
+            continue;
+        }
         let mut candidate_shifts = shifts.to_vec();
         let mut refill_failed = false;
         for shift in &mut candidate_shifts {
@@ -2196,6 +2369,26 @@ fn apply_single_core_fiammetta_rotation(
             }
             let mut shift_options = options.clone();
             shift_options.shift_hours = shift.duration_hours;
+            let active_names = active_team_names(teams, &shift.active_teams);
+            if !active_names.contains(target) {
+                refill_failed = true;
+                break;
+            }
+            let forbidden_names: Vec<String> = match room_kind {
+                FacilityKind::TradePost => trade_pool
+                    .entries
+                    .iter()
+                    .filter(|entry| !active_names.contains(&entry.name))
+                    .map(|entry| entry.name.clone())
+                    .collect(),
+                FacilityKind::Factory => manu_pool
+                    .entries
+                    .iter()
+                    .filter(|entry| !active_names.contains(&entry.name))
+                    .map(|entry| entry.name.clone())
+                    .collect(),
+                _ => Vec::new(),
+            };
             let refill = match room_kind {
                 FacilityKind::TradePost => refill_trade_room_with_core(
                     blueprint,
@@ -2206,6 +2399,7 @@ fn apply_single_core_fiammetta_rotation(
                     instances,
                     &shift_options,
                     Some(durin_plan),
+                    &forbidden_names,
                     &mut shift.assignment,
                 ),
                 FacilityKind::Factory if target == "清流" => refill_manu_room_with_core(
@@ -4462,18 +4656,28 @@ fn schedule_abc_rotation(
             attach_fiammetta_cycle_boundaries(
                 blueprint,
                 operbox,
+                instances,
+                table,
+                options,
+                &teams,
                 &peak_plan.continuous_roles,
                 &shift_binds,
+                cycle_hours,
                 &mut shifts,
-            );
+            )?;
         } else if !applied_single_core && !applied_witch {
             attach_fiammetta_cycle_boundary(
                 blueprint,
                 operbox,
+                instances,
+                table,
+                options,
+                &teams,
                 &peak_plan.continuous_roles,
                 &shift_binds,
+                cycle_hours,
                 &mut shifts,
-            );
+            )?;
         }
     }
     validate_final_rotation_invariants(&shifts, &shift_binds, &peak_plan.active_dependencies)?;
@@ -4530,6 +4734,14 @@ fn sorted_assignment_names(assignment: &BaseAssignment) -> Vec<String> {
     let mut names: Vec<_> = assignment.operator_names().into_iter().collect();
     names.sort();
     names
+}
+
+fn active_team_names(teams: &[TeamAssignment], active: &[TeamLabel]) -> HashSet<String> {
+    teams
+        .iter()
+        .filter(|team| active.contains(&team.label))
+        .flat_map(|team| team.operators.iter().cloned())
+        .collect()
 }
 
 fn solve_owned_peak_assignment(
@@ -5164,12 +5376,45 @@ fn schedule_fiammetta_8_8_4_4(
             "fiammetta-8844 requires an eligible peak production target under the configured priority",
         )
     })?;
+    if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
+        return Err(Error::msg(format!(
+            "fiammetta-8844 does not support single-core target {target}"
+        )));
+    }
 
+    let mut fiammetta_owner = raw.shifts[0].assignment.clone();
+    let active_names = active_team_names(&raw.teams, &raw.shifts[0].active_teams);
+    refill_fiammetta_target_room(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        &mut fiammetta_owner,
+        &target,
+        &room_id,
+        8.0,
+        &active_names,
+    )?;
+    if !fiammetta_owner
+        .operators_in(&room_id)
+        .iter()
+        .any(|operator| operator.name == target)
+    {
+        return Err(Error::msg(
+            "fiammetta-8844 target was lost while re-searching its room",
+        ));
+    }
     let owners: Vec<_> = raw
         .shifts
         .iter()
-        .map(|shift| OwnedRotationAssignment {
-            assignment: shift.assignment.clone(),
+        .enumerate()
+        .map(|(index, shift)| OwnedRotationAssignment {
+            assignment: if index == 0 {
+                fiammetta_owner.clone()
+            } else {
+                shift.assignment.clone()
+            },
             plan: raw.peak_plan.clone(),
         })
         .collect();
@@ -7648,6 +7893,17 @@ mod tests {
             .operators_in(&action.room_id)
             .iter()
             .any(|operator| operator.name == action.target));
+        assert_eq!(
+            report.shifts[0].assignment.operators_in(&action.room_id),
+            report.shifts[1].assignment.operators_in(&action.room_id),
+            "FiammettaOnly must use the re-searched target room owner"
+        );
+        let active_names = active_team_names(&report.teams, &report.shifts[1].active_teams);
+        assert!(report.shifts[1]
+            .assignment
+            .operators_in(&action.room_id)
+            .iter()
+            .all(|operator| active_names.contains(&operator.name)));
         assert_eq!(
             report.daily.trade,
             report.shifts.iter().map(|shift| shift.weighted_trade).sum()
@@ -10290,7 +10546,22 @@ mod tests {
                     .map(|action| action.target.as_str())
             })
             .collect();
-        assert_eq!(targets, HashSet::from(["巫恋", "龙舌兰"]));
+        assert_eq!(
+            targets,
+            HashSet::from(["巫恋", "龙舌兰"]),
+            "teams={:?} active={:?} assignments={:?}",
+            report.teams,
+            report
+                .shifts
+                .iter()
+                .map(|shift| shift.active_teams.clone())
+                .collect::<Vec<_>>(),
+            report
+                .shifts
+                .iter()
+                .map(|shift| shift.assignment.operator_names())
+                .collect::<Vec<_>>()
+        );
 
         let mut rooms = Vec::new();
         let mut selected_tailors = Vec::new();
