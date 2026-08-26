@@ -18,13 +18,14 @@ CANONICAL_PATHS:
 GUARANTEE_CLAIM:
 CHANGED_PATHS:
 DIFF_PATH_OR_COMMIT:
+PACKET_SHA256:
 ASSERTION_COMMAND_AND_OUTPUT:
 EVIDENCE_MANIFEST:
 BATCH_RESULT: optional; only if already run
 EXCLUSIONS:
 ```
 
-Do not include the primary agent's root-cause analysis, design rationale, expected verdict, prior reviewer output, or another agent's conclusion. Point to files and artifacts instead of pasting unrelated history. Stop as `INCONCLUSIVE` if the canonical input, diff, or assertion evidence is absent.
+Compute `PACKET_SHA256` after freezing the packet. Do not include the primary agent's root-cause analysis, design rationale, expected verdict, prior reviewer output, or another agent's conclusion. Point to files and artifacts instead of pasting unrelated history. Stop as `INCONCLUSIVE` if the canonical input, diff, assertion evidence, or packet digest is absent.
 
 ## Dispatch
 
@@ -35,7 +36,7 @@ Do not include the primary agent's root-cause analysis, design rationale, expect
 
 ## Compare
 
-Compare verdict, blocking findings, invariant/guarantee classification, cited evidence, minimal illegal witness, and unverified gaps.
+Compare verdict, canonical-to-final-state trace, invariant/guarantee classification, cited evidence, minimal illegal witness, assertion-audit findings, and unverified gaps. Do not ask one reviewer to respond to the other; the primary agent resolves any disagreement against original evidence.
 
 ```text
 DUAL_BLIND_REVIEW: AGREEMENT | MATERIAL_DISAGREEMENT | INCONCLUSIVE
@@ -45,6 +46,7 @@ SHARED_FINDINGS:
 TERRA_ONLY_FINDINGS:
 SOL_ONLY_FINDINGS:
 EVIDENCE_DISPUTES:
+ASSERTION_AUDIT_DISPUTES:
 NEXT_ACTION:
 ```
 
