@@ -8,10 +8,6 @@ use super::plan_compute::{
     compute_plan, inline_operbox, PlanComputeInput, PlanComputeParams, PlanResources,
     RequestedOutputs,
 };
-use infra_core::bake::{
-    bake_catalogs, default_baked_out_dir, set_runtime_bake_in_progress, validate_baked_catalog,
-    warm_runtime_baked_table, BakeGeneratorFingerprint, BakeOptions, BakeProgressEvent,
-};
 use infra_core::box_profile::{baseline_path_or_default, BoxProfile};
 use infra_core::export::MaaSchedule;
 use infra_core::instances::{default_instances_path, OperatorInstances};
@@ -273,79 +269,11 @@ fn validate_plan_compute_params(
 }
 
 fn spawn_background_bake() -> Option<thread::JoinHandle<()>> {
-    let out_dir = default_baked_out_dir().ok()?;
-    let generator = current_generator_fingerprint().ok()?;
-    if validate_baked_catalog(&out_dir, &generator).is_ok() {
-        return None;
-    }
-    eprintln!(
-        "infra-cli serve: baked catalog missing or stale, baking in background -> {}",
-        out_dir.display()
-    );
-    set_runtime_bake_in_progress(true);
-    Some(thread::spawn(move || {
-        let mut options = BakeOptions::default();
-        options.out_dir = out_dir;
-        options.generator = Some(generator);
-        options.progress = Some(std::sync::Arc::new(print_bake_progress_line));
-        if let Err(err) = bake_catalogs(&options) {
-            eprintln!("infra-cli serve background bake failed: {err}");
-        }
-        set_runtime_bake_in_progress(false);
-    }))
+    None
 }
 
-fn current_generator_fingerprint() -> Result<BakeGeneratorFingerprint, Error> {
-    let path = std::env::current_exe()?;
-    let bytes = fs::read(&path)?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    use std::hash::{Hash, Hasher};
-    bytes.hash(&mut hasher);
-    Ok(BakeGeneratorFingerprint {
-        kind: "infra-cli-exe".to_string(),
-        path: path.to_string_lossy().to_string(),
-        bytes: bytes.len() as u64,
-        hash64: format!("{:016x}", hasher.finish()),
-    })
-}
-
-fn print_bake_progress_line(event: BakeProgressEvent) {
-    match event {
-        BakeProgressEvent::Started {
-            out_dir,
-            operator_count,
-            signature_count,
-            worker_count,
-        } => eprintln!(
-            "[bake] start operators={} signatures={} rayon_workers={} -> {}",
-            operator_count,
-            signature_count,
-            worker_count,
-            out_dir.display()
-        ),
-        BakeProgressEvent::SignatureStarted {
-            facility,
-            signature_key,
-            combo_count,
-        } => eprintln!("[bake] {facility} {signature_key}: enumerating {combo_count} combos"),
-        BakeProgressEvent::SignatureFinished {
-            facility,
-            signature_key,
-            rows,
-            elapsed_ms,
-        } => eprintln!("[bake] {facility} {signature_key}: rows={rows} elapsed={elapsed_ms}ms"),
-        BakeProgressEvent::Writing { path, rows } => {
-            if let Some(rows) = rows {
-                eprintln!("[bake] write {} rows={rows}", path.display());
-            } else {
-                eprintln!("[bake] write {}", path.display());
-            }
-        }
-        BakeProgressEvent::Finished {
-            combo_table_rows,
-            elapsed_ms,
-        } => eprintln!("[bake] done combo_table_rows={combo_table_rows} elapsed={elapsed_ms}ms"),
-    }
+fn warm_runtime_baked_table() -> Result<bool, Error> {
+    Ok(false)
 }
 
 #[derive(Debug, Deserialize)]
@@ -874,6 +802,12 @@ mod tests {
                 "maa_title": "Contract test"
             }
         })
+    }
+
+    #[test]
+    fn serve_bake_adapters_are_noops() {
+        assert!(spawn_background_bake().is_none());
+        assert!(!warm_runtime_baked_table().unwrap());
     }
 
     #[test]
