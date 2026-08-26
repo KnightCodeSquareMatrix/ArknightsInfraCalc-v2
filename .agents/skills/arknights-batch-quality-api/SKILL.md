@@ -15,6 +15,7 @@ Use the Check service as the only source of batch inputs and results. This workf
 4. Do not print full plan, profile, MAA, training advice, stdout, or response JSON into chat.
 5. Use the compact summary endpoint for polling and error diagnosis.
 6. There is no authentication. Do not invent or request a token.
+7. Do not invoke `infra-cli serve`, `ping`, or any `bake` command. The Check runner executes one `infra-cli plan` process per Box.
 
 ## API Base
 
@@ -67,7 +68,7 @@ Parameters:
 - `BOX_SOURCE`: normally `representative` or `high_owned`; `production` is also supported when configured.
 - `ROTATION`: exact advertised profile.
 - `TOP`: integer 1 through 100.
-- `ASSERT_INVARIANTS`: boolean. Use `true` for solver/search, Plan, Team/Shift, rotation, MAA/export, cross-facility, or invariant debugging; otherwise use the user's choice, defaulting to `false`.
+- `ASSERT_INVARIANTS`: boolean. Use `true` for solver/search, Plan, Team/Shift, rotation, MAA/export, cross-facility, or invariant debugging; the runner forwards it as CLI `plan --assert-invariants`. Otherwise use the user's choice, defaulting to `false`.
 
 Store `data.jobId`, `data.summaryUrl`, and `data.downloadUrl`. Resolve returned relative URLs against `API_BASE`.
 
@@ -107,6 +108,6 @@ Download: <API_BASE><downloadUrl>
 
 ## 5. HTTP Or Creation Errors
 
-The internal API exposes concrete diagnostics. On a non-2xx response, report `error.message` verbatim. Common examples are runner heartbeat expiry, another active job ID, missing Box source configuration, unsupported `plan.compute` schema v4, solver failure, or an `assert-invariants ...` diagnostic.
+The internal API exposes concrete diagnostics. On a non-2xx response, report `error.message` verbatim. Common examples are runner heartbeat expiry, another active job ID, missing Box source configuration, solver failure, timeout, or an `assert-invariants ...` diagnostic.
 
 Do not retry configuration, capability, invariant, or solver errors. Retry only transient connection failures, at most three times with a two-second delay.

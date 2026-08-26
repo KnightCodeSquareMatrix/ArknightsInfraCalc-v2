@@ -8,6 +8,11 @@ description: 把本地最新 Linux infra-cli 推送到 dev 服务器（114.66.55
 dev 环境推送唯一入口：`scripts/update_solver_dev.py`。生产环境（`/opt/arknights-infra`，
 端口 4175）走前端仓库 `docs/UPDATE_SOLVER.md`，不要混用。
 
+> 批量验收走 quality-check，入口是 `scripts/update_solver_quality.py`（默认本地
+> 127.0.0.1:5174，把 ELF 投到本地 Check 的 `server/quality/solver-incoming/`，
+> runner 自动发现并跑矩阵）。dev 部署（本 skill）与 quality 批量验收是两套独立
+> 投递目标，互不替代；需要两者时依次执行。
+
 ## 服务器事实（真源：systemd 运行时）
 
 - 服务器：`root@114.66.55.78`，SSH 密钥 `~/.ssh/id_rsa`（默认提供）。

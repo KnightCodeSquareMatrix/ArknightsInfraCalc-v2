@@ -6,18 +6,23 @@ Implements docs/QUALITY_CHECK_CLI_UPDATE.md (embeddedData hot-path, no bake):
     cargo build --release -p infra-cli
     python3 scripts/update_solver_quality.py
 
-The script uploads the ELF to solver-incoming/infra-cli.partial, atomically
-renames it, then polls the public quality status API until the new bundle and
-its job appear and the job reaches a terminal state.
+Default (local) mode drops the ELF straight into the local quality-check
+runner's solver-incoming dir and polls the local status API until the new
+bundle and its job appear and the job reaches a terminal state. No SSH is
+involved.
 
 Optional overrides:
 
-    python3 scripts/update_solver_quality.py --target root@1.2.3.4
     python3 scripts/update_solver_quality.py --local-elf /some/path/infra-cli
-    python3 scripts/update_solver_quality.py --status-url https://.../api/quality/status
+    python3 scripts/update_solver_quality.py --status-url http://127.0.0.1:5174/api/quality/status
+    python3 scripts/update_solver_quality.py --incoming /path/to/check/server/quality/solver-incoming
     python3 scripts/update_solver_quality.py --poll-sec 5 --timeout-sec 1800
+    python3 scripts/update_solver_quality.py --remote root@1.2.3.4   # ssh mode (see below)
 
-Defaults match the quality-check environment on 114.66.55.78.
+Remote (--remote) mode uploads the ELF to solver-incoming/infra-cli.partial
+on the given host, atomically renames it, then polls a status API.
+
+Defaults target the local quality-check dev server (127.0.0.1:5174).
 """
 
 from __future__ import annotations
@@ -25,7 +30,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shlex
+import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -34,10 +42,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_SSH_TARGET = "root@114.66.55.78"
 DEFAULT_LOCAL_ELF = ROOT / "target" / "release" / "infra-cli"
-DEFAULT_INCOMING = "/var/lib/arknights-infra-quality/solver-incoming"
-DEFAULT_STATUS_URL = "https://instance-pi2ohhfj.tail2dca9.ts.net:10000/api/quality/status"
+
+# 本地 quality-check dev 部署：Check 仓库目录（可通过 env 覆盖）
+DEFAULT_CHECK_REPO = os.environ.get(
+    "QUALITY_CHECK_REPO_DIR",
+    "/home/knightcode/Projects/ArknightsInfraCalc-check",
+)
+DEFAULT_INCOMING = os.environ.get(
+    "QUALITY_LOCAL_DROP_DIR",
+    f"{DEFAULT_CHECK_REPO}/server/quality/solver-incoming",
+)
+DEFAULT_STATUS_URL = os.environ.get(
+    "QUALITY_LOCAL_STATUS_URL",
+    "http://127.0.0.1:5174/api/quality/status",
+)
 DEFAULT_POLL_SEC = 5
 DEFAULT_TIMEOUT_SEC = 1800
 
@@ -60,6 +79,18 @@ def ensure_elf(path: Path) -> None:
 def run(cmd: list[str], *, stdin: str | None = None) -> None:
     print(f"\n$ {shlex.join(cmd)}")
     subprocess.run(cmd, input=stdin, text=True, check=True)
+
+
+def drop_local(local_elf: Path, incoming: Path) -> None:
+    """原子投放：写入临时文件后 rename，避免 runner 领取不完整的 ELF。"""
+    incoming = incoming.expanduser().resolve()
+    incoming.mkdir(parents=True, exist_ok=True)
+    partial = incoming / "infra-cli.partial"
+    final = incoming / "infra-cli"
+    shutil.copy2(local_elf, partial)
+    partial.chmod(stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)
+    os.replace(partial, final)
+    print(f"\n$ dropped: {local_elf} -> {final}")
 
 
 def fetch_json(url: str, timeout: float = 15) -> dict:
@@ -87,7 +118,12 @@ def find_job_for_bundle(data: dict, bundle_id: str) -> dict | None:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=DEFAULT_SSH_TARGET, help="ssh target host")
+    parser.add_argument(
+        "--remote",
+        dest="remote_target",
+        default=None,
+        help="ssh target host for remote upload mode (default: local drop)",
+    )
     parser.add_argument(
         "--local-elf",
         type=Path,
@@ -97,7 +133,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--incoming",
         default=DEFAULT_INCOMING,
-        help="remote quality solver-incoming dir",
+        help="quality solver-incoming dir (local mode: local path; remote mode: remote path)",
     )
     parser.add_argument(
         "--status-url",
@@ -138,26 +174,28 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Local ELF: {local_elf}")
     print(f"Local sha256: {executable_sha256}")
-    print(f"SSH target: {args.target}")
     print(f"Incoming dir: {args.incoming}")
+    print(f"Status URL: {args.status_url}")
 
-    partial = f"{args.incoming}/infra-cli.partial"
-    final = f"{args.incoming}/infra-cli"
-
-    run(["scp", str(local_elf), f"{args.target}:{partial}"])
-
-    remote_script = (
-        "set -euo pipefail\n"
-        f"partial={shlex.quote(partial)}\n"
-        f"final={shlex.quote(final)}\n"
-        "test -f \"$partial\"\n"
-        "chown arkinfra:arkinfra \"$partial\"\n"
-        "chmod 750 \"$partial\"\n"
-        f"sha256sum \"$partial\"\n"
-        f"mv -f \"$partial\" \"$final\"\n"
-        "ls -la \"$(dirname \"$final\")\"\n"
-    )
-    run(["ssh", args.target, "bash", "-s"], stdin=remote_script)
+    if args.remote_target is None:
+        drop_local(local_elf, Path(args.incoming))
+    else:
+        print(f"SSH target: {args.remote_target}")
+        partial = f"{args.incoming}/infra-cli.partial"
+        final = f"{args.incoming}/infra-cli"
+        run(["scp", str(local_elf), f"{args.remote_target}:{partial}"])
+        remote_script = (
+            "set -euo pipefail\n"
+            f"partial={shlex.quote(partial)}\n"
+            f"final={shlex.quote(final)}\n"
+            "test -f \"$partial\"\n"
+            "chown arkinfra:arkinfra \"$partial\"\n"
+            "chmod 750 \"$partial\"\n"
+            f"sha256sum \"$partial\"\n"
+            f"mv -f \"$partial\" \"$final\"\n"
+            "ls -la \"$(dirname \"$final\")\"\n"
+        )
+        run(["ssh", args.remote_target, "bash", "-s"], stdin=remote_script)
 
     if args.no_wait:
         print("\nUploaded. Not waiting (--no-wait).")

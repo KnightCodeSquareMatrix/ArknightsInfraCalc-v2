@@ -3,11 +3,19 @@
 > 文档角色：current-reference
 > 生命周期状态：current
 > 当前真源：docs/INFRA_CLI.md
-> 摘要：记录将求解器 Linux CLI 更新到远端 quality-check 的操作规则与热路径部署
+> 摘要：记录将求解器 Linux CLI 更新到 quality-check 的操作规则与热路径部署
 
-本文只描述求解器仓库产物如何进入远端 quality-check。quality-check 为每个 solver 建立不可变 bundle；不要直接覆盖已有 bundle、运行中的 CLI 或共享 data 目录。
+质量服务可为**本地 dev（127.0.0.1:5174）**或**远端（114.66.55.78）**。默认走本地：
+`scripts/update_solver_quality.py` 把 ELF 直接投到本地 Check 仓库的
+`server/quality/solver-incoming/`，runner 自动发现并跑矩阵。远端用
+`--remote root@114.66.55.78`。quality-check 为每个 solver 建立不可变 bundle；
+不要直接覆盖已有 bundle、运行中的 CLI 或共享 data 目录。
 
 ## 1. 更新前提
+
+> 本节前提同时适用本地与远端。本地 dev quality 使用 `next dev` + 本地 runner，
+> 目标状态 API 为 `http://127.0.0.1:5174/api/quality/status`，投递目录为
+> Check 仓库 `server/quality/solver-incoming/`；远端前提如下。
 
 - 目标服务：`114.66.55.78` 上的 quality-check（`arknights-infra-quality-next`）。
 - 运行用户：`arkinfra`。
@@ -53,7 +61,15 @@ worktree。**当前工作树 dirty 时**可手动构建 release bundle（跳过 
 
 ## 4. 上传并原子改名
 
-先通过临时文件名上传，避免 runner 领取不完整的文件：
+推荐用脚本（默认本地，见上；`--no-wait` 只投放不轮询）：
+
+```bash
+python3 scripts/update_solver_quality.py
+```
+
+脚本先写 `infra-cli.partial` 后原子 rename，避免 runner 领取不完整的文件，再轮询
+status API 直到新 bundle 与 job 达到终态。本地模式直接复制到
+`server/quality/solver-incoming/`；远端模式（`--remote`）通过 scp/ssh 执行：
 
 ```bash
 scp dist/arknights-infra-linux-x86_64/infra-cli \
@@ -102,11 +118,13 @@ ssh root@114.66.55.78 'journalctl -u arknights-infra-quality-next-runner.service
 自动发现 solver：bundle=solver-<commit>... job=<jobId>
 ```
 
-查看质量服务公开状态：
+查看质量服务公开状态（本地 dev）：
 
 ```bash
-curl -sS https://instance-pi2ohhfj.tail2dca9.ts.net:10000/api/quality/status
+curl -sS http://127.0.0.1:5174/api/quality/status
 ```
+
+远端：`curl -sS https://instance-pi2ohhfj.tail2dca9.ts.net:10000/api/quality/status`。
 
 验收至少确认：
 
