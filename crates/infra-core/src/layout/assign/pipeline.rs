@@ -978,6 +978,57 @@ fn control_layout_for_upper_bound(
     layout
 }
 
+fn saileach_is_inactive_with_best_office(
+    run: &AssignmentRun<'_>,
+    producer_layout: &crate::layout::LayoutContext,
+) -> Result<bool> {
+    if producer_layout.office_room_count == 0 {
+        return Ok(false);
+    }
+
+    let office_occupants: HashSet<_> = run
+        .assignment
+        .rooms
+        .iter()
+        .filter(|room| {
+            run.blueprint
+                .rooms
+                .iter()
+                .any(|bp| bp.id == room.room_id && bp.kind == FacilityKind::Office)
+        })
+        .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
+        .collect();
+    let mut best_office_pct: f64 = 0.0;
+    for name in run.operbox.roster().names() {
+        if run.used.contains(name) && !office_occupants.contains(name) {
+            continue;
+        }
+        let Some(progress) = run.operbox.progress_of(name) else {
+            continue;
+        };
+        let tier = crate::tier::PromotionTier::from_elite(progress.elite);
+        let buff_ids = run.instances.resolve_office_buff_ids(name, tier);
+        if buff_ids.is_empty() {
+            continue;
+        }
+        let office_pct = crate::office::solve_office(
+            &crate::office::OfficeRoomInput {
+                operators: vec![crate::office::OfficeOperator {
+                    name: name.clone(),
+                    elite: progress.elite,
+                    buff_ids,
+                }],
+                mood: run.options.mood,
+                layout: producer_layout.clone(),
+            },
+            run.table,
+        )
+        .hire_spd_pct;
+        best_office_pct = best_office_pct.max(office_pct);
+    }
+    Ok(best_office_pct >= 25.0)
+}
+
 fn prepare_peak_control_candidate<'a>(
     mut run: AssignmentRun<'a>,
     plan: &AssignmentPlan,
@@ -987,6 +1038,18 @@ fn prepare_peak_control_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
+    let mut effective_exclusions = control_exclusions.clone();
+    let control_names: HashSet<String> = run
+        .assignment
+        .control_operators()
+        .into_iter()
+        .map(|operator| operator.name)
+        .collect();
+    let saileach_required = control_names.contains("琴柳")
+        || dynamic_set.is_some_and(|(required, _)| required.contains("琴柳"));
+    if !saileach_required && saileach_is_inactive_with_best_office(&run, producer_layout)? {
+        effective_exclusions.insert("琴柳".to_string());
+    }
     if run.assignment.control_operators().len() < 5 {
         if let Some((required, excluded)) = dynamic_set {
             if !assign_control_matching_dynamic_set(
@@ -998,7 +1061,7 @@ fn prepare_peak_control_candidate<'a>(
                 &plan.control_candidate_requirements,
                 required,
                 excluded,
-                control_exclusions,
+                &effective_exclusions,
                 &mut run.used,
             )? {
                 return Ok(None);
@@ -1011,7 +1074,7 @@ fn prepare_peak_control_candidate<'a>(
                 producer_layout,
                 run.options,
                 &plan.control_candidate_requirements,
-                control_exclusions,
+                &effective_exclusions,
                 &mut run.used,
             )?;
         }
