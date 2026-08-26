@@ -3609,6 +3609,24 @@ pub fn assert_final_rotation_invariants(
 ) -> Result<()> {
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
+    for shift in &report.shifts {
+        let Some(action) = &shift.fiammetta else {
+            continue;
+        };
+        let target_in_room = shift
+            .assignment
+            .operators_in(&action.room_id)
+            .iter()
+            .any(|operator| operator.name == action.target);
+        if !target_in_room {
+            return Err(Error::msg(format!(
+                "assert-invariants fiammetta_target_present failed in shift {}: target {} missing from room {}",
+                shift.index + 1,
+                action.target,
+                action.room_id.0
+            )));
+        }
+    }
     let mut seen_binds = HashSet::new();
     for plan in &report.assignment_plans {
         for bind in shift_binds_from_plan(plan) {
