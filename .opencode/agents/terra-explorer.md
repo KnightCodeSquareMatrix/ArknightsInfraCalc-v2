@@ -2,6 +2,7 @@
 description: 只读调查代码库、文档和运行证据；适合大范围扫描、定位责任层、调用链和文件级事实。
 mode: subagent
 model: deepseek/deepseek-v4-flash
+reasoningEffort: low
 steps: 99
 permission:
   edit: deny
