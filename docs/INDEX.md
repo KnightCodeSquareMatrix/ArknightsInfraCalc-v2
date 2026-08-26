@@ -37,6 +37,7 @@
 | 部署长驻服务 | [前端 serve 指南](FRONTEND_SERVE_GUIDE.md) | 启动、探活、超时和部署操作 |
 | 构建发布包 | [release README](../release/README.md) | 发布目录、构建脚本和发布夹具 |
 | 更新 quality-check CLI | [quality-check CLI 更新规则](QUALITY_CHECK_CLI_UPDATE.md) | 构建、验证、上传和远端 bundle 验收 |
+| 更新 dev 求解器 | [更新服务器求解器（dev 环境）](UPDATE_SOLVER.md) | 构建、推送、健康检查和自动回滚 |
 | 使用练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) | 玩家产品语义、结构化输出与旧 v2 诊断边界 |
 
 命令的当前参数以生成/runtime help 和 [INFRA_CLI.md](INFRA_CLI.md) 为准；前端不得从示例输出反推长期 wire schema。
