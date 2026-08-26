@@ -5,7 +5,7 @@ description: Record and audit reproducible ArknightsInfraCalc build, test, CLI, 
 
 # Arknights Evidence
 
-Use repository evidence tools for every build, test, CLI, benchmark, format, or structure check supporting a conclusion. A bare run must be rerun through the wrapper before delivery.
+Use repository evidence tools when a task needs durable, reproducible verification. They are recommended for large refactors, solver/search changes, system/rotation/export work, deployment, and formal audits; ordinary local fixes and documentation changes may use direct commands.
 
 ## Record Runs
 

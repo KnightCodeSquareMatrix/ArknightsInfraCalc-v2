@@ -66,8 +66,8 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 每个写入单元只有一个主要意图；旁支发现默认 deferred。达到唯一 owner、冲突路径删除和相应证明后停止扩张。
 - 新抽象应让真实重复语义、所有权或证明义务更清楚；“出现第二个用例”是审阅问题，不是禁止合法具名机制的硬规则。
 - 修改候选集合、剪枝、分解、目标、top-K、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；无法证明完整时不得声称全局最优。
-- 所有用于结论的验证必须通过统一 evidence 工具留痕；未跑类别明确写“未跑”。
-- 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 同样通过 evidence 工具记录。
+- 验证按改动风险选择方式：大型重构、solver/search、体系/排班/export、部署和需要长期审计的任务，使用 evidence 工具留痕；普通局部修复和文档调整可直接运行必要命令，并在最终说明结果。
+- 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 是否通过 evidence 工具记录由任务风险决定。
 - Agent memory 只能记录可丢弃的检索提示与协作偏好；领域语义、当前实现、架构决策和活动任务必须落在版本化 canonical、ADR 或 change 文档中，memory 不得成为真源。
 - 当前任务拥有 TODO、计划、change 或文档治理迁移时，生命周期语义唯一以 `docs/文档生命周期.md` 为准；`.agents/skills/_shared/CHANGE_LIFECYCLE.md` 只提供执行入口。完成时吸收 current facts、拆分开放项、自动归档并更新索引和引用。
 - 代码变化不自动要求文档变化；只在行为语义、接口、持久决策或活动任务状态改变时更新最近的 owner。不得维护摘要复核传播或全仓 docs-impact 声明。
@@ -81,7 +81,7 @@ Agent workflow 采用 [AI 编排与 Harness 讨论记录](docs/AI编排与Harnes
 ```text
 bootstrap_context → classify_task → route_domain_owner → plan / plan-review
 → parallel research/review → join findings → select one implementation unit
-→ single-writer executor → deterministic evidence verification
+→ single-writer executor → risk-matched verification
 → fresh-context review → final verification → checkpoint → memory capture → report
 ```
 

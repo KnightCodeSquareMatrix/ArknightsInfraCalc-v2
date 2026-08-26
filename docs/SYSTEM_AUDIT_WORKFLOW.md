@@ -175,7 +175,7 @@ subagent 的任务描述必须附上用户确认的不变量、禁止事项、�
 
 reviewer 对每个改动文件检查：是否直接建立、消费或证明当前不变量；撤销后 bug 或证明是否会失效；修改是在删除冲突路径还是只让架构更整齐；新抽象是否已有第二个当前真实用例。范围外改动默认撤回，旁支问题进入 `side_findings`。
 
-所有实现者和 reviewer 共用 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 的证据规则。subagent 的消息不是验证证据；主 Agent 必须读取最终 diff、manifest、日志、exit code 和产物。
+所有实现者和 reviewer 共用 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 的风险分层规则。正式审计或任务主动选择证据工作流时，subagent 的消息不是验证证据；主 Agent 必须读取最终 diff 以及已生成的 manifest、日志、exit code 和产物。
 
 ## 7. 验证与完成证明
 

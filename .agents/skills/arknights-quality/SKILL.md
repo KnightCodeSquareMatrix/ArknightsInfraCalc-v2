@@ -35,7 +35,7 @@ state, ownership, and closure semantics are owned only by
 
 ## Complete
 
-Use `arknights-evidence` to capture baseline and current facts. Prove migration completion, delete old paths, compare behavior/performance/validation as scoped, update current docs, and defer unrelated discoveries.
+For large quality migrations, use `arknights-evidence` to capture baseline and current facts. Prove migration completion, delete old paths, compare behavior/performance/validation as scoped, update current docs, and defer unrelated discoveries.
 
 When the quality task owns a tracked plan or documentation migration, closure
 must also prove lifecycle state, index coverage, and repository references. Do

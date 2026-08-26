@@ -102,9 +102,9 @@
 - 对 stdout / MAA 断言设施类型、实际成员、工作 / 休息状态和核心字段；profile 只断言账号分析与 rotation 指标，不要求它包含最终 MAA 那次完整房间 assignment。
 - `plan`、legacy serve 和 `plan.compute` 都通过 `commands/plan_compute.rs` 生成一次用户 rotation；profile、stdout、MAA 和 Worker rotation 摘要必须消费该同一结果。
 
-## 4. 验证留痕
+## 4. 验证留痕（按需）
 
-任何用于结论的 test、build、CLI smoke、benchmark、格式和结构校验都必须通过 `scripts/codex/run_evidence.sh` 或兼容包装器留痕；裸跑后必须带证据重跑。每份日志至少包含：
+证据工具是大型重构、solver/search、体系/排班/export、部署和正式审计的可选增强。普通 owner-local 修复、文档调整和一次性诊断可以直接运行必要命令，不要求为了留痕重复执行。需要可复现交付或长期审计时，使用 `scripts/codex/run_evidence.sh` 或兼容包装器，并保留：
 
 - 完整命令和 cwd。
 - 输入 layout、operbox、assignment、fixture 和 baseline 路径。
@@ -119,16 +119,16 @@
 --maa-out out/<task>-maa.json
 ```
 
-包装器把日志、status 和聚合 manifest 写入 `target/codex-runs/<task>/`。使用 `--artifact kind=path` 登记 profile、MAA、失败集合报告和其他产物；重复运行不得覆盖旧日志。裸跑结果、终端滚屏、Agent 消息、`/tmp` 和 commit hash 都不能代替最终证据。
+包装器把日志、status 和聚合 manifest 写入 `target/codex-runs/<task>/`。使用 `--artifact kind=path` 登记 profile、MAA、失败集合报告和其他产物；重复运行不得覆盖旧日志。对于已选择证据工作流的任务，裸跑结果、终端滚屏、Agent 消息、`/tmp` 和 commit hash 不能代替其声明的证据。
 
-每个代码 / 数据任务 manifest 必须包含：
+选择证据工作流的代码 / 数据任务 manifest 应包含：
 
 - `change_scope`：唯一不变量、根因层、required paths、allowed consumers、proof paths 和 explicitly deferred；
 - `scope_expansions` 与 `side_findings`；
 - reviewer 最终核对的 invariant、实际 changed paths 和 expansion id；
 - runs、artifacts、输入和 exit code。
 
-完成前运行 `check_task_scope.py` 和 `render_evidence.py`。文档影响按 [文档生命周期](文档生命周期.md) 由 Agent 直接判断；检查器不根据源码 diff 强制传播文档更新。
+使用 manifest 的任务完成前运行 `check_task_scope.py` 和 `render_evidence.py`。文档影响按 [文档生命周期](文档生命周期.md) 由 Agent 直接判断；检查器不根据源码 diff 强制传播文档更新。
 
 证据至少保留到任务交付完成。交付后可按任务目录归档或清理；具有长期审计价值的结论应保存稳定摘要或 artifact，不能假设 `target/` 永远不会被 `cargo clean` 删除。本次工作流不要求迁移或批量删除旧日志。
 

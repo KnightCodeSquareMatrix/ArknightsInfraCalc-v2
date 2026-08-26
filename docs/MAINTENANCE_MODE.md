@@ -34,7 +34,7 @@ Debug 任务按以下原则处理：
 - 已知 canonical 领域文档时直接完整读取；未知时才查 [INDEX.md](INDEX.md)。
 - 代码 owner、命令或生命周期位置不明时才定向查 [PROJECT_MAP.md](PROJECT_MAP.md)。
 - 本文按症状读取相关复现、定位和验收章节，不要求每个 debug 任务通读全文。
-- 所有结论性命令使用 `arknights-evidence`；搜索空间或求解保证变化再读取 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 的对应段。
+- 大型或高风险任务的结论性命令使用 `arknights-evidence`；普通局部修复可直接运行必要命令。搜索空间或求解保证变化再读取 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 的对应段。
 
 ## 2. Bug 处理流程
 
@@ -79,9 +79,9 @@ selection reject trace 尚未进入该入口。
 分量，中枢 EffectAtom 使用同一 apply loop 记录 condition、state write 与 GlobalInject merge。
 它不回答未选候选为何落败；输出含私人编制，必须重定向到任务专属私有 evidence。
 
-### 2.3 验证证据硬门禁
+### 2.3 验证与可选证据
 
-验证和证据要求以 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 为唯一文字真源，命令执行以 [scripts/codex/README.md](../scripts/codex/README.md) 为唯一工具入口。任何 test、build、CLI、benchmark、格式或结构校验都必须留痕；full suite 必须比较完整失败集合，真实 `plan` 必须使用任务专属 `out/` 产物。最终回复按实际类别链接证据，未跑项明确写“未跑”。
+验证和证据要求以 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 为唯一文字真源，命令执行以 [scripts/codex/README.md](../scripts/codex/README.md) 为工具说明。按改动风险选择验证深度；大型或高风险任务可用 wrapper、完整失败集合和任务专属产物形成可复现记录，普通任务不要求重复包装命令。最终回复说明实际运行的命令和未运行的高风险验证。
 
 ## 3. 分层定位
 
@@ -260,7 +260,7 @@ schedule_team_rotation
 
 ## 5. 验收矩阵
 
-按 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 选择与改动半径匹配的回归层级，并使用 [scripts/codex/run_evidence.sh](../scripts/codex/run_evidence.sh) 留痕。普通机制问题通常需要数据/solver 定向回归；编排和排班问题必须增加生命周期反例与一次真实 `plan` 或 `layout team-rotation`；CLI/MAA 问题必须检查实际输出字段和任务专属 JSON。
+按 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 选择与改动半径匹配的回归层级。大型或高风险任务可使用 [scripts/codex/run_evidence.sh](../scripts/codex/run_evidence.sh) 留痕；普通机制问题通常需要数据/solver 定向回归；编排和排班问题必须增加生命周期反例与一次真实 `plan` 或 `layout team-rotation`；CLI/MAA 问题必须检查实际输出字段和 JSON。
 
 不要用单元测试代替用户入口，也不要用 `layout test` 代替完整模拟；不要为了 `bake validate` 通过而提交大体积生成物。
 

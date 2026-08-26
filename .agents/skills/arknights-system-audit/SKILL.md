@@ -45,9 +45,9 @@ Declare one primary invariant, required/consumer/proof paths, and deferred findi
 
 ## Review and Prove
 
-Use independent read-only exploration and invariant extraction by default when both code reality and domain documents are nontrivial. Freeze the responsibility boundary before one writer starts. For rebuilds, use an adversarial reviewer on the actual diff and evidence.
+Use independent read-only exploration and invariant extraction by default when both code reality and domain documents are nontrivial. Freeze the responsibility boundary before one writer starts. For rebuilds, use an adversarial reviewer on the actual diff and any captured evidence.
 
-Require invariant-level regression and a real `plan` or `layout team-rotation` entry for scheduling/export changes. Use `arknights-evidence` for all command evidence and final scope/docs checks. Report the old illegal path, new owner, deleted conflicts, exact/heuristic impact if search space changed, tests, CLI result, and unresolved risks.
+Require invariant-level regression and a real `plan` or `layout team-rotation` entry for scheduling/export changes. Use `arknights-evidence` for formal audits and high-risk changes when durable command evidence is useful; it is not required for every audit command. Report the old illegal path, new owner, deleted conflicts, exact/heuristic impact if search space changed, tests, CLI result, and unresolved risks.
 
 If the audit owns an active TODO, plan, or change package, apply
 `../_shared/CHANGE_LIFECYCLE.md` after the invariant is proven. Formal

@@ -60,7 +60,7 @@ scripts/codex/render_evidence.py \
 
 ## 自测
 
-所有自测也必须通过证据包装器运行：
+本目录工具自身的回归可以通过证据包装器运行；普通仓库任务不要求使用包装器：
 
 ```bash
 scripts/codex/run_evidence.sh \

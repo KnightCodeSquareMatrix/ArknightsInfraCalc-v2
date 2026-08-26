@@ -26,7 +26,7 @@
 | `local` / local repair | 正确 owner 已能表达规则，只在 owner 内修正。 | [AGENTS.md](../AGENTS.md#2-真源与任务路由)、[Debug 指南](MAINTENANCE_MODE.md#11-任务与改动形态) |
 | `conformance-rebuild` | 现有模型无法表达已确认不变量，或多个阶段重复兜底时，重建单一责任边界。 | [AGENTS.md](../AGENTS.md#2-真源与任务路由)、[Debug 指南](MAINTENANCE_MODE.md#11-任务与改动形态) |
 | `formal-audit` | 用户要求严格逐项审计或两个 current canonical 冲突时启用的审计模式。 | [AGENTS.md](../AGENTS.md#2-真源与任务路由)、[体系审计工作流](SYSTEM_AUDIT_WORKFLOW.md) |
-| 验证留痕 | 用 `run_evidence.sh` 保存命令、输入、stdout/stderr、exit code 和产物到 `target/codex-runs/<task>/`。 | [质量与证据总则](QUALITY_AND_AUDIT.md#4-验证留痕) |
+| 验证留痕 | 按任务风险选择是否用 `run_evidence.sh` 保存命令、输入、stdout/stderr、exit code 和产物到 `target/codex-runs/<task>/`；不是所有任务的硬门禁。 | [质量与证据总则](QUALITY_AND_AUDIT.md#4-验证留痕按需) |
 
 ## 输入、布局与运行时对象
 
