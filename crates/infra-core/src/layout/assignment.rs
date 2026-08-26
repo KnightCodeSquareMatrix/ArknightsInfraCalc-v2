@@ -110,6 +110,9 @@ pub struct RoomEfficiencySnapshot {
     pub trade_equivalent_trade_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_equivalent_gold_efficiency: Efficiency,
+    /// 1:1 贸易/赤金归一化后的单房诊断值，不参与默认排序。
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub trade_combined_output_value: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_f64")]
     pub trade_output_per_day: f64,
     #[serde(default, skip_serializing_if = "is_zero_f64")]

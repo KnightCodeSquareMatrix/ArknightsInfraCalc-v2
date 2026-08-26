@@ -36,7 +36,7 @@ use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::{Condition, RecipeKind, Selector};
 use crate::FacilityKind;
 
-pub const BAKE_SCHEMA_VERSION: u32 = 12;
+pub const BAKE_SCHEMA_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BakeMode {
@@ -300,6 +300,8 @@ struct BakedComboRowDisk {
     trade_unit_output_multiplier_millis: Option<i32>,
     trade_final_efficiency_millis: Option<i32>,
     trade_equivalent_skill_efficiency_millis: Option<i32>,
+    trade_gold_equivalent_efficiency_millis: Option<i32>,
+    trade_combined_output_value_millis: Option<i32>,
     rule_id: Option<String>,
     unit_trade_per_day: Option<f64>,
     unit_gold_per_day: Option<f64>,
@@ -352,6 +354,12 @@ impl From<&BakedComboRow> for BakedComboRowDisk {
             trade_final_efficiency_millis: value.trade_final_efficiency.map(Efficiency::millis),
             trade_equivalent_skill_efficiency_millis: value
                 .trade_equivalent_skill_efficiency
+                .map(Efficiency::millis),
+            trade_gold_equivalent_efficiency_millis: value
+                .trade_gold_equivalent_efficiency
+                .map(Efficiency::millis),
+            trade_combined_output_value_millis: value
+                .trade_combined_output_value
                 .map(Efficiency::millis),
             rule_id: value.rule_id.clone(),
             unit_trade_per_day: value.unit_trade_per_day,
@@ -432,6 +440,12 @@ impl From<BakedComboRowDisk> for BakedComboRow {
                 .map(Efficiency::from_millis),
             trade_equivalent_skill_efficiency: value
                 .trade_equivalent_skill_efficiency_millis
+                .map(Efficiency::from_millis),
+            trade_gold_equivalent_efficiency: value
+                .trade_gold_equivalent_efficiency_millis
+                .map(Efficiency::from_millis),
+            trade_combined_output_value: value
+                .trade_combined_output_value_millis
                 .map(Efficiency::from_millis),
             rule_id: value.rule_id,
             unit_trade_per_day: value.unit_trade_per_day,
@@ -515,6 +529,8 @@ struct BakedComboRow {
     trade_final_efficiency: Option<Efficiency>,
     #[serde(rename = "te", skip_serializing_if = "Option::is_none")]
     trade_equivalent_skill_efficiency: Option<Efficiency>,
+    trade_gold_equivalent_efficiency: Option<Efficiency>,
+    trade_combined_output_value: Option<Efficiency>,
     #[serde(rename = "ri", skip_serializing_if = "Option::is_none")]
     rule_id: Option<String>,
     #[serde(rename = "utd", skip_serializing_if = "Option::is_none")]
@@ -986,7 +1002,7 @@ fn trade_combo_row(
         names,
         operator_indices,
         operator_mask,
-        sort_efficiency: result.efficiency.final_efficiency,
+        sort_efficiency: result.efficiency.total_efficiency,
         order_kind: Some(order_kind),
         recipe: None,
         trade_mechanism_signature,
@@ -1003,6 +1019,8 @@ fn trade_combo_row(
         ),
         trade_final_efficiency: Some(result.efficiency.final_efficiency),
         trade_equivalent_skill_efficiency: Some(result.efficiency.equivalent_skill_efficiency),
+        trade_gold_equivalent_efficiency: Some(result.efficiency.gold_equivalent_efficiency),
+        trade_combined_output_value: Some(result.efficiency.combined_output_value),
         rule_id: result.rule_id.clone(),
         unit_trade_per_day: Some(result.production.unit.unit_trade_per_day),
         unit_gold_per_day: Some(result.production.unit.unit_gold_per_day),
@@ -1144,6 +1162,8 @@ fn manufacture_combo_row(
         trade_unit_output_multiplier: None,
         trade_final_efficiency: None,
         trade_equivalent_skill_efficiency: None,
+        trade_gold_equivalent_efficiency: None,
+        trade_combined_output_value: None,
         rule_id: None,
         unit_trade_per_day: None,
         unit_gold_per_day: None,
@@ -1517,13 +1537,18 @@ impl CompleteBakedTradeCatalog {
                 occupancy_efficiency: efficiency.paper.occupancy_efficiency,
                 skill_efficiency: efficiency.paper.skill_efficiency,
                 control_efficiency: efficiency.paper.control_efficiency,
+                global_efficiency: efficiency.paper.control_efficiency,
                 paper_efficiency: efficiency.paper.paper_efficiency,
+                total_efficiency: efficiency.total_efficiency,
                 mechanic_equivalent_efficiency: result
                     .order_mechanic
                     .mechanic_equivalent_efficiency,
                 unit_output_multiplier: efficiency.production_basis.unit_output_multiplier,
                 final_efficiency: efficiency.final_efficiency,
                 equivalent_skill_efficiency: efficiency.equivalent_skill_efficiency,
+                trade_equivalent_efficiency: efficiency.trade_equivalent_efficiency,
+                gold_equivalent_efficiency: efficiency.gold_equivalent_efficiency,
+                combined_output_value: efficiency.combined_output_value,
                 unit_trade_per_day: result.production.unit.unit_trade_per_day,
                 unit_gold_per_day: result.production.unit.unit_gold_per_day,
                 rule_id: result.rule_id,
@@ -1815,11 +1840,11 @@ fn validate_baked_row_for_signature(row: &BakedComboRowDisk, key: &str) -> Resul
     if expected_key != key {
         return Err(Error::msg(format!("baked row does not match {key:?}")));
     }
-    let final_efficiency = row
-        .trade_final_efficiency_millis
+    let sort_efficiency = row
+        .trade_paper_efficiency_millis
         .or(row.manufacture_final_efficiency_millis)
         .ok_or_else(|| Error::msg(format!("baked row has no final efficiency in {key:?}")))?;
-    if row.sort_efficiency_millis != final_efficiency {
+    if row.sort_efficiency_millis != sort_efficiency {
         return Err(Error::msg(format!(
             "baked row sort key mismatch in {key:?}"
         )));
@@ -1837,6 +1862,8 @@ fn trade_response_fields_present(row: &BakedComboRowDisk) -> bool {
         && row.trade_unit_output_multiplier_millis.is_some()
         && row.trade_final_efficiency_millis.is_some()
         && row.trade_equivalent_skill_efficiency_millis.is_some()
+        && row.trade_gold_equivalent_efficiency_millis.is_some()
+        && row.trade_combined_output_value_millis.is_some()
         && row.unit_trade_per_day.is_some()
         && row.unit_gold_per_day.is_some()
         && row.unit_originium_per_day.is_some()
@@ -2331,10 +2358,14 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
             skill_efficiency: row.trade_skill_efficiency?,
             control_efficiency: row.trade_control_efficiency?,
             paper_efficiency: row.trade_paper_efficiency?,
+            total_efficiency: row.trade_paper_efficiency?,
             mechanic_equivalent_efficiency,
             unit_output_multiplier: row.trade_unit_output_multiplier?,
             final_efficiency,
             equivalent_skill_efficiency: row.trade_equivalent_skill_efficiency?,
+            trade_equivalent_efficiency: row.trade_equivalent_skill_efficiency?,
+            gold_equivalent_efficiency: row.trade_gold_equivalent_efficiency?,
+            combined_output_value: row.trade_combined_output_value?,
             unit_trade_per_day,
             unit_gold_per_day,
             rule_id: row.rule_id.clone(),

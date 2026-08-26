@@ -1613,3 +1613,122 @@ evidence-entry        luna-extractor  completed
 这次实验没有验证 durable resume/cancel、长期后台任务或跨 provider worker 混用，但这些不是当前 MVP 的缺口。原生 subagent 路径已满足本阶段“拆分、并行、只读、返回和汇总”的核心假设。
 
 因此当前结论收敛为：暂停 Worker Broker、MCP、Codex/Claude CLI adapter 和本地中转设计；先把现有 research-wave 结果接入统一 join/evidence 记录，再考虑任何异构 worker。
+
+---
+
+## 15. 2026-08-26：项目 Agent 编排与 OpenCode 配置收敛记录
+
+### 15.1 本轮目标与用户裁决
+
+本轮不是降低项目的质量门槛。用户的判断是：该项目是复杂的机制建模和求解器，赶进度后的代码容易膨胀为缺少责任边界和证明的实现；已有人工编排是刻意的质量控制。需要减少的是稳定、重复的调度和验收指令，而不是减少领域审查。
+
+用户确认的工作原则：
+
+- 主 Agent 先理解问题全貌、验收条件、相关模块和依赖，再分派工作；
+- 可独立且确有收益的调查、测试分析或互不重叠模块工作并行；强依赖、小任务和共享写入保持顺序；
+- 主 Agent 负责拆分、冲突处理、领域裁决、集成和最终验证；
+- 项目内有具体领域上下文的 agent 优先于通用 `plan-reviewer`；
+- 不把 Git 历史作为当前 bug 或错误结果的默认调查对象；
+- 工作区外本地文件、SQLite、日志可作为只读证据，但外部写入必须由用户明确授权。
+
+### 15.2 最近会话的观察证据
+
+对 2026-08-19 至 2026-08-26 的本地 OpenCode SQLite 会话记录做了只读审计：63 个主 `build`/`plan` 会话和 212 个直接 child session。以下是记录事实，不代表项目的长期统计结论。
+
+稳定主流程为：
+
+```text
+问题与领域约束
+→ 代码/数据/文档 owner 定位
+→ 独立只读调查或提取
+→ 用户或 canonical 裁决语义
+→ 单 writer 小范围实现
+→ fixture/真实入口/证据验证
+→ 领域复核
+→ 交付、checkpoint 与 deferred finding
+```
+
+会话显示的质量要求包括：公式和输出口径必须明确；计划与实现应分离；必须覆盖一般约束而不是仅让单个 fixture 通过；领域结论需要定向测试、真实入口或生成产物；dirty worktree 中必须隔离任务范围；高风险变更在 evidence 后复核。
+
+观察到的重复协调成本：
+
+- `git status --short` 在 47 个主会话中调用 135 次；开始、修改后、提交/发布前的状态转换检查有价值，其余重复查询通常无新信息。
+- 有 105 次 reviewer 委派；多轮复核曾发现真实缺陷，但同一稳定 diff 的重复终审也发生过。
+- 相同 `cargo fmt`、窄测试与 `cargo check` 多次运行；后续 release build 仍可能暴露调用点或集成遗漏，说明应优先使用一次完整的完成门禁而非重复窄测试。
+- 稳定 skill、示例和 metadata 被反复读取；用户发送“继续”71 次，表明 Agent 常在可逆实现/验证步骤前过早暂停。
+
+由此得出的工作流推断是：将 `preflight → patch batch → focused matrix → build/release gate → fresh review → final evidence` 固化到 project skill 与脚本，可以减少协调摩擦，同时不削弱审查强度。该推断仍需在真实任务中验证，而非视为已证明的效率改进。
+
+### 15.3 已落地的项目内协议
+
+本轮新增并修改了以下项目工件：
+
+- 根 `AGENTS.md`：机制/数据映射任务路由到 `arknights-maintenance` 加 `arknights-mechanics-contract`；高风险候选空间、剪枝、目标、Bake/cache 路由到求解保证复核；Team/Shift、心情、绑定或 MAA 路由到轮换复核。
+- `.agents/skills/arknights-mechanics-contract/SKILL.md`：定义 canonical 机制到运行时数据、L1/L2/L3 和结算 owner 的最小契约；要求数据行、公式、单位、范围、零值/边界/反例和 evidence，明确不裁决候选选择或排班。
+- `arknights-maintenance`：仅在触发时加载机制、求解保证或轮换协议，避免低风险 owner-local 修复被流程化膨胀。
+- `arknights-system-audit`：涉及 Team/Shift、休息、心情、绑定、容量、producer shutdown 或 MAA 时，要求 per-shift 断言、合法/非法 witness、真实入口和 MAA 产物检查。
+- `arknights-evidence`：非简单代码、求解器、体系或交付任务先运行一次 `preflight_harness.py`；相关 patch 批处理后再记录验证；未变 diff 不重复相同命令；tracked 高风险任务在交付前运行 `completion_gate.py`。
+
+新增的项目 OpenCode 只读 reviewer：
+
+| Agent | 职责 | 明确排除 | 模型与权限 |
+|---|---|---|---|
+| `mechanics-contract-auditor` | 技能、效率、无人机、电力、心情、订单、单位产出和 source-to-runtime 契约 | 候选选择、Plan admission、排班、部署 | Sol high；`read`/`glob`/`grep`/只读 shell |
+| `solver-guarantee-reviewer` | 候选空间、约束、剪枝、目标、top-K、Bake、cache 与保证声明 | 游戏公式裁决、泛化架构审查、部署 | Sol high；`read`/`glob`/`grep`/只读 shell |
+| `rotation-maa-reviewer` | Team/Shift、工作休息、心情、绑定、容量、producer shutdown 与 MAA fidelity | 未指定的 `auto_rotation`/`mower_dynamic`、单房机制解释 | Sol high；`read`/`glob`/`grep`/只读 shell |
+
+三者均只审 parent 已冻结的 scope、diff 和 evidence bundle；统一返回 `APPROVED`、`REVISE` 或 `INCONCLUSIVE`，并分别列出范围、可验证事实、阻塞发现、缺失证明和 out-of-scope 项。`INCONCLUSIVE` 用于缺少 canonical、真实入口、生成产物或关键证明，避免把材料不足误报为通过或缺陷。
+
+Shell 权限已从最初的 `deny` 调整为允许只读查询和既有验证命令。理由是 reviewer 需要检查 SQLite 对话记录、日志、真实 CLI、evidence manifest 与已生成产物。提示词仍禁止 shell 修改文件、仓库、数据库、生成物、服务或外部状态；`edit: deny` 保持不变。
+
+本轮验证：`scripts/codex` 的 66 个 Python 单测通过并已由 evidence wrapper 留痕；`check_repository_facts.py` 通过；相关 Markdown 与 agent frontmatter 通过 `git diff --check` 和 OpenCode agent 列表加载检查。
+
+### 15.4 全局 OpenCode 配置变更
+
+全局配置位于 `~/.config/opencode/`，不属于本仓库版本控制。本轮修改如下：
+
+- `AGENTS.md` 新增 orchestrator-first 的并行规则：复杂任务先建全貌；仅对两个及以上独立且有收益的工作单元在同一消息中并行委派；主 Agent 整合，避免同文件/共享状态并行写入。
+- `AGENTS.md` 新增 current-state analysis：bug、错误结果和行为异常默认检查当前代码、数据、文档、配置、测试与运行证据；不主动使用 `git log`、`git show`、`git blame`、历史分支或旧版本。仅在用户要求历史根因、回归定位、作者意图、兼容迁移，或当前证据无法区分仍影响结论的来源时调查历史。
+- 通用 `plan-reviewer` 已 `disable: true`；高风险评审不再默认兜底为通用 agent，而优先使用项目内领域 agent。
+- `AGENTS.md` 新增 external workspace policy：可读工作区外本地文件、目录、SQLite 与日志；默认外部访问只读，禁止未经用户授权的外部文件、数据库或服务写入，并要求最小化敏感内容读取与披露。
+- 全局 `opencode.json` 为 `build`、`plan`、`general`、`explore` 和顶层配置显式设定 `external_directory: {"*":"allow"}`。OpenCode 默认内建规则会保留 `ask`，故必须由每个 agent 的后置规则覆盖；已通过 `opencode debug config` 与 `opencode debug agent` 检查解析结果。
+
+OpenCode 的 `external_directory` 只控制路径边界，不能表示“外部目录只读”。外部写入限制依赖各 agent 的 `edit` 权限和顶层提示词；需要强隔离时应使用 `edit: deny` 的只读 agent，而不能把全局 `external_directory: allow` 误解为类似 Codex 的完整访问模式。
+
+### 15.5 当前模型分工假设与未完成设计
+
+本轮讨论形成的暂定分工：
+
+```text
+DeepSeek: 低成本事实层
+  提取、分类、日志/JSON/SQLite 查询、明确范围的文件/调用链定位
+
+Terra: 主编排与常规实现层
+  建立全貌、任务拆分、跨文件结论整合、普通 owner-local 修复、测试设计
+
+Sol high: 高风险裁决层
+  机制契约、求解保证、轮换/MAA 的冻结 diff 与证据包复核
+```
+
+当前 `luna-extractor` 已适合 DeepSeek。`terra-explorer` 的现有职责大部分也是明确范围的代码/文档/调用链调查，因此很可能可以迁移到 DeepSeek；但“调查目标尚模糊、跨领域且需要不断选择下一条调查路径”的少数任务仍可能需要 Terra。
+
+这不是已完成的 agent 重设计。尚待完成：
+
+1. 重新定义 `luna-extractor` 与 `terra-explorer` 的边界，避免两个低成本事实 agent 重叠。
+2. 为 DeepSeek agent 设置升级契约：材料冲突、责任边界不清、需要领域裁决或无法给出可追溯证据时，返回结构化升级请求给 Terra，不自行扩大推断。
+3. 为 Terra 主 Agent 明确何时必须调用三类 Sol reviewer，以及每个稳定 diff 只允许一次初审与一次基于新 diff 的复审。
+4. 在真实任务中记录模型质量、延迟、成本、漏检和错误升级率，再决定是否将 `terra-explorer` 完全迁移到 DeepSeek。
+
+### 15.6 运行时并行的澄清
+
+OpenCode 原生 `task` 在同一 assistant 消息中提交多个调用时可并行执行，但该工具调用批次会等待所有结果返回后，主 Agent 才进入下一轮工具操作。它不是“启动后台任务后主 Agent 可立即继续做别的工作”的异步 API。
+
+因此当前可用模式是：
+
+```text
+同一消息提交多个独立 task
+→ 等待全部 child 结果
+→ 主 Agent 汇总、实现或继续验证
+```
+
+先前观察到的串行行为通常发生在模型每轮只生成一个 task call，即使其文字声称会并行。顶层提示词要求同一消息一次发出独立调用，是提高实际并发概率的提示约束，不是运行时调度器。

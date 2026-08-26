@@ -1,50 +1,26 @@
 {
   "schema_version": 4,
-  "rotation_profile": "abc_12_6_6",
+  "rotation_profile": "main_backup_12_12",
   "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/operbox_full_e2.json",
+  "operbox_label": "data/fixtures/243/operbox_full_e2.json",
   "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 418,
     "tier_up_owned": 418,
-    "trade_pool_ready": 75,
+    "trade_pool_ready": 74,
     "manufacture_pool_ready": 90
   },
   "domains": [
-    {
-      "id": "trade_gold",
-      "label": "贸易·赤金线",
-      "current": {
-        "operators": [
-          "卡夫卡",
-          "巫恋",
-          "龙舌兰"
-        ],
-        "final_efficiency": 2.606,
-        "mechanic_equivalent_efficiency": 0.46
-      },
-      "baseline": {
-        "operators": [
-          "巫恋",
-          "龙舌兰",
-          "卡夫卡"
-        ],
-        "final_efficiency": 2.482,
-        "mechanic_equivalent_efficiency": 0.46
-      },
-      "gap_ratio": 0.049959709911361665,
-      "severity": "ok"
-    },
     {
       "id": "trade_originium",
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "贝洛内",
-          "伺夜",
-          "但书"
+          "但书",
+          "推进之王",
+          "摩根"
         ],
-        "final_efficiency": 3.1
+        "final_efficiency": 3.073
       },
       "baseline": {
         "operators": [
@@ -52,9 +28,9 @@
           "乌有",
           "黑键"
         ],
-        "final_efficiency": 2.79
+        "final_efficiency": 2.794
       },
-      "gap_ratio": 0.11111111111111113,
+      "gap_ratio": 0.09985683607730848,
       "severity": "ok"
     },
     {
@@ -62,11 +38,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "温蒂",
+          "森蚺",
           "清流",
-          "森蚺"
+          "温蒂"
         ],
-        "final_efficiency": 9.096
+        "final_efficiency": 9.406
       },
       "baseline": {
         "operators": [
@@ -74,9 +50,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.392
+        "final_efficiency": 8.102
       },
-      "gap_ratio": 0.0838894184938037,
+      "gap_ratio": 0.16094791409528514,
       "severity": "ok"
     },
     {
@@ -84,11 +60,11 @@
       "label": "制造·赤金产线",
       "current": {
         "operators": [
-          "温蒂",
+          "森蚺",
           "清流",
-          "森蚺"
+          "温蒂"
         ],
-        "final_efficiency": 2.363
+        "final_efficiency": 2.343
       },
       "baseline": {
         "operators": [
@@ -96,9 +72,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.238
+        "final_efficiency": 2.093
       },
-      "gap_ratio": 0.05585344057193923,
+      "gap_ratio": 0.11944577161968467,
       "severity": "ok"
     },
     {
@@ -106,11 +82,11 @@
       "label": "制造·经验产线",
       "current": {
         "operators": [
-          "乌尔比安",
-          "弑君者",
-          "断罪者"
+          "灰毫",
+          "远牙",
+          "迷迭香"
         ],
-        "final_efficiency": 2.185
+        "final_efficiency": 2.36
       },
       "baseline": {
         "operators": [
@@ -120,7 +96,7 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": 0.11593462717058227,
+      "gap_ratio": 0.20531154239019403,
       "severity": "ok"
     },
     {
@@ -128,13 +104,13 @@
       "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 5.34
+        "final_efficiency": 4.335
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 5.352
+        "final_efficiency": 3.84
       },
-      "gap_ratio": -0.002242152466367798,
+      "gap_ratio": 0.12890625000000003,
       "severity": "ok"
     },
     {
@@ -142,29 +118,27 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 9.29
+        "final_efficiency": 9.048
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 9.084
+        "final_efficiency": 8.938
       },
-      "gap_ratio": 0.02267723469837071,
+      "gap_ratio": 0.01230700380398293,
       "severity": "ok"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 5.34,
-    "daily_manufacture_efficiency": 9.29,
-    "daily_power_efficiency": 3.664
+    "daily_trade_efficiency": 4.335,
+    "daily_manufacture_efficiency": 9.048,
+    "daily_power_efficiency": 3.643
   },
   "baseline_rotation": {
-    "daily_trade_efficiency": 5.352,
-    "daily_manufacture_efficiency": 9.084,
+    "daily_trade_efficiency": 3.84,
+    "daily_manufacture_efficiency": 8.938,
     "daily_power_efficiency": 3.627
   },
   "actions": [],
-  "flags": [
-    "trade_gold_ok"
-  ],
+  "flags": [],
   "narration_hints": []
 }

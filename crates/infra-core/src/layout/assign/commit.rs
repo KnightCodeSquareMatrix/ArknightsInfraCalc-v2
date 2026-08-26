@@ -104,6 +104,7 @@ pub(super) fn trade_efficiency_snapshot(hit: &TradeSearchHit) -> RoomEfficiencyS
         trade_equivalent_skill_efficiency: breakdown.equivalent_skill_efficiency,
         trade_equivalent_trade_efficiency: breakdown.trade_equivalent_efficiency,
         trade_equivalent_gold_efficiency: breakdown.gold_equivalent_efficiency,
+        trade_combined_output_value: breakdown.combined_output_value,
         trade_output_per_day: breakdown.trade_output_per_day,
         gold_consumption_per_day: breakdown.gold_consumption_per_day,
         trade_originium_shards_per_day: breakdown.originium_shards_per_day,

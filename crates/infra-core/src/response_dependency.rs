@@ -1351,7 +1351,7 @@ mod tests {
         assert!(report.external_atom_count > 0);
         assert!(report.rows.iter().any(|row| {
             row.target_facility == "trade"
-                && row.selector.as_deref() == Some("tagged_count_in_trade_sum")
+                && row.selector.as_deref() == Some("tagged_count_in_current_trade_room")
         }));
         assert!(report.resource_conversions.iter().any(|conversion| {
             conversion.from == "dream"

@@ -359,8 +359,8 @@ mod tests {
                 tailor.clone(),
             ],
         );
-        assert!((e0.unit_trade_per_day - 11_192.9).abs() < 0.001);
-        assert!((e0.gsl_unit_gold() - 837.56).abs() < 0.001);
+        assert!((e0.unit_trade_per_day - 11_331.04).abs() < 0.001);
+        assert!((e0.gsl_unit_gold() - 957.76).abs() < 0.001);
 
         let (e2, _) = solve_unit(
             3,

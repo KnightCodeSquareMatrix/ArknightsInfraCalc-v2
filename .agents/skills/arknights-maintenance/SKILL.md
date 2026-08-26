@@ -26,6 +26,14 @@ Keep one observable invariant in scope. A small change is correct when the exist
 
 If canonical Markdown conflicts, stop semantic writing and request a ruling. Code, tests, fixtures, and output cannot choose the rule.
 
+## Add Domain Protocols Only When Triggered
+
+- Skill, efficiency, drone, power, mood, order, unit-output, or runtime data-mapping changes: also load `arknights-mechanics-contract`. It owns source-to-runtime mapping and formula proof, not candidate selection or scheduling.
+- Candidate universe, pruning, decomposition, objective, top-K, Bake, or cache changes: classify the guarantee in `arknights-quality`; for medium/high-risk changes, request `solver-guarantee-reviewer` on the frozen diff and evidence.
+- Team/Shift membership, work/rest, mood, binds, capacity, producer shutdown, or MAA output changes: also load `arknights-system-audit` and request `rotation-maa-reviewer` before final delivery.
+
+Do not load every protocol for an owner-local repair. The primary maintenance scope remains one observable invariant.
+
 ## Implement and Stop
 
 1. Change the earliest owner that permits the invalid state; keep normal domain paths intact.

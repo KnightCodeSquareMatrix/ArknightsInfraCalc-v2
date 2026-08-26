@@ -509,6 +509,7 @@ pub(super) fn refresh_trade_efficiency_snapshots(
                 trade_equivalent_skill_efficiency: solved.efficiency.equivalent_skill_efficiency,
                 trade_equivalent_trade_efficiency: solved.efficiency.trade_equivalent_efficiency,
                 trade_equivalent_gold_efficiency: solved.efficiency.gold_equivalent_efficiency,
+                trade_combined_output_value: solved.efficiency.combined_output_value,
                 trade_output_per_day: solved.production.unit.unit_trade_per_day
                     * solved.efficiency.total_efficiency.as_f64(),
                 gold_consumption_per_day: solved.production.unit.gold_consumption_per_day
@@ -1250,7 +1251,7 @@ mod tests {
     }
 
     #[test]
-    fn final_refresh_updates_earlier_trade_snapshot_after_later_tagged_consumer_commits() {
+    fn final_refresh_keeps_earlier_trade_snapshot_current_room_scoped() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let blueprint = BaseBlueprint {
@@ -1320,6 +1321,10 @@ mod tests {
             .efficiency_in(&RoomId::from("trade_a"))
             .unwrap()
             .trade_paper_efficiency;
+        let one_control = assignment
+            .efficiency_in(&RoomId::from("trade_a"))
+            .unwrap()
+            .trade_control_efficiency;
 
         assignment.set_room(
             "trade_b",
@@ -1339,9 +1344,14 @@ mod tests {
             .unwrap()
             .trade_paper_efficiency;
         assert_eq!(
-            two_consumers - one_consumer,
+            one_control,
             crate::Efficiency::from_decimal(0.050),
-            "后站提交第二名标签 consumer 后，前站快照也必须按最终全局人数刷新"
+            "trade_a 站内 1 名叙拉古（伺夜）→ +5% 中枢注入"
+        );
+        assert_eq!(
+            two_consumers - one_consumer,
+            crate::Efficiency::ZERO,
+            "八幡海铃按站内 scope 结算，trade_b 加入叙拉古不得改变 trade_a 注入"
         );
     }
 }

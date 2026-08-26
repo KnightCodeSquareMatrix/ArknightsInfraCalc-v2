@@ -279,6 +279,47 @@ impl MoodModel {
             .sum()
     }
 
+    pub fn control_smiley_recovery_value(&self, control_operators: &[(String, u8)]) -> f64 {
+        self.control_smiley_recovery_for_facility(FacilityKind::ControlCenter, control_operators)
+    }
+
+    pub fn control_smiley_recovery_for_facility(
+        &self,
+        facility: FacilityKind,
+        control_operators: &[(String, u8)],
+    ) -> f64 {
+        let Some(smiley) = &self.control_smiley_recovery else {
+            return 0.0;
+        };
+        let provider_count = smiley
+            .providers
+            .iter()
+            .filter(|provider| {
+                control_operators
+                    .iter()
+                    .any(|(name, elite)| name == &provider.name && *elite >= provider.elite)
+            })
+            .count();
+        if provider_count == 0 {
+            return 0.0;
+        }
+        let total = smiley.per_provider * provider_count as f64;
+        if facility == FacilityKind::ControlCenter {
+            return total;
+        }
+        let spread = self.control_global_recovery.iter().any(|entry| {
+            entry.spread_smiley
+                && control_operators
+                    .iter()
+                    .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
+        });
+        if spread {
+            total
+        } else {
+            0.0
+        }
+    }
+
     /// 当前进驻人数减免（仅 trade/factory；1/2/3 人对应 0/0.05/0.1）。
     pub fn occupancy_reduction(&self, facility: FacilityKind, occupancy: usize) -> f64 {
         let Some(key) = facility_key(facility) else {

@@ -71,38 +71,7 @@ fn control_global_recovery_hit(model: &MoodModel, inputs: &DrainInputs<'_>) -> f
 ///
 /// 在中枢内始终生效；精二玛恩纳在岗时扩散到其他生产/功能设施。
 fn control_smiley_recovery_hit(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
-    let Some(smiley) = &model.control_smiley_recovery else {
-        return 0.0;
-    };
-    let provider_count = smiley
-        .providers
-        .iter()
-        .filter(|provider| {
-            inputs
-                .control_ops
-                .iter()
-                .any(|(name, elite)| name == &provider.name && *elite >= provider.elite)
-        })
-        .count();
-    if provider_count == 0 {
-        return 0.0;
-    }
-    let total = smiley.per_provider * provider_count as f64;
-    if inputs.facility == FacilityKind::ControlCenter {
-        return total;
-    }
-    let spread = model.control_global_recovery.iter().any(|entry| {
-        entry.spread_smiley
-            && inputs
-                .control_ops
-                .iter()
-                .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
-    });
-    if spread {
-        total
-    } else {
-        0.0
-    }
+    model.control_smiley_recovery_for_facility(inputs.facility, inputs.control_ops)
 }
 
 /// 自身技能对本人产生的消耗修正（受同房「消除自身消耗」抵消；recipe 门限校验）。

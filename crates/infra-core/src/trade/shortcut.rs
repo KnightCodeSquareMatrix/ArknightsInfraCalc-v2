@@ -364,7 +364,7 @@ fn resolve_trade_shortcut_inner(
     if let Some(m) = match_docus_solo_shortcut(ops, table) {
         return Some(m);
     }
-    if let Some(m) = match_witch_group_shortcut(ops, table) {
+    if let Some(m) = match_witch_group_shortcut(ops, table, trade_level) {
         return Some(m);
     }
     if let Some(m) = match_blackkey_closure_shortcut(ops, table) {
@@ -531,14 +531,21 @@ pub fn match_docus_syracusa_shortcut(
 pub fn match_witch_group_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
+    trade_level: u8,
 ) -> Option<TradeShortcutMatch> {
+    if trade_level != 3 {
+        return None;
+    }
     let kind = classify_witch_room(ops, table)?;
     let id = match kind {
         WitchRoomKind::LongE2Beta => "gsl_witch_long_beta",
         WitchRoomKind::LongE2Alpha => "gsl_witch_long_alpha",
         WitchRoomKind::LongE2Blank => "gsl_witch_long_blank",
+        WitchRoomKind::LongE0Beta => "gsl_witch_long0_beta",
         WitchRoomKind::LongE0Alpha => "gsl_witch_long0_alpha",
         WitchRoomKind::LongE0Blank => "gsl_witch_long0_blank",
+        WitchRoomKind::LongE1Alpha => "gsl_witch_long1_alpha",
+        WitchRoomKind::LongE1Blank => "gsl_witch_long1_blank",
         WitchRoomKind::BetaBlankNoLongE2 => "gsl_witch_beta_blank",
     };
     let cache = trade_shortcut_cache()?;
@@ -551,8 +558,11 @@ enum WitchRoomKind {
     LongE2Beta,
     LongE2Alpha,
     LongE2Blank,
+    LongE0Beta,
     LongE0Alpha,
     LongE0Blank,
+    LongE1Alpha,
+    LongE1Blank,
     BetaBlankNoLongE2,
 }
 
@@ -567,7 +577,8 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
 
     let long = find_op(ops, "龙舌兰");
     let long_e2 = long.is_some_and(|o| o.elite >= 2);
-    let long_e0_only = long.is_some_and(|o| o.elite < 2);
+    let long_e0_only = long.is_some_and(|o| o.elite == 0);
+    let long_e1_only = long.is_some_and(|o| o.elite == 1);
 
     let has_beta = ops
         .iter()
@@ -585,11 +596,20 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
     if long_e2 && !has_beta && !has_alpha {
         return Some(WitchRoomKind::LongE2Blank);
     }
+    if long_e0_only && has_beta {
+        return Some(WitchRoomKind::LongE0Beta);
+    }
     if long_e0_only && has_alpha && !has_beta {
         return Some(WitchRoomKind::LongE0Alpha);
     }
     if long_e0_only && !has_beta && !has_alpha {
         return Some(WitchRoomKind::LongE0Blank);
+    }
+    if long_e1_only && has_alpha && !has_beta {
+        return Some(WitchRoomKind::LongE1Alpha);
+    }
+    if long_e1_only && !has_beta && !has_alpha {
+        return Some(WitchRoomKind::LongE1Blank);
     }
     if !long_e2 && has_beta && has_blank_third(ops, table) {
         return Some(WitchRoomKind::BetaBlankNoLongE2);
@@ -1012,7 +1032,7 @@ mod tests {
             mk_op("龙舌兰", 2, vec!["trade_ord_long[010]"]),
             mk_op("卡夫卡", 2, vec!["trade_ord_wt&cost[011]"]),
         ];
-        let m = match_witch_group_shortcut(&ops, &table).expect("match");
+        let m = match_witch_group_shortcut(&ops, &table, 3).expect("match");
         assert_eq!(m.entry.id, "gsl_witch_long_beta");
         assert_eq!(
             m.entry.mechanic_equivalent_efficiency,
@@ -1036,11 +1056,43 @@ mod tests {
                 tailor.clone(),
             ],
             &table,
+            3,
         )
         .expect("E0 Tequila alpha");
         assert_eq!(e0.entry.id, "gsl_witch_long0_alpha");
-        assert_eq!(e0.community_unit_trade_per_day(3, 10_265.0), Some(11_192.9));
-        assert_eq!(e0.entry.unit_gsl_gold_anchor, Some(837.56));
+        assert_eq!(
+            e0.community_unit_trade_per_day(3, 10_265.0),
+            Some(11_331.04)
+        );
+        assert_eq!(e0.entry.unit_gsl_gold_anchor, Some(957.76));
+
+        let e0_beta = match_witch_group_shortcut(
+            &[
+                witch.clone(),
+                mk_op("龙舌兰", 0, vec!["trade_ord_long[000]"]),
+                mk_op("卡夫卡", 2, vec!["trade_ord_wt&cost[011]"]),
+            ],
+            &table,
+            3,
+        )
+        .expect("E0 Tequila beta");
+        assert_eq!(e0_beta.entry.id, "gsl_witch_long0_beta");
+        assert_eq!(
+            e0_beta.community_unit_trade_per_day(3, 10_265.0),
+            Some(11_575.34)
+        );
+        assert_eq!(e0_beta.entry.unit_gsl_gold_anchor, Some(1_164.384));
+
+        assert!(match_witch_group_shortcut(
+            &[
+                witch.clone(),
+                mk_op("龙舌兰", 0, vec!["trade_ord_long[000]"]),
+                tailor.clone(),
+            ],
+            &table,
+            2,
+        )
+        .is_none());
 
         let e2 = match_witch_group_shortcut(
             &[
@@ -1049,6 +1101,7 @@ mod tests {
                 tailor,
             ],
             &table,
+            3,
         )
         .expect("E2 Tequila alpha");
         assert_eq!(e2.entry.id, "gsl_witch_long_alpha");
@@ -1076,7 +1129,7 @@ mod tests {
             ),
         ];
         assert!(docus_tailor_exclusive_violation(&witch_long_docus, &table));
-        assert!(match_witch_group_shortcut(&witch_long_docus, &table).is_none());
+        assert!(match_witch_group_shortcut(&witch_long_docus, &table, 3).is_none());
 
         let docus_solo = vec![
             mk_op(
@@ -1107,7 +1160,7 @@ mod tests {
             mk_op("卡夫卡", 2, vec!["trade_ord_wt&cost[011]"]),
             mk_op("古米", 0, vec!["trade_ord_spd&cost[000]"]),
         ];
-        let m = match_witch_group_shortcut(&ops, &table).expect("match");
+        let m = match_witch_group_shortcut(&ops, &table, 3).expect("match");
         assert_eq!(m.entry.id, "gsl_witch_beta_blank");
         assert_eq!(m.entry.mechanic_equivalent_efficiency, Efficiency::ZERO);
     }
@@ -1186,7 +1239,7 @@ mod tests {
                 .is_none()
         );
         assert!(match_closure_shortcut(&mix, &table, 134.0, 3).is_none());
-        assert!(match_witch_group_shortcut(&mix, &table).is_none());
+        assert!(match_witch_group_shortcut(&mix, &table, 3).is_none());
     }
 
     #[test]

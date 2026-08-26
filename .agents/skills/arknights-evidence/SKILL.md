@@ -9,10 +9,11 @@ Use repository evidence tools when a task needs durable, reproducible verificati
 
 ## Record Runs
 
-1. Create task metadata from `scripts/codex/task_metadata.example.json`: one invariant, root layer, required/consumer/proof/deferred paths, side findings, and reviewer fields.
-2. Run `scripts/codex/run_evidence.sh --task <slug> --category <category> --stem <name> --inputs '<inputs>' -- <command...>`.
-3. Register generated profile, MAA, comparison, or report files with repeated `--artifact kind=path`.
-4. Keep every rerun. Do not overwrite failures or use shared output names.
+1. For a large or high-risk task, run `python3 scripts/codex/preflight_harness.py` once before changing files when the harness boundary matters.
+2. For durable task evidence, create metadata from `scripts/codex/task_metadata.example.json`.
+3. Batch related patches before formatting and testing. Use `scripts/codex/run_evidence.sh` for distinct verification purposes when the task needs reproducible logs or artifacts.
+4. Register generated profile, MAA, comparison, or report files with repeated `--artifact kind=path` when using the wrapper.
+5. Keep every rerun when using the wrapper. Do not overwrite failures or use shared output names.
 
 Use categories `build`, `targeted-test`, `full-suite`, `cli`, `performance`, `format`, and `structure`. Include actual layout, operbox, assignment, fixture, policy, output, baseline, seed, and time limit when relevant.
 
@@ -40,6 +41,7 @@ Before completion run:
 
 1. `scripts/codex/check_task_scope.py --manifest <manifest>`;
 2. `scripts/codex/render_evidence.py --manifest <manifest> --output <report>`.
+3. `python3 scripts/codex/completion_gate.py --task <slug> --manifest <manifest>` for tasks that opted into the evidence workflow.
 
 When a task closes or supersedes tracked work, inspect the final tree as well as
 the diff and require the lifecycle hard check; scope scripts do

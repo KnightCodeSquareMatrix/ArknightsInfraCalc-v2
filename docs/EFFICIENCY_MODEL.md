@@ -34,7 +34,7 @@ expected_output = unit_output_per_day × total_efficiency × minutes / 1440
 - `Display` / CSV / 文本固定输出三位小数；
 - JSON 输出数值而不是百分比或原始千分整数，数值已量化到三位小数。
 
-bake schema v12 直接保存 `*_efficiency_millis: i32`，加载后还原为
+bake schema v13 直接保存 `*_efficiency_millis: i32`，加载后还原为
 `Efficiency`。因此 bake 的排序、序列化和运行时比较不再依赖浮点数，也不会受平台
 浮点尾差影响。
 
@@ -87,7 +87,8 @@ gold_output_per_day = gold_unit_output_per_day × total_efficiency
 | 可露希尔 | 12000 | 2000 |
 | 龙舌兰 + 裁缝 β | 12739.73 | 2328.77 |
 | 巫恋 E2 + 龙舌兰 E2 + 裁缝 α | 12030.46 | 1675.127 |
-| 巫恋 E2 + 龙舌兰 E0 + 裁缝 α | 11192.9 | 837.56 |
+| 巫恋 E2 + 龙舌兰 E0 + 裁缝 α | 11331.04 | 957.76 |
+| 巫恋 E2 + 龙舌兰 E0 + 裁缝 β | 11575.34 | 1164.384 |
 | 龙舌兰 + 但书 + 纯效率 | 16637.17 | 707.96 |
 | 但书 E2，一级站 | 20000 | 0 |
 | 但书 E2，二级站 | 18591.55 | 0 |
@@ -116,9 +117,13 @@ trade_equivalent_efficiency = total_efficiency × trade_role_multiplier
                               - base_efficiency
                               - global_efficiency
 gold_equivalent_efficiency = total_efficiency × gold_role_multiplier
+
+combined_output_value = total_efficiency × trade_role_multiplier
+                      + total_efficiency × gold_role_multiplier
 ```
 
 贸易等效效率用于比较“需要多少普通贸易技能效率”，所以扣除基础和中枢加成。赤金等效效率只如实还原特殊组合具备的赤金产能，不扣除基础效率、中枢加成或贸易订单消耗。贸易和赤金各有独立的 `role_multiplier`、`equivalent_efficiency`、`unit_output_per_day` 和实际产出。
+`combined_output_value` 是用户裁决的贸易:赤金 `1:1` 归一化单房诊断值，不是生产效率，不进入默认贸易排序、`DailyTotals` 或通用 solver comparator。
 
 ### 3.3 制造
 
@@ -196,5 +201,5 @@ schema，也不自动成为其他 System / Rule alternative 的 comparator。
  - `REGRESSION_CASES.csv` 的旧列仍用于内部回归兼容；新增回归应锚定 `total_efficiency`、单位日产出和实际产出；
 - `UNIT_OUTPUT_ANCHORS.csv` 独立锚定社区单位产出；
 - `verify --all` 同时验证最终效率、机制解释、规则 ID 与单位产出；
-- bake 需要 schema v12，旧 schema 不兼容，必须重新生成；
+- bake 需要 schema v13，旧 schema 不兼容，必须重新生成；
 - CLI 文本和 CSV 的效率列固定三位小数，JSON 效率为已量化的数值。

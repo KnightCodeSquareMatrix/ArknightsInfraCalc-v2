@@ -48,6 +48,8 @@ pub(super) struct PlanComputeOptions {
     pub maa_title: Option<String>,
     #[serde(default = "default_fiammetta_enable")]
     pub fiammetta_enable: bool,
+    #[serde(default)]
+    pub assert_invariants: bool,
 }
 
 fn default_top_k() -> usize {

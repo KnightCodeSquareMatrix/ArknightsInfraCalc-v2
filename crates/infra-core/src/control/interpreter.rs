@@ -955,32 +955,38 @@ mod tests {
     }
 
     #[test]
-    fn haru_trade_tagged_inject_is_delayed_and_resolves_zero_one_two() {
-        let mut layout = LayoutContext::default();
-        let solve = |layout: LayoutContext| {
-            solve_control(
-                &ControlRoomInput {
-                    operators: vec![control_op("八幡海铃", 2)],
-                    mood: 24.0,
-                    layout,
-                },
-                &table(),
-            )
-        };
+    fn haru_trade_tagged_inject_is_delayed_and_resolves_current_trade_room() {
+        let result = solve_control(
+            &ControlRoomInput {
+                operators: vec![control_op("八幡海铃", 2)],
+                mood: 24.0,
+                layout: LayoutContext::default(),
+            },
+            &table(),
+        );
+        assert!(result.inject.has_dynamic_trade_inject());
+        assert_eq!(result.inject.trade_tagged().len(), 1);
+        assert_eq!(
+            result.inject.trade_tagged()[0].count_scope,
+            TradeTaggedCountScope::CurrentTradeRoom
+        );
 
-        let zero = solve(layout.clone());
-        assert!(zero.inject.has_dynamic_trade_inject());
-        assert_eq!(zero.inject.trade_eff_pct(), 0.0);
-
-        layout
-            .trade_tagged_count_sum
-            .insert("cc.g.siracusa".to_string(), 1);
-        assert_eq!(solve(layout.clone()).inject.trade_eff_pct(), 5.0);
-
-        layout
-            .trade_tagged_count_sum
-            .insert("cc.g.siracusa".to_string(), 2);
-        assert_eq!(solve(layout).inject.trade_eff_pct(), 10.0);
+        // 八幡海铃只按各贸易房站内叙拉古人数结算；全站 3 名不得跨站串入统一全局值。
+        let all_counts = std::collections::HashMap::from([("cc.g.siracusa".to_string(), 3)]);
+        for (in_room, expected) in [(0, 0.0), (1, 5.0), (2, 10.0)] {
+            let room = if in_room == 0 {
+                std::collections::HashMap::new()
+            } else {
+                std::collections::HashMap::from([("cc.g.siracusa".to_string(), in_room)])
+            };
+            assert_eq!(
+                result
+                    .inject
+                    .trade_eff_pct_with_scoped_tag_counts(&all_counts, &room),
+                expected,
+                "站内 {in_room} 名叙拉古 → {expected}%"
+            );
+        }
     }
 
     #[test]

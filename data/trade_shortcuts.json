@@ -36,7 +36,39 @@
     },
     {
       "id": "gsl_witch_long0_alpha",
-      "label": "巫恋Ⅱ+龙舌兰0/1 + 裁缝a",
+      "label": "巫恋Ⅱ+龙舌兰精0 + 裁缝α",
+      "mechanic_equivalent_efficiency": 0.0,
+      "tailor_tier": "alpha",
+      "unit_gsl_gold_anchor": 957.76,
+      "unit_output": {
+        "kind": "enhanced_unit_output_per_day",
+        "value": 11331.04
+      },
+      "unit_output_source": "用户裁决：三级贸易站、精0龙舌兰+巫恋自身裁缝α+外部裁缝α",
+      "unit_output_precision": "exact",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long0_beta",
+      "label": "巫恋Ⅱ+龙舌兰精0 + 裁缝β",
+      "mechanic_equivalent_efficiency": 0.0,
+      "tailor_tier": "beta",
+      "unit_gsl_gold_anchor": 1164.384,
+      "unit_output": {
+        "kind": "enhanced_unit_output_per_day",
+        "value": 11575.34
+      },
+      "unit_output_source": "用户裁决：三级贸易站、精0龙舌兰+巫恋自身裁缝α+外部裁缝β",
+      "unit_output_precision": "exact",
+      "match": {
+        "kind": "witch"
+      }
+    },
+    {
+      "id": "gsl_witch_long1_alpha",
+      "label": "巫恋Ⅱ+龙舌兰精1 + 裁缝α（旧低练锚点）",
       "mechanic_equivalent_efficiency": 0.0,
       "tailor_tier": "alpha",
       "unit_gsl_gold_anchor": 837.56,
@@ -44,7 +76,7 @@
         "kind": "enhanced_unit_output_per_day",
         "value": 11192.9
       },
-      "unit_output_source": "用户裁决：三级贸易站、精0/精1龙舌兰+裁缝a",
+      "unit_output_source": "既有精0/精1低练兼容锚点；本轮未新增精1社区数值",
       "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
@@ -175,6 +207,21 @@
       "unit_output_precision": "exact",
       "match": {
         "kind": "docus"
+      }
+    },
+    {
+      "id": "gsl_witch_long1_blank",
+      "label": "巫恋Ⅱ+龙舌兰精1 + 白板（旧低练锚点）",
+      "mechanic_equivalent_efficiency": 0.17,
+      "tailor_tier": "regular",
+      "unit_output": {
+        "kind": "enhanced_unit_output_per_day",
+        "value": 11222.357513
+      },
+      "unit_output_source": "既有精0/精1低练兼容锚点；本轮未新增精1社区数值",
+      "unit_output_precision": "derived_from_rounded_equivalent",
+      "match": {
+        "kind": "witch"
       }
     },
     {

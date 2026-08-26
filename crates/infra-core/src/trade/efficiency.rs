@@ -65,6 +65,8 @@ pub struct TradeEfficiency {
     pub equivalent_skill_efficiency: Efficiency,
     pub trade_equivalent_efficiency: Efficiency,
     pub gold_equivalent_efficiency: Efficiency,
+    /// 1:1 policy diagnostic: normalized trade output plus normalized gold output.
+    pub combined_output_value: Efficiency,
     pub applies_paper_efficiency: bool,
 }
 
@@ -97,6 +99,8 @@ impl TradeEfficiency {
         } else {
             Efficiency::ZERO
         };
+        let combined_output_value =
+            total_efficiency * unit_output_multiplier + total_efficiency * gold_output_multiplier;
         Self {
             paper,
             production_basis: TradeProductionBasis {
@@ -114,6 +118,7 @@ impl TradeEfficiency {
             equivalent_skill_efficiency,
             trade_equivalent_efficiency: equivalent_skill_efficiency,
             gold_equivalent_efficiency,
+            combined_output_value,
             applies_paper_efficiency: apply_paper_efficiency,
         }
     }
@@ -143,5 +148,32 @@ mod tests {
         );
         assert_eq!(efficiency.total_efficiency, Efficiency::from_decimal(1.23));
         assert_eq!(efficiency.final_efficiency, Efficiency::from_decimal(1.907));
+    }
+
+    #[test]
+    fn dual_output_value_uses_the_user_confirmed_one_to_one_policy() {
+        let paper = PaperTradeEfficiency::from_percent_points(3.0, 90.0, 0.0);
+        let efficiency = TradeEfficiency::new(
+            paper,
+            GOLD_TRADE_REFERENCE_OUTPUT_PER_DAY,
+            11_331.04,
+            957.76,
+            Some("gsl_witch_long0_alpha".to_string()),
+            true,
+        );
+
+        assert_eq!(efficiency.total_efficiency, Efficiency::from_decimal(1.930));
+        assert_eq!(
+            efficiency.trade_equivalent_efficiency,
+            Efficiency::from_decimal(1.101)
+        );
+        assert_eq!(
+            efficiency.gold_equivalent_efficiency,
+            Efficiency::from_decimal(0.185)
+        );
+        assert_eq!(
+            efficiency.combined_output_value,
+            Efficiency::from_decimal(2.316)
+        );
     }
 }

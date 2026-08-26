@@ -89,7 +89,7 @@ mask、signature、合法性 join、winner 一次提交和 resolved dependency�
 
 | Producer | 激活 tier | 对每间贸易房 `r` 的注入 | 作用域 |
 |----------|-----------|--------------------------|--------|
-| 八幡海铃 | E2 / `tier_up` | `5 × Σ(q∈R) n_s(q)` | 跨所有贸易站求叙拉古总人数，然后对各贸易房注入同一数值 |
+| 八幡海铃 | E2 / `tier_up` | `5 × n_s(r)` | 只统计当前贸易房的叙拉古人数，各贸易房独立结算，不跨房合并 |
 | 戴菲恩 | E2 / `tier_up` | `10 × n_g(r)` | **逐贸易房本地计数**；`(3,0)` 与 `(2,1)` 不能合并成一个全局总数 |
 | 凛御银灰 | E0 起 / 保留规则 | 仅保留 consumer 阈值事实；不自动注入 | 自动中枢 admission 为 `excluded_automatic` |
 
@@ -129,7 +129,7 @@ anchor：
 
 | Producer | 目标域 / consumer | 当前处置 |
 |----------|-------------------|----------|
-| 八幡海铃 | 全贸易站叙拉古 workforce | 首期实现 |
+| 八幡海铃 | 各贸易房本地叙拉古 workforce | 首期实现 |
 | 戴菲恩 | 各贸易房本地格拉斯哥 workforce | 首期实现 |
 | 凛御银灰 | 各贸易房谢拉格三人阈值 | 首期实现 |
 | 涤火杰西卡 | 制造站黑钢 workforce | 已接入通用 rule、presence 前缀与 dependency；exact manufacture joint 仍待恢复 |

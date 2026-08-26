@@ -27,8 +27,10 @@
 | 意图 / 触发 | 必须使用 |
 |---|---|
 | bug、结果不对、CLI、数据、solver、局部排班 | `arknights-maintenance` |
+| 技能、效率、无人机、电力、心情、订单、单位产出或运行时数据映射 | `arknights-maintenance` + `arknights-mechanics-contract` |
 | 新功能、恢复 TODO、新模式、接口或产品行为 | `arknights-feature` |
 | 独立授权的架构、性能、工作流、技术债或 solver assurance | `arknights-quality` |
+| 大型 solver/search、Plan、rotation、MAA/export、跨设施或机制变更后的最终状态门禁 | `arknights-invariant-gate` + `arknights-evidence` |
 | 体系、跨设施、required anchor、scope、Team/Shift 绑定 | `arknights-system-audit` |
 | build、test、CLI、benchmark、格式、结构或产物结论 | `arknights-evidence` |
 | 练卡推荐**玩家**语义、名单、组合知识、输出口径、`--answer` 产品行为 | `arknights-feature` 或 `arknights-maintenance` + 先读 `docs/练卡推荐相关/README.md`，再完整读题面相关 canonical（新手/口径/组合/散件/审阅稿） |
@@ -37,6 +39,8 @@
 | 建筑技能解锁阶段、`tier_0/tier_up`、`operator_instances` 设施绑定审计 | `arknights-building-skill-audit` |
 
 debug / feature / quality Skill 是任务意图的 primary owner；`arknights-system-audit` 和 `arknights-evidence` 在触发时作为附加审计 / 证据协议，不接管任务目标与 scope。
+
+机制与数据口径变更由 `arknights-mechanics-contract` 提供附加契约；候选集合、剪枝、目标、Bake 或 cache 的 medium/high-risk 改动应调用 `solver-guarantee-reviewer`；Team/Shift、心情、休息、绑定或 MAA 改动应调用 `rotation-maa-reviewer`。它们都是只读领域复核，不接管写入或最终裁决。
 
 `local` 表示正确 owner 已存在、只修 owner 内部；`conformance-rebuild` 表示现有模型无法表达已确认不变量，或多个阶段在重复兜底。它们是诊断结果，不是与 debug/feature/quality 并列的用户意图。
 
@@ -66,6 +70,8 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 每个写入单元只有一个主要意图；旁支发现默认 deferred。达到唯一 owner、冲突路径删除和相应证明后停止扩张。
 - 新抽象应让真实重复语义、所有权或证明义务更清楚；“出现第二个用例”是审阅问题，不是禁止合法具名机制的硬规则。
 - 修改候选集合、剪枝、分解、目标、top-K、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；无法证明完整时不得声称全局最优。
+- 对 solver/search、Plan admission、Team/Shift、rotation、MAA/export、跨设施机制或大规模运行时数据变更，完成前必须使用 `arknights-invariant-gate`：在 Rust 最终 `assignment` 上注册 `--assert-invariants` 检查，并用 Python 对 `data/fixtures/box-bundles/` 的代表性与 high-owned 集合批量调用该 gate。Python 不得解析文本/MAA 或重写机制语义；它只报告 Rust gate、求解无解、输入错误和超时。实际 assertion diff 必须经 Sol 复审至 `PASS`。
+- Agent 不得新增、修改或运行源代码内测试（包括 Cargo unit/integration tests、Python test modules 和 fixture snapshot tests）。验证逐步迁移到 Rust 最终状态 `--assert-invariants` gate、Python 持久化 box 批量求解和 Sol 复审；该禁令不阻止实现或运行 gate 本身及其批量验收脚本。
 - 验证按改动风险选择方式：大型重构、solver/search、体系/排班/export、部署和需要长期审计的任务，使用 evidence 工具留痕；普通局部修复和文档调整可直接运行必要命令，并在最终说明结果。
 - 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 是否通过 evidence 工具记录由任务风险决定。
 - Agent memory 只能记录可丢弃的检索提示与协作偏好；领域语义、当前实现、架构决策和活动任务必须落在版本化 canonical、ADR 或 change 文档中，memory 不得成为真源。

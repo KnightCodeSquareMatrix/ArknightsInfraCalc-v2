@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -137,19 +137,51 @@ impl ControlEffectLedger {
     }
 
     /// Number of effective sources beyond the first source in the four ledger
-    /// regions. Equal max sources are redundant for candidate admission even
-    /// when they are tied winners.
+    /// regions. A physical operator counts once per key even when it owns
+    /// multiple effective atoms. Equal max sources from different operators
+    /// are redundant for candidate admission even when they are tied winners.
     pub fn redundant_effect_source_count(&self) -> usize {
-        self.candidates
-            .iter()
-            .filter(|record| {
-                matches!(
-                    record.status,
-                    ControlEffectStatus::Winner | ControlEffectStatus::TiedWinner
-                )
-            })
-            .count()
-            .saturating_sub(self.values.len())
+        let mut sources_by_key: HashMap<ControlEffectKey, HashSet<&str>> = HashMap::new();
+        for record in &self.candidates {
+            if matches!(
+                record.status,
+                ControlEffectStatus::Winner | ControlEffectStatus::TiedWinner
+            ) {
+                sources_by_key
+                    .entry(record.key)
+                    .or_default()
+                    .insert(record.source_operator.as_str());
+            }
+        }
+        sources_by_key
+            .values()
+            .map(|sources| sources.len().saturating_sub(1))
+            .sum()
+    }
+
+    pub fn has_redundant_effect_sources(&self) -> bool {
+        self.redundant_effect_source_count() > 0
+    }
+
+    /// A control state may retain only one physical source for each EffectKey.
+    /// Lower values are still illegal occupants even when their atom is
+    /// suppressed by a higher source.
+    pub fn has_conflicting_effect_sources(&self) -> bool {
+        self.conflicting_effect_source_count() > 0
+    }
+
+    pub fn conflicting_effect_source_count(&self) -> usize {
+        let mut sources_by_key: HashMap<ControlEffectKey, HashSet<&str>> = HashMap::new();
+        for record in &self.candidates {
+            sources_by_key
+                .entry(record.key)
+                .or_default()
+                .insert(record.source_operator.as_str());
+        }
+        sources_by_key
+            .values()
+            .map(|sources| sources.len().saturating_sub(1))
+            .sum()
     }
 }
 
@@ -256,5 +288,51 @@ mod tests {
         ledger.freeze();
 
         assert_eq!(ledger.redundant_effect_source_count(), 1);
+    }
+
+    #[test]
+    fn multiple_effective_atoms_from_one_operator_are_one_candidate_source() {
+        let mut ledger = ControlEffectLedger::default();
+        ledger.record_max(
+            "阿米娅",
+            "control_tra_spd[000]",
+            "trade_a",
+            ControlEffectKey::TRADE_GLOBAL_EFFICIENCY,
+            7.0,
+        );
+        ledger.record_max(
+            "阿米娅",
+            "control_tra_spd[001]",
+            "trade_b",
+            ControlEffectKey::TRADE_GLOBAL_EFFICIENCY,
+            7.0,
+        );
+        ledger.freeze();
+
+        assert_eq!(ledger.redundant_effect_source_count(), 0);
+        assert!(!ledger.has_conflicting_effect_sources());
+    }
+
+    #[test]
+    fn suppressed_lower_source_still_conflicts_for_candidate_admission() {
+        let mut ledger = ControlEffectLedger::default();
+        ledger.record_max(
+            "斩业星熊",
+            "control_token_prod_spd3[000]",
+            "manu_high",
+            ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY,
+            3.0,
+        );
+        ledger.record_max(
+            "Mon3tr",
+            "control_prod_spd[000]",
+            "manu_low",
+            ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY,
+            2.0,
+        );
+        ledger.freeze();
+
+        assert_eq!(ledger.redundant_effect_source_count(), 0);
+        assert!(ledger.has_conflicting_effect_sources());
     }
 }

@@ -34,6 +34,7 @@ data/operbox_account.json
 data/operbox_xlsx.json
 data/operbox_xlsx_new.json
 data/roster_xlsx.csv
+data/fixtures/box-bundles/
 .tmp
 
 feedback/

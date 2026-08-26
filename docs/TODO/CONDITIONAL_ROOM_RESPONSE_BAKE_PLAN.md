@@ -89,7 +89,7 @@ settled efficiency、limit contribution、L2 tag 或全局资源观察量时，�
 |---|---|---|---|---|---|
 | 戴菲恩—格拉斯哥 producer | 戴菲恩 `control_tra_limit&spd[010]` + 各房格拉斯哥 workforce | 戴菲恩 presence + 每房 `n_g(r)`；与本房 consumer signature 联合 | 每房 `n_g(r)=0/1/2/3` | 中枢→当前贸易房 | 非格拉斯哥者可 Join；格拉斯哥者更新逐房摘要 |
 | 凛御银灰—喀兰阈值 | 凛御银灰 `control_tra_limit&spd3[000]` + 喀兰 workforce | producer presence + 每房 `n_k(r)<3/≥3` | 每房二元阈值；最终读达标房数 | 中枢→贸易跨房 | 只有跨过阈值的喀兰 Join 改变响应 |
-| 八幡海铃—叙拉古总数 | 八幡海铃 `control_tra_limit&spd2[000]` + 叙拉古 workforce | producer presence + `Σr n_s(r)` | `0..全部贸易席位` | 中枢→全部贸易房 | 叙拉古 Join 更新全局摘要 |
+| 八幡海铃—叙拉古逐房注入 | 八幡海铃 `control_tra_limit&spd2[000]` + 各房叙拉古 workforce | producer presence + 每房 `n_s(r)` | 每房 `0..3` | 中枢→当前贸易房 | 当前贸易房叙拉古 Join 更新逐房摘要 |
 | 歌蕾蒂娅—深海猎人 | 中枢歌蕾蒂娅 + 制造 `cc.g.abyssal` workforce | producer presence + 本房 count × 全制造 count + `manu_prod_spd&power[000|010|020]` presence | 本房 `0..3`；全制造 `0..全部制造席位`；结果 cap 45/90 | 中枢→制造跨房；当前 live 只以三个 power buff 禁用该加成 | 深海 tag 或指定 power buff 改变响应 |
 | 涤火杰西卡—黑钢总数 | 涤火杰西卡 `control_bd_spd[000]` + 制造 `cc.g.blacksteel` workforce | producer presence + 全制造黑钢总数 | `0..全部制造席位`，每人 +5 | 中枢→全部制造房 | 黑钢 Join 更新总数；不建立固定 team/bind |
 | 怪猎 peer-tag inject | 火龙S黑角 `control_token_tra_spd[000]`；麒麟R夜刀 `control_token_prod_spd2[000]` | owner + 中枢 `cc.g.monhun` peer presence | owner 单独 / 有 peer | 中枢同房→全贸易或制造 | 仅怪猎 tag peer 改变 inject |
@@ -112,7 +112,7 @@ settled efficiency、limit contribution、L2 tag 或全局资源观察量时，�
 用户于 2026-07-17 根据技能原文确认：戴菲恩进驻控制中枢时，同一贸易站中每有一名
 格拉斯哥帮干员，该站订单获取效率 `+10%`。因此每间贸易房独立结算 `10 × n_g(r)`，不同
 房间不得先求总和。代码修复将戴菲恩从 `tagged_count_in_trade_sum` 改为 current-room deferred
-inject；八幡海铃仍保留全贸易站总数 scope。2026-07-19 后 `meta_vina` 自动 role 已删除，
+inject；八幡海铃同样按当前贸易房逐房结算，不再保留全贸易站总数 scope。2026-07-19 后 `meta_vina` 自动 role 已删除，
 `vina_lungmen` 只保留实际组合 shortcut；assignment-aware control comparator 会按实际贸易房逐房
 累计戴菲恩收益。完整条件响应行 joint/Bake 仍由本 TODO 与 A+ producer TODO 继续跟踪，当前
 有序填房 policy 不宣称全局最优。
@@ -122,7 +122,7 @@ inject；八幡海铃仍保留全贸易站总数 scope。2026-07-19 后 `meta_vi
 1. 纯同房计数：格拉斯哥本房 consumer、peer-count、room tag-count。
 2. 制造通用性：红云/泡泡 limit contribution、槐琥 peer-eff bucket、水月/海沫 skill family。
 3. 贸易 L2：订单 tag mask 及优先级；赤金链作为独立有序闭包。
-4. 无语义冲突的动态 producer：凛御银灰逐房阈值、八幡海铃全贸易总数。
+4. 无语义冲突的动态 producer：凛御银灰逐房阈值、八幡海铃逐房注入。
 5. 戴菲恩逐房效果修复通过后可纳入；全局资源链随后作为跨设施验收轴。
 
 用户于 2026-07-17 确认上述首批范围和戴菲恩逐房 response。2026-07-27 用户进一步裁决：
@@ -526,7 +526,7 @@ catalog generation 并用 live reference 重跑，不能只修正 winner 分数�
 
 1. Bake 与 live 使用同一候选集合、规则 registry 和 comparator。
 2. 三 producer 的 0/1/多 consumer、两两共存、三者共存和全部落败均有差分测试。
-3. 戴菲恩 `(3,0)` 与 `(2,1)` 不混淆；八幡海铃总数、凛御银灰逐站阈值均自洽。
+3. 戴菲恩 `(3,0)` 与 `(2,1)` 不混淆；八幡海铃逐房人数、凛御银灰逐站阈值均自洽。
 4. 任意两个房间、任意中枢与房间之间 logical mask 无交集。
 5. cache miss、损坏或不兼容只变慢，不换答案。
 6. 最终 live resolve 与 baked `final_efficiency`、unit output、limit、breakdown、`rule_id`

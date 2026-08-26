@@ -5490,7 +5490,7 @@
         {
           "id": "control_tra_limit&spd2[000]:trade_efficiency",
           "selector": {
-            "tagged_count_in_trade_sum": {
+            "tagged_count_in_current_trade_room": {
               "tag": "cc.g.siracusa"
             }
           },

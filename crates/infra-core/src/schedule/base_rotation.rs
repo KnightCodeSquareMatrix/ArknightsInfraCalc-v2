@@ -61,6 +61,8 @@ pub struct RoomEfficiencyLine {
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub gold_equivalent_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
+    pub combined_output_value: Efficiency,
+    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_efficiency: Efficiency,
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub trade_skill_efficiency: Efficiency,
@@ -180,6 +182,7 @@ pub fn evaluate_base_assignment_efficiencies(
             line.originium_shards_per_day = snapshot.trade_originium_shards_per_day;
             line.trade_equivalent_efficiency = snapshot.trade_equivalent_trade_efficiency;
             line.gold_equivalent_efficiency = snapshot.trade_equivalent_gold_efficiency;
+            line.combined_output_value = snapshot.trade_combined_output_value;
             line.station_efficiency = if snapshot.trade_occupancy_efficiency.is_zero()
                 && snapshot.trade_control_efficiency.is_zero()
             {
@@ -215,6 +218,7 @@ pub fn evaluate_base_assignment_efficiencies(
             line.gold_consumption_per_day = result.production.unit.gold_consumption_per_day
                 * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
                 * result.efficiency.total_efficiency.as_f64();
+            line.combined_output_value = result.efficiency.combined_output_value;
             line.originium_shards_per_day = result.production.unit.unit_originium_per_day
                 * result.efficiency.total_efficiency.as_f64();
             line.trade_equivalent_efficiency = result.efficiency.trade_equivalent_efficiency;

@@ -1224,7 +1224,7 @@ mod tests {
     }
 
     #[test]
-    fn siracusa_control_inject_counts_lappland_in_trade() {
+    fn siracusa_control_inject_counts_siracusa_in_the_same_trade_room_only() {
         let (instances, table) = pair();
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
@@ -1249,7 +1249,29 @@ mod tests {
             trade.layout.trade_tagged_count_sum.get("cc.g.siracusa"),
             Some(&1)
         );
-        assert!((trade.layout.global_inject.trade_eff_pct() - 5.0).abs() < f64::EPSILON);
+        let inject = &trade.layout.global_inject;
+        assert_eq!(inject.trade_tagged().len(), 1);
+        assert_eq!(
+            inject.trade_tagged()[0].count_scope,
+            crate::global_resource::TradeTaggedCountScope::CurrentTradeRoom
+        );
+        // 站内：trade_1 有 1 名叙拉古（拉普兰德）→ 5%；空贸易房 → 0%。
+        let in_room = std::collections::HashMap::from([("cc.g.siracusa".to_string(), 1)]);
+        let empty = std::collections::HashMap::new();
+        assert!(
+            (inject.trade_eff_pct_with_scoped_tag_counts(
+                &trade.layout.trade_tagged_count_sum,
+                &in_room,
+            ) - 5.0)
+                .abs()
+                < f64::EPSILON
+        );
+        assert!(
+            inject
+                .trade_eff_pct_with_scoped_tag_counts(&trade.layout.trade_tagged_count_sum, &empty)
+                .abs()
+                < f64::EPSILON
+        );
     }
 
     #[test]

@@ -49,6 +49,8 @@ Use independent read-only exploration and invariant extraction by default when b
 
 Require invariant-level regression and a real `plan` or `layout team-rotation` entry for scheduling/export changes. Use `arknights-evidence` for formal audits and high-risk changes when durable command evidence is useful; it is not required for every audit command. Report the old illegal path, new owner, deleted conflicts, exact/heuristic impact if search space changed, tests, CLI result, and unresolved risks.
 
+For Team/Shift, work/rest, mood, binds, capacity, producer shutdown, or MAA changes, also request `rotation-maa-reviewer` on the final diff. The proof must include the selected mode/profile, per-shift membership and state assertions, a legal and illegal bind/rest witness, and inspection of the generated MAA artifact. Do not treat a green unit test or an unchanged top schedule as conformance proof.
+
 If the audit owns an active TODO, plan, or change package, apply
 `../_shared/CHANGE_LIFECYCLE.md` after the invariant is proven. Formal
 audit waits govern semantic approval; they do not waive current-document and

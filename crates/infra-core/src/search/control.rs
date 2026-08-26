@@ -1040,6 +1040,9 @@ pub fn search_control_combos(
                 } else {
                     (solve_control(&input, table), 0, 0)
                 };
+            if result.effect_ledger.has_conflicting_effect_sources() {
+                return None;
+            }
             if !options.saileach_required
                 && operators.iter().any(|operator| operator.name == "琴柳")
             {
@@ -1579,6 +1582,71 @@ mod tests {
     }
 
     #[test]
+    fn control_search_rejects_redundant_effect_sources_but_keeps_other_effects_eligible() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("阿米娅", 2), ("阿斯卡纶", 2), ("Mon3tr", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 2,
+                top_k: 20,
+                fill_policy: ControlFillPolicy::LayeredFill,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(!hits.is_empty());
+        assert!(hits.iter().all(|hit| {
+            !(hit.names.iter().any(|name| name == "阿米娅")
+                && hit.names.iter().any(|name| name == "阿斯卡纶"))
+        }));
+        assert!(hits.iter().any(|hit| {
+            hit.names.iter().any(|name| name == "Mon3tr")
+                && (hit.names.iter().any(|name| name == "阿米娅")
+                    || hit.names.iter().any(|name| name == "阿斯卡纶"))
+        }));
+    }
+
+    #[test]
+    fn control_search_rejects_suppressed_lower_effect_source() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("斩业星熊", 2), ("诗怀雅", 2), ("Mon3tr", 2), ("阿米娅", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 3,
+                top_k: 20,
+                must_include: HashSet::from(["诗怀雅".to_string()]),
+                fill_policy: ControlFillPolicy::LayeredFill,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(hits.iter().all(|hit| {
+            !(hit.names.iter().any(|name| name == "斩业星熊")
+                && hit.names.iter().any(|name| name == "Mon3tr"))
+        }));
+    }
+
+    #[test]
     fn control_replacement_preference_requires_effective_family_representatives() {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
@@ -1624,7 +1692,7 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = Roster::from_elite_map(
-            ["Mon3tr", "斩业星熊", "诗怀雅", "玛恩纳", "维什戴尔"]
+            ["斩业星熊", "诗怀雅", "玛恩纳", "维什戴尔", "12F"]
                 .into_iter()
                 .map(|name| (name.to_string(), 2))
                 .collect(),
@@ -1836,10 +1904,19 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = Roster::from_elite_map(
-            ["阿米娅", "诗怀雅", "玛恩纳", "Mon3tr", "明椒", "焰尾"]
-                .into_iter()
-                .map(|name| (name.to_string(), 2))
-                .collect(),
+            [
+                "阿米娅",
+                "诗怀雅",
+                "玛恩纳",
+                "Mon3tr",
+                "明椒",
+                "焰尾",
+                "12F",
+                "Castle-3",
+            ]
+            .into_iter()
+            .map(|name| (name.to_string(), 2))
+            .collect(),
         );
         let pool = build_control_pool(&roster, &instances, &table).unwrap();
 
@@ -1864,10 +1941,19 @@ mod tests {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = Roster::from_elite_map(
-            ["重岳", "令", "Mon3tr", "玛恩纳", "阿米娅", "诗怀雅"]
-                .into_iter()
-                .map(|name| (name.to_string(), 2))
-                .collect(),
+            [
+                "重岳",
+                "令",
+                "Mon3tr",
+                "玛恩纳",
+                "阿米娅",
+                "诗怀雅",
+                "12F",
+                "Castle-3",
+            ]
+            .into_iter()
+            .map(|name| (name.to_string(), 2))
+            .collect(),
         );
         let pool = build_control_pool(&roster, &instances, &table).unwrap();
         let candidates = HashSet::from(["重岳".to_string(), "令".to_string()]);
@@ -1919,8 +2005,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].names.len(), 3);
+        assert!(
+            hits.is_empty(),
+            "all available operators are an illegal duplicate-source state"
+        );
     }
 
     #[test]
@@ -1950,7 +2038,7 @@ mod tests {
     }
 
     #[test]
-    fn saileach_required_bypasses_office_admission_filter() {
+    fn saileach_required_does_not_bypass_same_effect_admission() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let roster = Roster::from_elite_map(
@@ -1973,9 +2061,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            hits[0].names,
-            vec!["八幡海铃".to_string(), "琴柳".to_string()]
-        );
+        assert!(hits.is_empty());
     }
 }

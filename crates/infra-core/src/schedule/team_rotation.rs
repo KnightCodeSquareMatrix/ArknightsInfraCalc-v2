@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+use crate::control::{solve_control, ControlRoomInput};
 use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
@@ -614,14 +615,14 @@ fn office_candidates(
     _mood: f64,
     excluded: &HashSet<String>,
 ) -> Vec<AssignedOperator> {
-    let registry = crate::support_facility::SupportRegistry::load_default()
-        .expect("support registry loads in office candidate build");
     let roster = operbox.roster();
     let mut candidates: Vec<(f64, AssignedOperator)> = roster
         .names()
         .filter(|name| !excluded.contains(name.as_str()))
         .filter_map(|name| {
             let progress = roster.progress(name)?;
+            let registry = crate::support_facility::SupportRegistry::load_default()
+                .expect("support registry loads in office candidate build");
             let score = crate::office::evaluate_office(
                 &crate::support_facility::SupportRoomInput {
                     facility: crate::support_facility::SupportFacility::Office,
@@ -1325,6 +1326,32 @@ fn active_control_candidate_count(
         .filter(|name| !unavailable.contains(*name))
         .collect::<HashSet<_>>()
         .len()
+}
+
+fn effective_active_control_candidate_count(
+    by_team: &HashMap<TeamLabel, Vec<String>>,
+    active_teams: &[TeamLabel],
+    unavailable: &HashSet<String>,
+    control_pool: &crate::pool::ControlPool,
+    table: &SkillTable,
+) -> usize {
+    let names: HashSet<_> = active_teams
+        .iter()
+        .flat_map(|team| by_team.get(team).into_iter().flatten())
+        .filter(|name| !unavailable.contains(*name))
+        .collect();
+    let operators = names
+        .iter()
+        .filter_map(|name| {
+            control_pool
+                .entry(name)
+                .map(|entry| entry.to_control_operator())
+        })
+        .collect();
+    let conflicts = solve_control(&ControlRoomInput::with_operators(operators), table)
+        .effect_ledger
+        .conflicting_effect_source_count();
+    names.len().saturating_sub(conflicts)
 }
 
 fn least_available_control_team(
@@ -3031,51 +3058,15 @@ fn enumerate_abyssal_counts(
 
 // ── 中枢队伍归属 ──
 
-/// 从编排计划中提取体系绑定的中枢干员名（含 PickOne 候选人）。
+/// 从编排计划中提取体系绑定的实际中枢干员名。
 fn system_control_operators(plan: &AssignmentPlan, peak_ctrl: &HashSet<String>) -> HashSet<String> {
-    let mut names = HashSet::new();
-    names.extend(
-        plan.anchors
-            .iter()
-            .filter(|anchor| anchor.facility == FacilityKind::ControlCenter)
-            .map(|anchor| anchor.operator.clone()),
-    );
-    for sys in &plan.activated {
-        let has_production_slot = sys.slots.iter().any(|slot| {
-            let facility = match slot {
-                SlotFill::Fixed { facility, .. }
-                | SlotFill::PickOne { facility, .. }
-                | SlotFill::OptionalFixed { facility, .. } => facility,
-            };
-            matches!(facility, FacilityKind::TradePost | FacilityKind::Factory)
-        });
-        if !has_production_slot {
-            continue;
-        }
-        for slot in &sys.slots {
-            let facility = match slot {
-                SlotFill::Fixed { facility, .. }
-                | SlotFill::PickOne { facility, .. }
-                | SlotFill::OptionalFixed { facility, .. } => facility,
-            };
-            if *facility != FacilityKind::ControlCenter {
-                continue;
-            }
-            match slot {
-                SlotFill::Fixed { operator, .. } | SlotFill::OptionalFixed { operator, .. } => {
-                    names.insert(operator.clone());
-                }
-                SlotFill::PickOne { candidates, .. } => {
-                    for c in candidates {
-                        if peak_ctrl.contains(c) {
-                            names.insert(c.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    names
+    plan.anchors
+        .iter()
+        .filter(|anchor| {
+            anchor.facility == FacilityKind::ControlCenter && peak_ctrl.contains(&anchor.operator)
+        })
+        .map(|anchor| anchor.operator.clone())
+        .collect()
 }
 
 /// 判断体系的控制中枢干员应归属哪个队伍（基于生产 slot 所在半区）。
@@ -3118,33 +3109,23 @@ fn build_team_control_map(
     let system_names = system_control_operators(plan, &peak_set);
     let mut team_map: HashMap<TeamLabel, Vec<String>> = HashMap::new();
 
-    // Step 1: 体系干员归属到对应队伍
-    for sys in &plan.activated {
-        let team = system_control_team(sys, h1).unwrap_or(TeamLabel::Alpha);
-        for slot in &sys.slots {
-            let facility = match slot {
-                SlotFill::Fixed { facility, .. }
-                | SlotFill::PickOne { facility, .. }
-                | SlotFill::OptionalFixed { facility, .. } => facility,
-            };
-            if *facility != FacilityKind::ControlCenter {
-                continue;
-            }
-            let op_name: Option<String> = match slot {
-                SlotFill::Fixed { operator, .. } | SlotFill::OptionalFixed { operator, .. } => {
-                    if peak_set.contains(operator) {
-                        Some(operator.clone())
-                    } else {
-                        None
-                    }
-                }
-                SlotFill::PickOne { candidates, .. } => {
-                    candidates.iter().find(|c| peak_set.contains(*c)).cloned()
-                }
-            };
-            if let Some(name) = op_name {
-                team_map.entry(team).or_default().push(name);
-            }
+    // Step 1: 体系实际落位的中枢干员归属到对应队伍。
+    for anchor in plan
+        .anchors
+        .iter()
+        .filter(|anchor| anchor.facility == FacilityKind::ControlCenter)
+    {
+        let team = plan
+            .activated
+            .iter()
+            .find(|system| system.system_id == anchor.system_id)
+            .and_then(|system| system_control_team(system, h1))
+            .unwrap_or(TeamLabel::Alpha);
+        if peak_set.contains(&anchor.operator) {
+            team_map
+                .entry(team)
+                .or_default()
+                .push(anchor.operator.clone());
         }
     }
 
@@ -3523,6 +3504,118 @@ pub fn schedule_team_rotation(
     )
 }
 
+pub fn assert_final_rotation_invariants(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    report: &TeamRotationReport,
+) -> Result<()> {
+    let pool = build_control_pool_with_fillers(operbox, instances, table)?;
+    let mood = MoodModel::load_default()?;
+    for shift in &report.shifts {
+        let control = shift.assignment.control_operators();
+        if control.len() != 5 {
+            return Err(Error::msg(format!(
+                "assert-invariants control_capacity failed in shift {}",
+                shift.index + 1
+            )));
+        }
+        let operators = control
+            .iter()
+            .map(|op| {
+                pool.entry(&op.name)
+                    .map(|entry| entry.to_control_operator())
+                    .ok_or_else(|| {
+                        Error::msg(format!(
+                            "assert-invariants missing control operator {}",
+                            op.name
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut pre_control = shift.assignment.clone();
+        pre_control.rooms.retain(|room| room.room_id.0 != "control");
+        let layout = resolve_base(
+            blueprint,
+            &pre_control,
+            Some(instances),
+            Some(table),
+            24.0,
+            Some(operbox.durin_dorm_planning_count(instances)),
+        )?
+        .layout_snapshot();
+        let result = solve_control(
+            &ControlRoomInput {
+                operators,
+                mood: 24.0,
+                layout: layout.clone(),
+            },
+            table,
+        );
+        if result.effect_ledger.has_conflicting_effect_sources() {
+            return Err(Error::msg(format!(
+                "assert-invariants control_effect_source_unique failed in shift {}",
+                shift.index + 1
+            )));
+        }
+        let final_layout = resolve_base(
+            blueprint,
+            &shift.assignment,
+            Some(instances),
+            Some(table),
+            24.0,
+            Some(operbox.durin_dorm_planning_count(instances)),
+        )?
+        .layout_snapshot();
+        let control_values = [
+            result.inject.trade_eff_pct(),
+            result.office_hire_spd_pct,
+            result.meeting_speed_pct,
+            final_layout.global_inject.trade_eff_pct(),
+            final_layout.control_office_hire_spd_pct,
+            final_layout.control_meeting_speed_pct,
+        ];
+        if control_values
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+            || (final_layout.control_office_hire_spd_pct - result.office_hire_spd_pct).abs() > 1e-9
+            || (final_layout.control_meeting_speed_pct - result.meeting_speed_pct).abs() > 1e-9
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants control_effect_projection_finite failed in shift {}",
+                shift.index + 1,
+            )));
+        }
+        let control_ops = control
+            .iter()
+            .map(|op| (op.name.clone(), op.elite))
+            .collect::<Vec<_>>();
+        let recovery = mood.control_global_recovery_summary(&control_ops);
+        let smiley = mood.control_smiley_recovery_value(&control_ops);
+        let control_smiley =
+            mood.control_smiley_recovery_for_facility(FacilityKind::ControlCenter, &control_ops);
+        let spread_smiley =
+            mood.control_smiley_recovery_for_facility(FacilityKind::TradePost, &control_ops);
+        if !recovery.effective_value.is_finite()
+            || !recovery.faction_recovery_value.is_finite()
+            || recovery.faction_recovery_value < 0.0
+            || !smiley.is_finite()
+            || smiley < 0.0
+            || !control_smiley.is_finite()
+            || (control_smiley - smiley).abs() > 1e-9
+            || !spread_smiley.is_finite()
+            || spread_smiley < 0.0
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants control_mood_recovery_consistent failed in shift {}",
+                shift.index + 1
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn schedule_timed_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -3817,31 +3910,6 @@ fn schedule_abc_rotation(
             .cloned(),
     );
     let mut team_ctrl = build_team_control_map(&peak_ctrl, &peak_plan, &h1);
-    for sys in &peak_plan.activated {
-        let team = system_control_team(sys, &h1).unwrap_or(TeamLabel::Alpha);
-        for slot in &sys.slots {
-            let facility = match slot {
-                SlotFill::Fixed { facility, .. }
-                | SlotFill::PickOne { facility, .. }
-                | SlotFill::OptionalFixed { facility, .. } => facility,
-            };
-            if *facility != FacilityKind::ControlCenter {
-                continue;
-            }
-            match slot {
-                SlotFill::Fixed { operator, .. } | SlotFill::OptionalFixed { operator, .. } => {
-                    if operbox.owns(operator) {
-                        team_ctrl.entry(team).or_default().push(operator.clone());
-                    }
-                }
-                SlotFill::PickOne { .. } => {
-                    // `build_team_control_map` already consumed the actual
-                    // peak placement. Do not re-expand the declared choice
-                    // set here and pin every owned candidate.
-                }
-            }
-        }
-    }
     let mut production_team_by_name: HashMap<String, TeamLabel> = HashMap::new();
     for name in operators_of(&alpha) {
         production_team_by_name
@@ -3941,7 +4009,13 @@ fn schedule_abc_rotation(
                 .filter(|team| *team != resting)
                 .copied()
                 .collect();
-            active_control_candidate_count(by_team, &active, &unavailable_for_control) >= 5
+            effective_active_control_candidate_count(
+                by_team,
+                &active,
+                &unavailable_for_control,
+                &control_pool,
+                table,
+            ) >= 5
         })
     };
     let mut assigned_control: HashSet<String> = team_ctrl.values().flatten().cloned().collect();
@@ -4962,7 +5036,16 @@ fn repair_owner_meeting_seats(
         Some(operbox.durin_dorm_planning_count(instances)),
     )?
     .layout_snapshot();
-    let candidates = meeting_candidates(operbox, &layout, &owner.assignment.operator_names());
+    let mut forbidden = owner.assignment.operator_names();
+    forbidden.extend(owner.plan.excluded_operators.iter().cloned());
+    forbidden.extend(
+        owner
+            .plan
+            .rotation_reserves
+            .iter()
+            .flat_map(|reserve| reserve.operators.iter().cloned()),
+    );
+    let candidates = meeting_candidates(operbox, &layout, &forbidden);
     let worked_hours = HashMap::new();
     assign_rotating_meetings_with_context(
         &mut owner.assignment,
@@ -4971,7 +5054,7 @@ fn repair_owner_meeting_seats(
         TeamLabel::Beta,
         &HashMap::new(),
         &candidates,
-        &HashSet::new(),
+        &forbidden,
         Some(&FacilityRotationEligibility {
             worked_hours: &worked_hours,
             shift_hours,
@@ -5000,6 +5083,7 @@ fn schedule_main_backup_12_12(
         &HashSet::new(),
         true,
     )?;
+    repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
     let main_forbidden: HashSet<String> = main.assignment.operator_names();
     let mut backup = solve_policy_disjoint_backup(
         blueprint,
@@ -5019,6 +5103,15 @@ fn schedule_main_backup_12_12(
         &mut backup,
         &main_forbidden,
         true,
+    )?;
+    let backup_operbox = operbox.excluding(&main_forbidden);
+    repair_owner_meeting_seats(
+        blueprint,
+        &backup_operbox,
+        instances,
+        table,
+        &mut backup,
+        12.0,
     )?;
     let teams = vec![
         TeamAssignment {
@@ -6058,6 +6151,10 @@ fn continuation_room_line(
         gold_equivalent_efficiency: continuation_efficiency(
             total.gold_equivalent_efficiency,
             first.gold_equivalent_efficiency,
+        ),
+        combined_output_value: continuation_efficiency(
+            total.combined_output_value,
+            first.combined_output_value,
         ),
         trade_efficiency: continuation_efficiency(total.trade_efficiency, first.trade_efficiency),
         trade_skill_efficiency: continuation_efficiency(
@@ -10904,7 +11001,27 @@ mod tests {
         .unwrap()
         .layout_snapshot();
         assert!(active_layout.global_inject.has_dynamic_trade_inject());
-        assert_eq!(active_layout.global_inject.trade_eff_pct(), 5.0);
+        // 八幡海铃只按各贸易房站内叙拉古人数结算；trade_1 有伺夜 → 5%，空贸易房 → 0%。
+        let in_room = std::collections::HashMap::from([("cc.g.siracusa".to_string(), 1)]);
+        let empty = std::collections::HashMap::new();
+        assert_eq!(
+            active_layout
+                .global_inject
+                .trade_eff_pct_with_scoped_tag_counts(
+                    &active_layout.trade_tagged_count_sum,
+                    &in_room
+                ),
+            5.0
+        );
+        assert_eq!(
+            active_layout
+                .global_inject
+                .trade_eff_pct_with_scoped_tag_counts(
+                    &active_layout.trade_tagged_count_sum,
+                    &empty
+                ),
+            0.0
+        );
 
         // 未绑定 producer 允许进入 γ 候选（ADR 0004 D6：
         // 收益按最终实际在场结算，不后置新建 cohort）。
@@ -10970,11 +11087,31 @@ mod tests {
         )
         .unwrap()
         .layout_snapshot();
-        // 八幡海铃注入 = 5 × 全贸易站叙拉古人数（伺夜 + 贝洛内 = 2）→ 10%。
+        // 八幡海铃注入按各贸易房站内叙拉古人数结算：伺夜（trade_1）、贝洛内（trade_2）
+        // 各贡献 5%，全站人数不得跨站串入统一全局值。
+        let all_counts = &layout.trade_tagged_count_sum;
+        let in_room = std::collections::HashMap::from([("cc.g.siracusa".to_string(), 1)]);
         assert_eq!(
-            layout.global_inject.trade_eff_pct(),
-            10.0,
-            "未绑定 consumer 的收益按实际在场结算（D6）"
+            layout
+                .global_inject
+                .trade_eff_pct_with_scoped_tag_counts(all_counts, &in_room),
+            5.0,
+            "trade_1 站内 1 名叙拉古（伺夜）→ 5%"
+        );
+        assert_eq!(
+            layout
+                .global_inject
+                .trade_eff_pct_with_scoped_tag_counts(all_counts, &in_room),
+            5.0,
+            "trade_2 站内 1 名叙拉古（贝洛内）同样只贡献 5%"
+        );
+        let empty = std::collections::HashMap::new();
+        assert_eq!(
+            layout
+                .global_inject
+                .trade_eff_pct_with_scoped_tag_counts(all_counts, &empty),
+            0.0,
+            "无叙拉古的贸易房不应获得注入（D6）"
         );
         // γ 搜索上下文是纯 assignment，不派生 bind/cohort：
         // 后置 bind 只能来自 peak_plan（shift_binds_from_plan 唯一生成）。

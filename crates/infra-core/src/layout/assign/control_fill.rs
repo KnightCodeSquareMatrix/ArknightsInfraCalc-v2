@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::control::{solve_control, ControlRoomInput};
 use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{FacilityKind, RoomId};
@@ -146,16 +147,38 @@ fn assign_control_inner(
     used: &mut HashSet<String>,
 ) -> Result<bool> {
     const MAX_CONTROL: usize = 5;
-    if pool.entries.is_empty() {
-        return Ok(required_all.is_none_or(HashSet::is_empty));
-    }
     let pinned: HashSet<String> = assignment
         .control_operators()
         .into_iter()
         .map(|o| o.name)
         .collect();
     if pinned.len() >= MAX_CONTROL {
+        let operators = assignment
+            .control_operators()
+            .into_iter()
+            .map(|operator| {
+                pool.entry(&operator.name)
+                    .map(|entry| entry.to_control_operator())
+                    .ok_or_else(|| {
+                        Error::msg(format!(
+                            "control: pinned operator {} is absent from pool",
+                            operator.name
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if solve_control(&ControlRoomInput::with_operators(operators), table)
+            .effect_ledger
+            .has_conflicting_effect_sources()
+        {
+            return Err(Error::msg(
+                "control: pinned operators contain conflicting EffectKey sources",
+            ));
+        }
         return Ok(required_all.is_none_or(|required| required.is_subset(&pinned)));
+    }
+    if pool.entries.is_empty() {
+        return Ok(required_all.is_none_or(HashSet::is_empty));
     }
     let requirements: Vec<(HashSet<String>, u8)> = candidate_requirements
         .iter()
@@ -371,6 +394,48 @@ mod tests {
         let filtered =
             filter_control_pool_for_fill(&pool, &table, &HashSet::new(), &pinned, &pinned).unwrap();
         assert_eq!(filtered.entries.len(), 1);
+    }
+
+    #[test]
+    fn full_pinned_control_rejects_conflicting_effect_sources() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [
+                ("斩业星熊", 2),
+                ("诗怀雅", 2),
+                ("Mon3tr", 2),
+                ("玛恩纳", 2),
+                ("12F", 0),
+            ]
+            .into_iter()
+            .map(|(name, elite)| (name.to_string(), elite))
+            .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            RoomId::from("control"),
+            pool.entries
+                .iter()
+                .take(5)
+                .map(|entry| AssignedOperator::from_progress(&entry.name, entry.progress))
+                .collect(),
+        );
+
+        let error = assign_control(
+            &mut assignment,
+            &pool,
+            &table,
+            &LayoutContext::default(),
+            &AssignBaseOptions::default(),
+            &[],
+            &HashSet::new(),
+            &mut HashSet::new(),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("conflicting EffectKey"));
     }
 
     #[test]

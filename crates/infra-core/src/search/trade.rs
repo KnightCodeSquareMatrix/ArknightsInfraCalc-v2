@@ -39,6 +39,7 @@ pub struct TradeEfficiencyBreakdown {
     pub equivalent_skill_efficiency: Efficiency,
     pub trade_equivalent_efficiency: Efficiency,
     pub gold_equivalent_efficiency: Efficiency,
+    pub combined_output_value: Efficiency,
     /// 实际日产量（龙门币/天）
     pub unit_trade_per_day: f64,
     /// 实际日耗赤金
@@ -460,6 +461,7 @@ fn eval_combo_hit(
         equivalent_skill_efficiency: efficiency.equivalent_skill_efficiency,
         trade_equivalent_efficiency: efficiency.trade_equivalent_efficiency,
         gold_equivalent_efficiency: efficiency.gold_equivalent_efficiency,
+        combined_output_value: efficiency.combined_output_value,
         unit_trade_per_day: result.production.unit.unit_trade_per_day,
         unit_gold_per_day: result.production.unit.unit_gold_per_day,
         trade_output_per_day: result.production.unit.unit_trade_per_day

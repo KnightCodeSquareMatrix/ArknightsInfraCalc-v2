@@ -14,8 +14,8 @@ use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::schedule::{
-    DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
-    TimedRotationProfile,
+    assert_final_rotation_invariants, DailyTotals, RoomEfficiencyLine, ShiftEfficiencies,
+    TeamLabel, TeamRotationReport, TimedRotationProfile,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::training_advice::{
@@ -28,7 +28,7 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 3;
+const PLAN_SCHEMA_VERSION: u32 = 4;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
@@ -37,6 +37,8 @@ const PLAN_COMPUTE_SCHEMA_V2_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v2.schema.json");
 const PLAN_COMPUTE_SCHEMA_V3_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v3.schema.json");
+const PLAN_COMPUTE_SCHEMA_V4_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v4.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
@@ -61,9 +63,11 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_schema_v1: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V1_JSON)?,
         plan_schema_v2: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON)?,
         plan_schema_v3: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON)?,
+        plan_schema_v4: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V4_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
+        plan_contract_sha256_v4: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V4_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -205,9 +209,11 @@ struct ServeState {
     plan_schema_v1: JSONSchema,
     plan_schema_v2: JSONSchema,
     plan_schema_v3: JSONSchema,
+    plan_schema_v4: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
     plan_contract_sha256_v3: String,
+    plan_contract_sha256_v4: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -428,12 +434,13 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2, 3],
+                "supported_plan_schema_versions": [1, 2, 3, 4],
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,
                     "2": state.plan_contract_sha256_v2,
                     "3": state.plan_contract_sha256_v3,
+                    "4": state.plan_contract_sha256_v4,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -523,9 +530,10 @@ fn handle_plan_compute(
         1 => &state.plan_schema_v1,
         2 => &state.plan_schema_v2,
         3 => &state.plan_schema_v3,
+        4 => &state.plan_schema_v4,
         other => {
             return Err(Error::msg(format!(
-                "unsupported plan schema version {other}; expected 1, 2 or {PLAN_SCHEMA_VERSION}"
+                "unsupported plan schema version {other}; expected 1, 2, 3 or {PLAN_SCHEMA_VERSION}"
             )))
         }
     };
@@ -571,6 +579,16 @@ fn handle_plan_compute(
             maa: true,
         },
     )?;
+
+    if params.options.assert_invariants {
+        assert_final_rotation_invariants(
+            &params.layout,
+            &operbox,
+            &state.instances,
+            &state.table,
+            &computed.current.rotation,
+        )?;
+    }
 
     let profile = computed
         .profile
