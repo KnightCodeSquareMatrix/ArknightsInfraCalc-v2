@@ -124,7 +124,7 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 - 开始和结束都运行 `git status --short`。
 - 只 stage 本任务文件，使用显式路径；禁止 `git add .`。
 - 不自动 amend、rebase、reset、checkout、清理未跟踪文件或执行其他 destructive Git 操作。
-- 本轮形成独立单元时默认提交；同文件与用户改动无法可靠拆分时不强行提交。
+- 本轮形成独立单元时必须提交；只有用户明确要求不提交，或同文件与用户改动无法可靠拆分时才不提交，并在最终说明原因。提交前必须检查 `git status --short`、`git diff`、`git log --oneline -10`，提交后必须再次检查状态；不得把“用户未明确要求提交”当作不提交理由。
 - 发布到 quality-check 的提交标题必须使用中文；提交标题会作为质量网页中的摘要显示。
 - `target/codex-runs/`、兼容日志和 `out/` 证据保留到交付但不提交。
 - 最终说明 changed paths、文档影响、deferred findings、验证类别、未验证风险、commit 和剩余工作区状态。

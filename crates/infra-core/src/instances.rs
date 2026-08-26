@@ -332,4 +332,20 @@ mod tests {
             vec!["dorm_rec_single[020]".to_string()]
         );
     }
+
+    #[test]
+    fn vina_is_altered_not_glasgow_in_both_tiers() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+
+        for tier in [PromotionTier::Tier0, PromotionTier::TierUp] {
+            let instance = instances
+                .get("维娜·维多利亚", tier)
+                .expect("Vina instance should exist");
+            assert!(
+                !instance.tags.iter().any(|tag| tag == "cc.g.glasgow"),
+                "Vina must not be counted as Glasgow at {tier:?}: {:?}",
+                instance.tags
+            );
+        }
+    }
 }
