@@ -37,6 +37,7 @@
       "label": "喀兰跨站：灵知 E2 + 孑 + E2 喀兰贸易成员",
       "tier": "cross_station",
       "priority": 18,
+      "bind_all": true,
       "exclusive_group": "meta_chain",
       "shift_modes": ["peak"],
       "slots": [

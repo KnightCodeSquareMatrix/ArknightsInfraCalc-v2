@@ -24,8 +24,8 @@ use crate::mood::{
 };
 use crate::operbox::OperBox;
 use crate::pool::{
-    add_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
-    build_power_pool, build_trade_pool, karlan_precision_active, ManuPool, ManuPoolEntry,
+    build_control_pool_with_fillers, build_manufacture_pool, build_power_pool, build_trade_pool,
+    ManuPool, ManuPoolEntry,
 };
 use crate::search::{
     control_efficiency_fill_sort_weight, control_entry_plugin_fill,
@@ -1482,10 +1482,7 @@ fn assign_gamma_half(
         durin_dorm_planning,
     )?
     .layout_snapshot();
-    let mut trade_pool = pools.trade.clone();
-    if karlan_precision_active(&layout.global_inject) {
-        add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
-    }
+    let trade_pool = pools.trade.clone();
     assign_team_gamma_half(
         blueprint,
         instances,
