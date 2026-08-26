@@ -69,6 +69,8 @@ pub struct WorkforceIndex {
     pub control_operators: Vec<(String, u8)>,
     pub platform_rooms: Vec<RoomId>,
     pub all_base_names: Vec<String>,
+    /// 有效“在基建内”presence：排除会客室使用者和训练副手。
+    pub effective_base_presence: Vec<String>,
     pub rhine_life_in_base: u8,
     /// 基建内杜林族干员数（际崖居民；不含副手，至多 4）。
     pub durin_in_base: u8,
@@ -134,6 +136,16 @@ impl WorkforceIndex {
         } else {
             assignment.base_workforce.clone()
         };
+        let training_assist = assignment
+            .training_assist
+            .as_ref()
+            .map(|a| vec![a.name.clone()])
+            .unwrap_or_default();
+        let mut effective_base_presence = all_base_names
+            .iter()
+            .filter(|name| !training_assist.iter().any(|assist| assist == *name))
+            .cloned()
+            .collect::<Vec<_>>();
         for ops in by_room.values() {
             for op in ops {
                 if !all_base_names.iter().any(|n| n == &op.name) {
@@ -141,17 +153,18 @@ impl WorkforceIndex {
                 }
             }
         }
-        if let Some(assist) = &assignment.training_assist {
-            if !all_base_names.iter().any(|n| n == &assist.name) {
-                all_base_names.push(assist.name.clone());
+        for room in &blueprint.rooms {
+            if room.kind == FacilityKind::MeetingRoom {
+                continue;
+            }
+            for op in assignment.operators_in(&room.id) {
+                if !training_assist.iter().any(|assist| assist == &op.name)
+                    && !effective_base_presence.iter().any(|name| name == &op.name)
+                {
+                    effective_base_presence.push(op.name.clone());
+                }
             }
         }
-
-        let training_assist = assignment
-            .training_assist
-            .as_ref()
-            .map(|a| vec![a.name.clone()])
-            .unwrap_or_default();
 
         // 训练主位与训练副手均计入莱茵生命阵营人数（canonical RHINE_LAB §3）；
         // all_base_names 已包含副手，此处不再排除。
@@ -174,6 +187,7 @@ impl WorkforceIndex {
             control_operators,
             platform_rooms,
             all_base_names,
+            effective_base_presence,
             rhine_life_in_base,
             durin_in_base,
             training_assist,
@@ -240,7 +254,7 @@ impl WorkforceIndex {
         layout.power_workforce = self.power_workforce.clone();
         layout.control_workforce = self.control_workforce.clone();
         layout.control_operators = self.control_operators.clone();
-        layout.base_workforce = self.all_base_names.clone();
+        layout.base_workforce = self.effective_base_presence.clone();
         layout.training_assist = self.training_assist.clone();
         layout.rhine_life_in_base = self.rhine_life_in_base;
         layout.durin_in_base = self.durin_in_base;

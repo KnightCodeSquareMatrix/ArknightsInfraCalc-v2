@@ -176,6 +176,82 @@ pub struct FiammettaShiftAction {
     pub room_id: RoomId,
 }
 
+fn fiammetta_ready_events(
+    shifts: &[TeamShiftResult],
+    target: &str,
+    candidate_indices: &[usize],
+    model: &MoodModel,
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+) -> Vec<usize> {
+    let mut ready_mood = model.mood_cap;
+    let mut target_mood = model.mood_cap;
+    let mut last_event_at = 0.0;
+    let mut elapsed = 0.0;
+    let mut events = Vec::new();
+    for (index, shift) in shifts.iter().enumerate() {
+        if candidate_indices.contains(&index) {
+            let eta = shift_eta_with_instances(model, blueprint, &shift.assignment, instances);
+            let drain = eta
+                .per_op
+                .iter()
+                .find(|operator| operator.name == target)
+                .map(|operator| operator.drain_per_hour)
+                .unwrap_or(model.base_drain_per_hour)
+                .max(0.0);
+            let since_event = elapsed - last_event_at;
+            ready_mood = (ready_mood + 2.0 * since_event).min(model.mood_cap);
+            target_mood = (target_mood - drain * since_event).max(0.0);
+            if ready_mood + 1e-9 >= model.mood_cap {
+                events.push(index);
+                ready_mood = target_mood;
+                target_mood = model.mood_cap;
+                last_event_at = elapsed;
+            }
+        }
+        elapsed += shift.duration_hours;
+    }
+    events
+}
+
+fn fiammetta_ready_boundary_events(
+    shifts: &[TeamShiftResult],
+    candidates: &[(usize, String)],
+    model: &MoodModel,
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+) -> HashSet<usize> {
+    let mut ready_mood = model.mood_cap;
+    let mut target_mood = HashMap::<String, f64>::new();
+    let mut last_event_at = 0.0;
+    let mut elapsed = 0.0;
+    let mut accepted = HashSet::new();
+    for (index, shift) in shifts.iter().enumerate() {
+        if let Some((_, target)) = candidates.iter().find(|(candidate, _)| *candidate == index) {
+            let eta = shift_eta_with_instances(model, blueprint, &shift.assignment, instances);
+            let drain = eta
+                .per_op
+                .iter()
+                .find(|operator| operator.name == *target)
+                .map(|operator| operator.drain_per_hour)
+                .unwrap_or(model.base_drain_per_hour)
+                .max(0.0);
+            let since_event = elapsed - last_event_at;
+            ready_mood = (ready_mood + 2.0 * since_event).min(model.mood_cap);
+            let mood = target_mood.entry(target.clone()).or_insert(model.mood_cap);
+            *mood = (*mood - drain * since_event).max(0.0);
+            if ready_mood + 1e-9 >= model.mood_cap {
+                accepted.insert(index);
+                ready_mood = *mood;
+                *mood = model.mood_cap;
+                last_event_at = elapsed;
+            }
+        }
+        elapsed += shift.duration_hours;
+    }
+    accepted
+}
+
 /// Explicit same-dorm recovery group confirmed by the schedule layer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DormRestPlan {
@@ -2255,6 +2331,8 @@ fn attach_fiammetta_cycle_boundaries(
     if !operbox.owns("菲亚梅塔") || shifts.len() < 3 {
         return Ok(());
     }
+    let mood_model = MoodModel::load_default()?;
+    let mut candidates = Vec::new();
     for index in 0..shifts.len() {
         let previous_index = (index + shifts.len() - 1) % shifts.len();
         let previous = shifts[previous_index].assignment.clone();
@@ -2269,6 +2347,22 @@ fn attach_fiammetta_cycle_boundaries(
             continue;
         };
         if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
+            continue;
+        }
+        candidates.push((index, target, room_id));
+    }
+    let ready = fiammetta_ready_boundary_events(
+        shifts,
+        &candidates
+            .iter()
+            .map(|(index, target, _)| (*index, target.clone()))
+            .collect::<Vec<_>>(),
+        &mood_model,
+        blueprint,
+        instances,
+    );
+    for (index, target, room_id) in candidates {
+        if !ready.contains(&index) {
             continue;
         }
         let active_names = active_team_names(teams, &shifts[index].active_teams);
@@ -2309,14 +2403,9 @@ fn apply_single_core_fiammetta_rotation(
     if !operbox.owns("菲亚梅塔") || shifts.is_empty() {
         return Ok(false);
     }
-    let max_actions = match profile {
-        TimedRotationProfile::Abc12_12_12 => 3,
-        // The default 12/6/6 ABC cycle has one Fiammetta event at its
-        // S3 -> S1 boundary. Its target-room refresh is handled below by
-        // attach_fiammetta_cycle_boundary; only 12/12/12 may re-search that
-        // room once per 12h shift.
-        _ => return Ok(false),
-    };
+    if !matches!(profile, TimedRotationProfile::Abc12_12_12) {
+        return Ok(false);
+    }
     let cycle_hours: f64 = shifts.iter().map(|shift| shift.duration_hours).sum();
     let model = MoodModel::load_default()?;
     let trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
@@ -2455,40 +2544,33 @@ fn apply_single_core_fiammetta_rotation(
             continue;
         }
 
-        let drain = candidate_shifts
-            .iter()
-            .find_map(|shift| {
-                shift_eta_with_instances(&model, blueprint, &shift.assignment, instances)
-                    .per_op
-                    .into_iter()
-                    .find(|operator| operator.name == target)
-                    .map(|operator| operator.drain_per_hour)
-            })
-            .unwrap_or(model.base_drain_per_hour);
-        let required_actions = ((cycle_hours * drain) / model.workable_mood())
-            .ceil()
-            .max(1.0) as usize;
-        if required_actions > max_actions {
-            continue;
-        }
-
         let target_team = teams
             .iter()
             .find(|team| team.operators.iter().any(|operator| operator == target))
             .map(|team| team.label);
-        let mut action_indices: Vec<_> = candidate_shifts
-            .iter()
-            .enumerate()
-            .filter_map(|(index, shift)| (Some(shift.resting_team) == target_team).then_some(index))
-            .collect();
-        for step in 0..required_actions {
-            let index = step * candidate_shifts.len() / required_actions;
-            if !action_indices.contains(&index) {
-                action_indices.push(index);
-            }
+        let action_candidates: Vec<_> = if target_team.is_some() {
+            candidate_shifts
+                .iter()
+                .enumerate()
+                .filter_map(|(index, shift)| {
+                    (Some(shift.resting_team) == target_team).then_some(index)
+                })
+                .chain(0..candidate_shifts.len())
+                .collect()
+        } else {
+            (0..candidate_shifts.len()).collect()
+        };
+        let action_indices = fiammetta_ready_events(
+            &candidate_shifts,
+            target,
+            &action_candidates,
+            &model,
+            blueprint,
+            instances,
+        );
+        if action_indices.is_empty() {
+            continue;
         }
-        action_indices.sort_unstable();
-        action_indices.truncate(required_actions);
         for index in action_indices {
             candidate_shifts[index].fiammetta = Some(FiammettaShiftAction {
                 target: target.to_string(),
@@ -2540,11 +2622,12 @@ fn apply_witch_group_fiammetta_rotation(
     if !operbox.owns("菲亚梅塔") || shifts.is_empty() {
         return Ok(false);
     }
-    let max_actions = match profile {
-        TimedRotationProfile::Abc12_12_12 => 3,
-        TimedRotationProfile::Abc12_6_6 => 2,
-        _ => return Ok(false),
-    };
+    if !matches!(
+        profile,
+        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
+    ) {
+        return Ok(false);
+    }
     let Some(room_id) = shifts.iter().find_map(|shift| {
         shift.assignment.rooms.iter().find_map(|room| {
             blueprint
@@ -2572,6 +2655,7 @@ fn apply_witch_group_fiammetta_rotation(
         return Ok(false);
     }
     let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let mood_model = MoodModel::load_default()?;
     let mut ranked_tailors = Vec::new();
     for tailor in tailors {
         let mut assignment = shifts[0].assignment.clone();
@@ -2624,10 +2708,22 @@ fn apply_witch_group_fiammetta_rotation(
         .map(|shift| shift.duration_hours)
         .sum();
     let required_actions = ["巫恋", "龙舌兰"];
-    if required_actions.len() > max_actions || required_actions.len() > candidate_shifts.len() {
+    if required_actions.len() > candidate_shifts.len() {
         return Ok(false);
     }
     for (index, target) in required_actions.into_iter().enumerate() {
+        let ready = fiammetta_ready_events(
+            &candidate_shifts,
+            target,
+            &[index],
+            &mood_model,
+            blueprint,
+            instances,
+        )
+        .contains(&index);
+        if !ready {
+            return Ok(false);
+        }
         candidate_shifts[index].fiammetta = Some(FiammettaShiftAction {
             target: target.to_string(),
             displaced: String::new(),

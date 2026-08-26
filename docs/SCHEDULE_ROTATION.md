@@ -16,7 +16,7 @@
 | profile | CLI | 状态与 owner | 失败语义 |
 |---|---|---|---|
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
-| `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；最多每个休息班一次菲亚回岗，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
+| `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；菲亚按事件边界和自身恢复状态决定回岗次数，不设机制级固定次数上限，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
 | `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
 | `fiammetta_witch_12_12` | `--rotation fiammetta-witch-1212` | 两个预认领 Plan owner 共享巫恋+龙舌兰，同一三级赤金贸易站内由两只不同裁缝 β 按 AB 轮换；每班一个菲亚目标 | 缺菲亚、完整龙巫、两只裁缝 β、合法房间或完整 owner 即报错；不回退普通二班 |
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
@@ -244,7 +244,7 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 
 ### 7.2 菲亚梅塔主力回岗覆盖
 
-回岗覆盖默认启用，可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；关闭后不生成回岗动作，与显式 `fiammetta-8844` 或 `fiammetta-witch-1212` 组合直接失败。启用时：默认 12/6/6 每个 24h 周期一次，12/12/12 最多三个 12h 班各一次；每个班次至多一次且不强行凑满：
+回岗覆盖默认启用，可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；关闭后不生成回岗动作，与显式 `fiammetta-8844` 或 `fiammetta-witch-1212` 组合直接失败。启用时按事件边界和菲亚梅塔自身 ready 状态决定是否使用，可在同一轮换周期内多次使用：
 
 1. 账号必须拥有菲亚梅塔；
 2. 从 peak 主力按布局分支查找目标：153 为 `可露希尔 > 巫恋+龙舌兰 > 但书（精0/精二）`；243/252 为 `但书（精0/精二） > 可露希尔 > 巫恋+龙舌兰 > 清流`；333/342 为 `但书（精0/精二） > 可露希尔 > 清流 > 巫恋+龙舌兰`；巫恋+龙舌兰必须同时使用并搭配两只不同裁缝 β；
