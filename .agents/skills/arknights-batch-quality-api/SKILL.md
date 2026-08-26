@@ -1,11 +1,11 @@
 ---
 name: arknights-batch-quality-api
-description: Batch Check updated Arknights solver bundles through the Quality HTTP API. Use after solver updates or when asked to batch solve representative/high-owned Boxes, poll compact status, report exact per-Box errors, or provide a downloadable result link.
+description: Batch Check updated Arknights solver bundles on the remote Quality service through its HTTP API. Use after solver updates or when asked to batch solve representative/high-owned Boxes, poll compact status, report exact per-Box errors, or provide a downloadable result link.
 ---
 
 # Arknights Batch Quality API
 
-Use the Check service as the only source of batch inputs and results. This workflow is optimized for fast agent feedback without loading large solver results into context.
+Use the remote Check service as the only source of batch inputs and results. This workflow is optimized for fast agent feedback without loading large solver results into context.
 
 ## Hard Rules
 
@@ -19,10 +19,10 @@ Use the Check service as the only source of batch inputs and results. This workf
 
 ## API Base
 
-Use `QUALITY_CHECK_API_URL` when provided; otherwise use the local default:
+Use `QUALITY_CHECK_API_URL` when provided; otherwise use the default remote Check API:
 
 ```bash
-API_BASE="${QUALITY_CHECK_API_URL:-http://127.0.0.1:5174}"
+API_BASE="${QUALITY_CHECK_API_URL:-https://instance-pi2ohhfj.tail2dca9.ts.net:10000}"
 ```
 
 ## 1. Discover Options
