@@ -582,7 +582,7 @@ pub(super) fn pick_trade_meta_then_plain(
         && !role_used.contains(DOCUS_TRADE_NAME)
         && pool.entry(DOCUS_TRADE_NAME).is_some()
     {
-        if let Ok(hit) = pick_trade_role_hit_requiring(
+        match pick_trade_role_hit_requiring(
             "docus",
             pool,
             table,
@@ -598,7 +598,13 @@ pub(super) fn pick_trade_meta_then_plain(
             options.top_k,
             required_names,
         ) {
-            return Ok(hit);
+            Ok(hit) => return Ok(hit),
+            Err(error) if required_names.iter().any(|name| name == DOCUS_TRADE_NAME) => {
+                return Err(Error::msg(format!(
+                    "required docus core has no legal teammate combination: {error}"
+                )));
+            }
+            Err(_) => {}
         }
     }
     if order == TradeOrderKind::Gold
