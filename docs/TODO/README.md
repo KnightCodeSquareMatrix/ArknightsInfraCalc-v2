@@ -20,6 +20,7 @@
 | [Worker 内联 JSON 集成与部署验收](Worker内联JSON集成与部署验收.md) | `ready-on-request` | 将已验证的 plan.compute v1 集成到目标分支和部署环境并完成浏览器验收 |
 | [Worker 契约 hash 治理与前端版本上报](Worker契约hash治理与前端版本上报.md) | `proposal` | 分两个阶段治理契约校验并补齐构建标识：当前版本前端侧缓解（schema hash 降诊断、feedback 携带本次求解的 solver Git 提交号和构建时间），下一版本从 ping 契约移除 schema hash 并增强 schema 错误报告 |
 | [Worker 旧路径协议清理](Worker旧路径协议清理.md) | `blocked` | 等待 plan.compute v1 集成部署和 inventory 后删除 legacy plan 路径协议与兼容说明 |
+| [中枢与相关变更历史对话审计汇总](中枢与相关变更历史对话审计汇总.md) | `ready-on-request` | 从历史对话和当时 Markdown 中提取用户裁决、实现范围、验证状态与重新审计清单 |
 | [中枢效果账本与顺序选位重构](中枢效果账本与顺序选位重构.md) | `ready-on-request` | 以原子级效果账本和顺序选位统一控制中枢同种效果取最高、技能盘点与轮换事实 |
 | [体系注册表后续缺口](体系注册表后续缺口.md) | `ready-on-request` | 承接旧组合体系规范化报告中仍有效但未获当前授权的开放项 |
 | [动态 Producer 旧设计阻塞分析交接](动态Producer旧设计阻塞分析交接.md) | `ready-on-request` | 记录回退后的动态 producer 旧模型边界、已验证阻塞和下一位 agent 的只读分析入口 |
