@@ -30,6 +30,32 @@ pub(crate) fn assign_control(
     excluded_control: &HashSet<String>,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    assign_control_with_saileach(
+        assignment,
+        pool,
+        table,
+        layout,
+        options,
+        candidate_requirements,
+        excluded_control,
+        None,
+        false,
+        used,
+    )
+}
+
+pub(crate) fn assign_control_with_saileach(
+    assignment: &mut BaseAssignment,
+    pool: &ControlPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    candidate_requirements: &[crate::layout::ControlCandidateRequirement],
+    excluded_control: &HashSet<String>,
+    saileach_best_office_pct: Option<f64>,
+    saileach_required: bool,
+    used: &mut HashSet<String>,
+) -> Result<()> {
     assign_control_inner(
         assignment,
         pool,
@@ -39,6 +65,8 @@ pub(crate) fn assign_control(
         candidate_requirements,
         None,
         Some(excluded_control),
+        saileach_best_office_pct,
+        saileach_required,
         used,
     )?
     .then_some(())
@@ -57,6 +85,36 @@ pub(crate) fn assign_control_matching_dynamic_set(
     excluded_control: &HashSet<String>,
     used: &mut HashSet<String>,
 ) -> Result<bool> {
+    assign_control_matching_dynamic_set_with_saileach(
+        assignment,
+        pool,
+        table,
+        layout,
+        options,
+        candidate_requirements,
+        required_all,
+        dynamic_excluded,
+        excluded_control,
+        None,
+        false,
+        used,
+    )
+}
+
+pub(crate) fn assign_control_matching_dynamic_set_with_saileach(
+    assignment: &mut BaseAssignment,
+    pool: &ControlPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    candidate_requirements: &[crate::layout::ControlCandidateRequirement],
+    required_all: &HashSet<String>,
+    dynamic_excluded: &HashSet<String>,
+    excluded_control: &HashSet<String>,
+    saileach_best_office_pct: Option<f64>,
+    saileach_required: bool,
+    used: &mut HashSet<String>,
+) -> Result<bool> {
     let excluded: HashSet<_> = dynamic_excluded.union(excluded_control).cloned().collect();
     assign_control_inner(
         assignment,
@@ -67,6 +125,8 @@ pub(crate) fn assign_control_matching_dynamic_set(
         candidate_requirements,
         Some(required_all),
         Some(&excluded),
+        saileach_best_office_pct,
+        saileach_required,
         used,
     )
 }
@@ -81,6 +141,8 @@ fn assign_control_inner(
     candidate_requirements: &[crate::layout::ControlCandidateRequirement],
     required_all: Option<&HashSet<String>>,
     excluded: Option<&HashSet<String>>,
+    saileach_best_office_pct: Option<f64>,
+    saileach_required: bool,
     used: &mut HashSet<String>,
 ) -> Result<bool> {
     const MAX_CONTROL: usize = 5;
@@ -117,6 +179,8 @@ fn assign_control_inner(
         must_include: must_include.clone(),
         candidate_requirements: requirements,
         fill_policy: ControlFillPolicy::LayeredFill,
+        saileach_best_office_pct,
+        saileach_required,
     };
 
     let base_pool =

@@ -95,6 +95,10 @@ pub struct ControlSearchOptions {
     /// 候选组最低命中数；约束合法组合，不改变实际效率排序。
     pub candidate_requirements: Vec<(HashSet<String>, u8)>,
     pub fill_policy: ControlFillPolicy,
+    /// 当前班次可用办公室的最高静态加成；仅用于琴柳的条件准入特判。
+    pub saileach_best_office_pct: Option<f64>,
+    /// Plan 是否硬要求琴柳。硬要求时不能由该特判移除。
+    pub saileach_required: bool,
 }
 
 impl Default for ControlSearchOptions {
@@ -108,6 +112,8 @@ impl Default for ControlSearchOptions {
             must_include: HashSet::new(),
             candidate_requirements: Vec::new(),
             fill_policy: ControlFillPolicy::default(),
+            saileach_best_office_pct: None,
+            saileach_required: false,
         }
     }
 }
@@ -1034,6 +1040,33 @@ pub fn search_control_combos(
                 } else {
                     (solve_control(&input, table), 0, 0)
                 };
+            if !options.saileach_required
+                && operators.iter().any(|operator| operator.name == "琴柳")
+            {
+                if let Some(best_office_pct) = options.saileach_best_office_pct {
+                    let other_control = solve_control(
+                        &ControlRoomInput {
+                            operators: operators
+                                .iter()
+                                .filter(|operator| operator.name != "琴柳")
+                                .cloned()
+                                .collect(),
+                            mood,
+                            layout: layout.clone(),
+                        },
+                        table,
+                    );
+                    if 5.0
+                        + best_office_pct
+                        + other_control
+                            .effect_ledger
+                            .value(ControlEffectKey::OFFICE_HIRE_SPEED)
+                        >= 30.0
+                    {
+                        return None;
+                    }
+                }
+            }
             let global_recovery = mood_model.control_global_recovery_summary(
                 &operators
                     .iter()
@@ -1888,5 +1921,61 @@ mod tests {
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].names.len(), 3);
+    }
+
+    #[test]
+    fn saileach_admission_counts_other_control_office_bonus() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("琴柳", 2), ("八幡海铃", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 2,
+                top_k: 20,
+                saileach_best_office_pct: Some(20.0),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(hits.is_empty(), "5 + 20 + 10 reaches the 30% threshold");
+    }
+
+    #[test]
+    fn saileach_required_bypasses_office_admission_filter() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let roster = Roster::from_elite_map(
+            [("琴柳", 2), ("八幡海铃", 2)]
+                .into_iter()
+                .map(|(name, elite)| (name.to_string(), elite))
+                .collect(),
+        );
+        let pool = build_control_pool(&roster, &instances, &table).unwrap();
+        let hits = search_control_combos(
+            &pool,
+            &table,
+            &ControlSearchOptions {
+                max_operators: 2,
+                top_k: 20,
+                saileach_best_office_pct: Some(20.0),
+                saileach_required: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            hits[0].names,
+            vec!["八幡海铃".to_string(), "琴柳".to_string()]
+        );
     }
 }

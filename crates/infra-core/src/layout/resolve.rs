@@ -186,6 +186,10 @@ fn resolve_base_inner(
             instances,
         )?;
 
+        // 琴柳的中枢条件读取办公室当前联络速度。办公室的实际技能值必须在
+        // 中枢结算前可见，避免把后续办公室成员错误地当成不存在。
+        layout.office_hire_spd_pct =
+            support_office_hire_speed(blueprint, assignment, &layout, mood)?;
         let control_ops: Vec<ControlOperator> = assignment
             .control_operators()
             .iter()
@@ -260,6 +264,49 @@ fn resolve_base_inner(
         },
         trace,
     ))
+}
+
+fn support_office_hire_speed(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    layout: &LayoutContext,
+    mood: f64,
+) -> Result<f64> {
+    use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
+
+    let registry = SupportRegistry::load_default()?;
+    let extra_recruit_slots = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+        .map(|room| room.level.saturating_sub(1))
+        .max()
+        .unwrap_or(0);
+    let mut best: f64 = 0.0;
+    for room in blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+    {
+        let operators = support_operators(assignment.operators_in(&room.id), mood);
+        if operators.is_empty() {
+            continue;
+        }
+        let result = crate::office::evaluate_office(
+            &SupportRoomInput {
+                facility: SupportFacility::Office,
+                operators,
+                capacity: room.operator_capacity(),
+                extra_recruit_slots,
+                elapsed_hours: 24.0,
+                external_speed_bonus_pct: 0.0,
+                layout: layout.clone(),
+            },
+            &registry,
+        )?;
+        best = best.max(result.skill_speed_bonus_pct);
+    }
+    Ok(best)
 }
 
 fn build_support_rooms(
@@ -762,6 +809,27 @@ mod tests {
         assert_eq!(normal.trade_rooms.len(), traced.trade_rooms.len());
         assert_eq!(normal.manu_rooms.len(), traced.manu_rooms.len());
         assert!(trace.control.is_some());
+    }
+
+    #[test]
+    fn saileach_does_not_activate_when_registry_office_speed_reaches_threshold() {
+        let (instances, table) = pair();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("control", vec![AssignedOperator::new("琴柳", 2)]);
+        assignment.set_room("office_1", vec![AssignedOperator::new("月禾", 2)]);
+
+        let resolved = resolve_base(
+            &blueprint,
+            &assignment,
+            Some(&instances),
+            Some(&table),
+            24.0,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.layout.control_office_hire_spd_pct, 0.0);
     }
 
     #[test]

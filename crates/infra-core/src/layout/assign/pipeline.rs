@@ -27,7 +27,9 @@ use crate::search::{
 use crate::skill_table::SkillTable;
 
 use super::commit::{commit_manu_room, commit_trade_room};
-use super::control_fill::{assign_control, assign_control_matching_dynamic_set};
+use super::control_fill::{
+    assign_control_matching_dynamic_set_with_saileach, assign_control_with_saileach,
+};
 use super::manufacture_fill::{
     assign_manufacture_lines, manu_options, manufacture_candidate_pool_for_demand, pick_manu_hit,
     refresh_manufacture_efficiency_snapshots,
@@ -978,12 +980,12 @@ fn control_layout_for_upper_bound(
     layout
 }
 
-fn saileach_is_inactive_with_best_office(
+fn best_available_office_pct(
     run: &AssignmentRun<'_>,
     producer_layout: &crate::layout::LayoutContext,
-) -> Result<bool> {
+) -> Result<Option<f64>> {
     if producer_layout.office_room_count == 0 {
-        return Ok(false);
+        return Ok(None);
     }
 
     let office_occupants: HashSet<_> = run
@@ -998,7 +1000,16 @@ fn saileach_is_inactive_with_best_office(
         })
         .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
         .collect();
-    let mut best_office_pct: f64 = 0.0;
+    let registry = crate::support_facility::SupportRegistry::load_default()?;
+    let extra_recruit_slots = run
+        .blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+        .map(|room| room.level.saturating_sub(1))
+        .max()
+        .unwrap_or(0);
+    let mut best_office_pct: Option<f64> = None;
     for name in run.operbox.roster().names() {
         if run.used.contains(name) && !office_occupants.contains(name) {
             continue;
@@ -1006,27 +1017,28 @@ fn saileach_is_inactive_with_best_office(
         let Some(progress) = run.operbox.progress_of(name) else {
             continue;
         };
-        let tier = crate::tier::PromotionTier::from_elite(progress.elite);
-        let buff_ids = run.instances.resolve_office_buff_ids(name, tier);
-        if buff_ids.is_empty() {
-            continue;
-        }
-        let office_pct = crate::office::solve_office(
-            &crate::office::OfficeRoomInput {
-                operators: vec![crate::office::OfficeOperator {
+        let office_pct = crate::office::evaluate_office(
+            &crate::support_facility::SupportRoomInput {
+                facility: crate::support_facility::SupportFacility::Office,
+                operators: vec![crate::support_facility::SupportOperator {
                     name: name.clone(),
                     elite: progress.elite,
-                    buff_ids,
+                    rarity: progress.rarity,
+                    level: progress.level,
+                    mood: run.options.mood.max(0.0),
                 }],
-                mood: run.options.mood,
+                capacity: 1,
+                extra_recruit_slots,
+                elapsed_hours: 24.0,
+                external_speed_bonus_pct: 0.0,
                 layout: producer_layout.clone(),
             },
-            run.table,
-        )
-        .hire_spd_pct;
-        best_office_pct = best_office_pct.max(office_pct);
+            &registry,
+        )?
+        .skill_speed_bonus_pct;
+        best_office_pct = Some(best_office_pct.map_or(office_pct, |best| best.max(office_pct)));
     }
-    Ok(best_office_pct >= 25.0)
+    Ok(best_office_pct)
 }
 
 fn prepare_peak_control_candidate<'a>(
@@ -1038,7 +1050,6 @@ fn prepare_peak_control_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
-    let mut effective_exclusions = control_exclusions.clone();
     let control_names: HashSet<String> = run
         .assignment
         .control_operators()
@@ -1046,13 +1057,19 @@ fn prepare_peak_control_candidate<'a>(
         .map(|operator| operator.name)
         .collect();
     let saileach_required = control_names.contains("琴柳")
-        || dynamic_set.is_some_and(|(required, _)| required.contains("琴柳"));
-    if !saileach_required && saileach_is_inactive_with_best_office(&run, producer_layout)? {
-        effective_exclusions.insert("琴柳".to_string());
-    }
+        || dynamic_set.is_some_and(|(required, _)| required.contains("琴柳"))
+        || plan
+            .control_candidate_requirements
+            .iter()
+            .any(|requirement| {
+                requirement.min_count > 0
+                    && requirement.candidates.len() == 1
+                    && requirement.candidates.iter().any(|name| name == "琴柳")
+            });
+    let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
     if run.assignment.control_operators().len() < 5 {
         if let Some((required, excluded)) = dynamic_set {
-            if !assign_control_matching_dynamic_set(
+            if !assign_control_matching_dynamic_set_with_saileach(
                 &mut run.assignment,
                 control_pool,
                 run.table,
@@ -1061,20 +1078,24 @@ fn prepare_peak_control_candidate<'a>(
                 &plan.control_candidate_requirements,
                 required,
                 excluded,
-                &effective_exclusions,
+                control_exclusions,
+                saileach_best_office_pct,
+                saileach_required,
                 &mut run.used,
             )? {
                 return Ok(None);
             }
         } else {
-            assign_control(
+            assign_control_with_saileach(
                 &mut run.assignment,
                 control_pool,
                 run.table,
                 producer_layout,
                 run.options,
                 &plan.control_candidate_requirements,
-                &effective_exclusions,
+                control_exclusions,
+                saileach_best_office_pct,
+                saileach_required,
                 &mut run.used,
             )?;
         }
@@ -1352,6 +1373,7 @@ mod tests {
     use crate::layout::blueprint::{
         BlueprintScenario, FacilityKind, RoomBlueprint, RoomId, RoomProduct,
     };
+    use crate::layout::LayoutContext;
     use crate::operbox::OperBoxEntry;
     use crate::skill_table::{default_skill_table_path, SkillTable};
     use crate::trade::TradeOrderKind;
@@ -2264,5 +2286,38 @@ mod tests {
             Some((&HashSet::from(["八幡海铃".to_string()]), &HashSet::new())),
         );
         assert!(result.is_err(), "真实 resolve 错误不得降级成不可行候选");
+    }
+
+    #[test]
+    fn best_available_office_pct_uses_support_registry() {
+        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let operbox = OperBox::from_entries([e2("月禾")].into_iter().collect()).unwrap();
+        let mut blueprint = control_blueprint(false);
+        blueprint.rooms.push(RoomBlueprint {
+            id: RoomId::from("office"),
+            kind: FacilityKind::Office,
+            level: 3,
+            product: None,
+            dorm_beds: None,
+            dorm_ambience_level: None,
+        });
+        let options = AssignBaseOptions::default();
+        let run = AssignmentRun::new(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &options,
+            BaseAssignment::default(),
+            HashSet::new(),
+        );
+        let mut layout = LayoutContext::default();
+        layout.office_room_count = 1;
+
+        assert_eq!(
+            best_available_office_pct(&run, &layout).unwrap(),
+            Some(35.0)
+        );
     }
 }
