@@ -1914,6 +1914,9 @@ fn validate_final_rotation_invariants(
     }
 
     for bind in binds {
+        if shifts.len() != 3 {
+            continue;
+        }
         if bind
             .operators
             .iter()
@@ -3510,6 +3513,55 @@ pub fn assert_final_rotation_invariants(
 ) -> Result<()> {
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
+    let mut seen_binds = HashSet::new();
+    for plan in &report.assignment_plans {
+        for bind in shift_binds_from_plan(plan) {
+            let mut key = bind.operators.clone();
+            key.sort();
+            key.dedup();
+            if !seen_binds.insert(key) {
+                continue;
+            }
+            for shift in &report.shifts {
+                let present = shift.assignment.operator_names();
+                let flags: Vec<_> = bind
+                    .operators
+                    .iter()
+                    .map(|name| present.contains(name))
+                    .collect();
+                if flags
+                    .first()
+                    .is_some_and(|first| flags.iter().any(|flag| flag != first))
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants shift_bind_cohort_preserved failed in shift {} for {:?}",
+                        shift.index + 1,
+                        bind.operators
+                    )));
+                }
+            }
+            let expected_shifts = usize::from(bind.on_shifts) + usize::from(bind.off_shifts);
+            if report.shifts.len() == expected_shifts {
+                let active = report
+                    .shifts
+                    .iter()
+                    .filter(|shift| {
+                        let present = shift.assignment.operator_names();
+                        bind.operators.iter().all(|name| present.contains(name))
+                    })
+                    .count();
+                let inactive = report.shifts.len().saturating_sub(active);
+                if (bind.on_shifts > 0 && active != usize::from(bind.on_shifts))
+                    || (bind.off_shifts > 0 && inactive != usize::from(bind.off_shifts))
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants shift_bind_cohort_preserved failed for {:?}: expected {}/{} active/resting shifts, got {active}/{inactive}",
+                        bind.operators, bind.on_shifts, bind.off_shifts
+                    )));
+                }
+            }
+        }
+    }
     for shift in &report.shifts {
         let control = shift.assignment.control_operators();
         if control.len() != 5 {
@@ -3565,6 +3617,36 @@ pub fn assert_final_rotation_invariants(
             Some(operbox.durin_dorm_planning_count(instances)),
         )?
         .layout_snapshot();
+        for room in &shift.assignment.rooms {
+            if blueprint
+                .room(&room.room_id)
+                .is_none_or(|spec| spec.kind != FacilityKind::TradePost)
+            {
+                continue;
+            }
+            let has_market_variant = room.operators.iter().any(|operator| {
+                instances
+                    .resolve_trade_buff_ids(&operator.name, operator.tier())
+                    .iter()
+                    .any(|buff_id| buff_id == "trade_ord_limit_count[000]")
+            });
+            let has_karlan_consumer = room.operators.iter().any(|operator| {
+                instances
+                    .tags_for(&operator.name, operator.tier())
+                    .iter()
+                    .any(|tag| tag == "cc.g.karlan")
+            });
+            if has_market_variant
+                && has_karlan_consumer
+                && final_layout.global_inject.karlan_precision().is_none()
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants karlan_trade_requires_control_source failed in shift {} room {}",
+                    shift.index + 1,
+                    room.room_id.0,
+                )));
+            }
+        }
         let control_values = [
             result.inject.trade_eff_pct(),
             result.office_hire_spd_pct,
@@ -5216,11 +5298,8 @@ fn augment_witch_profile_plan(
             },
         });
     }
-    plan.shift_binds.push(ShiftBind {
-        operators: operators.into_iter().map(str::to_string).collect(),
-        on_shifts: 1,
-        off_shifts: 1,
-    });
+    // The two persistent cores and alternating beta tailor are fixed by their separate owner
+    // plans. They are not one same-work/rest cohort, so they must not create a ShiftBind.
     Ok(())
 }
 
