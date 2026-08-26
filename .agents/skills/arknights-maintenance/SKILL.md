@@ -34,6 +34,39 @@ If canonical Markdown conflicts, stop semantic writing and request a ruling. Cod
 
 Do not load every protocol for an owner-local repair. The primary maintenance scope remains one observable invariant.
 
+## Standard Bug-Fix Chain
+
+Use this chain as the default for a bug that crosses code, data, solver, or
+runtime validation. The order matters: review the repaired behavior only after
+fresh execution evidence exists.
+
+1. **Reproduce**: capture the real entry, input, expected result, actual
+   result, and the smallest failing case. Use `terra-explorer` when the first
+   illegal state or owner is unclear; use `luna-extractor` for large logs or
+   repeated baselines.
+2. **Locate the owner**: read canonical semantics, trace the earliest stage
+   that permits the bad state, and classify the repair as local,
+   conformance, quality, or feature. Load `arknights-mechanics-contract` for
+   formulas/data mapping and `arknights-system-audit` for cross-boundary
+   admission, rotation, or export rules.
+3. **Implement the smallest owner fix**: keep one writer, preserve the normal
+   path, and register any final-state invariant in the Rust gate. Do not move
+   mechanism semantics into Python. For candidate/search or solver changes,
+   state whether each reduction is a hard constraint, safe reduction,
+   heuristic, policy, or approximation.
+4. **Run fresh verification before review**: format Rust, run the real CLI
+   entry, focused non-source checks, and risk-matched evidence. For final-state
+   or high-risk changes, run `arknights-invariant-gate` and its persistent box
+   batch. The batch must classify invariant failures, solver no-solution,
+   input failures, and timeouts separately.
+5. **Review the actual result**: only after the changed code and fresh batch
+   evidence exist, request the applicable reviewer: `sol-reviewer`,
+   `solver-guarantee-reviewer`, or `rotation-maa-reviewer`. If review blocks,
+   return to step 3, then rerun step 4 before requesting review again.
+6. **Close the repair**: report root cause, owner, changed paths, evidence,
+   reviewer result, deferred findings, and residual risk. Update or archive
+   the owning change document when lifecycle rules require it.
+
 ## Implement and Stop
 
 1. Change the earliest owner that permits the invalid state; keep normal domain paths intact.

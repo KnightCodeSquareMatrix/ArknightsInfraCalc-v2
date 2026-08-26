@@ -25,8 +25,9 @@ Use this Skill after a large or high-risk change that can produce a plausible-lo
 
 1. Run one real `plan` with `--assert-invariants` and both batch groups through `scripts/codex/run_evidence.sh`; do not run source-code tests.
 2. Report separately: checked count, invariant failures, solver infeasible/no-solution failures, parse/input failures, and timeouts.
-3. For solver/search, Plan, Team/Shift, rotation, MAA, export, or cross-facility changes, request `sol-reviewer` on the actual assertion diff and evidence. Revise until the reviewer returns `PASS`.
-4. Never claim a batch green result proves global optimality. It proves the named final-state invariant for the completed runs only.
+3. Run the real CLI and batch **before** requesting review. Give `sol-reviewer` the actual assertion diff and fresh evidence; never use a pre-change review as acceptance evidence.
+4. For solver/search, Plan, Team/Shift, rotation, MAA, export, or cross-facility changes, request `sol-reviewer` and revise until the reviewer returns `PASS`. Rerun the real CLI and batch after every blocking revision.
+5. Never claim a batch green result proves global optimality. It proves the named final-state invariant for the completed runs only.
 
 ## Stop Condition
 
