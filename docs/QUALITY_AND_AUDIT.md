@@ -64,6 +64,34 @@
 
 低风险文档或 owner-local 修复不强制运行所有全局类别；高风险搜索空间变化不能只靠一个 golden snapshot。
 
+### 2.3 无人值守修复与用户裁决
+
+用户明确授权某个任务无人值守修复时，workflow 默认持续推进：实现、格式或构建失败、final-state assertion / batch 失败、以及有 canonical 路径与最小反例支撑的 reviewer finding，均可自动形成一个新的单 writer 修复单元。每个单元完成后必须重新冻结 diff、changed paths、assertion 输出和 batch 结果；旧轮证据不得用于新轮通过。
+
+无人值守不授予业务语义裁决权。主 Agent 只编排、核对原始证据和决定继续 / 暂停；实现 Agent 不得自行放宽验收条件、删除失败断言、缩小 batch 输入、修改 canonical 语义或将未验证结果标记为通过。已批准任务明确要求新增或调整 final-state assertion 时，assertion diff 仍须按风险走独立复审。
+
+以下是唯一的固定暂停原因，必须写为 `PAUSE_REASON`，并附直接证据；“不确定”“想扩大重构”或普通失败不是暂停理由：
+
+| `PAUSE_REASON` | 必须暂停的条件 |
+|---|---|
+| `CANONICAL_CONFLICT_OR_GAP` | 两份 current canonical 冲突，或现有用户裁决 / canonical 都不足以唯一决定领域语义。 |
+| `GUARANTEE_CLASS_CHANGE` | 修复会改变 hard constraint、safe reduction、heuristic、policy restriction 或 approximation 的分类、承诺范围或 fallback。 |
+| `DOMAIN_POLICY_CHANGE` | 修复必须改变用户可见的机制、优先级、无解 / fallback 策略、连续在岗、reserve / bind 或其他领域政策。 |
+| `UNRESOLVED_EVIDENCE_DISPUTE` | 独立 reviewer 的实质分歧无法由 canonical、最终状态 assertion、真实入口或 batch 结果裁决。 |
+| `EXTERNAL_OR_IRREVERSIBLE_EFFECT` | 修复将部署、迁移 / 删除数据、覆盖用户工作区改动、改变公共接口，或产生其他不可逆外部副作用。 |
+
+自动循环的任务包必须声明：目标、用户已授权范围、canonical 路径、允许 changed paths、保证等级、required proof obligations、最大轮数和外部动作策略。默认上限是同一 finding 两次自动修复、整个任务四个修复单元；达到任一上限时以 `UNRESOLVED_EVIDENCE_DISPUTE` 暂停并保留 checkpoint，不得无界重试。每轮 final status 只能是：
+
+```text
+AUTO_STATUS: CONTINUE | PAUSED_FOR_USER | COMPLETED
+PAUSE_REASON: <one enum above, only when paused>
+FROZEN_PACKET_SHA256:
+EVIDENCE_REFS:
+NEXT_IMPLEMENTATION_UNIT:
+```
+
+`COMPLETED` 仍要求该风险等级的全部 gate 和独立复审通过；reviewer 的 `APPROVED`、单个命令成功或实现 Agent 的总结均不能单独关闭任务。当前 harness 尚未实现持久 writer lease、自动重试或用户通知 runtime；本节先定义所有 runtime 必须遵守的决策合同，不声称这些能力已落地。
+
 ## 3. 回归分层
 
 回归应按责任半径分层，不用单个大快照代替全部证明。
