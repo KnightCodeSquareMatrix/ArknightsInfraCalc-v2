@@ -73,7 +73,7 @@ fn print_usage() {
     eprintln!("Usage:");
     eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|12/12/12|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
     eprintln!(
-        "      [--profile-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--json]"
+        "      [--profile-out <file.json>] [--rotation-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--assert-invariants] [--json]"
     );
     eprintln!("      (default layout: data/fixtures/243/layout.json)");
     eprintln!("  infra-cli advice --operbox <path.json> [--player [--layout <layout.json>] [--player-context <context.json>] [--pretty] | --rules <path> | --answer | --explain [--pretty]]");

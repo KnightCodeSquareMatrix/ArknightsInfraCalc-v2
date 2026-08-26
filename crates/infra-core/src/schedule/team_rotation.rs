@@ -3513,6 +3513,22 @@ pub fn assert_final_rotation_invariants(
 ) -> Result<()> {
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
+    let docus_trade_core_required = operbox.owns("但书")
+        && blueprint
+            .rooms
+            .iter()
+            .filter(|room| room.kind == FacilityKind::TradePost)
+            .count()
+            >= 2
+        && blueprint.rooms.iter().any(|room| {
+            room.kind == FacilityKind::TradePost
+                && matches!(
+                    room.product,
+                    Some(RoomProduct::Trade {
+                        order: TradeOrderKind::Gold
+                    })
+                )
+        });
     let mut seen_binds = HashSet::new();
     for plan in &report.assignment_plans {
         for bind in shift_binds_from_plan(plan) {
@@ -3646,6 +3662,27 @@ pub fn assert_final_rotation_invariants(
                     room.room_id.0,
                 )));
             }
+        }
+        if docus_trade_core_required
+            && !shift.assignment.rooms.iter().any(|room| {
+                room.operators
+                    .iter()
+                    .any(|operator| operator.name == "但书")
+                    && blueprint.room(&room.room_id).is_some_and(|spec| {
+                        spec.kind == FacilityKind::TradePost
+                            && matches!(
+                                spec.product,
+                                Some(RoomProduct::Trade {
+                                    order: TradeOrderKind::Gold
+                                })
+                            )
+                    })
+            })
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants docus_trade_core_required failed in shift {}",
+                shift.index + 1
+            )));
         }
         let control_values = [
             result.inject.trade_eff_pct(),

@@ -115,6 +115,13 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         }
     }
 
+    if let Some(path) = rotation_out_from_args(args) {
+        let rotation_json = serde_json::to_string_pretty(rotation)?;
+        ensure_parent_dir(&path)?;
+        fs::write(&path, format!("{rotation_json}\n"))?;
+        eprintln!("rotation JSON → {}", path.display());
+    }
+
     if let Some(maa_path) = maa_out {
         let schedule = computed
             .maa
@@ -199,6 +206,12 @@ fn output_dir_from_args(args: &[String]) -> Option<PathBuf> {
 fn maa_out_from_args(args: &[String]) -> Option<PathBuf> {
     args.windows(2)
         .find(|w| w[0] == "--maa-out")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn rotation_out_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--rotation-out")
         .map(|w| PathBuf::from(&w[1]))
 }
 
