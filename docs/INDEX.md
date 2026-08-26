@@ -87,6 +87,7 @@
 | `interface.frontend-cli` | [infra-cli + Layout 生成器 — 前端对接说明](FRONTEND_CLI.md) |
 | `layout.assignment` | [全基建进驻编制（宏观排班）](BASE_ASSIGNMENT.md) |
 | `mechanics.effect-atom` | [EffectAtom 设计文档](EFFECT_ATOM_DESIGN.md) |
+| `production.drones` | [无人机生成、分配与产出结算](DRONES.md) |
 | `schedule.fiammetta` | [菲亚梅塔换心情规则](Fiammetta.md) |
 | `schedule.mode` | [排班模式](排班模式.md) |
 | `schedule.timed` | [定时换班（公孙长乐 × InfraCalc）](定时换班.md) |
@@ -136,6 +137,7 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 | [ADR 0006: 二班与深海轮换的缺员容错与终验契约](ADR/0006-rotation-shortfall-tolerance-and-validation.md) | `accepted` | 裁决 `main_backup_12_12` 与 `abyssal_7_5_7_5` 的主备求解、办公室与会客室缺员容错、绑定终验、warnings 输出及 ABC 全 profile 一致性 |
 | [ADR 0007: 回退恢复后的中枢与二发电事实边界](ADR/0007-regression-recovery-control-and-two-power-boundaries.md) | `accepted` | 恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界 |
 | [ADR 0008: 办公室连续工作时长预算与通用轮换准入](ADR/0008-office-continuous-work-budget.md) | `proposed` | 规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则 |
+| [ADR 0009: 无人机效率转化与产出核算](ADR/0009-drone-efficiency-conversion-and-production-accounting.md) | `accepted` | 记录发电效率、无人机库存、目标分配与制造贸易额外产出的统一裁决 |
 <!-- END GENERATED DECISIONS -->
 
 ## 6. 开发与项目治理
