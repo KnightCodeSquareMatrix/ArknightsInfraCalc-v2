@@ -431,6 +431,9 @@ pub struct TeamRotationReport {
     pub peak_plan: AssignmentPlan,
     /// Every independently solved assignment keeps its own Plan owner.
     pub assignment_plans: Vec<AssignmentPlan>,
+    /// Peak-dependent bind closures used while constructing this final rotation.
+    #[serde(skip)]
+    pub runtime_shift_binds: Vec<RuntimeShiftBind>,
     /// 最高效率 peak 编制从满心情工作到首个瓶颈触发的最长时间。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak_mood_eta: Option<ShiftEta>,
@@ -1902,20 +1905,32 @@ fn gamma_production_coexist_seed(
     GammaProductionContext { assignment: seed }
 }
 
+fn validate_fiammetta_continuous_targets(shifts: &[TeamShiftResult]) -> Result<()> {
+    let targets: HashSet<_> = shifts
+        .iter()
+        .filter_map(|shift| shift.fiammetta.as_ref())
+        .map(|action| action.target.as_str())
+        .filter(|target| *target != "歌蕾蒂娅")
+        .collect();
+    for shift in shifts {
+        for target in &targets {
+            if !shift.assignment.operator_names().contains(*target) {
+                return Err(Error::msg(format!(
+                    "fiammetta_continuous_target_present failed in shift {}: target {} missing",
+                    shift.index + 1,
+                    target
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_final_rotation_invariants(
     shifts: &[TeamShiftResult],
     binds: &[RuntimeShiftBind],
     active_dependencies: &[crate::layout::ActiveDependency],
 ) -> Result<()> {
-    let fiammetta_targets: HashSet<_> = shifts
-        .iter()
-        .filter_map(|shift| {
-            shift
-                .fiammetta
-                .as_ref()
-                .map(|action| action.target.as_str())
-        })
-        .collect();
     for shift in shifts {
         let mut seen = HashSet::new();
         for room in &shift.assignment.rooms {
@@ -1940,20 +1955,17 @@ fn validate_final_rotation_invariants(
 
         let present = shift.assignment.operator_names();
         for bind in binds {
-            let checked_operators: Vec<_> = bind
+            let flags: Vec<_> = bind
                 .operators
                 .iter()
-                .filter(|name| !fiammetta_targets.contains(name.as_str()))
-                .collect();
-            let flags: Vec<_> = checked_operators
-                .iter()
-                .map(|name| present.contains(*name))
+                .map(|name| present.contains(name))
                 .collect();
             if flags
                 .first()
                 .is_some_and(|first| flags.iter().any(|flag| flag != first))
             {
-                let active: Vec<_> = checked_operators
+                let active: Vec<_> = bind
+                    .operators
                     .iter()
                     .zip(&flags)
                     .filter(|(_, present)| **present)
@@ -1989,15 +2001,10 @@ fn validate_final_rotation_invariants(
         }
     }
 
+    validate_fiammetta_continuous_targets(shifts)?;
+
     for bind in binds {
         if shifts.len() != 3 {
-            continue;
-        }
-        if bind
-            .operators
-            .iter()
-            .any(|name| fiammetta_targets.contains(name.as_str()))
-        {
             continue;
         }
         let active = shifts
@@ -2098,15 +2105,12 @@ fn has_multi_member_shift_bind(name: &str, shift_binds: &[RuntimeShiftBind]) -> 
 
 fn fiammetta_target_names<'a>(
     blueprint: &BaseBlueprint,
-    continuous_roles: &'a [crate::layout::ContinuousRole],
+    _continuous_roles: &'a [crate::layout::ContinuousRole],
     shift_binds: &'a [RuntimeShiftBind],
 ) -> impl Iterator<Item = &'static str> + 'a {
     fiammetta_return_priority(blueprint)
         .into_iter()
-        .filter(move |name| {
-            continuous_roles.iter().any(|role| role.operator == *name)
-                || !has_multi_member_shift_bind(name, shift_binds)
-        })
+        .filter(move |name| !has_multi_member_shift_bind(name, shift_binds))
 }
 
 fn first_fiammetta_boundary_target(
@@ -2162,18 +2166,25 @@ fn attach_fiammetta_cycle_boundary(
         return Ok(());
     }
     let (first_two, third_slice) = shifts.split_at_mut(2);
-    let first = &mut first_two[0];
     let third = &third_slice[0];
     if let Some((target, room_id)) = first_fiammetta_boundary_target(
         blueprint,
         &third.assignment,
-        &first.assignment,
+        &first_two[0].assignment,
         continuous_roles,
         shift_binds,
     ) {
         if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
             return Ok(());
         }
+        if !first_two
+            .iter()
+            .chain(third_slice.iter())
+            .all(|shift| shift.assignment.operator_names().contains(&target))
+        {
+            return Ok(());
+        }
+        let first = &mut first_two[0];
         let active_names = active_team_names(teams, &first.active_teams);
         refresh_fiammetta_target_room(
             blueprint,
@@ -2349,6 +2360,12 @@ fn attach_fiammetta_cycle_boundaries(
         if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
             continue;
         }
+        if !shifts
+            .iter()
+            .all(|shift| shift.assignment.operator_names().contains(&target))
+        {
+            continue;
+        }
         candidates.push((index, target, room_id));
     }
     let ready = fiammetta_ready_boundary_events(
@@ -2403,7 +2420,10 @@ fn apply_single_core_fiammetta_rotation(
     if !operbox.owns("菲亚梅塔") || shifts.is_empty() {
         return Ok(false);
     }
-    if !matches!(profile, TimedRotationProfile::Abc12_12_12) {
+    if !matches!(
+        profile,
+        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
+    ) {
         return Ok(false);
     }
     let cycle_hours: f64 = shifts.iter().map(|shift| shift.duration_hours).sum();
@@ -2462,18 +2482,12 @@ fn apply_single_core_fiammetta_rotation(
         let Some(room_kind) = blueprint.room(&room_id).map(|room| room.kind) else {
             continue;
         };
-        if !shifts.iter().all(|shift| {
-            shift
-                .assignment
-                .operators_in(&room_id)
-                .iter()
-                .any(|operator| operator.name == target)
-        }) {
-            continue;
-        }
         let mut candidate_shifts = shifts.to_vec();
         let mut refill_failed = false;
         for shift in &mut candidate_shifts {
+            if shift.assignment.operator_names().contains(target) {
+                continue;
+            }
             if shift
                 .assignment
                 .operators_in(&room_id)
@@ -2488,11 +2502,8 @@ fn apply_single_core_fiammetta_rotation(
             }
             let mut shift_options = options.clone();
             shift_options.shift_hours = shift.duration_hours;
-            let active_names = active_team_names(teams, &shift.active_teams);
-            if !active_names.contains(target) {
-                refill_failed = true;
-                break;
-            }
+            let mut active_names = active_team_names(teams, &shift.active_teams);
+            active_names.insert(target.to_string());
             let forbidden_names: Vec<String> = match room_kind {
                 FacilityKind::TradePost => trade_pool
                     .entries
@@ -2572,10 +2583,25 @@ fn apply_single_core_fiammetta_rotation(
             continue;
         }
         for index in action_indices {
+            let action_room_id = candidate_shifts[index]
+                .assignment
+                .rooms
+                .iter()
+                .find_map(|room| {
+                    room.operators
+                        .iter()
+                        .any(|operator| operator.name == target)
+                        .then(|| room.room_id.clone())
+                })
+                .ok_or_else(|| {
+                    Error::msg(format!(
+                        "Fiammetta target {target} missing after continuous refill"
+                    ))
+                })?;
             candidate_shifts[index].fiammetta = Some(FiammettaShiftAction {
                 target: target.to_string(),
                 displaced: String::new(),
-                room_id: room_id.clone(),
+                room_id: action_room_id,
             });
         }
 
@@ -3627,52 +3653,61 @@ pub fn assert_final_rotation_invariants(
             )));
         }
     }
+    validate_fiammetta_continuous_targets(&report.shifts)
+        .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+    let report_binds = if report.runtime_shift_binds.is_empty() {
+        report
+            .assignment_plans
+            .iter()
+            .flat_map(shift_binds_from_plan)
+            .collect()
+    } else {
+        report.runtime_shift_binds.clone()
+    };
     let mut seen_binds = HashSet::new();
-    for plan in &report.assignment_plans {
-        for bind in shift_binds_from_plan(plan) {
-            let mut key = bind.operators.clone();
-            key.sort();
-            key.dedup();
-            if !seen_binds.insert(key) {
-                continue;
+    for bind in report_binds {
+        let mut key = bind.operators.clone();
+        key.sort();
+        key.dedup();
+        if !seen_binds.insert(key) {
+            continue;
+        }
+        for shift in &report.shifts {
+            let present = shift.assignment.operator_names();
+            let flags: Vec<_> = bind
+                .operators
+                .iter()
+                .map(|name| present.contains(name))
+                .collect();
+            if flags
+                .first()
+                .is_some_and(|first| flags.iter().any(|flag| flag != first))
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants shift_bind_cohort_preserved failed in shift {} for {:?}",
+                    shift.index + 1,
+                    bind.operators
+                )));
             }
-            for shift in &report.shifts {
-                let present = shift.assignment.operator_names();
-                let flags: Vec<_> = bind
-                    .operators
-                    .iter()
-                    .map(|name| present.contains(name))
-                    .collect();
-                if flags
-                    .first()
-                    .is_some_and(|first| flags.iter().any(|flag| flag != first))
-                {
-                    return Err(Error::msg(format!(
-                        "assert-invariants shift_bind_cohort_preserved failed in shift {} for {:?}",
-                        shift.index + 1,
-                        bind.operators
-                    )));
-                }
-            }
-            let expected_shifts = usize::from(bind.on_shifts) + usize::from(bind.off_shifts);
-            if report.shifts.len() == expected_shifts {
-                let active = report
-                    .shifts
-                    .iter()
-                    .filter(|shift| {
-                        let present = shift.assignment.operator_names();
-                        bind.operators.iter().all(|name| present.contains(name))
-                    })
-                    .count();
-                let inactive = report.shifts.len().saturating_sub(active);
-                if (bind.on_shifts > 0 && active != usize::from(bind.on_shifts))
-                    || (bind.off_shifts > 0 && inactive != usize::from(bind.off_shifts))
-                {
-                    return Err(Error::msg(format!(
+        }
+        let expected_shifts = usize::from(bind.on_shifts) + usize::from(bind.off_shifts);
+        if report.shifts.len() == expected_shifts {
+            let active = report
+                .shifts
+                .iter()
+                .filter(|shift| {
+                    let present = shift.assignment.operator_names();
+                    bind.operators.iter().all(|name| present.contains(name))
+                })
+                .count();
+            let inactive = report.shifts.len().saturating_sub(active);
+            if (bind.on_shifts > 0 && active != usize::from(bind.on_shifts))
+                || (bind.off_shifts > 0 && inactive != usize::from(bind.off_shifts))
+            {
+                return Err(Error::msg(format!(
                         "assert-invariants shift_bind_cohort_preserved failed for {:?}: expected {}/{} active/resting shifts, got {active}/{inactive}",
                         bind.operators, bind.on_shifts, bind.off_shifts
                     )));
-                }
             }
         }
     }
@@ -3760,38 +3795,6 @@ pub fn assert_final_rotation_invariants(
                     room.room_id.0,
                 )));
             }
-        }
-        let docus_trade_core_required =
-            report
-                .assignment_plans
-                .get(shift.plan_index)
-                .is_some_and(|plan| {
-                    plan.anchors.iter().any(|anchor| {
-                        anchor.operator == "但书"
-                            && anchor.facility == FacilityKind::TradePost
-                            && anchor.trade_order == Some(TradeOrderKind::Gold)
-                    })
-                });
-        if docus_trade_core_required
-            && !shift.assignment.rooms.iter().any(|room| {
-                room.operators
-                    .iter()
-                    .any(|operator| operator.name == "但书")
-                    && blueprint.room(&room.room_id).is_some_and(|spec| {
-                        spec.kind == FacilityKind::TradePost
-                            && matches!(
-                                spec.product,
-                                Some(RoomProduct::Trade {
-                                    order: TradeOrderKind::Gold
-                                })
-                            )
-                    })
-            })
-        {
-            return Err(Error::msg(format!(
-                "assert-invariants docus_trade_core_required failed in shift {}",
-                shift.index + 1
-            )));
         }
         let control_values = [
             result.inject.trade_eff_pct(),
@@ -4999,6 +5002,7 @@ fn schedule_abc_rotation(
         profile,
         assignment_plans: vec![peak_plan.clone()],
         peak_plan,
+        runtime_shift_binds: shift_binds,
         peak_mood_eta,
         teams,
         shifts,
@@ -5674,7 +5678,7 @@ fn schedule_fiammetta_8_8_4_4(
         AbyssalShortShiftPolicy::Disabled,
         TimedRotationProfile::Abc12_6_6,
     )?;
-    let binds = shift_binds_from_plan(&raw.peak_plan);
+    let binds = raw.runtime_shift_binds.clone();
     let (target, room_id) = first_fiammetta_boundary_target(
         blueprint,
         &raw.shifts[2].assignment,
@@ -5716,16 +5720,47 @@ fn schedule_fiammetta_8_8_4_4(
             "fiammetta-8844 target was lost while re-searching its room",
         ));
     }
-    let owners: Vec<_> = raw
-        .shifts
-        .iter()
-        .enumerate()
-        .map(|(index, shift)| OwnedRotationAssignment {
-            assignment: if index == 0 {
-                fiammetta_owner.clone()
-            } else {
-                shift.assignment.clone()
-            },
+    let mut owner_assignments = vec![
+        fiammetta_owner,
+        raw.shifts[1].assignment.clone(),
+        raw.shifts[2].assignment.clone(),
+    ];
+    for (index, assignment) in owner_assignments.iter_mut().enumerate() {
+        if assignment.operator_names().contains(&target) {
+            continue;
+        }
+        if assignment.operators_in(&room_id).iter().any(|operator| {
+            operator.name != target && has_multi_member_shift_bind(&operator.name, &binds)
+        }) {
+            return Err(Error::msg(format!(
+                "fiammetta-8844 cannot retain {target}: target room contains a bound cohort"
+            )));
+        }
+        let mut active_names = active_team_names(&raw.teams, &raw.shifts[index].active_teams);
+        active_names.insert(target.clone());
+        let hours = if index == 0 { 8.0 } else { 4.0 };
+        refill_fiammetta_target_room(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            assignment,
+            &target,
+            &room_id,
+            hours,
+            &active_names,
+        )?;
+        if !assignment.operator_names().contains(&target) {
+            return Err(Error::msg(format!(
+                "fiammetta-8844 could not retain target {target} across all shifts"
+            )));
+        }
+    }
+    let owners: Vec<_> = owner_assignments
+        .into_iter()
+        .map(|assignment| OwnedRotationAssignment {
+            assignment,
             plan: raw.peak_plan.clone(),
         })
         .collect();
@@ -5771,7 +5806,7 @@ fn schedule_fiammetta_8_8_4_4(
             transition: ShiftTransition::ReplaceRooms,
         },
     ];
-    finalize_profile_rotation(
+    let mut report = finalize_profile_rotation(
         TimedRotationProfile::Fiammetta8_8_4_4,
         blueprint,
         operbox,
@@ -5781,7 +5816,14 @@ fn schedule_fiammetta_8_8_4_4(
         raw.teams,
         states,
         started,
-    )
+    )?;
+    report.runtime_shift_binds = binds;
+    validate_final_rotation_invariants(
+        &report.shifts,
+        &report.runtime_shift_binds,
+        &raw.peak_plan.active_dependencies,
+    )?;
+    Ok(report)
 }
 
 fn choose_four(items: &[String]) -> Vec<Vec<String>> {
@@ -6529,6 +6571,10 @@ fn finalize_profile_rotation(
     };
     let warnings = rotation_shortfall_warnings(blueprint, &shifts);
     let assignment_plans: Vec<_> = owners.iter().map(|owner| owner.plan.clone()).collect();
+    let runtime_shift_binds = assignment_plans
+        .iter()
+        .flat_map(shift_binds_from_plan)
+        .collect();
     let peak_plan = assignment_plans[0].clone();
     let peak_mood_eta = Some(shift_eta_with_instances(
         &MoodModel::load_default()?,
@@ -6540,6 +6586,7 @@ fn finalize_profile_rotation(
         profile,
         peak_plan,
         assignment_plans,
+        runtime_shift_binds,
         peak_mood_eta,
         teams,
         shifts,

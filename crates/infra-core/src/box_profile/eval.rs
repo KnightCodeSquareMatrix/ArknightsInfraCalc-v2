@@ -297,6 +297,7 @@ fn probe_shell(
             profile: crate::schedule::TimedRotationProfile::default(),
             peak_plan: AssignmentPlan::recovery(AssignShiftMode::Peak),
             assignment_plans: vec![AssignmentPlan::recovery(AssignShiftMode::Peak)],
+            runtime_shift_binds: vec![],
             peak_mood_eta: None,
             teams: vec![],
             shifts: vec![],
