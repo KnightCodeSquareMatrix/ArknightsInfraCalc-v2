@@ -4182,7 +4182,7 @@
         },
         "trade": {
           "buff_ids": [
-            "trade_ord_spd&limit_tag[000]"
+            "trade_ord_orchd2[000]"
           ],
           "stepwise": false
         }

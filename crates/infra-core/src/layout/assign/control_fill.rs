@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{FacilityKind, RoomId};
 use crate::layout::context::LayoutContext;
+use crate::mood::MoodModel;
 use crate::pool::{try_filter_standalone, ControlPool};
 use crate::search::{
     search_control_combos, ControlFillPolicy, ControlSearchOptions, MATATABI_CONSUMER_NAME,
@@ -167,6 +168,16 @@ fn assign_control_inner(
                     })
             })
             .collect::<Result<Vec<_>>>()?;
+        let mood_model = MoodModel::load_default()?;
+        let control_operators = operators
+            .iter()
+            .map(|operator| (operator.name.clone(), operator.elite))
+            .collect::<Vec<_>>();
+        if mood_model.control_global_recovery_has_conflict(&control_operators) {
+            return Err(Error::msg(
+                "control: pinned operators contain conflicting global recovery owners",
+            ));
+        }
         if solve_control(&ControlRoomInput::with_operators(operators), table)
             .effect_ledger
             .has_conflicting_effect_sources()

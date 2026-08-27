@@ -3473,6 +3473,19 @@ fn ensure_control_inject_coverage(
     entry_by_name: &HashMap<String, crate::pool::ControlPoolEntry>,
 ) -> Result<()> {
     let mut ops = assignment.control_operators();
+    let mood_model = MoodModel::load_default()?;
+    let has_global_recovery_conflict = |candidate_ops: &[AssignedOperator]| {
+        let control_operators = candidate_ops
+            .iter()
+            .map(|operator| (operator.name.clone(), operator.elite))
+            .collect::<Vec<_>>();
+        mood_model.control_global_recovery_has_conflict(&control_operators)
+    };
+    if has_global_recovery_conflict(&ops) {
+        return Err(Error::msg(
+            "control rotation contains conflicting global recovery owners",
+        ));
+    }
     let automatically_excluded = automatically_excluded_control_names(final_pool, table)?;
     let assigned = assignment.operator_names();
     let dimensions: [(
@@ -3535,6 +3548,9 @@ fn ensure_control_inject_coverage(
                 let mut candidate_ops = ops.clone();
                 candidate_ops[drop_idx] =
                     AssignedOperator::from_progress(&candidate.name, candidate.progress);
+                if has_global_recovery_conflict(&candidate_ops) {
+                    continue;
+                }
                 let values = evaluate(&candidate_ops)?;
                 let target = component(&values);
                 if target <= 0.0 {
@@ -3633,6 +3649,13 @@ pub fn assert_final_rotation_invariants(
     table: &SkillTable,
     report: &TeamRotationReport,
 ) -> Result<()> {
+    let unresolved_trade_refs = table.validate_operator_refs(instances);
+    if !unresolved_trade_refs.is_empty() {
+        return Err(Error::msg(format!(
+            "assert-invariants runtime_trade_skill_refs_resolve failed:\n{}",
+            unresolved_trade_refs.join("\n")
+        )));
+    }
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
     for shift in &report.shifts {
@@ -3819,6 +3842,21 @@ pub fn assert_final_rotation_invariants(
             .iter()
             .map(|op| (op.name.clone(), op.elite))
             .collect::<Vec<_>>();
+        let active_global_recovery_owners = mood
+            .control_global_recovery
+            .iter()
+            .filter(|entry| {
+                control_ops
+                    .iter()
+                    .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
+            })
+            .count();
+        if active_global_recovery_owners > 1 {
+            return Err(Error::msg(format!(
+                "assert-invariants control_global_recovery_owner_unique failed in shift {}",
+                shift.index + 1
+            )));
+        }
         let recovery = mood.control_global_recovery_summary(&control_ops);
         let smiley = mood.control_smiley_recovery_value(&control_ops);
         let control_smiley =
@@ -3953,6 +3991,13 @@ fn schedule_abc_rotation(
         .cloned()
         .collect();
     let mood_model = MoodModel::load_default()?;
+    let has_global_recovery_conflict = |candidate_ops: &[AssignedOperator]| {
+        let control_operators = candidate_ops
+            .iter()
+            .map(|operator| (operator.name.clone(), operator.elite))
+            .collect::<Vec<_>>();
+        mood_model.control_global_recovery_has_conflict(&control_operators)
+    };
     let peak_mood_eta = Some(shift_eta_with_instances(
         &mood_model,
         blueprint,
@@ -4593,7 +4638,13 @@ fn schedule_abc_rotation(
                     if automatically_excluded.contains(&entry.name) {
                         continue;
                     }
-                    ops.push(AssignedOperator::from_progress(&entry.name, entry.progress));
+                    let candidate = AssignedOperator::from_progress(&entry.name, entry.progress);
+                    let mut candidate_ops = ops.clone();
+                    candidate_ops.push(candidate.clone());
+                    if has_global_recovery_conflict(&candidate_ops) {
+                        continue;
+                    }
+                    ops.push(candidate);
                     names.insert(entry.name.clone());
                 }
                 a.set_room(RoomId::from("control"), ops);

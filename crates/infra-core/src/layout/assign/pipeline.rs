@@ -1141,7 +1141,7 @@ fn finish_peak_prefix_candidate<'a>(
         &plan.producers,
         &mut run.assignment,
         &mut run.used,
-    );
+    )?;
     assign_sphinx_urrbian_dorm_anchor(
         run.blueprint,
         run.operbox,

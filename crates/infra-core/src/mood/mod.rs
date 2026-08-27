@@ -260,6 +260,14 @@ impl MoodModel {
         }
     }
 
+    /// The facility-wide recovery family admits at most one active owner per
+    /// control-center state. Other mood sources remain independently additive.
+    pub fn control_global_recovery_has_conflict(&self, control_operators: &[(String, u8)]) -> bool {
+        self.control_global_recovery_summary(control_operators)
+            .redundant_owner_count
+            > 0
+    }
+
     pub fn control_faction_recovery_value(&self, control_operators: &[(String, u8)]) -> f64 {
         self.control_faction_recovery
             .iter()

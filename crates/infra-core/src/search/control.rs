@@ -568,21 +568,6 @@ fn control_global_recovery_redundancy(
     global_recovery.redundant_owner_count
 }
 
-fn active_global_recovery_owner_count(
-    mood_model: &crate::mood::MoodModel,
-    operators: &[ControlOperator],
-) -> usize {
-    mood_model
-        .control_global_recovery
-        .iter()
-        .filter(|entry| {
-            operators
-                .iter()
-                .any(|operator| operator.name == entry.name && operator.elite >= entry.elite)
-        })
-        .count()
-}
-
 /// 中枢搜索排序：当前为贸易/制造注入%之和。
 ///
 /// 公孙长乐口径下不需要跨贸易/制造平衡公式；贸易站赤金订单总效率、
@@ -1070,15 +1055,12 @@ pub fn search_control_combos(
                     }
                 }
             }
-            let global_recovery = mood_model.control_global_recovery_summary(
-                &operators
-                    .iter()
-                    .map(|operator| (operator.name.clone(), operator.elite))
-                    .collect::<Vec<_>>(),
-            );
-            if global_recovery.effective_owner_count > 0
-                && active_global_recovery_owner_count(&mood_model, &operators) > 1
-            {
+            let control_operators = operators
+                .iter()
+                .map(|operator| (operator.name.clone(), operator.elite))
+                .collect::<Vec<_>>();
+            let global_recovery = mood_model.control_global_recovery_summary(&control_operators);
+            if mood_model.control_global_recovery_has_conflict(&control_operators) {
                 return None;
             }
             let breakdown = evaluate_control_policy(

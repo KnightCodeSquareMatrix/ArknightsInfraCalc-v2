@@ -4,6 +4,7 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
+use crate::mood::MoodModel;
 use crate::operbox::OperBox;
 
 const SENXI_DORM_CUISINE_BUFF: &str = "dorm_rec_bd_dungeon[000]";
@@ -21,7 +22,8 @@ pub(super) fn place_system_producers(
     producers: &[crate::layout::orchestrate::ProducerSlot],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
-) {
+) -> Result<()> {
+    let mood_model = MoodModel::load_default()?;
     for producer in producers {
         let name = producer.operator.as_str();
         if used.contains(name) {
@@ -39,6 +41,19 @@ pub(super) fn place_system_producers(
                     .unwrap_or_else(|| AssignedOperator::new(name, producer.elite));
                 let mut ops = control;
                 ops.push(op);
+                let control_operators = ops
+                    .iter()
+                    .map(|operator| (operator.name.clone(), operator.elite))
+                    .collect::<Vec<_>>();
+                if mood_model.control_global_recovery_has_conflict(&control_operators) {
+                    if producer.optional {
+                        continue;
+                    }
+                    return Err(crate::error::Error::msg(format!(
+                        "control producer {} conflicts with an existing global recovery owner",
+                        producer.operator
+                    )));
+                }
                 used.insert(name.into());
                 assignment.set_room(RoomId::from("control"), ops);
             }
@@ -59,6 +74,7 @@ pub(super) fn place_system_producers(
             }
         }
     }
+    Ok(())
 }
 
 pub(super) fn assign_dorm_producers(
