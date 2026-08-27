@@ -54,6 +54,14 @@ total_efficiency   = base_efficiency + global_efficiency + skill_efficiency
 `occupancy_efficiency` 仍作为诊断分量返回，但它已包含在 `base_efficiency` 中，不能再次相加。
 `control_efficiency` 是贸易接口中的历史字段别名，新的统一接口使用 `global_efficiency`。
 
+### 3.1.1 读数异常时先核对分量
+
+当结果看起来“过高”或“过低”时，先把同一份结果拆成 `base_efficiency`、`global_efficiency`、`skill_efficiency` 和 `total_efficiency`，再比较数值。不要把一份文档中的技能分量与另一份文档中的总效率直接比较，也不要把订单上限、仓库容量或心情恢复量直接加进效率。
+
+贸易域还要注意跨设施效果的落点：某些中枢效果会在贸易解释器开始前写入目标干员的运行时效率或订单上限，因此它可能已经包含在 `skill_efficiency` 或最终订单上限中，不能再按原始技能描述额外加一次。应以 `PaperTradeEfficiency` 的分量和最终 `total_efficiency` 为准，并沿 `source buff -> operator instance -> EffectAtom -> phase -> output field` 核对一次。
+
+喀兰组合是标准例子：策略记录的 `129%` 是技能结算，三级站三人满员的基础项是 `103%`，所以统一总效率是 `2.320`。灵知的 `-15%/+6` 还会改变银灰的有效效率和孑的订单上限压缩，不能只把 `-15%` 当作一个独立的总效率减项。
+
 实际产出不再伪装成效率倍率：
 
 ```text

@@ -79,6 +79,18 @@ selection reject trace 尚未进入该入口。
 分量，中枢 EffectAtom 使用同一 apply loop 记录 condition、state write 与 GlobalInject merge。
 它不回答未选候选为何落败；输出含私人编制，必须重定向到任务专属私有 evidence。
 
+### 2.2.1 效率异常的通用排查
+
+“效率太高”通常同时可能是公式错误、重复计分或单位口径误读。按下面顺序排查：
+
+1. **冻结单位和范围**：记录设施等级、实际进驻人数、心情、当前订单数、订单上限、控制中枢成员，以及比较值分别表示技能效率、总效率、单位产出还是特殊组合等效值。
+2. **先拆最终结果**：优先读取 `base_efficiency`、`global_efficiency`、`skill_efficiency`、`total_efficiency` 和 `final_order_limit`。确认 `occupancy_efficiency` 没有被再次加到 `base_efficiency`，订单上限没有被当作效率。
+3. **沿机制链回溯**：从源技能行和 `buff_id` 开始，核对 operator instance 归属、tag、跨设施注入、EffectAtom 的 phase 顺序、selector 读取值和最终输出字段。跨设施效果如果已写入目标干员运行时状态，不得再从原始技能描述重复加一次。
+4. **做最小差分**：至少比较无中枢 producer、移除条件技能、空白第三人、替换第三人和订单数接近上限的情况；同时观察效率分量、订单上限和机制结果，不能只看一个 top hit。
+5. **分开验证结算和准入**：先用 `verify` / `trade yield` 或固定编制确认单站公式，再用真实 `plan` / `layout team-rotation` 确认候选准入、跨设施绑定和每班最终成员。合法的“未被策略认领”不能直接判成机制失败。
+
+喀兰链的实际教训是：`129%` 技能效率与 `2.320` 总效率并不冲突；灵知 E2 只对贸易站中带 `cc.g.karlan` 的谢拉格成员生效，孑精1+的订单数和订单差两项需要在最终上限确定后互补结算。针对轮换的检查只消费结构化 rotation JSON，检查控制中枢来源、贸易成员整组绑定和同班一致性，不解析文本或重新实现机制公式。
+
 ### 2.3 验证与可选证据
 
 验证和证据要求以 [QUALITY_AND_AUDIT.md](QUALITY_AND_AUDIT.md) 为唯一文字真源，命令执行以 [scripts/codex/README.md](../scripts/codex/README.md) 为工具说明。按改动风险选择验证深度；大型或高风险任务可用 wrapper、完整失败集合和任务专属产物形成可复现记录，普通任务不要求重复包装命令。最终回复说明实际运行的命令和未运行的高风险验证。
