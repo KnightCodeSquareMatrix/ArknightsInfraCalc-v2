@@ -223,6 +223,7 @@ cargo run -p infra-cli -- layout team-rotation \
 - 宿舍成员：由 `pinned_assignment_excluding` 从 peak 拷贝并共享。
 - 办公室成员：所有办公室岗位从 shared 排除，按 αβγ cohort 轮换；绑定成员随其消费方
   体系同上同下，未绑定成员按办公室候选效率分配到三个 cohort，休息班由合法候选补位。
+  未来可接入专门的办公室 fallback 池；当前为空实现，候选耗尽不静默扩大池子。
 - 中枢：不在 `pinned_assignment` 中钉死；每班按活跃两队重搜/补位，休息队不得上岗。
 - 迷迭香感知 producer：不作为完整 `rosemary_perception` System 进编；由 global effect + `assign_perception_producers` 处理（Phase 4）。
 - 黑键贸易站：`blackkey_closure` 仍是 L3 shortcut / segment 锚点；排班入口由 `closure` role 选择，不再作为 fixed registry 早占站。

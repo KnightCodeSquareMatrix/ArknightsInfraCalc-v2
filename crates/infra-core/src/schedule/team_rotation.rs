@@ -48,6 +48,17 @@ struct FacilityRotationEligibility<'a> {
     full_control: bool,
 }
 
+#[derive(Debug, Default)]
+struct OfficeFallbackPool {
+    entries: Vec<AssignedOperator>,
+}
+
+impl OfficeFallbackPool {
+    fn empty() -> Self {
+        Self::default()
+    }
+}
+
 /// Closed set of timed-rotation products supported by the runtime.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -693,7 +704,9 @@ fn office_candidates(
     layout: &LayoutContext,
     _mood: f64,
     excluded: &HashSet<String>,
+    fallback_pool: &OfficeFallbackPool,
 ) -> Vec<AssignedOperator> {
+    debug_assert!(fallback_pool.entries.is_empty());
     let roster = operbox.roster();
     let mut candidates: Vec<(f64, AssignedOperator)> = roster
         .names()
@@ -4358,6 +4371,7 @@ fn schedule_abc_rotation(
         &layout,
         options.mood,
         &peak_plan.excluded_operators.iter().cloned().collect(),
+        &OfficeFallbackPool::empty(),
     );
     let mut reserved: HashSet<String> = operators_of(&alpha)
         .into_iter()
@@ -5238,7 +5252,15 @@ fn fill_owner_office_seats(
             excluded.insert(operator.clone());
         }
     }
-    let candidates = office_candidates(operbox, instances, table, &layout, options.mood, &excluded);
+    let candidates = office_candidates(
+        operbox,
+        instances,
+        table,
+        &layout,
+        options.mood,
+        &excluded,
+        &OfficeFallbackPool::empty(),
+    );
     let model = MoodModel::load_default()?;
     let worked_hours = HashMap::new();
     let eligibility = FacilityRotationEligibility {

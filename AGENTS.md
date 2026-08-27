@@ -136,3 +136,9 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 - 发布到 quality-check 的提交标题必须使用中文；提交标题会作为质量网页中的摘要显示。
 - `target/codex-runs/`、兼容日志和 `out/` 证据保留到交付但不提交。
 - 最终说明 changed paths、文档影响、deferred findings、验证类别、未验证风险、commit 和剩余工作区状态。
+
+### 办公室 fallback 池提醒
+
+- 办公室选人由办公室模块按自身效率规则决定，候选池必须来自主路径当前 assignment 的统一裁剪结果。
+- 未来允许增加专门的办公室 fallback 池；当前 fallback 池为空实现，未启用。
+- fallback 池不得通过静默回读全 roster 扩大候选集合；池子耗尽或状态不一致继续 fail-fast。
