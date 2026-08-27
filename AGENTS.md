@@ -64,6 +64,8 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 共享工作区保持一个 writer。并行 writer 必须使用从明确 base SHA 建立的隔离 worktree。
 - 非简单且存在独立调查、提取或审阅轴时，默认积极使用边界明确的只读 subagent；不为凑数量委派。主 Agent 必须检查真实文件、diff、日志和产物。
 - 委派前按当前运行时选择真实可用的具名 profile；Codex 使用 `.codex/agents/`，OpenCode 使用 `.opencode/agents/`。任务名或提示词不能证明模型已切换；无法选择低成本 profile 时，不把机械提取批量回落到默认 Sol。
+- 对边界已明确的阶段性分析、计划、当前代码/diff 或 evidence packet，优先用 `stage-reviewer` 做快速对抗初审；它只能裁决当前阶段是否继续，不能替代用户语义裁决或适用的领域 Sol 最终审阅。
+- 用户明确授权无人值守修复时，按 `docs/QUALITY_AND_AUDIT.md` §2.3 的固定 `PAUSE_REASON`、冻结证据包和重试上限自动推进；未触发该枚举不得因一般不确定性暂停，也不得自行扩大业务语义、保证等级或外部副作用范围。
 - 体系或 conformance-rebuild 写入前简述：领域不变量、首次违规位置、修复后的单一责任边界、要删除或改写的冲突路径。
 - `shift_bind`、tag、priority、shortcut 只能消费各自语义，不能代替 required admission。
 - 不为单一 operbox、room id、Shift 下标、fixture 或当前 top hit 写补偿特判。

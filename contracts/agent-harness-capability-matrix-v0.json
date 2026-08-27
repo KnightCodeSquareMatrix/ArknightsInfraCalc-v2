@@ -32,7 +32,7 @@
         "luna-extractor",
         "sol-reviewer"
       ],
-      "notes": "Only the four project-configured Task targets are currently allowed."
+      "notes": "Phase 0B verifies only the listed profiles; other project Task targets remain outside this harness matrix."
     },
     {
       "id": "mimo-code",

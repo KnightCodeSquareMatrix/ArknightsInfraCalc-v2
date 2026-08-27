@@ -1732,3 +1732,15 @@ OpenCode 原生 `task` 在同一 assistant 消息中提交多个调用时可并�
 ```
 
 先前观察到的串行行为通常发生在模型每轮只生成一个 task call，即使其文字声称会并行。顶层提示词要求同一消息一次发出独立调用，是提高实际并发概率的提示约束，不是运行时调度器。
+
+### 15.7 快速阶段审阅层
+
+用户裁决将有人值守 debug 与无人值守工作流分开：有人值守时，DeepSeek-V4-Flash-0731 的低延迟适合承担主执行和快速审阅；Sol 不再默认反复审查同一阶段材料，而集中处理判断错误代价高的领域裁决和最终证据。
+
+本轮从 OpenCode SQLite 抽取 2026-08-26 以来的项目子会话作为设计基线：36 次 `terra-explorer` 平均 4.3 分钟，38 次 `sol-reviewer` 平均 8.1 分钟。数据库记录的平均 cost 分别为 0.016 和 0.126；部分早期 Sol 记录 cost 为 0，因此该数值只用于当前会话内相对观察，不是完整账单。真实案例显示，DeepSeek 能快速发现调用链、计划缺口和代码反例，但首次根因或执行点仍可能被后续对抗审阅修正。
+
+新增项目 profile `stage-reviewer`，模型为 `deepseek/deepseek-v4-flash`、`variant: low`，只读且禁止 bash、task 和写入。它只消费父 Agent 提供的有界任务包，覆盖四个阶段：`ANALYSIS`、`PLAN`、`CODE_DIFF` 和 `EVIDENCE`。输出使用 `PROCEED`、`REVISE`、`ESCALATE_SOL`、`ESCALATE_TERRA_OR_USER` 或 `INCONCLUSIVE`；`PROCEED` 只允许进入下一阶段，禁止解释为最终交付通过。
+
+阶段审阅必须主动构造竞争解释、合法 witness 或最小反例，并区分事实、推断和未知。机制语义、solver 保证、Plan admission、required anchor、跨设施、Team/Shift、rotation、心情、MAA/export、最终 invariant、安全和不可逆变更仍必须由适用的领域 Sol reviewer 终审；结构化 `FINAL_REVIEW` 字段强制 HIGH 风险在修复后或当前阶段进入 Sol。canonical 冲突和用户取舍交回 Terra/用户，不由快速审阅层裁决。
+
+该 profile 已加入项目 `build.permission.task`，根 `AGENTS.md` 负责路由。它尚未加入 Phase 0B harness capability matrix 的已验证 profile，也没有形成漏检率、错误升级率和 wall-clock 的 A/B 结果；后续真实任务应记录这些指标，再决定是否扩大无人值守权限或提高 reasoning effort。
