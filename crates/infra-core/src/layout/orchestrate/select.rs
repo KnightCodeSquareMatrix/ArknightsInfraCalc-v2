@@ -11,6 +11,9 @@ use crate::layout::tier::OperatorTier;
 use crate::operbox::OperBox;
 use crate::skill_table::{default_skill_table_path, SkillTable};
 
+const ABYSSAL_CONTROL_BETA_BUFF: &str = "control_mp_aegir2[010]";
+const ABYSSAL_TAG: &str = "cc.g.abyssal";
+
 use super::plan::{registry_as_activated, AssignmentPlan};
 use super::rules::{
     compile_rules, default_rule_catalog_path, load_rule_catalog, validate_rule_preferences,
@@ -205,16 +208,37 @@ fn compile_plan_once(
         i32::MIN..=18,
     )?;
     let mut late = late;
-    let has_other_cross_station = registry_claims
-        .iter()
-        .any(|claim| claim.tier == OperatorTier::CrossStation && claim.system_id != "trade_core")
-        || compiled
-            .activated
-            .iter()
-            .chain(late.activated.iter())
-            .any(|system| {
-                system.tier == OperatorTier::CrossStation && system.system_id != "trade_core"
-            });
+    // Mujica is the lowest-priority complete control combination: any other
+    // combination that can claim control, including ABC's deferred Abyssal
+    // branch, must suppress it. Generic bonuses do not set this flag.
+    let has_other_cross_station = registry_claims.iter().any(|claim| {
+        claim.tier == OperatorTier::CrossStation
+            && claim.system_id != "trade_core"
+            && claim
+                .slots
+                .iter()
+                .any(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
+    }) || compiled.activated.iter().chain(late.activated.iter()).any(
+        |system| {
+            system.tier == OperatorTier::CrossStation
+                && system.system_id != "trade_core"
+                && system.slots.iter().any(|slot| {
+                    matches!(
+                        slot,
+                        super::plan::SlotFill::Fixed {
+                            facility: crate::layout::FacilityKind::ControlCenter,
+                            ..
+                        } | super::plan::SlotFill::OptionalFixed {
+                            facility: crate::layout::FacilityKind::ControlCenter,
+                            ..
+                        } | super::plan::SlotFill::PickOne {
+                            facility: crate::layout::FacilityKind::ControlCenter,
+                            ..
+                        }
+                    )
+                })
+        },
+    ) || has_usable_abyssal_combination(operbox, instances, &scratch);
     let mut mujica_catalog = catalog.clone();
     mujica_catalog
         .rules
@@ -362,6 +386,47 @@ fn compile_plan_once(
         control_candidate_requirements,
     };
     Ok((plan, final_scratch))
+}
+
+fn has_usable_abyssal_combination(
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    seed: &BaseAssignment,
+) -> bool {
+    let used = seed.operator_names();
+    let mut producer_available = false;
+    let mut hunters = 0usize;
+    for entry in operbox
+        .entries
+        .iter()
+        .filter(|entry| entry.own && !used.contains(&entry.name))
+    {
+        let tier = crate::tier::PromotionTier::from_elite_rarity_level(
+            entry.elite,
+            entry.rarity,
+            entry.level,
+        );
+        let control_buffs = instances.resolve_control_buff_ids(&entry.name, tier);
+        if control_buffs
+            .iter()
+            .any(|buff| buff == ABYSSAL_CONTROL_BETA_BUFF)
+        {
+            producer_available = true;
+        }
+        let is_hunter = instances
+            .tags_for(&entry.name, tier)
+            .iter()
+            .any(|tag| tag == ABYSSAL_TAG)
+            && !control_buffs
+                .iter()
+                .any(|buff| buff == ABYSSAL_CONTROL_BETA_BUFF);
+        if is_hunter {
+            hunters += 1;
+        }
+    }
+    // The control bonus is enabled once Gladia and three other Abyssal
+    // hunters are available. Room and skill feasibility is resolved by S2.
+    producer_available && hunters >= 3
 }
 
 pub(crate) fn guarded_pack_violation(
