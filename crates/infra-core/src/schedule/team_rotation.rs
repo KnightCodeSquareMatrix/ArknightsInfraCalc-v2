@@ -1918,16 +1918,43 @@ fn gamma_production_coexist_seed(
     GammaProductionContext { assignment: seed }
 }
 
-fn validate_fiammetta_continuous_targets(shifts: &[TeamShiftResult]) -> Result<()> {
+fn validate_fiammetta_continuous_targets(
+    blueprint: &BaseBlueprint,
+    profile: TimedRotationProfile,
+    shifts: &[TeamShiftResult],
+) -> Result<()> {
+    // These profiles keep a served target in every final production shift;
+    // two-shift owner profiles have a different, local target lifetime.
+    if !matches!(
+        profile,
+        TimedRotationProfile::Abc12_6_6
+            | TimedRotationProfile::Abc12_12_12
+            | TimedRotationProfile::Fiammetta8_8_4_4
+    ) {
+        return Ok(());
+    }
     let targets: HashSet<_> = shifts
         .iter()
         .filter_map(|shift| shift.fiammetta.as_ref())
         .map(|action| action.target.as_str())
-        .filter(|target| *target != "歌蕾蒂娅")
         .collect();
     for shift in shifts {
+        let production_names: HashSet<_> = shift
+            .assignment
+            .rooms
+            .iter()
+            .filter(|room| {
+                blueprint.room(&room.room_id).is_some_and(|room| {
+                    matches!(
+                        room.kind,
+                        FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
+                    )
+                })
+            })
+            .flat_map(|room| room.operators.iter().map(|operator| operator.name.as_str()))
+            .collect();
         for target in &targets {
-            if !shift.assignment.operator_names().contains(*target) {
+            if !production_names.contains(*target) {
                 return Err(Error::msg(format!(
                     "fiammetta_continuous_target_present failed in shift {}: target {} missing",
                     shift.index + 1,
@@ -1937,6 +1964,82 @@ fn validate_fiammetta_continuous_targets(shifts: &[TeamShiftResult]) -> Result<(
         }
     }
     Ok(())
+}
+
+fn fiammetta_action_slots(profile: TimedRotationProfile, shift_count: usize) -> Vec<usize> {
+    let count = match profile {
+        TimedRotationProfile::MainBackup12_12 => 2,
+        TimedRotationProfile::Abc12_12_12 => 3,
+        TimedRotationProfile::Abc12_6_6 => 2,
+        TimedRotationProfile::Fiammetta8_8_4_4 => 3,
+        TimedRotationProfile::FiammettaWitch12_12 => 2,
+        _ => 0,
+    };
+    (0..count.min(shift_count)).collect()
+}
+
+fn validate_fiammetta_action_policy(
+    profile: TimedRotationProfile,
+    shifts: &[TeamShiftResult],
+) -> Result<()> {
+    let slots = fiammetta_action_slots(profile, shifts.len());
+    let mut targets = HashSet::new();
+    let valid_targets: &[&str] = match profile {
+        TimedRotationProfile::FiammettaWitch12_12 => {
+            &["但书", "可露希尔", "清流", "巫恋", "龙舌兰"]
+        }
+        _ => &["但书", "可露希尔", "清流"],
+    };
+    for shift in shifts {
+        if let Some(action) = &shift.fiammetta {
+            if !slots.contains(&shift.index) {
+                return Err(Error::msg(format!(
+                    "fiammetta_action_slot failed in shift {}",
+                    shift.index + 1
+                )));
+            }
+            if !targets.insert(action.target.clone()) {
+                return Err(Error::msg(format!(
+                    "fiammetta_target_unique failed: target {} is repeated",
+                    action.target
+                )));
+            }
+            if !valid_targets.contains(&action.target.as_str()) {
+                return Err(Error::msg(format!(
+                    "fiammetta_target_invalid failed in shift {}: target {} is not a legal target",
+                    shift.index + 1,
+                    action.target
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn first_fiammetta_assignment_target(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+) -> Option<(String, RoomId)> {
+    fiammetta_return_priority(blueprint)
+        .into_iter()
+        .filter(|target| !used.contains(*target))
+        .find_map(|target| {
+            assignment.rooms.iter().find_map(|room| {
+                let production = blueprint.room(&room.room_id).is_some_and(|room| {
+                    matches!(
+                        room.kind,
+                        FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
+                    )
+                });
+                (production
+                    && room
+                        .operators
+                        .iter()
+                        .any(|operator| operator.name == target))
+                .then(|| (target.to_string(), room.room_id.clone()))
+            })
+        })
 }
 
 fn validate_final_rotation_invariants(
@@ -2013,8 +2116,6 @@ fn validate_final_rotation_invariants(
             }
         }
     }
-
-    validate_fiammetta_continuous_targets(shifts)?;
 
     for bind in binds {
         if shifts.len() != 3 {
@@ -2418,7 +2519,8 @@ fn attach_fiammetta_cycle_boundaries(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_single_core_fiammetta_rotation(
+#[allow(dead_code)]
+fn apply_single_core_fiammetta_rotation_legacy(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -2645,6 +2747,194 @@ fn apply_single_core_fiammetta_rotation(
         return Ok(true);
     }
     Ok(false)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_profile_fiammetta_rotation(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    profile: TimedRotationProfile,
+    teams: &[TeamAssignment],
+    continuous_roles: &[crate::layout::ContinuousRole],
+    shift_binds: &[RuntimeShiftBind],
+    shifts: &mut [TeamShiftResult],
+) -> Result<bool> {
+    if !operbox.owns("菲亚梅塔") || shifts.is_empty() {
+        return Ok(false);
+    }
+    let slots = fiammetta_action_slots(profile, shifts.len());
+    if slots.is_empty() {
+        return Ok(false);
+    }
+    let cycle_hours: f64 = shifts.iter().map(|shift| shift.duration_hours).sum();
+    let trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
+    let manu_pool =
+        build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
+    let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let mut candidate_shifts = shifts.to_vec();
+    let mut used_targets = HashSet::new();
+    let mut applied = false;
+
+    for slot in slots {
+        let mut selected = false;
+        for target in fiammetta_return_priority(blueprint) {
+            if used_targets.contains(target)
+                || !matches!(target, "但书" | "可露希尔" | "清流")
+                || (target == "清流" && operbox.elite_of(target).is_some_and(|elite| elite == 0))
+            {
+                continue;
+            }
+            let Some(room_id) = continuous_roles
+                .iter()
+                .find(|role| role.operator == target)
+                .map(|role| role.room_id.clone())
+                .or_else(|| {
+                    candidate_shifts.iter().find_map(|shift| {
+                        shift.assignment.rooms.iter().find_map(|room| {
+                            room.operators
+                                .iter()
+                                .any(|operator| operator.name == target)
+                                .then(|| room.room_id.clone())
+                        })
+                    })
+                })
+            else {
+                continue;
+            };
+            let Some(room_kind) = blueprint.room(&room_id).map(|room| room.kind) else {
+                continue;
+            };
+            let mut trial = candidate_shifts.clone();
+            let mut failed = false;
+            for shift in &mut trial {
+                if shift.assignment.operator_names().contains(target) {
+                    continue;
+                }
+                if shift
+                    .assignment
+                    .operators_in(&room_id)
+                    .iter()
+                    .any(|operator| {
+                        operator.name != target
+                            && has_multi_member_shift_bind(&operator.name, shift_binds)
+                    })
+                {
+                    failed = true;
+                    break;
+                }
+                let mut shift_options = options.clone();
+                shift_options.shift_hours = shift.duration_hours;
+                let mut active_names = active_team_names(teams, &shift.active_teams);
+                active_names.insert(target.to_string());
+                let forbidden_names: Vec<String> = match room_kind {
+                    FacilityKind::TradePost => trade_pool
+                        .entries
+                        .iter()
+                        .filter(|entry| !active_names.contains(&entry.name))
+                        .map(|entry| entry.name.clone())
+                        .collect(),
+                    FacilityKind::Factory => manu_pool
+                        .entries
+                        .iter()
+                        .filter(|entry| !active_names.contains(&entry.name))
+                        .map(|entry| entry.name.clone())
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                let refill = match room_kind {
+                    FacilityKind::TradePost => refill_trade_room_with_core(
+                        blueprint,
+                        &room_id,
+                        target,
+                        &trade_pool,
+                        table,
+                        instances,
+                        &shift_options,
+                        Some(durin_plan),
+                        &forbidden_names,
+                        &mut shift.assignment,
+                    ),
+                    FacilityKind::Factory if target == "清流" => refill_manu_room_with_core(
+                        blueprint,
+                        &room_id,
+                        target,
+                        &manu_pool,
+                        table,
+                        instances,
+                        &shift_options,
+                        Some(durin_plan),
+                        &forbidden_names,
+                        &mut shift.assignment,
+                    ),
+                    _ => Err(Error::msg("unsupported Fiammetta continuous core facility")),
+                };
+                if refill.is_err() {
+                    failed = true;
+                    break;
+                }
+            }
+            if failed
+                || trial
+                    .iter()
+                    .any(|shift| !shift.assignment.operator_names().contains(target))
+            {
+                continue;
+            }
+            let action_room_id = trial[slot].assignment.rooms.iter().find_map(|room| {
+                room.operators
+                    .iter()
+                    .any(|operator| operator.name == target)
+                    .then(|| room.room_id.clone())
+            });
+            let Some(action_room_id) = action_room_id else {
+                continue;
+            };
+            trial[slot].fiammetta = Some(FiammettaShiftAction {
+                target: target.to_string(),
+                displaced: String::new(),
+                room_id: action_room_id,
+            });
+            candidate_shifts = trial;
+            used_targets.insert(target.to_string());
+            applied = true;
+            selected = true;
+            break;
+        }
+        if !selected {
+            break;
+        }
+    }
+    if !applied {
+        return Ok(false);
+    }
+    for shift in &mut candidate_shifts {
+        clear_production_efficiencies(blueprint, &mut shift.assignment);
+        shift.efficiencies = evaluate_base_assignment_efficiencies(
+            blueprint,
+            &shift.assignment,
+            instances,
+            table,
+            shift.duration_hours,
+            Some(durin_plan),
+        )?;
+        shift.weighted_trade = shift
+            .efficiencies
+            .weighted_trade_for_cycle(shift.duration_hours, cycle_hours);
+        shift.weighted_manufacture = shift
+            .efficiencies
+            .weighted_manufacture_for_cycle(shift.duration_hours, cycle_hours);
+        shift.weighted_power = shift
+            .efficiencies
+            .weighted_power_for_cycle(shift.duration_hours, cycle_hours);
+    }
+    if validate_final_rotation_invariants(&candidate_shifts, shift_binds, &[]).is_err() {
+        return Ok(false);
+    }
+    shifts.clone_from_slice(&candidate_shifts);
+    Ok(true)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2957,7 +3247,7 @@ struct AbyssalCandidate {
     control_producer: String,
 }
 
-/// 构造 S2 深海短班候选：四名深海猎手视作等价生产锚，按房间人数计数枚举。
+/// 构造 S2 深海短班候选：至少三名深海猎手视作等价生产锚，按房间人数计数枚举。
 /// 歌蕾蒂娅只能承受约 7h 短班；深海链不进入普通 base_systems registry。
 struct AbyssalBuildCtx<'a> {
     operbox: &'a OperBox,
@@ -3723,8 +4013,23 @@ pub fn assert_final_rotation_invariants(
                 action.room_id.0
             )));
         }
+        let valid_room = blueprint.room(&action.room_id).is_some_and(|room| {
+            matches!(
+                room.kind,
+                FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
+            )
+        });
+        if !valid_room {
+            return Err(Error::msg(format!(
+                "assert-invariants fiammetta_action_room failed in shift {}: room {} is not production",
+                shift.index + 1,
+                action.room_id.0
+            )));
+        }
     }
-    validate_fiammetta_continuous_targets(&report.shifts)
+    validate_fiammetta_continuous_targets(blueprint, report.profile, &report.shifts)
+        .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+    validate_fiammetta_action_policy(report.profile, &report.shifts)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     let report_binds = if report.runtime_shift_binds.is_empty() {
         report
@@ -4468,7 +4773,7 @@ fn schedule_abc_rotation(
     // 5) 组装 ABC 三态（每班满编）并评分。默认时长仍为 12/6/6；
     // 菲亚 profile 会先按 16/4/4 构造，再由 profile finalizer 展开第一态。
     //
-    //    S2 深海链双路径对比：预占猎手 → γ fill 绕开 → 补第3人 → 评分，与无深海基线对比，选优胜。
+    //    S2 深海链优先路径：预占猎手 → γ fill 绕开 → 补第3人；满足准入后优先于普通 S2，深海候选内部再按效率选优。
     let shift_specs: [(f64, [TeamLabel; 2], TeamLabel, [&BaseAssignment; 2]); 3] = [
         (
             shift_hours[0],
@@ -4710,7 +5015,7 @@ fn schedule_abc_rotation(
 
         let mut assignment;
         if index == 1 && abyssal_policy == AbyssalShortShiftPolicy::Opportunistic {
-            // ── S2 双路径对比 ──
+            // ── S2 深海候选优先 ──
             // 路径 A: 无深海（基线）
             let mut base = shared.clone();
             for part in parts {
@@ -4863,27 +5168,22 @@ fn schedule_abc_rotation(
             }
             let (best_assignment, best_scores, best_warmup_rooms) =
                 if let Some((candidate, score_aby, candidate_warmup_rooms)) = best_abyssal {
-                    if score_aby.manufacture_efficiency > score_base.manufacture_efficiency {
-                        let alpha_beta: HashSet<String> = teams
-                            .iter()
-                            .filter(|team| matches!(team.label, TeamLabel::Alpha | TeamLabel::Beta))
-                            .flat_map(|team| team.operators.iter().cloned())
-                            .collect();
-                        if let Some(team) =
-                            teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
-                        {
-                            let mut ops = team.operators.clone();
-                            ops.extend(candidate.gamma_ops.clone());
-                            ops.push(candidate.control_producer.clone());
-                            ops.sort();
-                            ops.dedup();
-                            ops.retain(|name| !alpha_beta.contains(name));
-                            team.operators = ops;
-                        }
-                        (candidate.assignment, score_aby, candidate_warmup_rooms)
-                    } else {
-                        (base, score_base, base_warmup_rooms)
+                    let alpha_beta: HashSet<String> = teams
+                        .iter()
+                        .filter(|team| matches!(team.label, TeamLabel::Alpha | TeamLabel::Beta))
+                        .flat_map(|team| team.operators.iter().cloned())
+                        .collect();
+                    if let Some(team) = teams.iter_mut().find(|team| team.label == TeamLabel::Gamma)
+                    {
+                        let mut ops = team.operators.clone();
+                        ops.extend(candidate.gamma_ops.clone());
+                        ops.push(candidate.control_producer.clone());
+                        ops.sort();
+                        ops.dedup();
+                        ops.retain(|name| !alpha_beta.contains(name));
+                        team.operators = ops;
                     }
+                    (candidate.assignment, score_aby, candidate_warmup_rooms)
                 } else {
                     (base, score_base, base_warmup_rooms)
                 };
@@ -5024,7 +5324,7 @@ fn schedule_abc_rotation(
     }
 
     if enable_fiammetta_return {
-        let applied_single_core = apply_single_core_fiammetta_rotation(
+        let applied_single_core = apply_profile_fiammetta_rotation(
             blueprint,
             operbox,
             instances,
@@ -5036,7 +5336,7 @@ fn schedule_abc_rotation(
             &shift_binds,
             &mut shifts,
         )?;
-        let applied_witch = if applied_single_core {
+        let _applied_witch = if applied_single_core {
             false
         } else {
             apply_witch_group_fiammetta_rotation(
@@ -5050,33 +5350,6 @@ fn schedule_abc_rotation(
                 &mut shifts,
             )?
         };
-        if !applied_single_core && !applied_witch && profile == TimedRotationProfile::Abc12_12_12 {
-            attach_fiammetta_cycle_boundaries(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                options,
-                &teams,
-                &peak_plan.continuous_roles,
-                &shift_binds,
-                cycle_hours,
-                &mut shifts,
-            )?;
-        } else if !applied_single_core && !applied_witch {
-            attach_fiammetta_cycle_boundary(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                options,
-                &teams,
-                &peak_plan.continuous_roles,
-                &shift_binds,
-                cycle_hours,
-                &mut shifts,
-            )?;
-        }
     }
     validate_final_rotation_invariants(&shifts, &shift_binds, &peak_plan.active_dependencies)?;
     validate_mood_gap_decay_work_spans(blueprint, instances, table, profile, &shifts)?;
@@ -5460,13 +5733,41 @@ fn schedule_main_backup_12_12(
             operators: sorted_assignment_names(&backup.assignment),
         },
     ];
+    let first_fiammetta = operbox
+        .owns("菲亚梅塔")
+        .then(|| {
+            first_fiammetta_assignment_target(blueprint, &main.assignment, &HashSet::new()).map(
+                |(target, room_id)| FiammettaShiftAction {
+                    target,
+                    displaced: String::new(),
+                    room_id,
+                },
+            )
+        })
+        .flatten();
+    let second_fiammetta = operbox
+        .owns("菲亚梅塔")
+        .then(|| {
+            let used = first_fiammetta
+                .as_ref()
+                .map(|action| std::iter::once(action.target.clone()).collect())
+                .unwrap_or_default();
+            first_fiammetta_assignment_target(blueprint, &backup.assignment, &used).map(
+                |(target, room_id)| FiammettaShiftAction {
+                    target,
+                    displaced: String::new(),
+                    room_id,
+                },
+            )
+        })
+        .flatten();
     let states = vec![
         RotationStateSpec {
             owner_index: 0,
             duration_hours: 12.0,
             active_teams: vec![TeamLabel::Alpha],
             resting_team: TeamLabel::Beta,
-            fiammetta: None,
+            fiammetta: first_fiammetta,
             dorm_rest: None,
             transition: ShiftTransition::ReplaceRooms,
         },
@@ -5475,7 +5776,7 @@ fn schedule_main_backup_12_12(
             duration_hours: 12.0,
             active_teams: vec![TeamLabel::Beta],
             resting_team: TeamLabel::Alpha,
-            fiammetta: None,
+            fiammetta: second_fiammetta,
             dorm_rest: None,
             transition: ShiftTransition::ReplaceRooms,
         },
@@ -5787,84 +6088,12 @@ fn schedule_fiammetta_8_8_4_4(
         TimedRotationProfile::Abc12_6_6,
     )?;
     let binds = raw.runtime_shift_binds.clone();
-    let (target, room_id) = first_fiammetta_boundary_target(
-        blueprint,
-        &raw.shifts[2].assignment,
-        &raw.shifts[0].assignment,
-        &raw.peak_plan.continuous_roles,
-        &binds,
-    )
-    .ok_or_else(|| {
-        Error::msg(
-            "fiammetta-8844 requires an eligible peak production target under the configured priority",
-        )
-    })?;
-    if !matches!(target.as_str(), "但书" | "可露希尔" | "清流") {
-        return Err(Error::msg(format!(
-            "fiammetta-8844 does not support single-core target {target}"
-        )));
-    }
-
-    let mut fiammetta_owner = raw.shifts[0].assignment.clone();
-    let active_names = active_team_names(&raw.teams, &raw.shifts[0].active_teams);
-    refill_fiammetta_target_room(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        &mut fiammetta_owner,
-        &target,
-        &room_id,
-        8.0,
-        &active_names,
-    )?;
-    if !fiammetta_owner
-        .operators_in(&room_id)
-        .iter()
-        .any(|operator| operator.name == target)
-    {
-        return Err(Error::msg(
-            "fiammetta-8844 target was lost while re-searching its room",
-        ));
-    }
-    let mut owner_assignments = vec![
+    let fiammetta_owner = raw.shifts[0].assignment.clone();
+    let owner_assignments = vec![
         fiammetta_owner,
         raw.shifts[1].assignment.clone(),
         raw.shifts[2].assignment.clone(),
     ];
-    for (index, assignment) in owner_assignments.iter_mut().enumerate() {
-        if assignment.operator_names().contains(&target) {
-            continue;
-        }
-        if assignment.operators_in(&room_id).iter().any(|operator| {
-            operator.name != target && has_multi_member_shift_bind(&operator.name, &binds)
-        }) {
-            return Err(Error::msg(format!(
-                "fiammetta-8844 cannot retain {target}: target room contains a bound cohort"
-            )));
-        }
-        let mut active_names = active_team_names(&raw.teams, &raw.shifts[index].active_teams);
-        active_names.insert(target.clone());
-        let hours = if index == 0 { 8.0 } else { 4.0 };
-        refill_fiammetta_target_room(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            assignment,
-            &target,
-            &room_id,
-            hours,
-            &active_names,
-        )?;
-        if !assignment.operator_names().contains(&target) {
-            return Err(Error::msg(format!(
-                "fiammetta-8844 could not retain target {target} across all shifts"
-            )));
-        }
-    }
     let owners: Vec<_> = owner_assignments
         .into_iter()
         .map(|assignment| OwnedRotationAssignment {
@@ -5887,13 +6116,9 @@ fn schedule_fiammetta_8_8_4_4(
             duration_hours: 8.0,
             active_teams: raw.shifts[0].active_teams.clone(),
             resting_team: raw.shifts[0].resting_team,
-            fiammetta: Some(FiammettaShiftAction {
-                target,
-                displaced: String::new(),
-                room_id,
-            }),
+            fiammetta: None,
             dorm_rest: None,
-            transition: ShiftTransition::FiammettaOnly,
+            transition: ShiftTransition::ReplaceRooms,
         },
         RotationStateSpec {
             owner_index: 1,
@@ -5926,6 +6151,49 @@ fn schedule_fiammetta_8_8_4_4(
         started,
     )?;
     report.runtime_shift_binds = binds;
+    if options.fiammetta_enable {
+        apply_profile_fiammetta_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            TimedRotationProfile::Fiammetta8_8_4_4,
+            &report.teams,
+            &raw.peak_plan.continuous_roles,
+            &report.runtime_shift_binds,
+            &mut report.shifts,
+        )?;
+        for shift in &mut report.shifts {
+            if let Some(action) = shift.fiammetta.as_ref() {
+                shift.transition = ShiftTransition::FiammettaOnly;
+                shift.drone = None;
+                shift.efficiencies = score_fiammetta_continuation(
+                    blueprint,
+                    &shift.assignment,
+                    instances,
+                    table,
+                    operbox.durin_dorm_planning_count(instances),
+                    &action.room_id,
+                )?;
+                shift.weighted_trade = shift.efficiencies.weighted_trade(shift.duration_hours);
+                shift.weighted_manufacture = shift
+                    .efficiencies
+                    .weighted_manufacture(shift.duration_hours);
+                shift.weighted_power = shift.efficiencies.weighted_power(shift.duration_hours);
+            }
+        }
+        report.daily = DailyTotals {
+            trade: report.shifts.iter().map(|shift| shift.weighted_trade).sum(),
+            manufacture: report
+                .shifts
+                .iter()
+                .map(|shift| shift.weighted_manufacture)
+                .sum(),
+            power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
+            production: average_cycle_production(blueprint, &report.shifts),
+        };
+    }
     validate_final_rotation_invariants(
         &report.shifts,
         &report.runtime_shift_binds,

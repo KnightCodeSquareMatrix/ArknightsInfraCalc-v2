@@ -122,7 +122,7 @@
 | presence vector | 某成员在各 Shift 是否实际上岗的布尔向量，用于验证 producer/consumer 与 bind。 | [排班轮换](SCHEDULE_ROTATION.md#5-班次绑定shift_bind) |
 | α / β / γ | 默认 ABC 中的三个 Team；α、β 来自 peak 两半，γ 是替补队。 | [排班轮换](SCHEDULE_ROTATION.md#2-abc-轮换流程) |
 | mood ETA | 根据当前净心情消耗估算主力可持续时间的锚点；不会自动改写固定 profile。 | [排班轮换](SCHEDULE_ROTATION.md#71-peak-主力最长工作时间) |
-| 菲亚覆盖 / return | 部分 profile 或 ABC 后处理中的具名换人事件；具体目标和状态责任由 schedule owner 裁决。 | [菲亚梅塔规则](Fiammetta.md)、[排班轮换](SCHEDULE_ROTATION.md) |
+| 菲亚覆盖 / return | 部分 profile 中按固定班次生成的具名换人事件；具体次数、目标和状态责任见 canonical 规则。 | [菲亚梅塔使用规则](菲亚梅塔使用规则.md)、[排班轮换](SCHEDULE_ROTATION.md) |
 | MAA JSON | 从最终班次 assignments 映射出的 MAA 基建协议；export 不重新计算机制。 | [定时换班](定时换班.md)、`export/maa.rs` |
 
 ## 效率、产出与评分

@@ -64,7 +64,7 @@
 | 机制与数值 | [EffectAtom](EFFECT_ATOM_DESIGN.md)、[效率模型](EFFICIENCY_MODEL.md)、[评分口径](SCORING_MODEL.md) |
 | 设施与单班编制 | [制造站](MANUFACTURE_STATUS.md)、[控制中枢](CONTROL_CENTER_ASSIGNMENT.md)、[全基建编制](BASE_ASSIGNMENT.md)、[编排层](ORCHESTRATION_LAYER.md) |
 | 跨设施与成套体系 | [体系导航](SYSTEM_CHAINS.md) 及其中链接的各体系 canonical |
-| 排班与换班 | [排班模式](排班模式.md)、[定时换班](定时换班.md)、[菲亚梅塔](Fiammetta.md) |
+| 排班与换班 | [排班模式](排班模式.md)、[定时换班](定时换班.md)、[菲亚梅塔使用规则](菲亚梅塔使用规则.md) |
 | 对外接口 | [infra-cli](INFRA_CLI.md)、[前端接口](FRONTEND_CLI.md)、[前端效率字段迁移说明](前端效率字段迁移说明.md) |
 | 练卡推荐 | [练卡推荐领域索引](练卡推荐相关/README.md) |
 
@@ -89,7 +89,7 @@
 | `layout.assignment` | [全基建进驻编制（宏观排班）](BASE_ASSIGNMENT.md) |
 | `mechanics.effect-atom` | [EffectAtom 设计文档](EFFECT_ATOM_DESIGN.md) |
 | `production.drones` | [无人机生成、分配与产出结算](DRONES.md) |
-| `schedule.fiammetta` | [菲亚梅塔换心情规则](Fiammetta.md) |
+| `schedule.fiammetta` | [菲亚梅塔使用规则](菲亚梅塔使用规则.md) |
 | `schedule.mode` | [排班模式](排班模式.md) |
 | `schedule.timed` | [定时换班（公孙长乐 × InfraCalc）](定时换班.md) |
 | `scoring.efficiency` | [直接效率与整数结算架构](EFFICIENCY_MODEL.md) |

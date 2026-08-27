@@ -2,7 +2,7 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/排班模式.md；docs/定时换班.md；docs/Fiammetta.md
+> 当前真源：docs/排班模式.md；docs/定时换班.md；docs/菲亚梅塔使用规则.md
 > 摘要：记录当前定时换班 profiles、ABC 默认实现和入口
 
 > **当前实现参考**：`schedule_timed_rotation` 支持默认 αβγ `12/6/6`、ABC `12/12/12`、普通二班 `12/12`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 保留为默认 ABC 薄包装。Agent 默认经 `plan` 触发，仅排班入口为 `layout team-rotation`。模式边界由 [排班模式](排班模式.md) 裁决，定时换班规则由 [定时换班](定时换班.md) 裁决。A-B-A 的 CLI、core API 与 MAA 导出已移除。
@@ -16,7 +16,7 @@
 | profile | CLI | 状态与 owner | 失败语义 |
 |---|---|---|---|
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
-| `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；菲亚按事件边界和自身恢复状态决定回岗次数，不设机制级固定次数上限，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
+| `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；菲亚次数与时机见 [菲亚梅塔使用规则](菲亚梅塔使用规则.md)，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
 | `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
 | `fiammetta_witch_12_12` | `--rotation fiammetta-witch-1212` | 两个预认领 Plan owner 共享巫恋+龙舌兰，同一三级赤金贸易站内由两只不同裁缝 β 按 AB 轮换；每班一个菲亚目标 | 缺菲亚、完整龙巫、两只裁缝 β、合法房间或完整 owner 即报错；不回退普通二班 |
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
@@ -109,7 +109,7 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 
 每个班次只用活跃两队的中枢候选建池。体系中枢位先 pin 到 `control`，再由 `assign_control` 补满 5 人。轮换内设置 `skip_standalone_control = true` 以保留体系 pin，但补位仍按 plugin 规则过滤；排序分为 `ControlInjectRawSumV0` 注入分量（`trade_inject + manu_gold + manu_br`）加公招/心情补位分。这是中枢候选的局部排序 policy，不是贸易/制造平衡公式。
 
-S2 有深海短班特例：运行时按稳定 control buff capability 找 producer，按 `cc.g.abyssal` tag 找制造 consumer；若完整候选制造最终效率优于普通 S2 才采用，且不进入 12h 主班。当前四名合法 consumer 在制造加成上等价，候选只枚举“每个制造站放几人”（单站 0–3、总数 4），不枚举具体排列或原房间成员子集；补中枢只保护调用方传入的 producer pin，不按名字保护。
+S2 有深海短班特例：运行时按稳定 control buff capability 找歌蕾蒂娅 producer，按 `cc.g.abyssal` tag 找制造 consumer；歌蕾蒂娅加至少 3 名其他深海猎人即可启用，满足门槛的深海候选优先于普通 S2，不再以普通 S2 制造效率比较决定是否采用，且不进入 12h 主班。已有的额外深海猎人可继续进制造站；候选只枚举“每个制造站放几人”（单站 0–3），不枚举具体排列或原房间成员子集；补中枢只保护调用方传入的 producer pin，不按名字保护。
 
 相关单测：
 
@@ -245,21 +245,10 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 
 ### 7.2 菲亚梅塔主力回岗覆盖
 
-回岗覆盖默认启用，可用 `--no-fiammetta`（CLI）或 `plan.compute` v3 `options.fiammetta_enable=false` 关闭；关闭后不生成回岗动作，与显式 `fiammetta-8844` 或 `fiammetta-witch-1212` 组合直接失败。启用时按事件边界和菲亚梅塔自身 ready 状态决定是否使用，可在同一轮换周期内多次使用：
-
-1. 账号必须拥有菲亚梅塔；
-2. 从 peak 主力按布局分支查找目标：153 为 `可露希尔 > 巫恋+龙舌兰 > 但书（精0/精二）`；243/252 为 `但书（精0/精二） > 可露希尔 > 巫恋+龙舌兰 > 清流`；333/342 为 `但书（精0/精二） > 可露希尔 > 清流 > 巫恋+龙舌兰`；巫恋+龙舌兰必须同时使用并搭配两只不同裁缝 β；
-3. 定位该主力所属队伍的休息班；
-4. 将主力放回 peak 原房间，在所有合法替换位中选择该设施最终效率最高的一种；
-5. 被换下的干员离开当班工作 assignment；具体宿舍安排由 MAA 执行，本项目不保证写入某个宿舍槽位；
-6. 重新计算该班直接效率、加权效率与全日 totals；
-7. MAA 只在实际发生回岗的 plan 中输出 `Fiammetta.enable=true`。
-
-ABC 后处理可让但书、可露希尔或清流保留核心并逐班重新搜索队友；完整龙巫组在 `12/12/12` 中保持巫恋+龙舌兰原子同房并以两只裁缝 β 形成 AAB。具名 `fiammetta-witch-1212` 不走该后处理，而由两个 owner Plan 在求解前预认领龙巫房间并形成 AB。两条路径都是固定周期策略，不是完整实时心情排班器。
-
-当前固定业务优先级高于单班瞬时效率门槛：系统会在合法替换位中选最终效率最高者，
-但不会用当前仍待校正的局部效率数值取消已确认的主力回岗。全周期收益仍应结合
-主力最长工作时间、替补持续时间和宿舍恢复计算。
+菲亚梅塔次数、固定班次、目标去重、连续工作和布局优先级统一见
+[菲亚梅塔使用规则](菲亚梅塔使用规则.md)。本节只保留接口事实：回岗覆盖默认启用，
+可用 `--no-fiammetta` 或 `options.fiammetta_enable=false` 关闭；MAA 只序列化排班层
+已经生成的 `TeamShiftResult.fiammetta`，不自行选人或补动作。
 
 ---
 
