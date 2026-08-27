@@ -11,7 +11,8 @@ from typing import Any
 
 
 PROTOCOL_VERSION = "agent-harness-v0"
-REQUIRED_READONLY_PERMISSIONS = {"edit": "deny", "bash": "deny", "task": "deny"}
+REQUIRED_READONLY_PERMISSIONS = {"edit": "deny", "task": "deny"}
+ALLOWED_READONLY_BASH_PERMISSIONS = {"allow", "deny"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -103,6 +104,12 @@ def preflight(root: Path) -> dict[str, Any]:
                     f"Phase 0B profile {profile} permission.{permission}="
                     f"{actual!r}, expected {expected!r}"
                 )
+        bash_permission = frontmatter.get("permission.bash")
+        if bash_permission not in ALLOWED_READONLY_BASH_PERMISSIONS:
+            errors.append(
+                f"Phase 0B profile {profile} permission.bash={bash_permission!r}, "
+                "expected 'allow' or 'deny'"
+            )
 
     for runtime in matrix.get("runtimes", []):
         runtime_id = runtime.get("id", "unknown")
