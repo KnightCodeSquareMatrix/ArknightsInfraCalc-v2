@@ -3659,6 +3659,41 @@ pub fn assert_final_rotation_invariants(
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
     for shift in &report.shifts {
+        if shift
+            .efficiencies
+            .room_lines
+            .iter()
+            .filter(|line| {
+                blueprint
+                    .room(&RoomId::new(line.room_id.clone()))
+                    .is_some_and(|room| room.kind == FacilityKind::PowerPlant)
+            })
+            .any(|line| line.base_efficiency != Efficiency::ZERO)
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants power_station_base_zero failed in shift {}",
+                shift.index + 1
+            )));
+        }
+        let power_increments = shift
+            .efficiencies
+            .room_lines
+            .iter()
+            .filter(|line| {
+                blueprint
+                    .room(&RoomId::new(line.room_id.clone()))
+                    .is_some_and(|room| room.kind == FacilityKind::PowerPlant)
+            })
+            .map(|line| line.power_efficiency);
+        let expected_power = crate::power::aggregate_power_efficiency(power_increments);
+        if shift.efficiencies.power_efficiency != expected_power {
+            return Err(Error::msg(format!(
+                "assert-invariants power_shared_base_once failed in shift {}: expected {}, got {}",
+                shift.index + 1,
+                expected_power,
+                shift.efficiencies.power_efficiency,
+            )));
+        }
         let Some(action) = &shift.fiammetta else {
             continue;
         };
@@ -6543,7 +6578,9 @@ fn score_fiammetta_continuation(
             .iter()
             .map(|line| line.manufacture_efficiency)
             .sum(),
-        power_efficiency: room_lines.iter().map(|line| line.power_efficiency).sum(),
+        power_efficiency: crate::power::aggregate_power_efficiency(
+            room_lines.iter().map(|line| line.power_efficiency),
+        ),
         room_lines,
     })
 }

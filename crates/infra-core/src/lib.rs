@@ -111,8 +111,8 @@ pub use pool::{
     PowerPoolEntry, TradePool, TradePoolEntry, JIE_TRADE_NAME,
 };
 pub use power::{
-    apply_power_to_layout, charge_ramp_from_buffs, solve_power, PowerOperator, PowerResult,
-    PowerRoomInput,
+    aggregate_power_efficiency, apply_power_to_layout, charge_ramp_from_buffs, solve_power,
+    PowerOperator, PowerResult, PowerRoomInput,
 };
 pub use response_dependency::{
     build_response_dependency_report, build_response_dependency_report_for_blueprint,

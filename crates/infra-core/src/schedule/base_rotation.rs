@@ -8,6 +8,7 @@ use crate::instances::OperatorInstances;
 use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint};
 use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::solve_manufacture_with_shift;
+use crate::power::aggregate_power_efficiency;
 use crate::power::{solve_power, PowerRoomInput};
 use crate::skill_table::SkillTable;
 use crate::trade::input::TradeRoomInput;
@@ -150,7 +151,7 @@ pub fn evaluate_base_assignment_efficiencies(
 
     let mut trade_efficiency = Efficiency::ZERO;
     let mut manufacture_efficiency = Efficiency::ZERO;
-    let mut power_efficiency = Efficiency::ZERO;
+    let mut power_increments = Vec::new();
     let mut room_lines: Vec<RoomEfficiencyLine> = Vec::new();
 
     for room in &resolved.trade_rooms {
@@ -303,13 +304,8 @@ pub fn evaluate_base_assignment_efficiencies(
             layout: room.layout.clone(),
         };
         let result = solve_power(&input, table)?;
-        let efficiency = assignment
-            .efficiency_in(&room.id)
-            .filter(|s| s.is_power())
-            .map_or(result.final_efficiency, |snapshot| {
-                snapshot.power_final_efficiency
-            });
-        power_efficiency += efficiency;
+        let efficiency = result.final_efficiency;
+        power_increments.push(efficiency);
         line.power_efficiency = efficiency;
         line.power_skill_efficiency = result.skill_efficiency;
         line.operator_efficiency = result.skill_efficiency + result.ramp_efficiency;
@@ -318,6 +314,8 @@ pub fn evaluate_base_assignment_efficiencies(
         line.equivalent_efficiency = line.operator_efficiency;
         room_lines.push(line);
     }
+
+    let power_efficiency = aggregate_power_efficiency(power_increments);
 
     Ok(ShiftEfficiencies {
         trade_efficiency,

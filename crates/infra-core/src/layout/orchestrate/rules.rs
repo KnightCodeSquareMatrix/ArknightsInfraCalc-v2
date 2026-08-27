@@ -1707,7 +1707,7 @@ fn score_completed_power(
         None,
     )
     .ok()?;
-    resolved
+    let scores = resolved
         .power_rooms
         .iter()
         .map(|room| {
@@ -1723,8 +1723,8 @@ fn score_completed_power(
             .map(|result| result.final_efficiency)
             .ok()
         })
-        .collect::<Option<Vec<_>>>()
-        .map(|scores| scores.into_iter().sum())
+        .collect::<Option<Vec<_>>>()?;
+    Some(crate::power::aggregate_power_efficiency(scores.into_iter()))
 }
 
 fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {

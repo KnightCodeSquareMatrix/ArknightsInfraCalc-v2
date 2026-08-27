@@ -28,7 +28,7 @@
 - `manufacture_efficiency`；
 - `power_efficiency`。
 
-每项是同类房间直接效率之和。`weighted_*` 按分钟执行整数时长折算，
+贸易和制造是同类房间直接效率之和。发电站行只保存岗位增量，发电域汇总只注入一次共享基础 `1.000`。`weighted_*` 按分钟执行整数时长折算，
 `DailyTotals` 仍分开保存贸易、制造和发电，不做跨域相加。
 
 `RoomEfficiencySnapshot` 保存 solver / search 的直接效率结果，避免 CLI 或排班层再次

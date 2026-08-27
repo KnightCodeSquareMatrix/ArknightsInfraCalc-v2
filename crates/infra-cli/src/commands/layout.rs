@@ -642,9 +642,10 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
         }
     }
 
-    let mut power_total = infra_core::Efficiency::ZERO;
     let mut power_explain = Vec::new();
+    let mut power_total = infra_core::Efficiency::ZERO;
     if explain_json {
+        let mut power_results = Vec::new();
         for room in &resolved.power_rooms {
             let result = solve_power(
                 &PowerRoomInput {
@@ -655,7 +656,7 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
                 },
                 &table,
             )?;
-            power_total += result.final_efficiency;
+            power_results.push(result.clone());
             power_explain.push(serde_json::json!({
                 "room_id": room.id.0.clone(),
                 "status": "settled",
@@ -663,6 +664,9 @@ fn layout_eval_cmd(args: &[String]) -> Result<(), Error> {
                 "result": result,
             }));
         }
+        power_total = infra_core::aggregate_power_efficiency(
+            power_results.iter().map(|result| result.final_efficiency),
+        );
     }
 
     if text {

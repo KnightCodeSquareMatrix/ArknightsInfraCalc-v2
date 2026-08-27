@@ -8,7 +8,7 @@ use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::layout::LayoutContext;
 use crate::pool::PowerPool;
-use crate::power::{solve_power, PowerRoomInput};
+use crate::power::{aggregate_power_efficiency, solve_power, PowerRoomInput};
 use crate::skill_table::SkillTable;
 
 /// 虚拟发电站折算为制造纸面效率的历史解释系数。
@@ -114,7 +114,6 @@ pub fn search_power_assignment(
     let start = Instant::now();
     let mut used = HashSet::new();
     let mut assignments = Vec::new();
-    let mut total_efficiency = Efficiency::ZERO;
     let mut evaluated = 0u64;
 
     for station in 0..options.station_count as usize {
@@ -153,7 +152,6 @@ pub fn search_power_assignment(
         }
         let Some(hit) = best else { break };
         used.insert(hit.name.clone());
-        total_efficiency += hit.final_efficiency;
         assignments.push(PowerStationAssignment {
             station_index: station,
             hit,
@@ -161,8 +159,12 @@ pub fn search_power_assignment(
     }
 
     Ok(PowerSearchReport {
+        total_efficiency: aggregate_power_efficiency(
+            assignments
+                .iter()
+                .map(|assignment| assignment.hit.final_efficiency),
+        ),
         assignments,
-        total_efficiency,
         evaluated,
         elapsed: start.elapsed(),
     })
