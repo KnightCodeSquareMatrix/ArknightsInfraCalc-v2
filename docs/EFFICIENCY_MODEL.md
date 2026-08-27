@@ -54,7 +54,13 @@ total_efficiency   = base_efficiency + global_efficiency + skill_efficiency
 `occupancy_efficiency` 仍作为诊断分量返回，但它已包含在 `base_efficiency` 中，不能再次相加。
 `control_efficiency` 是贸易接口中的历史字段别名，新的统一接口使用 `global_efficiency`。
 
-### 3.1.1 读数异常时先核对分量
+### 3.1.1 贸易全局效率的具体口径
+
+贸易域的 `global_efficiency` 专指中枢来源的贸易站全局效率效果：阿米娅、明椒、阿斯卡纶、若叶睦和望提供的贸易站 `+7%` 效率加成。五者属于同一个贸易全局效果族；同一班中若有多个来源，只取最高的 `7%`，不叠加为 `14%`、`21%` 等。该分量应进入 `global_efficiency`，不能重复计入 `skill_efficiency`。
+
+八幡海铃的效果不属于贸易全局效率：她按当前贸易站内实际进驻的叙拉古干员数量，为每名叙拉古干员提供 `+5%`，属于当前房间技能效率，计入 `skill_efficiency`。其他只作用于当前房间或实际成员的跨设施响应也不能按全局 `+7%` 处理。
+
+### 3.1.2 读数异常时先核对分量
 
 当结果看起来“过高”或“过低”时，先把同一份结果拆成 `base_efficiency`、`global_efficiency`、`skill_efficiency` 和 `total_efficiency`，再比较数值。不要把一份文档中的技能分量与另一份文档中的总效率直接比较，也不要把订单上限、仓库容量或心情恢复量直接加进效率。
 
