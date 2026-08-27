@@ -1984,12 +1984,6 @@ fn validate_fiammetta_action_policy(
 ) -> Result<()> {
     let slots = fiammetta_action_slots(profile, shifts.len());
     let mut targets = HashSet::new();
-    let valid_targets: &[&str] = match profile {
-        TimedRotationProfile::FiammettaWitch12_12 => {
-            &["但书", "可露希尔", "清流", "巫恋", "龙舌兰"]
-        }
-        _ => &["但书", "可露希尔", "清流"],
-    };
     for shift in shifts {
         if let Some(action) = &shift.fiammetta {
             if !slots.contains(&shift.index) {
@@ -2004,7 +1998,7 @@ fn validate_fiammetta_action_policy(
                     action.target
                 )));
             }
-            if !valid_targets.contains(&action.target.as_str()) {
+            if !fiammetta_target_is_legal(profile, &action.target) {
                 return Err(Error::msg(format!(
                     "fiammetta_target_invalid failed in shift {}: target {} is not a legal target",
                     shift.index + 1,
@@ -2016,13 +2010,20 @@ fn validate_fiammetta_action_policy(
     Ok(())
 }
 
+fn fiammetta_target_is_legal(profile: TimedRotationProfile, target: &str) -> bool {
+    let _ = profile;
+    matches!(target, "但书" | "可露希尔" | "清流" | "巫恋" | "龙舌兰")
+}
+
 fn first_fiammetta_assignment_target(
+    profile: TimedRotationProfile,
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
     used: &HashSet<String>,
 ) -> Option<(String, RoomId)> {
     fiammetta_return_priority(blueprint)
         .into_iter()
+        .filter(|target| fiammetta_target_is_legal(profile, target))
         .filter(|target| !used.contains(*target))
         .find_map(|target| {
             assignment.rooms.iter().find_map(|room| {
@@ -5736,13 +5737,17 @@ fn schedule_main_backup_12_12(
     let first_fiammetta = operbox
         .owns("菲亚梅塔")
         .then(|| {
-            first_fiammetta_assignment_target(blueprint, &main.assignment, &HashSet::new()).map(
-                |(target, room_id)| FiammettaShiftAction {
-                    target,
-                    displaced: String::new(),
-                    room_id,
-                },
+            first_fiammetta_assignment_target(
+                TimedRotationProfile::MainBackup12_12,
+                blueprint,
+                &main.assignment,
+                &HashSet::new(),
             )
+            .map(|(target, room_id)| FiammettaShiftAction {
+                target,
+                displaced: String::new(),
+                room_id,
+            })
         })
         .flatten();
     let second_fiammetta = operbox
@@ -5752,13 +5757,17 @@ fn schedule_main_backup_12_12(
                 .as_ref()
                 .map(|action| std::iter::once(action.target.clone()).collect())
                 .unwrap_or_default();
-            first_fiammetta_assignment_target(blueprint, &backup.assignment, &used).map(
-                |(target, room_id)| FiammettaShiftAction {
-                    target,
-                    displaced: String::new(),
-                    room_id,
-                },
+            first_fiammetta_assignment_target(
+                TimedRotationProfile::MainBackup12_12,
+                blueprint,
+                &backup.assignment,
+                &used,
             )
+            .map(|(target, room_id)| FiammettaShiftAction {
+                target,
+                displaced: String::new(),
+                room_id,
+            })
         })
         .flatten();
     let states = vec![
@@ -6193,6 +6202,7 @@ fn schedule_fiammetta_8_8_4_4(
             power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
             production: average_cycle_production(blueprint, &report.shifts),
         };
+        validate_continuous_work_spans(blueprint, instances, &report)?;
     }
     validate_final_rotation_invariants(
         &report.shifts,
