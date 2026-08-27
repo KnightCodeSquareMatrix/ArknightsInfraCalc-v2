@@ -3140,22 +3140,17 @@ mod tests {
             .iter()
             .filter(|anchor| anchor.system_id == "rhine_receivers")
             .collect();
-        assert_eq!(rhine.len(), 3, "receiver + 2 real vacant support rooms");
+        assert_eq!(rhine.len(), 2, "receiver + 1 eligible support room");
         assert!(rhine.iter().all(|anchor| anchor.room_id.is_some()));
         let support_rooms: HashSet<_> = rhine
             .iter()
-            .filter(|anchor| {
-                matches!(
-                    anchor.facility,
-                    FacilityKind::Dormitory | FacilityKind::MeetingRoom
-                )
-            })
+            .filter(|anchor| matches!(anchor.facility, FacilityKind::Dormitory))
             .filter_map(|anchor| anchor.room_id.as_ref())
             .collect();
         assert_eq!(
             support_rooms.len(),
-            2,
-            "one_per_room 必须选择两个不同支持房"
+            1,
+            "one_per_room 必须选择一个 eligible 支持房"
         );
         assert!(compiled
             .shift_binds
@@ -3281,7 +3276,7 @@ mod tests {
             .iter()
             .filter(|anchor| anchor.system_id == "rhine_receivers")
             .collect();
-        assert_eq!(anchors.len(), 4, "receiver plus three real support rooms");
+        assert_eq!(anchors.len(), 3, "receiver plus two eligible support rooms");
         assert!(anchors.iter().any(|anchor| {
             anchor.operator == "缪尔赛思" && anchor.facility == FacilityKind::PowerPlant
         }));
@@ -3290,7 +3285,7 @@ mod tests {
             .iter()
             .find(|dependency| dependency.consumers.iter().any(|name| name == "缪尔赛思"))
             .unwrap();
-        assert_eq!(dependency.required.len(), 3);
+        assert_eq!(dependency.required.len(), 2);
         assert!(dependency
             .required
             .iter()
@@ -3336,7 +3331,7 @@ mod tests {
                     && dependency.consumers.iter().any(|name| name == "缪尔赛思")
             })
             .expect("双 receiver 应共享实际支持 dependency");
-        assert_eq!(dependency.required.len(), 4);
+        assert_eq!(dependency.required.len(), 3);
         assert!(dependency.required.iter().all(|name| {
             ["塞雷娅", "麦哲伦", "赫默", "白面鸮"].contains(&name.as_str())
         }));

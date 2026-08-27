@@ -141,9 +141,17 @@ impl WorkforceIndex {
             .as_ref()
             .map(|a| vec![a.name.clone()])
             .unwrap_or_default();
+        let meeting_names: std::collections::HashSet<String> = blueprint
+            .rooms
+            .iter()
+            .filter(|room| room.kind == FacilityKind::MeetingRoom)
+            .flat_map(|room| assignment.operators_in(&room.id))
+            .map(|operator| operator.name.clone())
+            .collect();
         let mut effective_base_presence = all_base_names
             .iter()
             .filter(|name| !training_assist.iter().any(|assist| assist == *name))
+            .filter(|name| !meeting_names.contains(*name))
             .cloned()
             .collect::<Vec<_>>();
         for ops in by_room.values() {
@@ -159,6 +167,7 @@ impl WorkforceIndex {
             }
             for op in assignment.operators_in(&room.id) {
                 if !training_assist.iter().any(|assist| assist == &op.name)
+                    && !meeting_names.contains(&op.name)
                     && !effective_base_presence.iter().any(|name| name == &op.name)
                 {
                     effective_base_presence.push(op.name.clone());
@@ -166,10 +175,10 @@ impl WorkforceIndex {
             }
         }
 
-        // 训练主位与训练副手均计入莱茵生命阵营人数（canonical RHINE_LAB §3）；
-        // all_base_names 已包含副手，此处不再排除。
+        // 莱茵技能的“基建内”排除会客室使用者和训练副手；
+        // effective_base_presence 已完成这两个排除。
         let rhine_life_in_base =
-            count_tagged_in_base_excluding(instances, &all_base_names, &[], TAG_RHINE, 6);
+            count_tagged_in_base_excluding(instances, &effective_base_presence, &[], TAG_RHINE, 6);
 
         let durin_in_base = count_tagged_in_base_excluding(
             instances,
@@ -553,7 +562,7 @@ mod tests {
     }
 
     #[test]
-    fn rhine_life_in_base_includes_training_assist() {
+    fn rhine_life_in_base_includes_training_lead_but_excludes_assist() {
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let instances =
             OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
@@ -562,6 +571,7 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
+        assignment.set_room("training", vec![AssignedOperator::new("星源", 2)]);
         assignment.training_assist = Some(AssignedOperator::new("赫默", 2));
         let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert_eq!(idx.rhine_life_in_base, 4);
@@ -594,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    fn rhine_life_in_base_dedups_assist_already_in_workforce() {
+    fn rhine_life_in_base_excludes_meeting_room_operator() {
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let instances =
             OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
@@ -603,9 +613,23 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        assignment.training_assist = Some(AssignedOperator::new("赫默", 2));
+        assignment.set_room("meeting", vec![AssignedOperator::new("赫默", 2)]);
         let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
-        assert_eq!(idx.rhine_life_in_base, 3);
+        assert_eq!(idx.rhine_life_in_base, 2);
+    }
+
+    #[test]
+    fn rhine_life_in_base_dedups_duplicate_workforce_names() {
+        let bp = BaseBlueprint::template_243_use_this().unwrap();
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
+        let mut assignment = BaseAssignment::default();
+        assignment.base_workforce = ["缪尔赛思", "缪尔赛思", "多萝西"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.rhine_life_in_base, 2);
     }
 
     #[test]

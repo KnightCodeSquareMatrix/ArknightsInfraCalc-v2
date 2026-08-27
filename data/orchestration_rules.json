@@ -694,7 +694,7 @@
             {
               "id": "rhine_support",
               "facility": "dormitory",
-              "facilities": ["meeting_room", "workshop", "training_room"],
+              "facilities": ["workshop", "training_room"],
               "candidates": [{ "name": "伊芙利特", "elite": 0 }, { "name": "塞雷娅", "elite": 0 }, { "name": "梅尔", "elite": 0 }, { "name": "麦哲伦", "elite": 0 }, { "name": "赫默", "elite": 0 }, { "name": "白面鸮", "elite": 0 }, { "name": "星源", "elite": 0 }, { "name": "多萝西", "elite": 0 }],
               "min_count": 1,
               "max_count": 4,
@@ -723,7 +723,7 @@
             {
               "id": "rhine_support",
               "facility": "dormitory",
-              "facilities": ["meeting_room", "workshop", "training_room"],
+              "facilities": ["workshop", "training_room"],
               "candidates": [{ "name": "伊芙利特", "elite": 0 }, { "name": "塞雷娅", "elite": 0 }, { "name": "梅尔", "elite": 0 }, { "name": "麦哲伦", "elite": 0 }, { "name": "赫默", "elite": 0 }, { "name": "白面鸮", "elite": 0 }, { "name": "星源", "elite": 0 }, { "name": "多萝西", "elite": 0 }],
               "min_count": 1,
               "max_count": 4,
@@ -750,7 +750,7 @@
             {
               "id": "rhine_support",
               "facility": "dormitory",
-              "facilities": ["meeting_room", "workshop", "training_room"],
+              "facilities": ["workshop", "training_room"],
               "candidates": [{ "name": "伊芙利特", "elite": 0 }, { "name": "塞雷娅", "elite": 0 }, { "name": "梅尔", "elite": 0 }, { "name": "麦哲伦", "elite": 0 }, { "name": "赫默", "elite": 0 }, { "name": "白面鸮", "elite": 0 }, { "name": "星源", "elite": 0 }, { "name": "多萝西", "elite": 0 }],
               "min_count": 1,
               "max_count": 5,
