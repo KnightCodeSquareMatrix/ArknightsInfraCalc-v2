@@ -181,7 +181,15 @@ fn solve_trade_with_shift_inner(
     apply_trade_phases(&mut ctx, table);
 
     let order_eff_base = ctx.order_eff_base();
-    let order_eff_skill = ctx.order_eff_skill();
+    let siracusa_skill_eff = input
+        .layout
+        .global_inject
+        .trade_eff_pct_for_family_with_scoped_tag_counts(
+            "trade_siracusa_scaling",
+            &input.layout.trade_tagged_count_sum,
+            &current_room_tag_counts(&ctx),
+        );
+    let order_eff_skill = ctx.order_eff_skill() + siracusa_skill_eff;
     let order_eff_pre = ctx.order_eff_total();
     let order_eff_global = order_eff_pre - order_eff_base - order_eff_skill;
     let paper_efficiency = PaperTradeEfficiency::from_percent_points(
@@ -242,6 +250,16 @@ fn solve_trade_with_shift_inner(
         mood_drain: mood_drain_from_ctx(&ctx),
         production,
     })
+}
+
+fn current_room_tag_counts(ctx: &TradeContext) -> std::collections::HashMap<String, u8> {
+    let mut counts = std::collections::HashMap::new();
+    for operator in &ctx.operators {
+        for tag in &operator.tags {
+            *counts.entry(tag.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
 }
 
 #[cfg(test)]

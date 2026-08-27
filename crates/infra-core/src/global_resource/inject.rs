@@ -134,6 +134,39 @@ impl GlobalInjectManifest {
         })
     }
 
+    /// Return one trade injection family using the same scoped count rules as
+    /// [`Self::trade_eff_pct_with_scoped_tag_counts`].
+    pub fn trade_eff_pct_for_family_with_scoped_tag_counts(
+        &self,
+        family: &str,
+        all_trade_counts: &HashMap<String, u8>,
+        current_room_counts: &HashMap<String, u8>,
+    ) -> f64 {
+        let static_value = self.trade_by_family.get(family).copied().unwrap_or(0.0);
+        self.trade_tagged
+            .iter()
+            .filter(|rule| rule.family == family)
+            .map(|rule| {
+                let counts = match rule.count_scope {
+                    TradeTaggedCountScope::AllTradeRooms => all_trade_counts,
+                    TradeTaggedCountScope::CurrentTradeRoom => current_room_counts,
+                    TradeTaggedCountScope::QualifiedTradeRooms { .. } => {
+                        return rule.resolved_count
+                    }
+                };
+                counts.get(&rule.target_tag).copied().unwrap_or(0)
+            })
+            .map(|count| f64::from(count))
+            .zip(
+                self.trade_tagged
+                    .iter()
+                    .filter(|rule| rule.family == family)
+                    .map(|rule| rule.value_per_operator),
+            )
+            .map(|(count, value)| count * value)
+            .fold(static_value, f64::max)
+    }
+
     fn trade_eff_pct_by(&self, count_of: impl Fn(&TaggedTradeInject) -> u8) -> f64 {
         if self.trade_tagged.is_empty() {
             return self.trade_by_family.values().sum();
