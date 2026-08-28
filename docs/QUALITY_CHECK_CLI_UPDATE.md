@@ -64,7 +64,8 @@ python3 scripts/update_solver_quality.py
 ```
 
 脚本先通过 scp 写入 `infra-cli.partial`，再在远端原子 rename，避免 runner 领取不完整的文件，
-随后轮询远端 status API 直到新 bundle 与 job 达到终态：
+随后轮询远端 status API，直到新 bundle 与质量 job 达到终态。正常的代表性矩阵通常在数十秒内完成；
+脚本最多等待 1800 秒，并在终态输出 case 计数：
 
 ```bash
 scp dist/arknights-infra-linux-x86_64/infra-cli \

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Push the local Linux infra-cli to the fixed remote quality-check service.
+"""Build and push infra-cli to the fixed remote quality-check service.
 
 Implements docs/QUALITY_CHECK_CLI_UPDATE.md (embeddedData hot-path, no bake):
 
-    cargo build --release -p infra-cli
     python3 scripts/update_solver_quality.py
 
 The script intentionally has no configurable deployment mode. It uploads the
@@ -51,6 +50,24 @@ def run(cmd: list[str], *, stdin: str | None = None) -> None:
     subprocess.run(cmd, input=stdin, text=True, check=True)
 
 
+def checkpoint(name: str, detail: str) -> None:
+    print(f"\n[{name}] {detail}")
+
+
+def workspace_status() -> tuple[str, bool]:
+    result = subprocess.run(
+        ["git", "status", "--short", "--branch"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    lines = result.stdout.strip().splitlines()
+    branch = lines[0] if lines else "unknown branch"
+    dirty = len(lines) > 1
+    return branch, dirty
+
+
 def fetch_json(url: str, timeout: float = 15) -> dict:
     with urllib.request.urlopen(url, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
@@ -78,20 +95,23 @@ def main() -> int:
     if len(sys.argv) != 1:
         raise SystemExit("usage: python3 scripts/update_solver_quality.py")
 
+    checkpoint("1/5 WORKSPACE", f"repository={ROOT}")
+    branch, dirty = workspace_status()
+    print(f"  {branch}")
+    print(f"  state={'DIRTY (building current worktree)' if dirty else 'CLEAN'}")
+
+    checkpoint("2/5 BUILD", "cargo build --release -p infra-cli")
+    run(["cargo", "build", "--release", "-p", "infra-cli"])
+
     local_elf = LOCAL_ELF
-    if not local_elf.is_file():
-        raise SystemExit(
-            f"local ELF does not exist: {local_elf}\n"
-            "Build it first with: cargo build --release -p infra-cli"
-        )
     ensure_elf(local_elf)
     executable_sha256 = sha256(local_elf)
 
-    print(f"Local ELF: {local_elf}")
-    print(f"Local sha256: {executable_sha256}")
-    print(f"Incoming dir: {REMOTE_INCOMING}")
-    print(f"Status URL: {STATUS_URL}")
-    print(f"SSH target: {REMOTE_TARGET}")
+    checkpoint("3/5 ARTIFACT", "Linux ELF verified")
+    print(f"  path={local_elf}")
+    print(f"  sha256={executable_sha256}")
+
+    checkpoint("4/5 PUSH", f"target={REMOTE_TARGET} incoming={REMOTE_INCOMING}")
 
     partial = f"{REMOTE_INCOMING}/infra-cli.partial"
     final = f"{REMOTE_INCOMING}/infra-cli"
@@ -109,12 +129,11 @@ def main() -> int:
     )
     run(["ssh", REMOTE_TARGET, "bash", "-s"], stdin=remote_script)
 
-    print(f"\nPolling {STATUS_URL} ...")
+    checkpoint("5/5 QUALITY", f"polling={STATUS_URL} until terminal")
     deadline = time.monotonic() + TIMEOUT_SEC
     bundle_id: str | None = None
     job_id: str | None = None
     terminal = {"completed", "failed", "cancelled", "paused"}
-
     while time.monotonic() < deadline:
         try:
             data = fetch_json(STATUS_URL)
@@ -129,7 +148,10 @@ def main() -> int:
                 bundle_id = bundle.get("bundleId")
                 print(f"  bundle found: {bundle_id}")
                 print(f"    gitCommit={bundle.get('gitCommit')} "
-                      f"autoDiscovered={bundle.get('autoDiscovered')}")
+                       f"embeddedData={bundle.get('embeddedData')} "
+                       f"autoDiscovered={bundle.get('autoDiscovered')}")
+                if bundle.get("embeddedData") is not True:
+                    raise SystemExit("new bundle is not using embeddedData=true")
 
         if bundle_id is not None and job_id is None:
             job = find_job_for_bundle(data, bundle_id)
@@ -146,7 +168,11 @@ def main() -> int:
                       f"interrupted={job.get('interruptedCount')} "
                       f"/ {job.get('caseCount')}")
                 print(f"    caseStatuses={job.get('caseStatuses')}")
-                return 0 if job.get("status") == "completed" else 2
+                if job.get("status") != "completed":
+                    return 2
+                print("\n[RESULT] DEPLOYED: quality job completed")
+                print(f"  bundle={bundle_id} job={job_id} sha256={executable_sha256}")
+                return 0
 
         time.sleep(POLL_SEC)
 
