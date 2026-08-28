@@ -42,6 +42,12 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 
 机制与数据口径变更由 `arknights-mechanics-contract` 提供附加契约；候选集合、剪枝、目标、Bake 或 cache 的 medium/high-risk 改动应调用 `solver-guarantee-reviewer`；Team/Shift、心情、休息、绑定或 MAA 改动应调用 `rotation-maa-reviewer`。它们都是只读领域复核，不接管写入或最终裁决。
 
+贸易普通订单期望值公式的修复唯一入口见
+`docs/TODO/贸易订单期望值计算口径问题-20260828.md`。实施时只保留
+`crates/infra-core/src/trade/order_mechanic.rs` 的统一期望值汇总实现；
+`shortcut.rs` 只能准备最终订单参数并调用该实现，不得保留第二套
+`p × (duration / gold)` 或 `p × (lmd / duration)` 汇总逻辑。
+
 `local` 表示正确 owner 已存在、只修 owner 内部；`conformance-rebuild` 表示现有模型无法表达已确认不变量，或多个阶段在重复兜底。它们是诊断结果，不是与 debug/feature/quality 并列的用户意图。
 
 `formal-audit` 只在用户要求严格逐项审计或 canonical 文档冲突时启用。只读 research 可按不同调查轴使用 explorer/extractor，不自行获得修改授权。
