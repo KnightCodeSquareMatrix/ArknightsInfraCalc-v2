@@ -75,7 +75,7 @@ layout / operbox / runtime data
 | `tier` | `PromotionTier` 技能解锁档 |
 | `training_advice` | 练卡：玩家 knowledge/player 层生成基础名单、组合完成度与 ≤10 建议；v2 机器诊断继续兼容 |
 | `types` | EffectAtom 的 phase、selector、condition、action 等共享类型 |
-| `control` | 中枢求值与全局注入写回 |
+| `control` | 中枢求值、效果账本与全局注入写回 |
 | `export` | MAA 排班 JSON 投影；不重新计算机制 |
 | `layout` | 蓝图、编制、Plan、填房、resolve 和 workforce |
 | `manufacture` | 制造 L1、单房求解和配方结果 |

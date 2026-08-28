@@ -114,6 +114,7 @@
 |---|---|
 | 一次请求经过哪些模块 | [架构导览](ARCHITECTURE_TOUR.md) |
 | 文件、模块、数据和命令 owner | [项目地图](PROJECT_MAP.md) |
+| 高频修复先查哪里 | [当前实现状态入口](CURRENT_STATUS.md) |
 | 调查 operbox 求解错误 | [求解错误分析报告](求解错误分析报告.md) |
 | 贸易解释器、shortcut、跨设施等内部地图 | [内部实现索引](INTERNAL/README.md) |
 | Rust 公共 API | `cargo doc -p infra-core --open`；crate landing 位于 [`crates/infra-core/src/lib.rs`](../crates/infra-core/src/lib.rs) |
