@@ -41,7 +41,7 @@
 
 - `docus`：只补已解析但书 anchor 所在房；执行 `unfiltered + must_include_name=但书`，全部候选统一按 `total_efficiency` 排序。`gsl_docus_syracusa` / `gsl_docus_solo` 由 shortcut matcher 对最终实际候选自然结算，不参与总 core 或 pick step 优先级。
 - `closure`：只补已解析可露希尔 anchor 所在房；候选统一 `must_include_name=可露希尔`。`gsl_blackkey_closure` 与其他 closure shortcut 只结算实际组合，不提供同一核心 key 内的选型优先；仅 Rosemary Plan 明确绑定时要求黑键。
-- `witch`：`filtered hit_filter=witch + must_include_names=[巫恋, 龙舌兰]`，只接受 `gsl_witch_long_beta` / `gsl_witch_long_alpha`；blank 仅用于单站结算兼容。`witch_fallback` 使用独立过滤器，不与龙巫约束混用。
+- `witch`：按 `filtered hit_filter=witch_beta → witch_alpha → witch_blank` 顺序尝试，并要求 `must_include_names=[巫恋, 龙舌兰]`；第三人严格按裁缝 β >> 裁缝 α > 白板降级，普通第三人只在最后白板层进入。`witch_fallback` 使用独立过滤器，不与完整龙巫约束混用。
 - 格拉斯哥成员进入普通合法候选；`segment/vina_lungmen` 仅在实际组合与 source buff capability 同时存在时结算，不占 role 优先级。
 - `witch_fallback`：`filtered hit_filter=witch + must_include_name=巫恋`，只作无完整龙巫时的合法候选，不形成第四层固定优先级。
 

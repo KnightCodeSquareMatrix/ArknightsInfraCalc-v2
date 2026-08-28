@@ -142,6 +142,10 @@ pub(super) fn assign_trade_jie_remainder(
                         SearchTripleFilter {
                             must_include_name: Some(JIE_TRADE_NAME.to_string()),
                             must_operator_override: Some(jie_op),
+                            forbidden_pairs: vec![(
+                                WITCH_TRADE_NAME.to_string(),
+                                TEQUILA_TRADE_NAME.to_string(),
+                            )],
                             ..SearchTripleFilter::default()
                         },
                     ) {
@@ -170,13 +174,17 @@ pub(super) fn assign_trade_jie_remainder(
         if order == TradeOrderKind::Originium {
             used_for_room.extend(GOLD_ORDER_CORE_NAMES.map(str::to_string));
         }
-        let hit = pick_trade_hit(
+        let hit = pick_trade_meta_then_plain(
             pool,
             table,
-            trade_room_options(&current_layout, gold_lines, options, order, room.level),
-            SearchTripleFilter::default(),
-            &used_for_room,
-            options.top_k,
+            &current_layout,
+            gold_lines,
+            options,
+            order,
+            room.level,
+            &mut used_for_room,
+            &[],
+            &[],
         )
         .map_err(|e| Error::msg(format!("trade recovery {}: {e}", room.id.0)))?;
         commit_trade_room(assignment, &room.id, &hit, pool, used)?;
@@ -727,7 +735,7 @@ pub(super) fn pick_trade_meta_then_plain(
         }
     }
     let mut plain_forbidden_pairs = forbidden_pairs.to_vec();
-    if room_level < 3
+    if room_level <= 3
         && !plain_forbidden_pairs.iter().any(|(left, right)| {
             (left == WITCH_TRADE_NAME && right == TEQUILA_TRADE_NAME)
                 || (left == TEQUILA_TRADE_NAME && right == WITCH_TRADE_NAME)

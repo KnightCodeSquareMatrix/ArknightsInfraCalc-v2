@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,8 @@ use crate::search::{
 };
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
-use crate::trade::input::TradeOrderKind;
+use crate::trade::input::{TradeOperator, TradeOrderKind};
+use crate::trade::shortcut::match_witch_group_shortcut;
 
 use super::base_rotation::{
     evaluate_base_assignment_efficiencies, RoomEfficiencyLine, ShiftEfficiencies,
@@ -4149,6 +4151,46 @@ pub fn assert_final_rotation_invariants(
                 .is_none_or(|spec| spec.kind != FacilityKind::TradePost)
             {
                 continue;
+            }
+            let has_witch = room
+                .operators
+                .iter()
+                .any(|operator| operator.name == "巫恋");
+            let has_tequila = room
+                .operators
+                .iter()
+                .any(|operator| operator.name == "龙舌兰");
+            if has_witch && has_tequila {
+                let level = blueprint
+                    .room(&room.room_id)
+                    .map(|spec| spec.level)
+                    .unwrap_or_default();
+                let valid_room = blueprint.room(&room.room_id).is_some_and(|spec| {
+                    spec.level == 3
+                        && spec.product
+                            == Some(RoomProduct::Trade {
+                                order: TradeOrderKind::Gold,
+                            })
+                });
+                let operators = room
+                    .operators
+                    .iter()
+                    .map(|operator| TradeOperator {
+                        name: operator.name.clone(),
+                        elite: operator.elite,
+                        buff_ids: instances.resolve_trade_buff_ids(&operator.name, operator.tier()),
+                        tags: instances.tags_for(&operator.name, operator.tier()),
+                        compiled_atoms: Arc::from([]),
+                    })
+                    .collect::<Vec<_>>();
+                let valid_rule = match_witch_group_shortcut(&operators, table, level).is_some();
+                if !valid_room || !valid_rule {
+                    return Err(Error::msg(format!(
+                        "assert-invariants witch_tequila_admission failed in shift {} room {}",
+                        shift.index + 1,
+                        room.room_id.0,
+                    )));
+                }
             }
             let has_market_variant = room.operators.iter().any(|operator| {
                 instances

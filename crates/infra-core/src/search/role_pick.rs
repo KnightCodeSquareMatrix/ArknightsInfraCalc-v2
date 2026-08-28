@@ -12,7 +12,7 @@ use crate::trade::segment::{segment_producer_active, trade_segment_cache};
 use super::trade::{
     hit_blackkey_closure_shortcut, hit_closure_shortcut, hit_docus_solo_shortcut,
     hit_witch_shortcut, search_trade_triples, search_trade_triples_filtered, SearchTripleFilter,
-    TradeEfficiencyBreakdown, TradeSearchHit, TradeSearchOptions,
+    TradeSearchHit, TradeSearchOptions,
 };
 
 const KARLAN_TRADE_NAMES: &[&str] = &["银灰", "崖心", "讯使", "角峰"];
@@ -237,22 +237,33 @@ fn named_hit_filter(filter_id: &str) -> Option<fn(&TradeSearchHit) -> bool> {
         "docus_syracusa" => Some(hit_docus_syracusa_shortcut),
         "closure" => Some(hit_closure_shortcut),
         "blackkey_closure" => Some(hit_blackkey_closure_shortcut),
-        "witch" => Some(hit_witch_with_tailor),
+        "witch_beta" => Some(hit_witch_beta),
+        "witch_alpha" => Some(hit_witch_alpha),
+        "witch_blank" => Some(hit_witch_blank),
         "witch_fallback" => Some(hit_witch_shortcut),
         "karlan" => Some(hit_karlan_jie),
         _ => None,
     }
 }
 
-fn hit_witch_with_tailor(hit: &TradeSearchHit) -> bool {
+fn hit_witch_beta(hit: &TradeSearchHit) -> bool {
     matches!(
         hit.rule_id.as_deref(),
-        Some(
-            "gsl_witch_long_beta"
-                | "gsl_witch_long_alpha"
-                | "gsl_witch_long0_alpha"
-                | "gsl_witch_long0_blank"
-        )
+        Some("gsl_witch_long_beta" | "gsl_witch_long0_beta")
+    )
+}
+
+fn hit_witch_alpha(hit: &TradeSearchHit) -> bool {
+    matches!(
+        hit.rule_id.as_deref(),
+        Some("gsl_witch_long_alpha" | "gsl_witch_long0_alpha" | "gsl_witch_long1_alpha")
+    )
+}
+
+fn hit_witch_blank(hit: &TradeSearchHit) -> bool {
+    matches!(
+        hit.rule_id.as_deref(),
+        Some("gsl_witch_long_blank" | "gsl_witch_long0_blank" | "gsl_witch_long1_blank")
     )
 }
 

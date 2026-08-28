@@ -83,7 +83,23 @@
       "pick_steps": [
         {
           "kind": "filtered",
-          "hit_filter": "witch",
+          "hit_filter": "witch_beta",
+          "must_include_names": [
+            "巫恋",
+            "龙舌兰"
+          ]
+        },
+        {
+          "kind": "filtered",
+          "hit_filter": "witch_alpha",
+          "must_include_names": [
+            "巫恋",
+            "龙舌兰"
+          ]
+        },
+        {
+          "kind": "filtered",
+          "hit_filter": "witch_blank",
           "must_include_names": [
             "巫恋",
             "龙舌兰"

@@ -14,7 +14,7 @@
 <!-- BEGIN GENERATED ACTIVE CHANGES -->
 | 文件 | 状态 | 用途 |
 |---|---|---|
-| [08-212 贸易站龙巫裁缝候选问题记录](08-212贸易站龙巫裁缝候选问题记录.md) | `in-progress` | 记录 08-212 贸易站龙巫特殊组合的候选优先级问题与用户裁决，等待后续修复指令 |
+| [08-212 贸易站龙巫裁缝候选问题记录](08-212贸易站龙巫裁缝候选问题记录.md) | `ready-on-request` | 记录 08-212 贸易站龙巫特殊组合的候选优先级问题、修复结果与验证边界 |
 | [AI 编排 Harness Phase 0A 协议草案](AI编排Harness%20Phase0A协议草案.md) | `proposal` | 冻结 harness-neutral 的任务、事件、结果、证明义务、证据 overlay 和 runtime capability 合同 |
 | [设施无关条件化响应 Bake 实施计划](CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md) | `ready-on-request` | 设施无关条件化响应 Bake 的后续实施任务 |
 | [动态 Producer A+：设施无关候选列 + 精确索引 Join](DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) | `ready-on-request` | 动态 producer 候选列、精确索引 Join 和 winner dependency 任务 |
