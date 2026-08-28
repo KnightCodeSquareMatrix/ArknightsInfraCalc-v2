@@ -10,8 +10,8 @@ use crate::layout::{
 };
 use crate::operbox::OperBox;
 use crate::schedule::{
-    fiammetta_return_priority, DormRestPlan, DroneAction, ShiftTransition, TeamLabel,
-    TeamRotationReport, TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
+    fiammetta_return_priority, DroneAction, ShiftTransition, TeamLabel, TeamRotationReport,
+    TimedRotationProfile, FIAMMETTA_RETURN_PRIORITY,
 };
 use crate::trade::input::TradeOrderKind;
 use crate::types::RecipeKind;
@@ -145,14 +145,11 @@ struct PlanInput<'a> {
     assignment: &'a BaseAssignment,
     name: String,
     description: String,
-    resting: Vec<String>,
     fiammetta_target: Option<&'a str>,
     fiammetta_priority: &'a [String],
     fiammetta_room: Option<&'a RoomId>,
-    dorm_rest: Option<&'a DormRestPlan>,
     drone: Option<&'a crate::schedule::DroneAction>,
     transition: ShiftTransition,
-    special_rest: Vec<(FacilityKind, String)>,
 }
 
 impl MaaSchedule {
@@ -185,29 +182,6 @@ pub fn build_from_team_rotation(
                 .iter()
                 .map(|team| team_label_zh(report.profile, *team))
                 .collect();
-            let mut resting = resting_team_operators(report, shift.resting_team, &shift.assignment);
-            if let Some(action) = &shift.fiammetta {
-                if !action.displaced.is_empty() && !resting.contains(&action.displaced) {
-                    // 被菲亚主力顶下来的干员必须优先拿到宿舍位，不能排在整支休息队
-                    // 后面因床位截断而丢失。
-                    resting.insert(0, action.displaced.clone());
-                }
-            }
-            let special_rest: Vec<_> = report
-                .assignment_plans
-                .get(shift.plan_index)
-                .unwrap_or(&report.peak_plan)
-                .anchors
-                .iter()
-                .filter_map(|anchor| {
-                    let facility = anchor.rest_facility?;
-                    resting
-                        .iter()
-                        .any(|name| name == &anchor.operator)
-                        .then(|| (facility, anchor.operator.clone()))
-                })
-                .collect();
-            resting.retain(|name| !special_rest.iter().any(|(_, special)| special == name));
             PlanInput {
                 assignment: &shift.assignment,
                 name: format!(
@@ -222,17 +196,14 @@ pub fn build_from_team_rotation(
                     shift.duration_hours,
                     team_label_zh(report.profile, shift.resting_team)
                 ),
-                resting,
                 fiammetta_target: shift
                     .fiammetta
                     .as_ref()
                     .map(|action| action.target.as_str()),
                 // ABC 主路径只执行 schedule 已确认的回岗动作；没有动作就保持关闭。
                 fiammetta_priority: &[],
-                special_rest,
                 transition: shift.transition,
                 fiammetta_room: shift.fiammetta.as_ref().map(|action| &action.room_id),
-                dorm_rest: shift.dorm_rest.as_ref(),
                 drone: shift.drone.as_ref(),
             }
         })
@@ -265,7 +236,7 @@ fn wrap_schedule(
 }
 
 fn build_plan(blueprint: &BaseBlueprint, input: &PlanInput) -> MaaPlan {
-    let mut rooms = if input.transition == ShiftTransition::FiammettaOnly {
+    let rooms = if input.transition == ShiftTransition::FiammettaOnly {
         build_fiammetta_transition_rooms(
             blueprint,
             input.assignment,
@@ -274,16 +245,8 @@ fn build_plan(blueprint: &BaseBlueprint, input: &PlanInput) -> MaaPlan {
                 .expect("Fiammetta-only transition has target room"),
         )
     } else {
-        build_rooms(
-            blueprint,
-            input.assignment,
-            &input.resting,
-            &input.special_rest,
-        )
+        build_rooms(blueprint, input.assignment)
     };
-    if let Some(dorm_rest) = input.dorm_rest {
-        apply_dorm_rest(blueprint, &mut rooms, dorm_rest);
-    }
     MaaPlan {
         name: input.name.clone(),
         description: input.description.clone(),
@@ -332,12 +295,7 @@ fn resolve_scheduled_fiammetta(target: &str) -> MaaFiammetta {
     }
 }
 
-fn build_rooms(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    resting: &[String],
-    special_rest: &[(FacilityKind, String)],
-) -> MaaRooms {
+fn build_rooms(blueprint: &BaseBlueprint, assignment: &BaseAssignment) -> MaaRooms {
     MaaRooms {
         trading: blueprint
             .rooms_of(FacilityKind::TradePost)
@@ -347,7 +305,7 @@ fn build_rooms(
                     RoomProduct::Trade { order } => Some(maa_trade_product(*order)),
                     _ => None,
                 });
-                production_slot(assignment, &room.id.0, product, true)
+                production_slot(assignment, &room.id.0, product)
             })
             .collect(),
         manufacture: blueprint
@@ -358,53 +316,37 @@ fn build_rooms(
                     RoomProduct::Factory { recipe } => Some(maa_factory_product(*recipe)),
                     _ => None,
                 });
-                production_slot(assignment, &room.id.0, product, true)
+                production_slot(assignment, &room.id.0, product)
             })
             .collect(),
         power: blueprint
             .rooms_of(FacilityKind::PowerPlant)
             .into_iter()
-            .map(|room| production_slot(assignment, &room.id.0, None, false))
+            .map(|room| production_slot(assignment, &room.id.0, None))
             .collect(),
-        dormitory: build_dorm_slots(blueprint, assignment, resting),
+        dormitory: build_dorm_slots(blueprint, assignment),
         control: if blueprint.count_facility(FacilityKind::ControlCenter) > 0 {
-            vec![shared_slot(assignment, "control", false)]
+            vec![shared_slot(assignment, "control")]
         } else {
             Vec::new()
         },
         meeting: blueprint
             .rooms_of(FacilityKind::MeetingRoom)
             .into_iter()
-            .map(|room| {
-                shared_slot_with_extra(
-                    assignment,
-                    &room.id.0,
-                    true,
-                    Vec::new(),
-                    Some(room.operator_capacity()),
-                )
-            })
+            .map(|room| shared_slot(assignment, &room.id.0))
             .collect(),
         hire: blueprint
             .rooms_of(FacilityKind::Office)
             .into_iter()
-            .map(|room| shared_slot(assignment, &room.id.0, true))
+            .map(|room| shared_slot(assignment, &room.id.0))
             .collect(),
         processing: blueprint
             .rooms_of(FacilityKind::Workshop)
             .into_iter()
             .enumerate()
             .map(|(index, room)| {
-                let extra = if index == 0 {
-                    special_rest
-                        .iter()
-                        .filter(|(facility, _)| *facility == FacilityKind::Workshop)
-                        .map(|(_, name)| name.clone())
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-                shared_slot_with_extra(assignment, &room.id.0, false, extra, Some(1))
+                let _ = index;
+                shared_slot(assignment, &room.id.0)
             })
             .collect(),
     }
@@ -415,7 +357,7 @@ fn build_fiammetta_transition_rooms(
     assignment: &BaseAssignment,
     target_room: &RoomId,
 ) -> MaaRooms {
-    let mut rooms = build_rooms(blueprint, assignment, &[], &[]);
+    let mut rooms = build_rooms(blueprint, assignment);
     let target = blueprint
         .room(target_room)
         .expect("scheduled Fiammetta target room remains in blueprint");
@@ -452,109 +394,48 @@ fn build_fiammetta_transition_rooms(
         FacilityKind::PowerPlant => rooms.power[target_index] = keep,
         _ => unreachable!(),
     }
-    rooms
-}
-
-fn apply_dorm_rest(blueprint: &BaseBlueprint, rooms: &mut MaaRooms, rest: &DormRestPlan) {
-    let dorm_index = blueprint
+    let fiammetta_dorm = blueprint
         .rooms_of(FacilityKind::Dormitory)
         .iter()
-        .position(|room| room.id == rest.room_id)
-        .expect("scheduled dorm rest room remains in blueprint");
-    let required = [
-        rest.single_manager.as_str(),
-        rest.group_manager.as_str(),
-        rest.target.as_str(),
-    ];
-    for slot in &mut rooms.dormitory {
-        slot.operators
-            .retain(|operator| !required.contains(&operator.as_str()));
-    }
-    let slot = &mut rooms.dormitory[dorm_index];
-    let mut operators = vec![
-        rest.single_manager.clone(),
-        rest.group_manager.clone(),
-        rest.target.clone(),
-    ];
-    operators.extend(slot.operators.iter().cloned());
-    let capacity = blueprint
-        .room(&rest.room_id)
-        .and_then(|room| room.dorm_beds)
-        .unwrap_or(5)
-        .max(1) as usize;
-    // Generic resting fill may already have used every spare bed. The explicit
-    // recovery group has priority; retain any remaining occupants only while
-    // the destination dorm still has capacity.
-    operators.truncate(capacity);
-    slot.skip = false;
-    slot.operators = operators;
-    // MAA must preserve manager -> target order for single-target recovery.
-    slot.sort = false;
-    slot.autofill = false;
+        .position(|room| {
+            assignment
+                .operators_in(&room.id)
+                .first()
+                .is_some_and(|operator| operator.name == "菲亚梅塔")
+        })
+        .expect("Fiammetta-only transition has a finalized Fiammetta dorm");
+    rooms.dormitory[fiammetta_dorm] = MaaRoomSlot {
+        skip: false,
+        product: None,
+        operators: operator_names(
+            assignment,
+            &blueprint.rooms_of(FacilityKind::Dormitory)[fiammetta_dorm]
+                .id
+                .0,
+        ),
+        sort: false,
+        autofill: false,
+    };
+    rooms
 }
 
 fn production_slot(
     assignment: &BaseAssignment,
     room_id: &str,
     product: Option<&'static str>,
-    sort: bool,
 ) -> MaaRoomSlot {
     let operators = operator_names(assignment, room_id);
     MaaRoomSlot {
         skip: false,
         product,
         operators,
-        sort,
+        sort: false,
         autofill: false,
     }
 }
 
-fn shared_slot(assignment: &BaseAssignment, room_id: &str, autofill_if_empty: bool) -> MaaRoomSlot {
-    shared_slot_with_extra(assignment, room_id, autofill_if_empty, Vec::new(), None)
-}
-
-fn shared_slot_with_extra(
-    assignment: &BaseAssignment,
-    room_id: &str,
-    autofill_if_empty: bool,
-    extra: Vec<String>,
-    capacity: Option<usize>,
-) -> MaaRoomSlot {
-    // 会客室由求解器填满（pipeline 末尾的 assign_meeting_rooms）；当可占用
-    // 干员不足而保留空席（例如仅剩 required 共享成员、第二席无候选）时，
-    // 按已裁决契约导出 `autofill: true` 提示前端自动补位；完全填满则为 false。
-    // special-rest 是该班的明确去向，优先于 peak/shared 中沿用的旧成员。
-    let mut operators = Vec::new();
-    for name in extra {
-        if !operators.contains(&name) {
-            operators.push(name);
-        }
-    }
-    for name in operator_names(assignment, room_id) {
-        if capacity.is_some_and(|capacity| operators.len() >= capacity) {
-            break;
-        }
-        if !operators.contains(&name) {
-            operators.push(name);
-        }
-    }
-    if let Some(capacity) = capacity {
-        operators.truncate(capacity);
-    }
-    let needs_autofill = if let Some(capacity) = capacity {
-        autofill_if_empty && operators.len() < capacity
-    } else {
-        autofill_if_empty && operators.is_empty()
-    };
-    if needs_autofill {
-        return MaaRoomSlot {
-            skip: false,
-            product: None,
-            operators,
-            sort: false,
-            autofill: true,
-        };
-    }
+fn shared_slot(assignment: &BaseAssignment, room_id: &str) -> MaaRoomSlot {
+    let operators = operator_names(assignment, room_id);
     MaaRoomSlot {
         skip: false,
         product: None,
@@ -564,61 +445,30 @@ fn shared_slot_with_extra(
     }
 }
 
-fn build_dorm_slots(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    resting: &[String],
-) -> Vec<MaaRoomSlot> {
-    let mut resting: Vec<String> = resting.to_vec();
+fn build_dorm_slots(blueprint: &BaseBlueprint, assignment: &BaseAssignment) -> Vec<MaaRoomSlot> {
     blueprint
         .rooms_of(FacilityKind::Dormitory)
         .into_iter()
         .map(|room| {
-            let beds = room.dorm_beds.unwrap_or(5).max(1) as usize;
-            let mut operators = operator_names(assignment, &room.id.0);
-            let spare = beds.saturating_sub(operators.len());
-            if spare > 0 && !resting.is_empty() {
-                let take = resting.len().min(spare);
-                operators.extend(resting.drain(..take));
-            }
+            let operators = operator_names(assignment, &room.id.0);
             if !operators.is_empty() {
                 return MaaRoomSlot {
                     skip: false,
                     product: None,
                     operators,
-                    sort: true,
+                    sort: false,
                     autofill: false,
                 };
             }
             MaaRoomSlot {
-                skip: false,
+                skip: true,
                 product: None,
                 operators: Vec::new(),
                 sort: false,
-                autofill: true,
+                autofill: false,
             }
         })
         .collect()
-}
-
-fn resting_team_operators(
-    report: &TeamRotationReport,
-    resting_team: TeamLabel,
-    assignment: &BaseAssignment,
-) -> Vec<String> {
-    let assigned = assignment_operator_names(assignment);
-    report
-        .teams
-        .iter()
-        .find(|team| team.label == resting_team)
-        .map(|team| {
-            team.operators
-                .iter()
-                .filter(|name| !assigned.contains(*name))
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 fn operator_names(assignment: &BaseAssignment, room_id: &str) -> Vec<String> {

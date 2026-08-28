@@ -46,6 +46,9 @@ use super::trade_fill::{
 };
 use super::{inject_search_anchor_pool_entries, tag_pool_from_plan, AssignBaseOptions};
 
+const SPHINX_NAME: &str = "深巡";
+const ULPIANUS_NAME: &str = "乌尔比安";
+
 /// 执行单班填房流水线，返回最终编制。
 ///
 /// `plan` 已由调用方通过 `build_plan` 构造（含 trade core registry skip 规则）。
@@ -198,6 +201,12 @@ fn run_shift_pipeline_with_producer_pruning(
             timer.mark("制造");
         }
         AssignShiftMode::Recovery => {
+            if !operator_is_in_normal_base(blueprint, &run.assignment, ULPIANUS_NAME) {
+                // Deepcolor's trade bonus requires Ulpianus to remain in the normal base.
+                // Recovery does not own an Ulpianus placement, so exclude Deepcolor
+                // before either the shadow or ordinary trade branch searches.
+                run.used.insert(SPHINX_NAME.to_string());
+            }
             let layout = run.resolve_snapshot(true)?;
             if karlan_precision_active(&layout.global_inject) {
                 add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
@@ -1155,6 +1164,12 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
+    if !operator_is_in_normal_base(run.blueprint, &run.assignment, ULPIANUS_NAME) {
+        // Deepcolor's trade bonus requires Ulpianus to remain in the normal base.
+        // This pipeline does not place Ulpianus beyond the producer anchor, so
+        // exclude Deepcolor from every subsequent peak trade branch.
+        run.used.insert(SPHINX_NAME.to_string());
+    }
     let layout = run.resolve_snapshot(true)?;
     let mut trade_pool = base_trade_pool.clone();
     if karlan_precision_active(&layout.global_inject) {
@@ -1269,6 +1284,22 @@ fn finish_peak_prefix_candidate<'a>(
         stable_order,
         run,
     }))
+}
+
+fn operator_is_in_normal_base(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    name: &str,
+) -> bool {
+    assignment.rooms.iter().any(|room| {
+        blueprint.room(&room.room_id).is_some_and(|spec| {
+            spec.kind != FacilityKind::MeetingRoom
+                && room.operators.iter().any(|operator| operator.name == name)
+        })
+    }) && assignment
+        .training_assist
+        .as_ref()
+        .is_none_or(|assist| assist.name != name)
 }
 
 fn trade_manufacture_efficiency_totals(
