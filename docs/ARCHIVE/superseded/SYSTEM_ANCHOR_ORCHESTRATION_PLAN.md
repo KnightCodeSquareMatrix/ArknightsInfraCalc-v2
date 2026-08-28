@@ -8,7 +8,7 @@
 > 摘要：保存体系 anchor 编排方案的被替代设计
 
 > 历史原状态：ready
-> 来源：[ADR 0001](../../ADR/0001-layout-assignment-decomposition.md)、[ORCHESTRATION_LAYER.md](../../ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](../../BASE_ASSIGNMENT.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../plans/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、`docs/公孙长乐的体系分析文档/`
+> 来源：[ORCHESTRATION_LAYER.md](../../ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](../../BASE_ASSIGNMENT.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../plans/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、`docs/公孙长乐的体系分析文档/`
 >
 > **范围划分**：本文聚焦**数据驱动 registry 子集**——`base_systems.json` schema 如何表达 anchor / min_pick / constraint，能用声明静态表达的体系走这条路。带运行期降级决策树的复杂体系（迷迭香 / 红松林 / 自动化 / 深巡乌尔比安）走**代码化体系层**，接口与 anchor 三态见 [CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md](CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md)。两条路径产出同一套中间语义，汇合到统一 `AssignmentPlan`。
 
@@ -182,11 +182,11 @@ pub struct AnchorSlot {
 - 迷迭香+黑键满足核心时同班出现，并继续由 `shift_bind` 保证同上同下。
 - 自动化金线不与迷迭香制造 anchor 同房。
 
-### Phase 4：AssignmentRun 与 ADR 0001 拆分收束
+### Phase 4：AssignmentRun 与编制拆分收束
 
 动作：
 
-- 按 ADR 0001 引入 `AssignmentRun` / commit helper，收敛 `used` 与 `assignment` 修改入口。
+- 引入 `AssignmentRun` / commit helper，收敛 `used` 与 `assignment` 修改入口。
 - 将 anchor fill 分别归入 `trade_fill.rs`、`manufacture_fill.rs`、`team_fill.rs`。
 - `pipeline.rs` 明确 anchor fill 阶段门。
 

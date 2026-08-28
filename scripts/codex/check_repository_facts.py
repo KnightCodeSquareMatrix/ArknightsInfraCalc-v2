@@ -28,7 +28,7 @@ PROJECT_MAP_RETRIEVAL_FACTS = (
 INDEX_RETRIEVAL_FACTS = (
     "[制造站](MANUFACTURE_STATUS.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
     "[控制中枢](CONTROL_CENTER_ASSIGNMENT.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
-    "[前端接口](FRONTEND_CLI.md) → [ADR 0003](ADR/0003-support-facility-frontend-contract.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
+    "[前端接口](FRONTEND_CLI.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
 )
 
 

@@ -121,7 +121,7 @@
 | 性能模型、Bake 和候选边界 | [性能工程](PERFORMANCE_ENGINEERING.md) |
 | 制造 `full_pool` / standalone 从哪里落到代码 | [制造站](MANUFACTURE_STATUS.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询) |
 | 动态 producer admission / dependency / 同班从哪里落到代码 | [控制中枢](CONTROL_CENTER_ASSIGNMENT.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询) |
-| 办公室 / 会客室当前出口与未来 `plan.compute` 扩展 | [前端接口](FRONTEND_CLI.md) → [ADR 0003](ADR/0003-support-facility-frontend-contract.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询) |
+| 办公室 / 会客室当前出口与未来 `plan.compute` 扩展 | [前端接口](FRONTEND_CLI.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询) |
 
 `PROJECT_MAP.md` 只回答“代码或数据在哪里”，rustdoc 只回答 public API；二者都不裁决领域行为。
 
@@ -132,12 +132,6 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 <!-- BEGIN GENERATED DECISIONS -->
 | 决策 | 状态 | 摘要 |
 |---|---|---|
-| [ADR 0001: layout 体系编排与 assignment 拆分](ADR/0001-layout-assignment-decomposition.md) | `accepted` | 保存布局编制分解为 System、Plan、Execute 的架构决策 |
-| [ADR 0002: 排班换班逻辑按模式分层](ADR/0002-schedule-rotation-mode-split.md) | `accepted` | 保存排班按执行模式分层的架构决策 |
-| [ADR 0003：办公室与会客室前端结果契约](ADR/0003-support-facility-frontend-contract.md) | `accepted` | 规定办公室与会客室静态求值未来如何通过 plan.compute 增量提供给 beta 前端 |
-| [ADR 0004: 体系审计裁决与排班责任边界](ADR/0004-scheduling-semantics-audit-rulings.md) | `accepted` | 保存 2026-07 体系审计中确认的领域语义、排班事实所有权与动态 producer 范围 |
-| [ADR 0005: 定时换班语义审计裁决与修复边界](ADR/0005-timed-rotation-semantics-audit-rulings.md) | `accepted` | 保存定时换班连续工作、菲亚执行边界及宿舍、办公室、菲亚目标、调试与无人机偏离的审计裁决 |
-| [ADR 0006: 二班与深海轮换的缺员容错与终验契约](ADR/0006-rotation-shortfall-tolerance-and-validation.md) | `accepted` | 裁决 `main_backup_12_12` 与 `abyssal_7_5_7_5` 的主备求解、办公室与会客室缺员容错、绑定终验、warnings 输出及 ABC 全 profile 一致性 |
 | [ADR 0007: 回退恢复后的中枢与二发电事实边界](ADR/0007-regression-recovery-control-and-two-power-boundaries.md) | `accepted` | 恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界 |
 | [ADR 0008: 办公室连续工作时长预算与通用轮换准入](ADR/0008-office-continuous-work-budget.md) | `proposed` | 规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则 |
 | [ADR 0009: 无人机效率转化与产出核算](ADR/0009-drone-efficiency-conversion-and-production-accounting.md) | `accepted` | 记录发电效率、无人机库存、目标分配与制造贸易额外产出的统一裁决 |

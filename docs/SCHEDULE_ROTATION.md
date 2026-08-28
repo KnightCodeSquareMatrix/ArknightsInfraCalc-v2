@@ -29,7 +29,7 @@
 
 办公室和会客室的普通未绑定成员以“满足心情约束下尽量少换人”为轮换策略：无额外心情消耗时，`12/12/12` 允许两人 `AAB`，主力可连续工作两个 12h 班，替补工作一个 12h 班；`12/6/6` 同样允许跨班复用，不因班次边界强制新增角色。存在额外消耗时，候选必须同时满足当前班次最长工作时长和本轮累计工作时长；例如地灵 E1（约 8.72h）不得进入 12h 办公室班，见行者 E2（同为约 8.72h）不得进入 12h 会客室班，斥罪（约 19.2h 累计上限）不得作为 `12/12/12` 的 24h 主力。绑定成员仍优先服从 `shift_bind`，不因普通少换人策略脱离绑定 cohort。
 
-办公室与会客室不要求「必须满编」：候选不足可空置，但实际人数不得超过容量，缺额必须经 `TeamRotationReport.warnings`（及 serve `rotation.warnings`）逐班提示（shift、设施、room id、缺额）。roster 充足时仍须满编且 warnings 为空。该容错覆盖 ABC、二班、菲亚与深海全部 profile（见 [ADR 0006](ADR/0006-rotation-shortfall-tolerance-and-validation.md)）。
+办公室与会客室不要求「必须满编」：候选不足可空置，但实际人数不得超过容量，缺额必须经 `TeamRotationReport.warnings`（及 serve `rotation.warnings`）逐班提示（shift、设施、room id、缺额）。roster 充足时仍须满编且 warnings 为空。该容错覆盖 ABC、二班、菲亚与深海全部 profile，当前实现以本页和最终状态校验为准。
 
 MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3班` / `4班`。每个 plan 说明下一段相对间隔；自动定时触发仍由外部 MAA 任务配置。菲亚事件态只重放目标房，其他房间和无人机均跳过。
 
@@ -278,4 +278,4 @@ CLI 文本和 CSV 会展示该锚点，JSON 保留完整 `per_op` 明细。默�
 
 γ 半班生产搜索使用实际共存上下文：H1 合并 β 与当前 γ partial，H2 合并 α 与当前 γ partial；每个贸易/制造房落位前重新 resolve。中枢 seed 按实际 `shift_bind` 的生产半区过滤：正在被 γ 接替的半区处于休息态，其绑定 producer 不进入候选上下文；另一活跃半区的绑定 producer 保留。不能复用静态 peak `production_layout` 或 peak 全中枢代替当班共存成员。
 
-未形成 peak bind 的可选动态 producer 不会被轮换层强塞，只在普通中枢搜索实际选中时按每班实际在场结算收益；γ 班允许普通搜索新增未绑定的目标标签 consumer，其收益只按该班最终实际在场状态结算，不要求轮换层后置新建 cohort 或反向绑定 producer（ADR 0004 D6，轮换搜索 heuristic）。最终导出前统一校验每班中枢恰好 5 人、显式 bind 同上同下且满足上 2 休 1；不再按标签重推 producer/consumer presence。
+未形成 peak bind 的可选动态 producer 不会被轮换层强塞，只在普通中枢搜索实际选中时按每班实际在场结算收益；γ 班允许普通搜索新增未绑定的目标标签 consumer，其收益只按该班最终实际在场状态结算，不要求轮换层后置新建 cohort 或反向绑定 producer。最终导出前统一校验每班中枢恰好 5 人、显式 bind 同上同下且满足上 2 休 1；不再按标签重推 producer/consumer presence。

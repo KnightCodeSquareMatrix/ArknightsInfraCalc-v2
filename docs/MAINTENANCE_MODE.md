@@ -249,7 +249,7 @@ schedule_team_rotation
 - `crates/infra-core/src/schedule/team_rotation.rs`
 - `crates/infra-core/src/schedule/shift_bind.rs`
 - `crates/infra-core/src/export/maa.rs`
-- `docs/ADR/0001-layout-assignment-decomposition.md`
+- `docs/ORCHESTRATION_LAYER.md`、`docs/BASE_ASSIGNMENT.md`
 - `docs/SCHEDULE_ROTATION.md`
 
 不要绕过 pipeline 手写 assignment 修 bug；这样会让 `plan`、`layout test`、`team-rotation` 三条路径再次分叉。

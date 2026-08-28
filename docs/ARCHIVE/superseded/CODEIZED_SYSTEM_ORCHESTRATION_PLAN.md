@@ -2,19 +2,19 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/ADR/0001-layout-assignment-decomposition.md
+> 替代项：docs/ORCHESTRATION_LAYER.md；docs/BASE_ASSIGNMENT.md
 > 历史原因：代码化体系分派方案已被声明式通用编排层替代
 > 快照日期：2026-07-18
 > 摘要：保存代码化体系编排层的被替代方案
 
 > 历史原状态：ready
-> 来源：[ADR 0001](../../ADR/0001-layout-assignment-decomposition.md)（决策 B–D）、用户体系级架构诊断报告（2026-06-26）
+> 来源：已归档的 layout 编排决策（决策 B–D）、用户体系级架构诊断报告（2026-06-26）
 > 关联：[SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md](SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../plans/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、[../公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md](../../公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md)
 > 性质：接口与阶段设计文档，**不下沉到最终代码**。文中 Rust 片段为目标接口意图与现状陈述，标注来源 file:line；具体实现属另一轮。
 
 ## 与现有 plan 的分工（先读这段，避免重复）
 
-- **本文** = ADR 0001 决策 B–D 的接口/阶段细节：代码化体系层接口、统一中间语义、execute 三态、anchor fill 阶段性候选池、两路径汇合。
+- **本文** = 已归档 layout 编排决策 B–D 的接口/阶段细节：代码化体系层接口、统一中间语义、execute 三态、anchor fill 阶段性候选池、两路径汇合。
 - **`SYSTEM_ANCHOR_ORCHESTRATION_PLAN.md`** = 数据驱动 registry 子集如何用 `base_systems.json` schema 表达 anchor / min_pick / constraint。
 - **`SYSTEM_REGISTRY_NORMALIZATION_REPORT.md`** = registry / trade role / global resource 的分层审计与去 fixed 错位。
 
@@ -139,7 +139,7 @@ pub enum SystemVerdict {
 
 ## 5. fill 阶段边界 + 阶段性候选池
 
-### 目标流水线（对齐 ADR 0001 Pipeline 阶段门）
+### 目标流水线（对齐历史 Pipeline 阶段门）
 
 ```text
 seed/pinned
@@ -173,7 +173,7 @@ seed/pinned
 
 `role_pick.rs`（docus/closure/witch）重定位为 **anchor fill policy**，不再是独立于 registry 的体系选择器（呼应报告第八节、registry 报告 §3.4）。即：体系/registry 决定“黑键贸易 anchor 启动”，role policy 决定“如何补齐这个 anchor 房”。
 
-## 6. 迁移顺序（对齐 ADR 0001 Phase 2–7）
+## 6. 迁移顺序（对齐历史编排 Phase 2–7）
 
 | Phase | 动作 | 验收 |
 |-------|------|------|
@@ -184,7 +184,7 @@ seed/pinned
 | 6 producer 统一 | producer_fill 手写 → ProducerSlot；深巡乌尔比安宿舍 anchor 纳入 | producer 缺失作为降级输出，explain 可解释 |
 | 7 轮换接入 | team_rotation 消费 plan 的 anchor/producer/degradation/shift_bind | γ 半区复用同一套 anchor fill，不再房间名反推 |
 
-每阶段单独验收、行为可解释。Phase 1（facade 机械拆分）见 ADR 0001，是本序列的基底。
+每阶段单独验收、行为可解释。Phase 1（facade 机械拆分）已由当前编排层和 assignment 文档承接。
 
 ## 7. 回归矩阵
 

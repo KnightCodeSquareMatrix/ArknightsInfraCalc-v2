@@ -20,7 +20,7 @@ build_plan -> execute_plan -> producer presence candidate
 
 该路径是当前生产实现。`TradeManufactureWeightedEfficiencyV1` 已作为关闭旧 raw-inject 剪枝的
 shadow 候选接在同一 presence 路径上，但公开默认仍保持 `ControlInjectRawSumV0`。不要把未提交
-过的 `control + 全贸易房 tuple` 暴力枚举路径、`joint_prefix.rs` 或 ADR 0004 当作当前能力；
+过的 `control + 全贸易房 tuple` 暴力枚举路径或 `joint_prefix.rs` 当作当前能力；
 它们已被删除。
 
 ## 2. 已修复与已知阻塞

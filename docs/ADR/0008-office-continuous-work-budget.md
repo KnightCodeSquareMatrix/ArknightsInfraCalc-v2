@@ -88,7 +88,7 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 - 普通成员可以进入连续预算候选，并获得跨 cohort 例外；
 - 绑定成员只能由最终 Plan 的 resolved dependency 和消费方 presence 驱动；
 - 绑定成员缺席时留空或报既有 hard failure，不得由普通办公室 fallback 代替；
-- 绑定最终仍须通过唯一 Team 和 active topology 终验，沿用 ADR 0006 D9 的责任边界。
+- 绑定最终仍须通过唯一 Team 和 active topology 终验，沿用当前排班 canonical 的责任边界。
 
 普通成员一旦离开办公室，连续工作段归零；之后重新进办公室须重新经过连续预算检查。
 
@@ -146,7 +146,7 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 3. 提取事务性连续预算 helper：候选临时落位，完成该 shift 最终上下文求值，失败则完整回滚并尝试下一候选。
 4. 用 `HashMap<RoomId, Vec<AssignedOperator>>` 保存连续段中的普通办公室成员；绑定成员继续走 resolved dependency、消费方 presence 和原有 bind 路径。
 5. 在所有 profile 的最终 report 上运行闭环终验；不缩小现有 `validate_profile_rotation` 的检查范围，并显式处理“整轮无休息边界”：累计净消耗大于零时拒绝，累计为零时允许。
-6. 同步更新 `docs/定时换班.md`、`docs/SCHEDULE_ROTATION.md` 和 ADR 0005 D4 / ADR 0006 D6 所引用的旧办公室范围。ADR 0008 accepted 后，旧裁决必须标记为 superseded 或在正文中明确被本 ADR 替代，不能让 current canonical 保留冲突表述。
+6. 同步更新 `docs/定时换班.md`、`docs/SCHEDULE_ROTATION.md` 所引用的旧办公室范围。ADR 0008 accepted 后，旧裁决必须在正文中明确被本 ADR 替代，不能让 current canonical 保留冲突表述。
 7. 补充纯函数边界测试、`12/6/6` 集成测试、自定义 `8/8/8` 与 `5/7/10` 测试、跨周期首尾测试、整轮正净消耗拒绝与零净消耗允许测试、多办公室房间稳定测试、绑定成员缺席测试、斥罪数据驱动测试和真实 CLI 回归。
 
 ## 后果
@@ -176,10 +176,10 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 
 本 ADR 当前为 `proposed`，因此暂不改写 current canonical。若用户接受并进入实现：
 
-- 办公室普通成员跨 cohort 连续复用将替代 ADR 0005 D4 中“普通成员仅在活跃 cohort 具备上岗资格”的旧范围；
-- 办公室连续预算将在 ABC 以及其他 timed profile 的最终办公室结果上生效，替代 ADR 0006 D6 对 ABC 不做连续工作 hard validation 的办公室例外；同时仅就“办公室连续预算”替代 ADR 0005 D1 中 ABC 不做完整循环 hard validation 的范围。ABC 仍不因此获得全设施连续心情、宿舍床位或全基建永续证明；
+- 办公室普通成员跨 cohort 连续复用将替代旧规则中“普通成员仅在活跃 cohort 具备上岗资格”的范围；
+- 办公室连续预算将在 ABC 以及其他 timed profile 的最终办公室结果上生效，替代旧规则对 ABC 不做连续工作 hard validation 的办公室例外。ABC 仍不因此获得全设施连续心情、宿舍床位或全基建永续证明；
 - 生产设施、中枢、会客室、Mower 和宿舍责任不被本 ADR 改写；
-- ADR 0005 与 ADR 0006 的其他决策保持有效。
+- 其他未被本 ADR 明确替代的排班决策保持有效。
 
 接受本 ADR 后，必须同步更新 `docs/定时换班.md` §1.1/§5.2 和 `docs/SCHEDULE_ROTATION.md` 对 ABC 验证范围的表述，避免“ABC 不做完整循环 hard validation”被理解为办公室也不验证。
 

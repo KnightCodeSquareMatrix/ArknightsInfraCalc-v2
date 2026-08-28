@@ -102,7 +102,7 @@ OperBoxEntry
 
 高优先硬规则只按结构不变量解析 required core，不靠 solver 决定硬核心；late competitive Rule 可调用已有制造/发电 domain solver，与普通基线做 Pareto 比较，resource gate 也可读取候选 assignment 的 `resolve_base` 结果，但规则层不复制机制公式。required anchor、`shift_bind` 和 shortcut 也不是同一种东西：anchor 保证进编，bind 约束已进编人员的跨班关系，shortcut 只负责最终组合结算。
 
-更详细的不变量见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md) 和 [ADR 0001](ADR/0001-layout-assignment-decomposition.md)。
+更详细的不变量见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md) 和 [BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)。
 
 ## 6. `execute_plan` 与 `used`：把计划落成初始编制
 
