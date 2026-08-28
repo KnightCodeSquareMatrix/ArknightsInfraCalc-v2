@@ -67,7 +67,8 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 
 - 未授权修改时只读；诊断不自动等于实现。区分用户事实、用户推测、Agent 推断和关键未知项。
 - 开始写入前检查工作区；用户既有改动默认属于用户，不覆盖、不清理、不混入本任务。
-- 共享工作区保持一个 writer。并行 writer 必须使用从明确 base SHA 建立的隔离 worktree。
+- 共享工作区保持一个 writer。并行任务优先拆分为只读调查；确需并行写入时，按不重叠的文件 owner 划分，所有 writer 从同一明确 base SHA 建立隔离 worktree，并由一个集成人负责顺序提交。
+- 并行 writer 不手动 merge 文件内容：集成人逐个 `cherry-pick` 已验证的原子提交。若两个任务必须改同一文件，改为串行执行或由单一 writer 集成；不得并行编辑后依赖人工冲突拼接。
 - 非简单且存在独立调查、提取或审阅轴时，默认积极使用边界明确的只读 subagent；不为凑数量委派。主 Agent 必须检查真实文件、diff、日志和产物。
 - 委派前按当前运行时选择真实可用的具名 profile；Codex 使用 `.codex/agents/`，OpenCode 使用 `.opencode/agents/`。任务名或提示词不能证明模型已切换；无法选择低成本 profile 时，不把机械提取批量回落到默认 Sol。
 - 对边界已明确的阶段性分析、计划、当前代码/diff 或 evidence packet，优先用 `stage-reviewer` 做快速对抗初审；它只能裁决当前阶段是否继续，不能替代用户语义裁决或适用的领域 Sol 最终审阅。
@@ -138,7 +139,8 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 - 开始和结束都运行 `git status --short`。
 - 只 stage 本任务文件，使用显式路径；禁止 `git add .`。
 - 不自动 amend、rebase、reset、checkout、清理未跟踪文件或执行其他 destructive Git 操作。
-- 本轮形成独立单元时必须提交；只有用户明确要求不提交，或同文件与用户改动无法可靠拆分时才不提交，并在最终说明原因。提交前必须检查 `git status --short`、`git diff`、`git log --oneline -10`，提交后必须再次检查状态；不得把“用户未明确要求提交”当作不提交理由。
+- 每个授权修复必须完成“实现、风险匹配验证、复核、原子提交”的闭环；除非用户明确要求不提交，修复停止前主动提交，不得把“用户未明确要求提交”当作不提交理由。
+- 提交前必须检查 `git status --short`、`git diff`、`git log --oneline -10`，仅 stage 本任务的显式路径；提交后再次检查状态。当前 writer 的 worktree 必须干净；共享主工作区如仍有其他 writer 的改动，必须逐项归属并说明，禁止为求干净而清理、stash、revert 或提交他人改动。
 - 发布到 quality-check 的提交标题必须使用中文；提交标题会作为质量网页中的摘要显示。
 - `target/codex-runs/`、兼容日志和 `out/` 证据保留到交付但不提交。
 - 最终说明 changed paths、文档影响、deferred findings、验证类别、未验证风险、commit 和剩余工作区状态。
