@@ -6,7 +6,7 @@ description: 把本地最新 Linux infra-cli 投递到远端 quality-check（114
 # Arknights 远端 Quality Check 求解器投递
 
 求解器投递和批量验收默认目标是远端 quality-check：`root@114.66.55.78`。
-唯一入口为 `scripts/update_solver_quality.py --remote root@114.66.55.78`；它以原子
+唯一入口为无参数的 `scripts/update_solver_quality.py`；它以原子
 rename 投递 Linux ELF，由远端 runner 安装不可变 bundle 并创建质量矩阵 job。
 
 不要默认投递到本地 Check，也不要替换 `/opt/arknights-infra-dev` 中的应用 CLI。
@@ -26,8 +26,8 @@ quality-check 的 bundle 投递或批量验收。
 ## 推送步骤
 
 1. 构建：`cargo build --release -p infra-cli`（Linux；不要上传 `infra-cli.exe`）。
-2. 投递：`python3 scripts/update_solver_quality.py --remote root@114.66.55.78`。
-   - 可用 `--no-wait` 仅投递；默认应等待远端安装 bundle 和 quality job 终态。
+2. 投递：`python3 scripts/update_solver_quality.py`。
+   - 脚本固定投递到远端并等待 bundle 安装和 quality job 终态。
    - 不手工覆盖已有 bundle、运行中的 CLI 或共享 data 目录。
 3. 验证：确认新 bundle 的 `gitCommit`、`executableSha256` 与 `embeddedData: true`，
    且其质量 job 完成，没有新增失败 case。详情按
