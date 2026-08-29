@@ -146,12 +146,37 @@ fn assign_team_trade_meta_rooms(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    println!(
+        "[rotation-debug] gamma trade input rooms={:?} used={:?} coexist={:?}",
+        rooms
+            .iter()
+            .map(|room| room.id.0.as_str())
+            .collect::<Vec<_>>(),
+        sorted_names(used),
+        sorted_names(&coexist_assignment.operator_names()),
+    );
     while let Some(room) =
         super::trade_fill::take_next_trade_room(&mut rooms, trade_pool, assignment, used)
     {
         if !assignment.operators_in(&room.id).is_empty() {
+            println!(
+                "[rotation-debug] gamma trade skip room={} already_assigned={:?}",
+                room.id.0,
+                assignment
+                    .operators_in(&room.id)
+                    .iter()
+                    .map(|operator| operator.name.as_str())
+                    .collect::<Vec<_>>(),
+            );
             continue;
         }
+        println!(
+            "[rotation-debug] gamma trade select room={} remaining_rooms={:?} used_before={:?} partial={:?}",
+            room.id.0,
+            rooms.iter().map(|candidate| candidate.id.0.as_str()).collect::<Vec<_>>(),
+            sorted_names(used),
+            sorted_names(&assignment.operator_names()),
+        );
         let mut current_assignment = coexist_assignment.clone();
         for assigned_room in &assignment.rooms {
             current_assignment.set_room_assignment(assigned_room.clone());
@@ -179,9 +204,23 @@ fn assign_team_trade_meta_rooms(
             &[],
         )
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;
+        println!(
+            "[rotation-debug] gamma trade hit room={} names={:?} rule={:?} efficiency={} used_after_search={:?}",
+            room.id.0,
+            &hit.names,
+            &hit.rule_id,
+            hit.final_efficiency,
+            sorted_names(used),
+        );
         commit_trade_room(assignment, &room.id, &hit, trade_pool, used)?;
     }
     Ok(())
+}
+
+fn sorted_names(names: &HashSet<String>) -> Vec<&str> {
+    let mut names: Vec<_> = names.iter().map(String::as_str).collect();
+    names.sort_unstable();
+    names
 }
 
 /// 队伍 partial assignment 的最终结算必须使用完整班次（coexist + partial）。

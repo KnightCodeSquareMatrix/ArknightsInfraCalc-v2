@@ -1553,6 +1553,15 @@ fn split_production_facilities(
             }
         }
     }
+    println!(
+        "[rotation-debug] production halves H1 trade={:?} manu={:?} power={:?}; H2 trade={:?} manu={:?} power={:?}",
+        halves[0].trade.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+        halves[0].manu.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+        halves[0].power.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+        halves[1].trade.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+        halves[1].manu.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+        halves[1].power.iter().map(|room| room.0.as_str()).collect::<Vec<_>>(),
+    );
     Ok(halves)
 }
 
@@ -1829,6 +1838,25 @@ fn production_half_from_peak(peak: &BaseAssignment, half: &FacilityHalf) -> Base
         }
     }
     half_assignment
+}
+
+fn print_trade_rotation_debug(label: &str, assignment: &BaseAssignment) {
+    let mut rooms: Vec<_> = assignment
+        .rooms
+        .iter()
+        .filter(|room| room.room_id.0.starts_with("trade_"))
+        .map(|room| {
+            (
+                room.room_id.0.as_str(),
+                room.operators
+                    .iter()
+                    .map(|operator| operator.name.as_str())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    rooms.sort_by(|left, right| left.0.cmp(right.0));
+    println!("[rotation-debug] {label} trade={rooms:?}");
 }
 
 fn active_dependency_required_manu_by_room(
@@ -2355,6 +2383,12 @@ fn finalize_timed_rotation(
     table: &SkillTable,
     mut report: TeamRotationReport,
 ) -> Result<TeamRotationReport> {
+    for shift in &report.shifts {
+        print_trade_rotation_debug(
+            &format!("finalize shift {} input", shift.index + 1),
+            &shift.assignment,
+        );
+    }
     for shift in &mut report.shifts {
         finalize_shift_dorms(blueprint, operbox, shift)?;
         clear_production_efficiencies(blueprint, &mut shift.assignment);
@@ -2387,6 +2421,10 @@ fn finalize_timed_rotation(
             .weighted_manufacture(shift.duration_hours);
         shift.weighted_power = shift.efficiencies.weighted_power(shift.duration_hours);
         annotate_assignment(blueprint, &mut shift.assignment);
+        print_trade_rotation_debug(
+            &format!("finalize shift {} output", shift.index + 1),
+            &shift.assignment,
+        );
     }
     report.daily = DailyTotals {
         trade: report.shifts.iter().map(|shift| shift.weighted_trade).sum(),
@@ -4857,6 +4895,7 @@ fn schedule_abc_rotation(
         &mut gamma_h1,
         &mut used_g1,
     )?;
+    print_trade_rotation_debug("gamma_h1 after fill", &gamma_h1);
     let mut gamma_h1_full_context = gamma_h1_context.assignment.clone();
     merge_rooms(&mut gamma_h1_full_context, &gamma_h1);
     let gamma_h1_layout = resolve_base(
@@ -4899,6 +4938,7 @@ fn schedule_abc_rotation(
         &mut gamma_h2,
         &mut used_g2,
     )?;
+    print_trade_rotation_debug("gamma_h2 after fill", &gamma_h2);
     validate_rotation_reserves_before_postprocess(
         blueprint,
         &peak_plan.rotation_reserves,
@@ -5578,6 +5618,7 @@ fn schedule_abc_rotation(
                     (base, score_base, base_warmup_rooms)
                 };
             assignment = best_assignment;
+            print_trade_rotation_debug("S2 final candidate", &assignment);
             let scores = best_scores;
             warmup_sticky_rooms = best_warmup_rooms;
             record_office_usage_hours(
@@ -5616,6 +5657,7 @@ fn schedule_abc_rotation(
             for part in parts {
                 merge_rooms(&mut assignment, part);
             }
+            print_trade_rotation_debug("S1/S3 merged before extras", &assignment);
             assign_rotating_anchors(&mut assignment, &peak, &active, &rotating_anchor_team)?;
             assign_rotating_offices_with_context(
                 &mut assignment,
@@ -5668,6 +5710,7 @@ fn schedule_abc_rotation(
                 &mut assignment,
                 &mut warmup_sticky_rooms,
             );
+            print_trade_rotation_debug("S1/S3 before final score", &assignment);
             clear_production_efficiencies(blueprint, &mut assignment);
             let scores = evaluate_base_assignment_efficiencies(
                 blueprint,
@@ -5714,6 +5757,12 @@ fn schedule_abc_rotation(
     }
 
     if enable_fiammetta_return {
+        for shift in &shifts {
+            print_trade_rotation_debug(
+                &format!("before fiammetta shift {}", shift.index + 1),
+                &shift.assignment,
+            );
+        }
         let applied_single_core = apply_profile_fiammetta_rotation(
             blueprint,
             operbox,
@@ -5726,6 +5775,12 @@ fn schedule_abc_rotation(
             &shift_binds,
             &mut shifts,
         )?;
+        for shift in &shifts {
+            print_trade_rotation_debug(
+                &format!("after single-core fiammetta shift {}", shift.index + 1),
+                &shift.assignment,
+            );
+        }
         let _applied_witch = if applied_single_core {
             false
         } else {
@@ -5740,6 +5795,12 @@ fn schedule_abc_rotation(
                 &mut shifts,
             )?
         };
+        for shift in &shifts {
+            print_trade_rotation_debug(
+                &format!("after all fiammetta shift {}", shift.index + 1),
+                &shift.assignment,
+            );
+        }
     }
     validate_final_rotation_invariants(
         blueprint,
