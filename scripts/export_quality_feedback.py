@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -74,6 +75,10 @@ def parse_timestamp(value: object) -> tuple[datetime, str]:
         raise RuntimeError(f"feedback createdAt is invalid: {value}") from error
     return parsed, parsed.strftime("%Y-%m-%d_%H-%M-%S_%f")[:-3] + "Z"
 
+def sha256_canonical(value: object) -> str:
+    encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
 
 def export(records: list[dict]) -> tuple[int, int]:
     known = existing_ids()
@@ -91,6 +96,10 @@ def export(records: list[dict]) -> tuple[int, int]:
         if feedback_id in known:
             skipped += 1
             continue
+        if feedback.get("layoutSha256") != sha256_canonical(record.get("layout")):
+            raise RuntimeError("layout hash mismatch")
+        if feedback.get("operboxSha256") != sha256_canonical(record.get("operbox")):
+            raise RuntimeError("operbox hash mismatch")
         created, timestamp_name = parse_timestamp(feedback.get("createdAt"))
         target = OUTPUT_ROOT / created.strftime("%Y") / created.strftime("%m") / severity / f"{timestamp_name}_{feedback_id}"
         target.mkdir(parents=True, exist_ok=True)
