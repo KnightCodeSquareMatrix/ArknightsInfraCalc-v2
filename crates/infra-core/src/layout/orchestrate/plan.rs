@@ -177,8 +177,10 @@ pub struct ResolvedRoleReserve {
 }
 
 /// 按 exact bind 连通分量打包生产房，作为计划可行性与 schedule 切半的共同事实源。
-/// reserve 尚未参与此过程；需要两半复用的 conditional pack 必须先证明自然打包结果
-/// 已经在 H1/H2 各有一个合法目标，不能依靠 schedule 事后搬动分量来挽救选型。
+/// 含贸易站的闭包先按贸易站数均衡分入两半，再按总房间负载决胜；纯制造/发电
+/// 闭包随后按总房间负载均衡。reserve 尚未参与此过程；需要两半复用的 conditional
+/// pack 必须先证明自然打包结果已经在 H1/H2 各有一个合法目标，不能依靠 schedule
+/// 事后搬动分量来挽救选型。
 pub(crate) fn pack_production_components<'a>(
     blueprint: &crate::layout::BaseBlueprint,
     assignment: &crate::layout::BaseAssignment,
@@ -230,11 +232,48 @@ pub(crate) fn pack_production_components<'a>(
         components.push(merged);
     }
 
-    components.sort_by_key(|component| std::cmp::Reverse(component.len()));
+    let trade_room_count = |component: &[RoomId]| {
+        component
+            .iter()
+            .filter(|room_id| {
+                blueprint
+                    .room(room_id)
+                    .is_some_and(|room| room.kind == FacilityKind::TradePost)
+            })
+            .count()
+    };
+    let component_key = |component: &[RoomId]| {
+        component
+            .iter()
+            .map(|room_id| room_id.0.clone())
+            .collect::<Vec<_>>()
+    };
+    components.sort_by(|left, right| {
+        trade_room_count(right)
+            .cmp(&trade_room_count(left))
+            .then_with(|| right.len().cmp(&left.len()))
+            .then_with(|| component_key(left).cmp(&component_key(right)))
+    });
     let mut halves: [Vec<Vec<RoomId>>; 2] = Default::default();
     for component in components {
         let load = |items: &[Vec<RoomId>]| items.iter().map(Vec::len).sum::<usize>();
-        let target = usize::from(load(&halves[1]) < load(&halves[0]));
+        let trade_load = |items: &[Vec<RoomId>]| {
+            items
+                .iter()
+                .map(|component| trade_room_count(component))
+                .sum::<usize>()
+        };
+        let target = if trade_room_count(&component) > 0 {
+            let left_trade = trade_load(&halves[0]);
+            let right_trade = trade_load(&halves[1]);
+            if left_trade == right_trade {
+                usize::from(load(&halves[1]) < load(&halves[0]))
+            } else {
+                usize::from(right_trade < left_trade)
+            }
+        } else {
+            usize::from(load(&halves[1]) < load(&halves[0]))
+        };
         halves[target].push(component);
     }
     Ok(halves)

@@ -56,7 +56,7 @@ MAA `plans[]` 与最终状态一一对应，顶层 `planTimes` 为 `2班` / `3�
 peak = assign_shift_with_plan(Peak) → { assignment, plan }
 shared = pinned_assignment_excluding(peak, all_office_ops)
                                        # 仅宿舍共享；办公室不钉死
-[h1, h2] = split_production_facilities
+[h1, h2] = split_production_facilities  # exact-bind 闭包不可拆；贸易闭包优先分半
 align_shift_binds(h1, h2)            # 迷迭香+黑键等同队
 α = peak ∩ h1,  β = peak ∩ h2
 γ = assign_team_gamma_half(h1) + assign_team_gamma_half(h2)  # 贸易走 docus/closure/witch/witch_fallback/karlan/penguin/plain

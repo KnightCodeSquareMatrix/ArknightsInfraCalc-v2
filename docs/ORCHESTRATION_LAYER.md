@@ -103,7 +103,7 @@ Mujica 是例外明确的低优先级中枢 fallback：正常 Rule、registry �
 
 Rosemary active 只关闭 legacy 纯烟火。感知附带分支是 priority 18 的独立声明式 rule：实际感知 ≥50 后仍必须让重岳、令、乌有三人完整落位并生成 bind；容量不足时自然关闭。不能在 select/rotation 另写 Rosemary id 分支。
 
-`AssignmentPlan.rotation_reserves` 保存正式 role/solver 解析、但不进入 peak 的实际成员集合。`ResolvedRoleReserve.reuse_policy=once` 只在 H1/H2 中首个可行目标房使用一次；`reuse_policy=every_eligible_half` 要求两个 half 都存在目标，并在菲亚后处理前把同一组成员分别写入两个 gamma half。声明了 `require_pre_split_halves=true` 的 conditional pack 还必须在全部 exact bind 落位后的自然 H1/H2 打包结果中两边已有目标；否则计划编译器事务性重编译并降级为基础 alternative，不提交 pack 的 anchors、relations 或 reserve。已经提交的 reserve 若在基础 fill 中被覆盖仍是 schedule 不变量错误。reserve 不保护 `apply_fiammetta_return` 后的最终房间成员；最终 assignment / MAA 可以包含一次合法菲亚换人。
+`AssignmentPlan.rotation_reserves` 保存正式 role/solver 解析、但不进入 peak 的实际成员集合。H1/H2 的共同打包器先保留全部 exact bind 连通闭包，再优先按贸易站数量分配含贸易站闭包，纯制造/发电闭包才按总房间负载补平；它不拆闭包，也不按房号特判。`ResolvedRoleReserve.reuse_policy=once` 只在 H1/H2 中首个可行目标房使用一次；`reuse_policy=every_eligible_half` 要求两个 half 都存在目标，并在菲亚后处理前把同一组成员分别写入两个 gamma half。声明了 `require_pre_split_halves=true` 的 conditional pack 还必须在全部 exact bind 落位后的自然 H1/H2 打包结果中两边已有目标；否则计划编译器事务性重编译并降级为基础 alternative，不提交 pack 的 anchors、relations 或 reserve。已经提交的 reserve 若在基础 fill 中被覆盖仍是 schedule 不变量错误。reserve 不保护 `apply_fiammetta_return` 后的最终房间成员；最终 assignment / MAA 可以包含一次合法菲亚换人。
 
 候选阶段解决所有 optional 选择；最终 `AssignmentPlan` 只包含已确定且可落位的 placement。`execute` 不得静默跳过 required placement，fill / rotation / export 不得再次判断体系。
 
