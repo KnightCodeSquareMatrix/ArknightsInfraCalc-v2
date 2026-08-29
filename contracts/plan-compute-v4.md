@@ -19,4 +19,6 @@ v4 完整继承 v3 的 layout、operbox、labels、rotation、top、system_prefe
 
 `options.assert_invariants` 为 boolean，默认 `false`。为 `true` 时，Worker 在完成求解后、生成 profile/MAA/training_advice 输出前，对最终 `TeamRotationReport.shifts[].assignment` 运行与 CLI `plan --assert-invariants` 相同的 Rust invariant gate。失败返回正常 `plan.compute` 错误 envelope：`code=PLAN_FAILED`、`stage=plan.compute`，`message` 保留具体 `assert-invariants ...` 诊断。
 
+成功响应的 `rotation.shifts[].assignment.rooms[].notes[]` 由 `infra-core::notes` 在最终班次状态上统一生成。每条 note 包含稳定 `code` 和展示用 `text`；`notes` 为空时省略。当前不会把 notes 写入外部 MAA wire JSON，MAA 仍只消费最终人员名单和动作。
+
 调用方只有在 `ping.result.supported_plan_schema_versions` 包含 `4` 时才能发送该字段。v1-v3 请求及默认行为保持不变。

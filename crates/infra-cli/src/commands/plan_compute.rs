@@ -9,7 +9,7 @@ use infra_core::export::{build_from_team_rotation, MaaExportOptions, MaaSchedule
 use infra_core::instances::OperatorInstances;
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
-use infra_core::schedule::TimedRotationProfile;
+use infra_core::schedule::{assert_final_rotation_invariants, TimedRotationProfile};
 use infra_core::skill_table::SkillTable;
 use infra_core::Error;
 use serde::Deserialize;
@@ -129,6 +129,7 @@ pub(super) struct PlanComputeInput<'a> {
     pub system_preferences: &'a HashMap<String, String>,
     pub maa_title: Option<&'a str>,
     pub fiammetta_enable: bool,
+    pub assert_invariants: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -158,6 +159,16 @@ pub(super) fn compute_plan(
         input.system_preferences,
         input.fiammetta_enable,
     )?;
+
+    if input.assert_invariants {
+        assert_final_rotation_invariants(
+            input.blueprint,
+            input.operbox,
+            resources.instances,
+            resources.table,
+            &current.rotation,
+        )?;
+    }
 
     let profile = requested
         .profile

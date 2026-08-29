@@ -246,6 +246,21 @@ fn assign_control_inner(
             "control: no combo extending pins after pool filter",
         ));
     };
+    let skillless_fallback_names: Vec<String> = hit
+        .names
+        .iter()
+        .filter(|name| {
+            !pinned.contains(*name)
+                && pool
+                    .entry(name.as_str())
+                    .is_some_and(|entry| entry.buff_ids.is_empty())
+        })
+        .cloned()
+        .collect();
+    assignment
+        .note_facts
+        .control_skillless_fallback_names
+        .clear();
     let control_id = RoomId::from("control");
     commit_control_combo(
         assignment,
@@ -259,6 +274,7 @@ fn assign_control_inner(
         used,
         &pinned,
     )?;
+    assignment.note_facts.control_skillless_fallback_names = skillless_fallback_names;
     Ok(true)
 }
 

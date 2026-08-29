@@ -346,6 +346,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             system_preferences: &system_preferences,
             maa_title: None,
             fiammetta_enable,
+            assert_invariants: false,
         },
         RequestedOutputs {
             profile: false,

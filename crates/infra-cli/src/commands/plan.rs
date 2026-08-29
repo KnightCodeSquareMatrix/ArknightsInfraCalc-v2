@@ -10,7 +10,6 @@ use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::AssignBaseOptions;
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
-use infra_core::schedule::assert_final_rotation_invariants;
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::Error;
 
@@ -64,6 +63,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             system_preferences: &system_preferences,
             maa_title,
             fiammetta_enable,
+            assert_invariants,
         },
         RequestedOutputs {
             profile: true,
@@ -75,10 +75,6 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         .as_ref()
         .expect("profile was requested for plan command");
     let rotation = &computed.current.rotation;
-    if assert_invariants {
-        assert_final_rotation_invariants(&blueprint, &operbox, &instances, &table, rotation)?;
-    }
-
     if let Some(path) = prefix_shadow_out_from_args(args)? {
         let shadow_options = AssignBaseOptions {
             top_k,

@@ -7,6 +7,7 @@ use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 
 use crate::layout::blueprint::RoomId;
+use crate::notes::Note;
 use crate::roster::OperatorProgress;
 use crate::tier::PromotionTier;
 
@@ -187,6 +188,8 @@ pub struct RoomAssignment {
     pub operators: Vec<AssignedOperator>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub efficiency: Option<RoomEfficiencySnapshot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -198,6 +201,8 @@ pub struct BaseAssignment {
     /// 覆盖 blueprint.scenario.base_workforce。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub base_workforce: Vec<String>,
+    #[serde(skip)]
+    pub(crate) note_facts: crate::notes::NoteFacts,
 }
 
 impl BaseAssignment {
@@ -245,12 +250,14 @@ impl BaseAssignment {
         if let Some(entry) = self.rooms.iter_mut().find(|r| r.room_id == room_id) {
             entry.operators = operators;
             entry.efficiency = efficiency;
+            entry.notes.clear();
             return;
         }
         self.rooms.push(RoomAssignment {
             room_id,
             operators,
             efficiency,
+            notes: Vec::new(),
         });
     }
 

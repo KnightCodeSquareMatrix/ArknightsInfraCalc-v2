@@ -153,6 +153,7 @@ shadow 候选路径实现，公开默认仍使用旧 comparator；exact joint �
 | `operators[].elite` | `0` 精0，`1` 精1，`2` 精2（`PromotionTier`） |
 | `training_assist` | 训练室副手（计入 workforce 规则时不进杜林等计数） |
 | `base_workforce` | 仅进驻名单、不占具体房间时（如杜林族计数）；覆盖 `scenario.base_workforce` |
+| `rooms[].notes` | 求解器 notes owner 根据最终编制和已确认事实生成的房间级解释；空数组省略；外部手工编制不会凭名单补造求解原因 |
 
 `resolve_base(blueprint, assignment, …)` 已消费该结构；缺省房间视为空岗。
 

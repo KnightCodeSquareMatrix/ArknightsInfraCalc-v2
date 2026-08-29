@@ -14,8 +14,8 @@ use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::schedule::{
-    assert_final_rotation_invariants, DailyTotals, RoomEfficiencyLine, ShiftEfficiencies,
-    TeamLabel, TeamRotationReport, TimedRotationProfile,
+    DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
+    TimedRotationProfile,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::training_advice::{
@@ -379,6 +379,7 @@ struct RotationShiftSummary {
     duration_hours: f64,
     active_teams: Vec<TeamLabel>,
     resting_team: TeamLabel,
+    assignment: infra_core::layout::BaseAssignment,
     efficiencies: ShiftEfficiencies,
     weighted_trade: infra_core::Efficiency,
     weighted_manufacture: infra_core::Efficiency,
@@ -398,6 +399,7 @@ impl From<&TeamRotationReport> for RotationSummary {
                     duration_hours: shift.duration_hours,
                     active_teams: shift.active_teams.clone(),
                     resting_team: shift.resting_team,
+                    assignment: shift.assignment.clone(),
                     efficiencies: shift.efficiencies.clone(),
                     weighted_trade: shift.weighted_trade,
                     weighted_manufacture: shift.weighted_manufacture,
@@ -573,22 +575,13 @@ fn handle_plan_compute(
             system_preferences: &params.options.system_preferences,
             maa_title: params.options.maa_title.as_deref(),
             fiammetta_enable: params.options.fiammetta_enable,
+            assert_invariants: params.options.assert_invariants,
         },
         RequestedOutputs {
             profile: true,
             maa: true,
         },
     )?;
-
-    if params.options.assert_invariants {
-        assert_final_rotation_invariants(
-            &params.layout,
-            &operbox,
-            &state.instances,
-            &state.table,
-            &computed.current.rotation,
-        )?;
-    }
 
     let profile = computed
         .profile
@@ -698,6 +691,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
             system_preferences: &system_preferences,
             maa_title: params.maa_title.as_deref(),
             fiammetta_enable: true,
+            assert_invariants: false,
         },
         RequestedOutputs {
             profile: params.profile_out.is_some(),

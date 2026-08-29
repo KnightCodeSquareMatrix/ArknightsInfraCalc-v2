@@ -28,6 +28,7 @@ use crate::layout::blueprint::{BaseBlueprint, FacilityKind};
 use crate::layout::orchestrate::AssignmentPlan;
 use crate::layout::shift::AssignShiftMode;
 use crate::layout::system::{explain_registry_systems, SlotFillMode, SystemExplainReport};
+use crate::notes::annotate_assignment;
 use crate::operbox::OperBox;
 use crate::pool::{compile_operator_atoms, ManuPoolEntry, TradePoolEntry};
 use crate::scoring::{ScoringPolicyId, TradeManufactureEfficiencyWeights};
@@ -331,6 +332,8 @@ where
                     == crate::layout::orchestrate::ReserveReusePolicy::EveryEligibleHalf
         });
         if !requires_final_pack_check {
+            let mut assignment = assignment;
+            annotate_assignment(blueprint, &mut assignment);
             return Ok(AssignShiftResult { assignment, plan });
         }
 
@@ -347,6 +350,8 @@ where
             &validation_plan,
         )?
         else {
+            let mut assignment = assignment;
+            annotate_assignment(blueprint, &mut assignment);
             return Ok(AssignShiftResult { assignment, plan });
         };
         if !disabled_conditional_packs.insert(pack_key.clone()) {

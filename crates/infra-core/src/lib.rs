@@ -54,6 +54,7 @@ pub mod export;
 pub mod layout;
 pub mod manufacture;
 pub mod meeting;
+pub mod notes;
 pub mod office;
 pub mod power;
 pub mod trade;
@@ -99,6 +100,7 @@ pub use mood::{
     dorm_recovery_rates, facility_key as mood_facility_key, operator_net_drain, shift_eta,
     workable_hours, DormOccupant, DrainInputs, MoodModel, OperatorEta, ShiftEta,
 };
+pub use notes::Note;
 pub use office::evaluate_office;
 pub use operbox::{
     default_layout_243_path, default_operbox_full_e2_path, default_operbox_gongsun_path,

@@ -23,6 +23,7 @@ use crate::mood::{
     dorm_recovery_rates, operator_net_drain, shift_eta, shift_eta_with_instances, workable_hours,
     DormOccupant, DrainInputs, MoodModel, ShiftEta,
 };
+use crate::notes::annotate_assignment;
 use crate::operbox::OperBox;
 use crate::pool::{
     build_control_pool_with_fillers, build_manufacture_pool, build_power_pool, build_trade_pool,
@@ -2288,6 +2289,34 @@ fn finalize_shift_dorms(
             .flatten()
             .any(|operator| operator.name == ULPIANUS_NAME)
     {
+        let progress = operbox
+            .progress_of(ULPIANUS_NAME)
+            .ok_or_else(|| Error::msg("Sphinx trade assignment requires an owned Ulpianus"))?;
+        let room = dorms
+            .iter()
+            .find(|room| {
+                preserved_by_room.get(&room.id).map_or(0, Vec::len)
+                    < room.dorm_beds.unwrap_or(5).max(1) as usize
+            })
+            .ok_or_else(|| {
+                Error::msg(format!(
+                    "shift {} sphinx_ulpianus_presence failed: no dorm bed for Ulpianus",
+                    shift.index + 1
+                ))
+            })?;
+        preserved_by_room
+            .get_mut(&room.id)
+            .expect("dorm was collected")
+            .push(AssignedOperator::from_progress(ULPIANUS_NAME, progress));
+    }
+
+    if shift_works_in_trade(blueprint, &shift.assignment, SPHINX_NAME)
+        && !operator_is_in_normal_base(blueprint, &shift.assignment, ULPIANUS_NAME)
+        && !preserved_by_room
+            .values()
+            .flatten()
+            .any(|operator| operator.name == ULPIANUS_NAME)
+    {
         return Err(Error::msg(format!(
             "shift {} sphinx_ulpianus_presence failed: Ulpianus is absent while Sphinx works in trade",
             shift.index + 1
@@ -2357,6 +2386,7 @@ fn finalize_timed_rotation(
             .efficiencies
             .weighted_manufacture(shift.duration_hours);
         shift.weighted_power = shift.efficiencies.weighted_power(shift.duration_hours);
+        annotate_assignment(blueprint, &mut shift.assignment);
     }
     report.daily = DailyTotals {
         trade: report.shifts.iter().map(|shift| shift.weighted_trade).sum(),
@@ -4198,6 +4228,27 @@ pub fn assert_final_rotation_invariants(
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
     for shift in &report.shifts {
+        let mut expected_notes = shift.assignment.clone();
+        annotate_assignment(blueprint, &mut expected_notes);
+        let actual_note_rows: Vec<_> = shift
+            .assignment
+            .rooms
+            .iter()
+            .filter(|room| !room.notes.is_empty())
+            .map(|room| (&room.room_id, &room.notes))
+            .collect();
+        let expected_note_rows: Vec<_> = expected_notes
+            .rooms
+            .iter()
+            .filter(|room| !room.notes.is_empty())
+            .map(|room| (&room.room_id, &room.notes))
+            .collect();
+        if actual_note_rows != expected_note_rows {
+            return Err(Error::msg(format!(
+                "assert-invariants room_notes_owner failed in shift {}",
+                shift.index + 1
+            )));
+        }
         let mut seen = HashSet::new();
         for room in &shift.assignment.rooms {
             let capacity = blueprint
