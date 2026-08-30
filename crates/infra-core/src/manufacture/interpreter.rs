@@ -223,10 +223,7 @@ pub fn collect_manu_atoms<'a>(
 
 pub fn apply_manu_phases(ctx: &mut ManuContext, table: &SkillTable) {
     let names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
-    let atoms = {
-        let ops = ctx.operators.clone();
-        collect_manu_atoms(&ops, table)
-    };
+    let atoms = collect_manu_atoms(&ctx.operators, table);
 
     for (atom, owner) in atoms {
         if !condition_met(&atom.condition, ctx, &owner) {

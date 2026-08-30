@@ -332,11 +332,12 @@ worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一�
   clone 计数属于 snapshot consumer 的构造成本，不应从 `resolve.wall_ms` 中再次扣除或解释为
   `resolve_base_inner` 内部耗时；当前 `AssignmentRun` 的专用入口已不再走这条路径。
 - 制造搜索的每个候选都会从 pool entry 深复制 `ManuOperator` 的 name/buff/tags，之后
-  evaluator 又复制 `ManuRoomInput` 的 operator vector；solver 再构造 runtime operators，
-  `apply_manu_phases` 还复制 `ctx.operators` 并重新生成 names 和 atom owner strings。以
-  `243 + full-E2` 核心 trace 为例，单次 current probe 有约 1,203,480 candidate attempts、
-  其中制造 leaf wall 约 1,792 ms；其排序约 984 ms、求值约 760 ms。制造每个三人候选至少
-  生成三份 pool-to-input operator 描述，mood-gap 长班次还会按窗口重复 runtime solve。
+  evaluator 又复制 `ManuRoomInput` 的 operator vector；solver 再构造 runtime operators。
+  旧版 `apply_manu_phases` 还会复制整组 `ctx.operators`，当前已改为直接借用只读切片；
+  既有 names 参数和 atom owner strings 的构造保持不变。以 `243 + full-E2` 核心 trace 为例，
+  单次 current probe 有约 1,203,480 candidate attempts，其中制造 leaf wall 约 1,792 ms；
+  其排序约 984 ms、求值约 760 ms。制造每个三人候选至少生成三份 pool-to-input
+  operator 描述，mood-gap 长班次还会按窗口重复 runtime solve。
 - 中枢与贸易也有同形的 per-candidate owned String/Vec 复制，但当前量级通常低于制造；
   发电在代表样本中只有几十到几百候选，clone 不是优先项。
 
