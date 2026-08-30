@@ -1426,32 +1426,6 @@ fn active_control_candidate_count(
         .len()
 }
 
-fn effective_active_control_candidate_count(
-    by_team: &HashMap<TeamLabel, Vec<String>>,
-    active_teams: &[TeamLabel],
-    unavailable: &HashSet<String>,
-    control_pool: &crate::pool::ControlPool,
-    table: &SkillTable,
-) -> usize {
-    let names: HashSet<_> = active_teams
-        .iter()
-        .flat_map(|team| by_team.get(team).into_iter().flatten())
-        .filter(|name| !unavailable.contains(*name))
-        .collect();
-    let operators = names
-        .iter()
-        .filter_map(|name| {
-            control_pool
-                .entry(name)
-                .map(|entry| entry.to_control_operator())
-        })
-        .collect();
-    let conflicts = solve_control(&ControlRoomInput::with_operators(operators), table)
-        .effect_ledger
-        .conflicting_effect_source_count();
-    names.len().saturating_sub(conflicts)
-}
-
 fn least_available_control_team(
     by_team: &HashMap<TeamLabel, Vec<String>>,
     unavailable: &HashSet<String>,
@@ -5538,54 +5512,20 @@ fn schedule_abc_rotation(
         names.sort();
         names.dedup();
     }
-    let unavailable_for_control: HashSet<String> = production_team_by_name
-        .keys()
-        .cloned()
-        .chain(scaffold_used.iter().cloned())
-        .chain(rotating_office_names.iter().cloned())
-        .chain(rotating_anchor_names.iter().cloned())
-        .collect();
-    let active_pair_has_five = |by_team: &HashMap<TeamLabel, Vec<String>>| {
-        TeamLabel::ALL.iter().all(|resting| {
-            let active: Vec<_> = TeamLabel::ALL
-                .iter()
-                .filter(|team| *team != resting)
-                .copied()
-                .collect();
-            effective_active_control_candidate_count(
-                by_team,
-                &active,
-                &unavailable_for_control,
-                &control_pool,
-                table,
-            ) >= 5
-        })
-    };
-    let mut assigned_control: HashSet<String> = team_ctrl.values().flatten().cloned().collect();
-    let mut skillless_fillers: Vec<_> = control_pool
+    let assigned_control: HashSet<String> = team_ctrl.values().flatten().cloned().collect();
+    let mut fallback_entry_names = HashSet::new();
+    let mut control_fallback_entries: Vec<_> = control_pool
         .entries
         .iter()
-        .filter(|entry| entry.buff_ids.is_empty())
+        .filter(|entry| entry.name != "琴柳")
         .filter(|entry| !assigned_control.contains(&entry.name))
         .filter(|entry| !production_team_by_name.contains_key(&entry.name))
         .filter(|entry| !scaffold_used.contains(&entry.name))
         .filter(|entry| !rotating_office_names.contains(&entry.name))
         .filter(|entry| !rotating_anchor_names.contains(&entry.name))
+        .filter(|entry| fallback_entry_names.insert(entry.name.clone()))
         .collect();
-    skillless_fillers.sort_by(|a, b| a.name.cmp(&b.name));
-    for entry in skillless_fillers {
-        if active_pair_has_five(&team_ctrl) {
-            break;
-        }
-        let team = least_available_control_team(&team_ctrl, &unavailable_for_control);
-        team_ctrl.entry(team).or_default().push(entry.name.clone());
-        assigned_control.insert(entry.name.clone());
-    }
-    if !active_pair_has_five(&team_ctrl) {
-        return Err(Error::msg(
-            "control rotation cannot fill all five seats for every active team pair",
-        ));
-    }
+    control_fallback_entries.sort_by(|a, b| a.name.cmp(&b.name));
     let office_pool = office_candidates(
         operbox,
         instances,
@@ -5736,10 +5676,12 @@ fn schedule_abc_rotation(
         // 但已经由 base_systems/peak_plan 验证可用，因此要按名补回。
         // 所有中枢候选已在进入三班前归入 α/β/γ；这里不再用全局池补位，
         // 避免未归队散件绕过轮休、三班连续上岗。
+        let mut team_entry_names = HashSet::new();
         let mut team_entries: Vec<crate::pool::ControlPoolEntry> = control_pool
             .entries
             .iter()
             .filter(|e| active_names.contains(&e.name))
+            .filter(|e| team_entry_names.insert(e.name.clone()))
             .cloned()
             .collect();
         let present_entries: HashSet<String> =
@@ -5842,10 +5784,15 @@ fn schedule_abc_rotation(
             pin_active_system_control(a, extra_control_pins)?;
             *used = a.operator_names();
             let mut final_pool = base_control_pool.clone();
-            let present: HashSet<String> =
+            let mut present: HashSet<String> =
                 final_pool.entries.iter().map(|e| e.name.clone()).collect();
+            for entry in &control_fallback_entries {
+                if present.insert(entry.name.clone()) {
+                    final_pool.entries.push((*entry).clone());
+                }
+            }
             for op in a.control_operators() {
-                if present.contains(&op.name) {
+                if !present.insert(op.name.clone()) {
                     continue;
                 }
                 final_pool.entries.push(crate::pool::ControlPoolEntry {
