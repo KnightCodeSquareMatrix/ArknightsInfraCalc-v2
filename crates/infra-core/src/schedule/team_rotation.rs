@@ -5046,8 +5046,6 @@ fn attach_fiammetta_target_actions(
             displaced: String::new(),
             room_id,
         });
-        shifts[slot].transition = ShiftTransition::FiammettaOnly;
-        shifts[slot].drone = None;
         consumed_shifts.insert(slot);
         used_slots += 1;
     }
