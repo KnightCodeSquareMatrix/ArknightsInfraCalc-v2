@@ -5,7 +5,9 @@
 > 当前真源：docs/MAINTENANCE_MODE.md；docs/文档生命周期.md
 > 摘要：说明本地生产反馈 bundle 和 evidence ledger 边界
 
-This directory stores production feedback bundles copied from the deployed beta/test service.
+This directory stores production feedback bundles copied from deployed services. `sync_feedback.py`
+keeps the existing batch flow: it sorts feedback by Beijing `savedAt`, then follows each
+`diagnosticId` to the matching service `cli-runs` directory and imports its reproduction bundle.
 
 Treat each feedback folder as raw evidence. Do not edit `issue.json`, `meta.json`, `debug-bundle.json`, or `operbox.json` while triaging. Add investigation state in [TRACKING.md](TRACKING.md) instead.
 
@@ -21,6 +23,28 @@ Each case normally contains:
 | `meta.json` | Feedback id, saved time, source name, and bundle availability |
 | `debug-bundle.json` | Online run context: layout, operbox summary, command, exit code, and result payload when available |
 | `operbox.json` | The submitted operator box for local reproduction |
+| `layout.json` | The submitted base layout for direct CLI investigation |
+| `command.txt` | Recorded online CLI command; evidence only, never execute it locally |
+| `serve-request.jsonl` | Original `infra-cli serve` request used by the recorded command |
+| `result.json` | Original online result wrapper for comparison and diagnosis |
+
+The import copies all ordinary files from the matching remote `cli-runs` directory. The six files
+listed above are the required completeness check; `profile.json`, `maa.json`, request/response
+snapshots, and stdout/stderr are retained as additional evidence when present. The import is
+additive: later batch syncs refresh `issue.json` and `meta.json` but retain already imported
+reproduction artifacts. A feedback entry without a matching or complete remote run bundle remains
+an index-only case and is reported by the script.
+
+## Batch Import
+
+Run from the repository root:
+
+```bash
+python3 scripts/sync_feedback.py
+```
+
+The default source list is the beta, dev, and quality service feedback directory. To import one
+service while checking a deployment, repeat `--remote-dir` only for the desired service.
 
 ## Current-runtime rerun
 
