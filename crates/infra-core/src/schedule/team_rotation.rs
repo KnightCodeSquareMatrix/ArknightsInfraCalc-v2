@@ -4979,7 +4979,9 @@ pub fn schedule_abc_rotation_candidates(
         }
     }
 
-    if winner_value_tied {
+    if winner_value_tied
+        && (winner_value - fiammetta_candidate_value(&baseline_for_tie)).abs() <= 1e-9
+    {
         winner = baseline_for_tie;
         winner_targets.clear();
     }
