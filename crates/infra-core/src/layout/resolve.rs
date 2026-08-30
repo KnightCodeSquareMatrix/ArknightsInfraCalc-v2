@@ -63,6 +63,12 @@ pub struct ResolvedBase {
     pub meeting_rooms: Vec<ResolvedSupportRoom>,
 }
 
+struct ResolvedBaseCore {
+    workforce: WorkforceIndex,
+    layout: LayoutContext,
+    trace: ResolveTrace,
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct ResolveTrace {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,7 +137,7 @@ pub fn resolve_base_with_trace(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn resolve_base_inner(
+fn resolve_base_core(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
     instances: Option<&OperatorInstances>,
@@ -139,7 +145,7 @@ fn resolve_base_inner(
     mood: f64,
     durin_dorm_planning: Option<u8>,
     trace_enabled: bool,
-) -> Result<(ResolvedBase, ResolveTrace)> {
+) -> Result<ResolvedBaseCore> {
     blueprint.validate()?;
     let mut trace = ResolveTrace::default();
 
@@ -285,16 +291,50 @@ fn resolve_base_inner(
 
     layout.global.run_conversions(&active_global_buffs);
 
+    Ok(ResolvedBaseCore {
+        workforce,
+        layout,
+        trace,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_base_inner(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: Option<&OperatorInstances>,
+    table: Option<&SkillTable>,
+    mood: f64,
+    durin_dorm_planning: Option<u8>,
+    trace_enabled: bool,
+) -> Result<(ResolvedBase, ResolveTrace)> {
+    let core = resolve_base_core(
+        blueprint,
+        assignment,
+        instances,
+        table,
+        mood,
+        durin_dorm_planning,
+        trace_enabled,
+    )?;
+    let ResolvedBaseCore {
+        workforce,
+        layout,
+        trace,
+    } = core;
+    let blueprint = blueprint.clone();
+    let assignment = assignment.clone();
     let support_started = Instant::now();
-    let (office_rooms, meeting_rooms) = build_support_rooms(blueprint, assignment, &layout, mood)?;
+    let (office_rooms, meeting_rooms) =
+        build_support_rooms(&blueprint, &assignment, &layout, mood)?;
     crate::profile::record_resolve_phase(
         crate::profile::ResolvePhase::Support,
         support_started.elapsed(),
     );
 
     let materialize_started = Instant::now();
-    let trade_rooms = build_trade_rooms(blueprint, assignment, instances, table, &layout);
-    let manu_rooms = build_manu_rooms(blueprint, assignment, instances, table, &layout);
+    let trade_rooms = build_trade_rooms(&blueprint, &assignment, instances, table, &layout);
+    let manu_rooms = build_manu_rooms(&blueprint, &assignment, instances, table, &layout);
     let power_rooms = build_power_rooms(&workforce, instances, &layout);
     crate::profile::record_resolve_phase(
         crate::profile::ResolvePhase::RoomMaterialize,
@@ -304,8 +344,8 @@ fn resolve_base_inner(
 
     Ok((
         ResolvedBase {
-            blueprint: blueprint.clone(),
-            assignment: assignment.clone(),
+            blueprint,
+            assignment,
             layout,
             trade_rooms,
             manu_rooms,
@@ -315,6 +355,31 @@ fn resolve_base_inner(
         },
         trace,
     ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn resolve_layout_snapshot(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: Option<&OperatorInstances>,
+    table: Option<&SkillTable>,
+    mood: f64,
+    durin_dorm_planning: Option<u8>,
+) -> Result<LayoutContext> {
+    let started = Instant::now();
+    let _resolve_perf = crate::profile::begin_resolve_perf();
+    let result = resolve_base_core(
+        blueprint,
+        assignment,
+        instances,
+        table,
+        mood,
+        durin_dorm_planning,
+        false,
+    )
+    .map(|core| core.layout);
+    crate::profile::record_resolve(started.elapsed());
+    result
 }
 
 fn support_office_hire_speed(

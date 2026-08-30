@@ -12,7 +12,7 @@ use crate::instances::OperatorInstances;
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::BaseBlueprint;
 use crate::layout::context::LayoutContext;
-use crate::layout::resolve::resolve_base;
+use crate::layout::resolve::resolve_layout_snapshot;
 use crate::operbox::OperBox;
 use crate::profile::{
     emit_resolve_stage, emit_solver_stage, solver_perf_snapshot, SolverPerfSnapshot,
@@ -63,15 +63,14 @@ impl<'a> AssignmentRun<'a> {
     /// `with_table = true` 复刻后续 consumer 搜索前的快照（含 skill table 解析效率）。
     pub(super) fn resolve_snapshot(&self, with_table: bool) -> Result<LayoutContext> {
         let table = if with_table { Some(self.table) } else { None };
-        Ok(resolve_base(
+        resolve_layout_snapshot(
             self.blueprint,
             &self.assignment,
             Some(self.instances),
             table,
             self.options.mood,
             Some(self.durin_plan),
-        )?
-        .layout_snapshot())
+        )
     }
 }
 

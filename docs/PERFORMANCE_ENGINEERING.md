@@ -320,13 +320,17 @@ worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一�
   `Arc` clone。初始化互斥锁只协调首次成功构造，失败不会写入缓存，因而保留原有的 JSON
   error variant、版本/校验失败和后续重试语义。`load_default()` 保留给需要 owned 值的兼容
   调用方，因此仍会复制 registry，但排班和 resolve 主路径已改用共享入口。缓存不改变候选排序。
-- `resolve_snapshot()` 只需要 `LayoutContext`，但当前先构造完整 `ResolvedBase`，包含
+- 旧版 `resolve_snapshot()` 只需要 `LayoutContext`，却先构造完整 `ResolvedBase`，包含
   support/trade/manufacture/power room vectors、`blueprint.clone()` 和 `assignment.clone()`，
-  再执行一次 `layout.clone()`。因此每次 snapshot 至少支付一次最终 layout clone 和完整
-  resolved-room 构造；这在 Peak prefix 中被 75 次重复。
-- `layout_snapshot()` 发生在 `resolve_base()` 返回之后，因此它的额外 `LayoutContext` clone
-  计数属于 snapshot consumer 的构造成本，不应从 `resolve.wall_ms` 中再次扣除或解释为
-  `resolve_base_inner` 内部耗时。
+  再执行一次 `layout.clone()`。当前 `AssignmentRun` 已改用 `resolve_layout_snapshot()`：
+  共享同一核心 resolve 阶段；在输入同时提供 instances/table 时完成 workforce、layout、
+  mechanics、support 和跨设施结算后，直接移动 `LayoutContext` 返回，跳过
+  `blueprint`/`assignment` clone、最终 support/production room materialize 和快照 clone。
+  本次只覆盖 `AssignmentRun` 的 layout-only 快照入口；其他需要完整 `ResolvedBase` 的入口保持
+  原有物化路径，公开 `ResolvedBase::layout_snapshot()` 仍保留为对已有完整结果的显式 clone helper。
+- 旧版 `layout_snapshot()` 发生在 `resolve_base()` 返回之后，因此它的额外 `LayoutContext`
+  clone 计数属于 snapshot consumer 的构造成本，不应从 `resolve.wall_ms` 中再次扣除或解释为
+  `resolve_base_inner` 内部耗时；当前 `AssignmentRun` 的专用入口已不再走这条路径。
 - 制造搜索的每个候选都会从 pool entry 深复制 `ManuOperator` 的 name/buff/tags，之后
   evaluator 又复制 `ManuRoomInput` 的 operator vector；solver 再构造 runtime operators，
   `apply_manu_phases` 还复制 `ctx.operators` 并重新生成 names 和 atom owner strings。以
@@ -342,10 +346,10 @@ worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一�
 2. 制造候选到 runtime solver 的多层 owned object 重建；
 3. Peak prefix 重复完整制造后缀和 resolve；
 4. resolve 内重复解析 support registry；
-5. `resolve_snapshot` 为只读 context 构造完整 `ResolvedBase`。
+5. （已修复）`resolve_snapshot` 为只读 context 构造完整 `ResolvedBase`。
 
-低风险优化边界是先把 support registry 变成进程级只读缓存，并增加仅生成
-`LayoutContext` 的 resolve owner；两者都不改变候选或公式。制造 operator/runtime 缓存、
+低风险优化边界已完成 support registry 进程级只读缓存和仅生成 `LayoutContext` 的 resolve
+owner；两者都不改变候选或公式。制造 operator/runtime 缓存、
 top-K heap、Peak prefix 结果复用和 resolve context cache 需要分别证明 recipe、mood、
 `used`、candidate projection、global inject、producer presence 和稳定 tie-break 不变，
 不能仅凭 clone 出现次数直接实现。
