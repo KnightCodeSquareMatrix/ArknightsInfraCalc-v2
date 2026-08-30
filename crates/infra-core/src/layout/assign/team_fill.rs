@@ -43,6 +43,7 @@ pub fn assign_team_producer_rooms(
         table,
         options,
         trade_rooms,
+        &[],
         assignment,
         used,
     )?;
@@ -81,6 +82,7 @@ pub fn assign_team_gamma_half(
     manu_rooms: &[RoomId],
     power_rooms: &[RoomId],
     required_manu_by_room: &HashMap<RoomId, Vec<String>>,
+    forbidden_pairs: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -93,6 +95,7 @@ pub fn assign_team_gamma_half(
         table,
         options,
         trade_rooms,
+        forbidden_pairs,
         assignment,
         used,
     )?;
@@ -134,6 +137,7 @@ fn assign_team_trade_meta_rooms(
     table: &SkillTable,
     options: &AssignBaseOptions,
     trade_rooms: &[RoomId],
+    forbidden_pairs: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -200,7 +204,7 @@ fn assign_team_trade_meta_rooms(
             order,
             room.level,
             used,
-            &[],
+            forbidden_pairs,
             &[],
         )
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;

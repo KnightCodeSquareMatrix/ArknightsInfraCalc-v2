@@ -34,7 +34,7 @@ pub use orchestrate::{
     build_plan, build_plan_with_runtime, execute_plan, ActivatedSystem, ActiveDependency,
     AnchorFillPolicy, AssignmentPlan, ContinuousRole, ControlCandidateRequirement, ExecuteResult,
     ReserveReusePolicy, ResolvedRoleReserve, SelectedRuleAlternative, ShiftBind, SlotFill,
-    SystemAnchor,
+    SystemAnchor, SystemConstraint,
 };
 pub use resolve::{
     resolve_automation_group_1_layout, resolve_base, resolve_base_with_trace,

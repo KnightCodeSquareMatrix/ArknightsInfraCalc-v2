@@ -1567,6 +1567,19 @@ fn split_production_facilities(
 
 /// γ 替补半区：贸易沿用 core role 顺序，制造/发电站绑定搜索。
 #[allow(clippy::too_many_arguments)]
+/// 从编排计划的 constraints 派生贸易站禁用组合对（与主路径 pipeline 同一来源）。
+fn forbidden_trade_pairs_from_plan(plan: &AssignmentPlan) -> Vec<(String, String)> {
+    plan.constraints
+        .iter()
+        .filter_map(|constraint| match constraint {
+            crate::layout::SystemConstraint::ForbidSameStation { a, b } => {
+                Some((a.clone(), b.clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 fn assign_gamma_half(
     blueprint: &BaseBlueprint,
     instances: &OperatorInstances,
@@ -1577,6 +1590,7 @@ fn assign_gamma_half(
     options: &AssignBaseOptions,
     half: &FacilityHalf,
     required_manu_by_room: &HashMap<RoomId, Vec<String>>,
+    forbidden_pairs: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -1605,6 +1619,7 @@ fn assign_gamma_half(
         &half.manu,
         &half.power,
         required_manu_by_room,
+        forbidden_pairs,
         assignment,
         used,
     )
@@ -4804,11 +4819,7 @@ pub fn schedule_abc_rotation_candidates(
         &[],
     )?;
     let baseline = finalize_timed_rotation(blueprint, operbox, instances, table, baseline)?;
-    write_candidate_report(
-        options.fiammetta_candidates_out.as_deref(),
-        "N",
-        &baseline,
-    );
+    write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &baseline);
     eprintln!(
         "[fiammetta-candidate] N {} trade={} manufacture={} targets=[]",
         profile.cli_name(),
@@ -5186,8 +5197,7 @@ fn schedule_abc_rotation(
     // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
-    let mut peak_skip: HashSet<String> =
-        skip_systems.iter().map(|s| s.to_string()).collect();
+    let mut peak_skip: HashSet<String> = skip_systems.iter().map(|s| s.to_string()).collect();
     let peak_result = assign_shift_with_plan_skip(
         blueprint,
         operbox,
@@ -5356,6 +5366,7 @@ fn schedule_abc_rotation(
         // Deepcolor when the shared/coexisting assignment already proves presence.
         used_g1.insert(SPHINX_NAME.to_string());
     }
+    let gamma_forbidden = forbidden_trade_pairs_from_plan(&peak_plan);
     assign_gamma_half(
         blueprint,
         instances,
@@ -5366,6 +5377,7 @@ fn schedule_abc_rotation(
         &gamma_h1_options,
         &h1,
         &required_manu_by_room,
+        &gamma_forbidden,
         &mut gamma_h1,
         &mut used_g1,
     )?;
@@ -5409,6 +5421,7 @@ fn schedule_abc_rotation(
         &gamma_h2_options,
         &h2,
         &required_manu_by_room,
+        &gamma_forbidden,
         &mut gamma_h2,
         &mut used_g2,
     )?;

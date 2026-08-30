@@ -90,6 +90,7 @@
 | `mechanics.effect-atom` | [EffectAtom 设计文档](EFFECT_ATOM_DESIGN.md) |
 | `production.drones` | [无人机生成、分配与产出结算](DRONES.md) |
 | `schedule.fiammetta` | [菲亚梅塔使用规则](菲亚梅塔使用规则.md) |
+| `schedule.fiammetta-candidates` | [菲亚梅塔候选分支适配层设计](菲亚梅塔候选分支适配层设计.md) |
 | `schedule.mode` | [排班模式](排班模式.md) |
 | `schedule.timed` | [定时换班（公孙长乐 × InfraCalc）](定时换班.md) |
 | `scoring.efficiency` | [直接效率与整数结算架构](EFFICIENCY_MODEL.md) |
@@ -135,7 +136,7 @@ ADR 保存长期决策及理由，不声明当前实现已经完成。当前能�
 | [ADR 0007: 回退恢复后的中枢与二发电事实边界](ADR/0007-regression-recovery-control-and-two-power-boundaries.md) | `accepted` | 恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界 |
 | [ADR 0008: 办公室连续工作时长预算与通用轮换准入](ADR/0008-office-continuous-work-budget.md) | `proposed` | 规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则 |
 | [ADR 0009: 无人机效率转化与产出核算](ADR/0009-drone-efficiency-conversion-and-production-accounting.md) | `accepted` | 记录发电效率、无人机库存、目标分配与制造贸易额外产出的统一裁决 |
-| [ADR 0010: 菲亚梅塔固定策略分支与完整排班重算接入](ADR/0010-fiammetta-fixed-branches-full-recompute.md) | `proposed` | 菲亚梅塔作为阶段间固定策略分支选择器，N/A/B 三候选各自从同一 Box 完整重算整个排班；候选不预排锁房，靠 L1 shortcut 自然选中 + trade_core 偏好改写上班优先级，菲亚对固定两人各换一次心情，按完整周期收益选 winner |
+| [ADR 0010: 菲亚梅塔固定策略分支与完整排班重算接入](ADR/0010-fiammetta-fixed-branches-full-recompute.md) | `superseded` | 菲亚梅塔作为阶段间固定策略分支选择器，N/A/B 三候选各自从同一 Box 完整重算整个排班；候选不预排锁房，靠 L1 shortcut 自然选中 + trade_core 偏好改写上班优先级，菲亚对固定两人各换一次心情，按完整周期收益选 winner |
 <!-- END GENERATED DECISIONS -->
 
 ## 6. 开发与项目治理
