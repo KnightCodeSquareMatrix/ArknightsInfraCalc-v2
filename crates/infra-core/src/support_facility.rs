@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -20,8 +21,28 @@ pub struct SupportRegistry {
     pub entries: Vec<SupportSkillEntry>,
 }
 
+static DEFAULT_SUPPORT_REGISTRY: OnceLock<Arc<SupportRegistry>> = OnceLock::new();
+static DEFAULT_SUPPORT_REGISTRY_INIT: Mutex<()> = Mutex::new(());
+
 impl SupportRegistry {
     pub fn load_default() -> Result<Self> {
+        Self::load_default_shared().map(|registry| (*registry).clone())
+    }
+
+    pub fn load_default_shared() -> Result<Arc<Self>> {
+        if let Some(registry) = DEFAULT_SUPPORT_REGISTRY.get() {
+            crate::profile::record_support_registry_access();
+            return Ok(Arc::clone(registry));
+        }
+
+        let _init = DEFAULT_SUPPORT_REGISTRY_INIT
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(registry) = DEFAULT_SUPPORT_REGISTRY.get() {
+            crate::profile::record_support_registry_access();
+            return Ok(Arc::clone(registry));
+        }
+
         let started = Instant::now();
         let raw = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -35,7 +56,12 @@ impl SupportRegistry {
             )));
         }
         registry.validate()?;
-        crate::profile::record_support_registry_load(started.elapsed());
+        let registry = Arc::new(registry);
+        DEFAULT_SUPPORT_REGISTRY
+            .set(Arc::clone(&registry))
+            .expect("registry initialization lock prevents duplicate support registry");
+        crate::profile::record_support_registry_parse(started.elapsed());
+        crate::profile::record_support_registry_access();
         Ok(registry)
     }
 

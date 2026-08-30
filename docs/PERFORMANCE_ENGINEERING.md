@@ -282,7 +282,9 @@ stderr，每行以 `[perf] ` 开头，后接单行 JSON；stdout、profile、rot
 resolve operation 额外包含 `workforce_ms`、`layout_ms`、`mechanics_ms`、
 `cross_facility_ms`、`support_ms`、`room_materialize_ms`，以及显式构造计数
 `support_registry_loads`、`layout_clones`、`blueprint_clones`、`assignment_clones`、
-`room_context_clones`。这些计数只覆盖源码中已确认的显式构造/clone，不是全局 allocator 统计；
+`room_context_clones`、`support_registry_parses`。其中 `support_registry_loads` 是 resolve
+内共享只读 registry 的访问次数，`support_registry_parses` 是 resolve 内进程级缓存实际
+parse/validate 次数。这些计数只覆盖源码中已确认的显式构造/clone，不是全局 allocator 统计；
 隐式 derive clone、Rust 标准容器扩容和 Rayon worker 内部临时分配仍需外部 profiler。
 
 唯一计数 owner 是单订单贸易搜索、单配方制造搜索、中枢组合搜索、发电 assignment 和公开
@@ -300,22 +302,24 @@ worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一�
 本轮没有启用 allocator 级 profiler；以下是源码显式 clone/构造和 release trace 的交叉结果，
 不是把每次堆分配都精确折算成字节。
 
-- `243 + full-E2` 的 `shift_pipeline_resolve / peak_prefixes` 阶段执行 75 次 resolve：
+- `243 + full-E2` 的缓存改动前 `shift_pipeline_resolve / peak_prefixes` 阶段执行 75 次 resolve：
   产生 126 次 support registry parse/validate、759 次 `LayoutContext` clone、750 次
   room-context clone，以及 75 次 `Blueprint` 和 75 次 `BaseAssignment` clone。该阶段
   resolve wall time 为约 39.9 ms，其中 support registry load 约 22.3 ms，约占 resolve
   support 子阶段的 94%。`153 + high-owned` 的对应数据是 70 次 resolve、112 次 registry
   load、670 次 layout clone、664 次 room-context clone。
-- 在包含完整 current rotation 的 `rotation_resolve / total` 聚合中，`243 + full-E2`
+- 在包含完整 current rotation 的缓存改动前 `rotation_resolve / total` 聚合中，`243 + full-E2`
   共 537 次 resolve、1,045 次 registry load、6,175 次 layout clone、6,109 次
   room-context clone，以及 537 次 blueprint/assignment clone；resolve wall 约 292.5 ms，
   其中 registry parse/validate 约 173.6 ms，support 阶段约 188.4 ms。平均每次 resolve
   约 1.95 次 registry load、11.5 次 layout clone、11.4 次 room-context clone，并固定复制
   一次 blueprint 和一次 assignment。`153 + high-owned` 对应为 259 次 resolve、483 次
   registry load、2,734 次 layout clone，resolve wall 约 110.2 ms。
-- `SupportRegistry::load_default()` 使用编译期字符串，但每次仍执行 serde parse 和 110
-  行 validate；它当前不是文件 I/O，却确实是重复 CPU 和分配。它在单次 resolve 中通常出现
-  两次：办公室前置条件一次、最终 support room 构造一次。
+- `SupportRegistry::load_default_shared()` 现在以进程级 `OnceLock` 保存已校验的只读
+  `Arc<SupportRegistry>`；首次成功访问执行一次 serde parse 和 110 行 validate，后续访问只做
+  `Arc` clone。初始化互斥锁只协调首次成功构造，失败不会写入缓存，因而保留原有的 JSON
+  error variant、版本/校验失败和后续重试语义。`load_default()` 保留给需要 owned 值的兼容
+  调用方，因此仍会复制 registry，但排班和 resolve 主路径已改用共享入口。缓存不改变候选排序。
 - `resolve_snapshot()` 只需要 `LayoutContext`，但当前先构造完整 `ResolvedBase`，包含
   support/trade/manufacture/power room vectors、`blueprint.clone()` 和 `assignment.clone()`，
   再执行一次 `layout.clone()`。因此每次 snapshot 至少支付一次最终 layout clone 和完整

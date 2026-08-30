@@ -65,6 +65,7 @@ pub struct OperationMetrics {
     pub blueprint_clones: u64,
     pub assignment_clones: u64,
     pub room_context_clones: u64,
+    pub support_registry_parses: u64,
     pub prepare_nanos: u64,
     pub bake_lookup_nanos: u64,
     pub evaluate_nanos: u64,
@@ -108,6 +109,9 @@ impl OperationMetrics {
             room_context_clones: self
                 .room_context_clones
                 .saturating_sub(before.room_context_clones),
+            support_registry_parses: self
+                .support_registry_parses
+                .saturating_sub(before.support_registry_parses),
             prepare_nanos: self.prepare_nanos.saturating_sub(before.prepare_nanos),
             bake_lookup_nanos: self
                 .bake_lookup_nanos
@@ -343,7 +347,7 @@ pub fn record_resolve_construction(
     });
 }
 
-pub fn record_support_registry_load(elapsed: Duration) {
+pub fn record_support_registry_access() {
     PERF_TRACE.with(|trace| {
         let mut trace = trace.borrow_mut();
         let Some(state) = trace.as_mut() else {
@@ -352,6 +356,28 @@ pub fn record_support_registry_load(elapsed: Duration) {
         if state.resolve_depth == 0 {
             return;
         }
+        state.metrics.resolve.support_registry_loads = state
+            .metrics
+            .resolve
+            .support_registry_loads
+            .saturating_add(1);
+    });
+}
+
+pub fn record_support_registry_parse(elapsed: Duration) {
+    PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return;
+        };
+        if state.resolve_depth == 0 {
+            return;
+        }
+        state.metrics.resolve.support_registry_parses = state
+            .metrics
+            .resolve
+            .support_registry_parses
+            .saturating_add(1);
         state.metrics.resolve.support_registry_load_nanos = state
             .metrics
             .resolve
@@ -645,6 +671,7 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
         "blueprint_clones": metrics.blueprint_clones,
         "assignment_clones": metrics.assignment_clones,
         "room_context_clones": metrics.room_context_clones,
+        "support_registry_parses": metrics.support_registry_parses,
         "prepare_ms": nanos_ms(metrics.prepare_nanos),
         "bake_lookup_ms": nanos_ms(metrics.bake_lookup_nanos),
         "evaluate_ms": nanos_ms(metrics.evaluate_nanos),

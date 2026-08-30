@@ -791,7 +791,7 @@ fn assign_meeting_rooms(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    let registry = crate::support_facility::SupportRegistry::load_default()?;
+    let registry = crate::support_facility::SupportRegistry::load_default_shared()?;
     let extra_recruit_slots = blueprint
         .rooms
         .iter()
@@ -1008,7 +1008,7 @@ fn best_available_office_pct(
         })
         .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
         .collect();
-    let registry = crate::support_facility::SupportRegistry::load_default()?;
+    let registry = crate::support_facility::SupportRegistry::load_default_shared()?;
     let extra_recruit_slots = run
         .blueprint
         .rooms

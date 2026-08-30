@@ -325,8 +325,7 @@ fn support_office_hire_speed(
 ) -> Result<f64> {
     use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
 
-    let registry = SupportRegistry::load_default()?;
-    crate::profile::record_resolve_construction(1, 0, 0, 0, 0);
+    let registry = SupportRegistry::load_default_shared()?;
     let extra_recruit_slots = blueprint
         .rooms
         .iter()
@@ -372,8 +371,7 @@ fn build_support_rooms(
 ) -> Result<(Vec<ResolvedSupportRoom>, Vec<ResolvedSupportRoom>)> {
     use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
 
-    let registry = SupportRegistry::load_default()?;
-    crate::profile::record_resolve_construction(1, 0, 0, 0, 0);
+    let registry = SupportRegistry::load_default_shared()?;
     let extra_recruit_slots = blueprint
         .rooms
         .iter()

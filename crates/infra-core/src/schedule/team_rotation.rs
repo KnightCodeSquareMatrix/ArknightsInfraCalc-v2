@@ -715,13 +715,16 @@ fn office_candidates(
 ) -> Vec<AssignedOperator> {
     debug_assert!(fallback_pool.entries.is_empty());
     let roster = operbox.roster();
+    let mut registry = None;
     let mut candidates: Vec<(f64, AssignedOperator)> = roster
         .names()
         .filter(|name| !excluded.contains(name.as_str()))
         .filter_map(|name| {
             let progress = roster.progress(name)?;
-            let registry = crate::support_facility::SupportRegistry::load_default()
-                .expect("support registry loads in office candidate build");
+            let registry = registry.get_or_insert_with(|| {
+                crate::support_facility::SupportRegistry::load_default_shared()
+                    .expect("support registry loads in office candidate build")
+            });
             let score = crate::office::evaluate_office(
                 &crate::support_facility::SupportRoomInput {
                     facility: crate::support_facility::SupportFacility::Office,
@@ -738,7 +741,7 @@ fn office_candidates(
                     external_speed_bonus_pct: 0.0,
                     layout: layout.clone(),
                 },
-                &registry,
+                registry.as_ref(),
             )
             .map(|result| result.skill_speed_bonus_pct)
             .unwrap_or(0.0);
@@ -1147,7 +1150,7 @@ fn meeting_candidates(
     layout: &LayoutContext,
     excluded: &HashSet<String>,
 ) -> Vec<AssignedOperator> {
-    let registry = crate::support_facility::SupportRegistry::load_default()
+    let registry = crate::support_facility::SupportRegistry::load_default_shared()
         .expect("support registry loads in meeting candidate build");
     let roster = operbox.roster();
     let extra_recruit_slots = 0;
