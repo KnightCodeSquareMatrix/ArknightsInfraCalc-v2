@@ -89,6 +89,12 @@ fn maa_out_from_args(args: &[String]) -> Option<PathBuf> {
         .map(|w| PathBuf::from(&w[1]))
 }
 
+fn fiammetta_candidates_out_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--fiammetta-candidates-out")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
 fn system_preferences_from_args(
     args: &[String],
 ) -> Result<std::collections::HashMap<String, String>, Error> {
@@ -167,6 +173,7 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
         top_k,
         system_preferences,
         fiammetta_enable,
+        fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
         ..AssignBaseOptions::default()
     };
     let report = schedule_timed_rotation(

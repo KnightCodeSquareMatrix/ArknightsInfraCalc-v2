@@ -256,14 +256,14 @@ fn hit_witch_beta(hit: &TradeSearchHit) -> bool {
 fn hit_witch_alpha(hit: &TradeSearchHit) -> bool {
     matches!(
         hit.rule_id.as_deref(),
-        Some("gsl_witch_long_alpha" | "gsl_witch_long0_alpha" | "gsl_witch_long1_alpha")
+        Some("gsl_witch_long_alpha" | "gsl_witch_long0_alpha")
     )
 }
 
 fn hit_witch_blank(hit: &TradeSearchHit) -> bool {
     matches!(
         hit.rule_id.as_deref(),
-        Some("gsl_witch_long_blank" | "gsl_witch_long0_blank" | "gsl_witch_long1_blank")
+        Some("gsl_witch_long_blank" | "gsl_witch_long0_blank")
     )
 }
 

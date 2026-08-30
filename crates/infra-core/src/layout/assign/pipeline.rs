@@ -36,8 +36,7 @@ use super::manufacture_fill::{
 };
 use super::power_fill::assign_power_stations;
 use super::producer_fill::{
-    assign_dorm_producers, assign_sphinx_urrbian_dorm_anchor,
-    cleanup_unused_sphinx_urrbian_dorm_anchor, place_system_producers,
+    assign_dorm_producers, cleanup_unused_sphinx_urrbian_dorm_anchor, place_system_producers,
 };
 use super::run::{AssignmentRun, StageTimer};
 use super::trade_fill::{
@@ -1151,12 +1150,6 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
-    assign_sphinx_urrbian_dorm_anchor(
-        run.blueprint,
-        run.operbox,
-        &mut run.assignment,
-        &mut run.used,
-    );
     assign_dorm_producers(
         run.blueprint,
         run.operbox,

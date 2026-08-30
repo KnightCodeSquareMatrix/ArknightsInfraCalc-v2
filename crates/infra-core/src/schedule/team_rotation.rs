@@ -17,7 +17,7 @@ use crate::layout::{
     refill_witch_room_with_tailor, resolve_base, ActivatedSystem, AnchorFillPolicy,
     AssignBaseOptions, AssignShiftMode, AssignedOperator, AssignmentPlan, BaseAssignment,
     BaseBlueprint, FacilityKind, LayoutContext, ReserveReusePolicy, ResolvedRoleReserve, RoomId,
-    RoomProduct, SelectedRuleAlternative, ShiftBind, SlotFill, SystemAnchor,
+    RoomProduct, SelectedRuleAlternative, ShiftBind, SlotFill, SystemAnchor, TradeRolePreference,
 };
 use crate::mood::{
     dorm_recovery_rates, operator_net_drain, shift_eta, shift_eta_with_instances, workable_hours,
@@ -4649,6 +4649,433 @@ pub fn assert_final_rotation_invariants(
     Ok(())
 }
 
+/// N/A/B 三候选各自独立完整求解后的完整周期收益。分值只用于候选之间比较，
+/// 不进入最终报告；沿用当前 profile 的既有 trade/manufacture 加权口径。
+fn fiammetta_candidate_score(report: &TeamRotationReport, options: &AssignBaseOptions) -> i64 {
+    i64::from(report.daily.trade.millis()) * i64::from(options.trade_manufacture_weights.trade)
+        + i64::from(report.daily.manufacture.millis())
+            * i64::from(options.trade_manufacture_weights.manufacture)
+}
+
+/// A 分支 trade_core 偏好的 alternative id。按 D4 降级：单金单贸易站 153 布局优先
+/// 可露希尔；其余布局优先但书；以候选干员实际拥有情况为准（但书任意练度或
+/// 可露希尔精二）。返回 None 表示无合法单核心目标。
+fn fiammetta_a_core_preference(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+) -> Option<(&'static str, &'static str)> {
+    let single_gold_trade = blueprint.count_facility(FacilityKind::TradePost) == 1
+        && blueprint.trade_station_scenario().gold_order_stations == 1;
+    let closure_ready = operbox.elite_of("可露希尔").is_some_and(|elite| elite >= 2);
+    let docus_ready = operbox.owns("但书");
+    if single_gold_trade {
+        if closure_ready {
+            return Some(("trade_core", "single_trade_closure"));
+        }
+        if docus_ready {
+            return Some(("trade_core", "single_trade_docus_fallback"));
+        }
+        return None;
+    }
+    if docus_ready {
+        return Some(("trade_core", "multi_trade_docus"));
+    }
+    if closure_ready {
+        return Some(("trade_core", "multi_trade_closure_fallback"));
+    }
+    None
+}
+
+/// B 分支资格（D5）：存在三级金单贸易站，且 `match_witch_group_shortcut` 能判定
+/// 合法完整龙巫组（巫恋 + 龙舌兰 + 合法裁缝 β/α/白板）。合法组合判定完全复用
+/// 既有 shortcut，不手搓第二套条件；条件不足直接放弃 B，不降级单人。
+fn fiammetta_b_eligible(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<bool> {
+    if !operbox.owns("巫恋") || !operbox.owns("龙舌兰") {
+        return Ok(false);
+    }
+    let trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
+    let Some(witch) = trade_pool.entry("巫恋") else {
+        return Ok(false);
+    };
+    let Some(tequila) = trade_pool.entry("龙舌兰") else {
+        return Ok(false);
+    };
+    let witch_op = witch.to_trade_operator();
+    let tequila_op = tequila.to_trade_operator();
+    let room_exists = blueprint
+        .rooms
+        .iter()
+        .any(|room| room.kind == FacilityKind::TradePost && room.level == 3);
+    if !room_exists {
+        return Ok(false);
+    }
+    let has_tailor = trade_pool.entries.iter().any(|entry| {
+        entry.name != "巫恋"
+            && entry.name != "龙舌兰"
+            && match_witch_group_shortcut(
+                &[
+                    witch_op.clone(),
+                    tequila_op.clone(),
+                    entry.to_trade_operator(),
+                ],
+                table,
+                3,
+            )
+            .is_some()
+    });
+    Ok(has_tailor)
+}
+
+/// A 分支资格（D5）：存在金单贸易站，且但书任意练度或可露希尔精二至少其一。
+fn fiammetta_a_eligible(blueprint: &BaseBlueprint, operbox: &OperBox) -> bool {
+    if blueprint.trade_station_scenario().gold_order_stations == 0 {
+        return false;
+    }
+    operbox.owns("但书") || operbox.elite_of("可露希尔").is_some_and(|elite| elite >= 2)
+}
+
+/// ABC 三班菲亚固定策略分支适配层。
+///
+/// N/A/B 三候选各自从同一 Box 独立完整求解一遍排班，统一经过最终化
+/// （宿舍落位、效率重算、Rust invariant gate）后再用完整周期收益比较选
+/// winner，平局保留 N。候选差异只通过两个轻量事实表达，不预排 seed、不锁房、
+/// 不 refill：
+/// - `gamma_relaxed`：γ（S2/S3）used 放行续命目标，使 L1 shortcut 组合跨班
+///   自然持续上班；
+/// - A 分支 `system_preferences` 偏好 trade_core 选择但书/可露希尔。
+pub fn schedule_abc_rotation_candidates(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    profile: TimedRotationProfile,
+) -> Result<TeamRotationReport> {
+    let shift_hours = match profile {
+        TimedRotationProfile::Abc12_6_6 => [12.0, 6.0, 6.0],
+        TimedRotationProfile::Abc12_12_12 => [12.0, 12.0, 12.0],
+        _ => {
+            return Err(Error::msg(
+                "schedule_abc_rotation_candidates only supports ABC profiles",
+            ))
+        }
+    };
+    let a_eligible = fiammetta_a_eligible(blueprint, operbox);
+    let b_eligible = fiammetta_b_eligible(blueprint, operbox, instances, table)?;
+    if !options.fiammetta_enable || !operbox.owns(FIAMMETTA_NAME) || (!a_eligible && !b_eligible) {
+        let mut baseline_options = options.clone();
+        baseline_options.fiammetta_enable = false;
+        let report = schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &baseline_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &[],
+            &[],
+        )?;
+        let report = finalize_timed_rotation(blueprint, operbox, instances, table, report)?;
+        write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &report);
+        return Ok(report);
+    }
+
+    let mut baseline_options = options.clone();
+    baseline_options.fiammetta_enable = false;
+    let baseline = schedule_abc_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        &baseline_options,
+        shift_hours,
+        false,
+        AbyssalShortShiftPolicy::default_for(profile),
+        profile,
+        &[],
+        &[],
+    )?;
+    let baseline = finalize_timed_rotation(blueprint, operbox, instances, table, baseline)?;
+    write_candidate_report(
+        options.fiammetta_candidates_out.as_deref(),
+        "N",
+        &baseline,
+    );
+    eprintln!(
+        "[fiammetta-candidate] N {} trade={} manufacture={} targets=[]",
+        profile.cli_name(),
+        baseline.daily.trade,
+        baseline.daily.manufacture,
+    );
+    let mut winner = baseline;
+    let mut winner_targets = Vec::<String>::new();
+
+    if a_eligible {
+        let mut a_options = options.clone();
+        if let Some((system, alternative)) = fiammetta_a_core_preference(blueprint, operbox) {
+            a_options
+                .system_preferences
+                .insert(system.to_string(), alternative.to_string());
+        }
+        let relaxed: Vec<&str> = if operbox.owns("但书") {
+            vec!["但书", "可露希尔"]
+        } else {
+            vec!["可露希尔"]
+        };
+        let a_targets: Vec<&str> = if operbox.owns("但书") {
+            vec!["但书", "可露希尔"]
+        } else {
+            vec!["可露希尔"]
+        };
+        match schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &a_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &relaxed,
+            &[],
+        ) {
+            Ok(mut candidate) => {
+                let attached = attach_fiammetta_target_actions(
+                    blueprint,
+                    operbox,
+                    instances,
+                    profile,
+                    &a_targets,
+                    &mut candidate.shifts,
+                )
+                .and_then(|_| {
+                    finalize_timed_rotation(blueprint, operbox, instances, table, candidate)
+                });
+                match attached {
+                    Ok(candidate) => {
+                        write_candidate_report(
+                            options.fiammetta_candidates_out.as_deref(),
+                            "A",
+                            &candidate,
+                        );
+                        let score = fiammetta_candidate_score(&candidate, options);
+                        let targets = candidate_target_names(&candidate);
+                        eprintln!(
+                            "[fiammetta-candidate] A {} trade={} manufacture={} targets={targets:?} score={score}",
+                            profile.cli_name(),
+                            candidate.daily.trade,
+                            candidate.daily.manufacture,
+                        );
+                        if score > fiammetta_candidate_score(&winner, options) {
+                            winner = candidate;
+                            winner_targets = targets;
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "[fiammetta-candidate] A {} rejected reason={error}",
+                            profile.cli_name()
+                        );
+                    }
+                }
+            }
+            Err(error) => {
+                eprintln!(
+                    "[fiammetta-candidate] A {} rejected reason={error}",
+                    profile.cli_name()
+                );
+            }
+        }
+    }
+
+    if b_eligible {
+        let mut b_options = options.clone();
+        b_options.trade_role_preference = Some(TradeRolePreference::Witch);
+        let relaxed: Vec<&str> = vec!["巫恋", "龙舌兰"];
+        match schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &b_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &relaxed,
+            &["trade_core"],
+        ) {
+            Ok(mut candidate) => {
+                let attached = attach_fiammetta_target_actions(
+                    blueprint,
+                    operbox,
+                    instances,
+                    profile,
+                    &relaxed,
+                    &mut candidate.shifts,
+                )
+                .and_then(|_| {
+                    finalize_timed_rotation(blueprint, operbox, instances, table, candidate)
+                });
+                match attached {
+                    Ok(candidate) => {
+                        write_candidate_report(
+                            options.fiammetta_candidates_out.as_deref(),
+                            "B",
+                            &candidate,
+                        );
+                        let score = fiammetta_candidate_score(&candidate, options);
+                        let targets = candidate_target_names(&candidate);
+                        eprintln!(
+                            "[fiammetta-candidate] B {} trade={} manufacture={} targets={targets:?} score={score}",
+                            profile.cli_name(),
+                            candidate.daily.trade,
+                            candidate.daily.manufacture,
+                        );
+                        if score > fiammetta_candidate_score(&winner, options) {
+                            winner = candidate;
+                            winner_targets = targets;
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "[fiammetta-candidate] B {} rejected reason={error}",
+                            profile.cli_name()
+                        );
+                    }
+                }
+            }
+            Err(error) => {
+                eprintln!(
+                    "[fiammetta-candidate] B {} rejected reason={error}",
+                    profile.cli_name()
+                );
+            }
+        }
+    }
+
+    eprintln!(
+        "[fiammetta-candidate] winner {} trade={} manufacture={} targets={winner_targets:?}",
+        winner.profile.cli_name(),
+        winner.daily.trade,
+        winner.daily.manufacture,
+    );
+    Ok(winner)
+}
+
+fn candidate_target_names(report: &TeamRotationReport) -> Vec<String> {
+    report
+        .shifts
+        .iter()
+        .filter_map(|shift| shift.fiammetta.as_ref())
+        .map(|action| action.target.clone())
+        .collect()
+}
+
+/// 把最终化后的候选排班报告写入指定目录（N.json / A.json / B.json）。
+/// 仅用于调试与对比；目录不存在时创建，写入失败不阻断主流程。
+fn write_candidate_report(
+    directory: Option<&std::path::Path>,
+    name: &str,
+    report: &TeamRotationReport,
+) {
+    let Some(directory) = directory else {
+        return;
+    };
+    let Ok(()) = std::fs::create_dir_all(directory) else {
+        return;
+    };
+    let Ok(json) = serde_json::to_string_pretty(report) else {
+        return;
+    };
+    let _ = std::fs::write(directory.join(format!("{name}.json")), json);
+}
+
+/// 对固定目标各写一次菲亚换心情动作，不改 assignment、不 refill。
+/// 用 `fiammetta_ready_events` 校验（菲亚攒满 + 目标在岗才 ready），ready 即每班
+/// 在岗保证由 L1 shortcut 自然选中 + `validate_fiammetta_continuous_targets` 兜底。
+fn attach_fiammetta_target_actions(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    profile: TimedRotationProfile,
+    targets: &[&str],
+    shifts: &mut [TeamShiftResult],
+) -> Result<()> {
+    if !operbox.owns(FIAMMETTA_NAME) {
+        return Err(Error::msg(
+            "fiammetta target actions require owned Fiammetta",
+        ));
+    }
+    let slots = fiammetta_action_slots(profile, shifts.len());
+    if slots.is_empty() || targets.is_empty() {
+        return Ok(());
+    }
+    let mood_model = MoodModel::load_default()?;
+    let action_budget = slots.len();
+    let mut used_slots = 0usize;
+    let mut consumed_shifts = HashSet::new();
+    for target in targets {
+        if used_slots >= action_budget {
+            break;
+        }
+        let Some(slot) = (0..shifts.len()).find(|slot| {
+            !consumed_shifts.contains(slot)
+                && shifts[*slot].assignment.rooms.iter().any(|room| {
+                    blueprint.room(&room.room_id).is_some_and(|spec| {
+                        matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
+                    }) && room
+                        .operators
+                        .iter()
+                        .any(|operator| operator.name == *target)
+                })
+        }) else {
+            continue;
+        };
+        let ready =
+            fiammetta_ready_events(shifts, target, &[slot], &mood_model, blueprint, instances)
+                .contains(&slot);
+        if !ready {
+            continue;
+        }
+        let Some(room_id) = shifts[slot].assignment.rooms.iter().find_map(|room| {
+            blueprint
+                .room(&room.room_id)
+                .filter(|spec| matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory))
+                .and_then(|_| {
+                    room.operators
+                        .iter()
+                        .any(|operator| operator.name == *target)
+                        .then(|| room.room_id.clone())
+                })
+        }) else {
+            continue;
+        };
+        shifts[slot].fiammetta = Some(FiammettaShiftAction {
+            target: target.to_string(),
+            displaced: String::new(),
+            room_id,
+        });
+        shifts[slot].transition = ShiftTransition::FiammettaOnly;
+        shifts[slot].drone = None;
+        consumed_shifts.insert(slot);
+        used_slots += 1;
+    }
+    if used_slots == 0 {
+        return Err(Error::msg("no ready fiammetta target action"));
+    }
+    Ok(())
+}
+
 pub fn schedule_timed_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -4657,6 +5084,14 @@ pub fn schedule_timed_rotation(
     options: &AssignBaseOptions,
     profile: TimedRotationProfile,
 ) -> Result<TeamRotationReport> {
+    if matches!(
+        profile,
+        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
+    ) {
+        return schedule_abc_rotation_candidates(
+            blueprint, operbox, instances, table, options, profile,
+        );
+    }
     let report = match profile {
         TimedRotationProfile::Abc12_6_6 => schedule_abc_rotation(
             blueprint,
@@ -4668,6 +5103,8 @@ pub fn schedule_timed_rotation(
             options.fiammetta_enable,
             AbyssalShortShiftPolicy::Opportunistic,
             TimedRotationProfile::Abc12_6_6,
+            &[],
+            &[],
         ),
         TimedRotationProfile::Abc12_12_12 => schedule_abc_rotation(
             blueprint,
@@ -4679,6 +5116,8 @@ pub fn schedule_timed_rotation(
             options.fiammetta_enable,
             AbyssalShortShiftPolicy::Disabled,
             TimedRotationProfile::Abc12_12_12,
+            &[],
+            &[],
         ),
         TimedRotationProfile::MainBackup12_12 => {
             schedule_main_backup_12_12(blueprint, operbox, instances, table, options)
@@ -4707,6 +5146,16 @@ enum AbyssalShortShiftPolicy {
     Disabled,
 }
 
+impl AbyssalShortShiftPolicy {
+    fn default_for(profile: TimedRotationProfile) -> Self {
+        match profile {
+            TimedRotationProfile::Abc12_6_6 => Self::Opportunistic,
+            TimedRotationProfile::Abc12_12_12 => Self::Disabled,
+            _ => Self::Disabled,
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn schedule_abc_rotation(
     blueprint: &BaseBlueprint,
@@ -4718,6 +5167,8 @@ fn schedule_abc_rotation(
     enable_fiammetta_return: bool,
     abyssal_policy: AbyssalShortShiftPolicy,
     profile: TimedRotationProfile,
+    gamma_relaxed: &[&str],
+    skip_systems: &[&str],
 ) -> Result<TeamRotationReport> {
     let t0 = Instant::now();
     let cycle_hours: f64 = shift_hours.iter().sum();
@@ -4735,6 +5186,8 @@ fn schedule_abc_rotation(
     // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
+    let mut peak_skip: HashSet<String> =
+        skip_systems.iter().map(|s| s.to_string()).collect();
     let peak_result = assign_shift_with_plan_skip(
         blueprint,
         operbox,
@@ -4743,7 +5196,7 @@ fn schedule_abc_rotation(
         &peak_options,
         AssignShiftMode::Peak,
         &BaseAssignment::default(),
-        &HashSet::new(),
+        &peak_skip,
     )?;
     let peak = peak_result.assignment;
     let mut peak_plan = peak_result.plan;
@@ -4863,6 +5316,27 @@ fn schedule_abc_rotation(
     let mut used_g2 = used_ab.clone();
     let gamma_h2_context =
         gamma_production_coexist_seed(blueprint, &shared, &peak, &shift_binds, &h2, &alpha);
+    for relaxed in gamma_relaxed {
+        // 候选分支的菲亚续命目标跨班复用：目标在 peak（S1）已上岗时，其原房会
+        // 通过 coexist 延续到 S2/S3；γ 只在目标尚未在 coexist 在岗的班次放行它，
+        // 避免跨班时在另一间贸易房重复落位（multiple room slots）。目标是各组合
+        // 的唯一 core，不参与 shift_bind / rotation_reserves / active dependency
+        // 的绑定闭包，也不出现在办公室/宿舍，移除无副作用。
+        if !gamma_h1_context
+            .assignment
+            .operator_names()
+            .contains(*relaxed)
+        {
+            used_g1.remove(*relaxed);
+        }
+        if !gamma_h2_context
+            .assignment
+            .operator_names()
+            .contains(*relaxed)
+        {
+            used_g2.remove(*relaxed);
+        }
+    }
     place_rotation_reserves_for_halves(
         blueprint,
         operbox,
@@ -6550,6 +7024,8 @@ fn schedule_fiammetta_8_8_4_4(
         false,
         AbyssalShortShiftPolicy::Disabled,
         TimedRotationProfile::Abc12_6_6,
+        &[],
+        &[],
     )?;
     let binds = raw.runtime_shift_binds.clone();
     let fiammetta_owner = raw.shifts[0].assignment.clone();

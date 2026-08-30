@@ -538,14 +538,12 @@ pub fn match_witch_group_shortcut(
     }
     let kind = classify_witch_room(ops, table)?;
     let id = match kind {
-        WitchRoomKind::LongE2Beta => "gsl_witch_long_beta",
-        WitchRoomKind::LongE2Alpha => "gsl_witch_long_alpha",
-        WitchRoomKind::LongE2Blank => "gsl_witch_long_blank",
-        WitchRoomKind::LongE0Beta => "gsl_witch_long0_beta",
-        WitchRoomKind::LongE0Alpha => "gsl_witch_long0_alpha",
-        WitchRoomKind::LongE0Blank => "gsl_witch_long0_blank",
-        WitchRoomKind::LongE1Alpha => "gsl_witch_long1_alpha",
-        WitchRoomKind::LongE1Blank => "gsl_witch_long1_blank",
+        WitchRoomKind::LongTierUpBeta => "gsl_witch_long_beta",
+        WitchRoomKind::LongTierUpAlpha => "gsl_witch_long_alpha",
+        WitchRoomKind::LongTierUpBlank => "gsl_witch_long_blank",
+        WitchRoomKind::LongTier0Beta => "gsl_witch_long0_beta",
+        WitchRoomKind::LongTier0Alpha => "gsl_witch_long0_alpha",
+        WitchRoomKind::LongTier0Blank => "gsl_witch_long0_blank",
         WitchRoomKind::BetaBlankNoLongE2 => "gsl_witch_beta_blank",
     };
     let cache = trade_shortcut_cache()?;
@@ -555,18 +553,19 @@ pub fn match_witch_group_shortcut(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WitchRoomKind {
-    LongE2Beta,
-    LongE2Alpha,
-    LongE2Blank,
-    LongE0Beta,
-    LongE0Alpha,
-    LongE0Blank,
-    LongE1Alpha,
-    LongE1Blank,
+    LongTierUpBeta,
+    LongTierUpAlpha,
+    LongTierUpBlank,
+    LongTier0Beta,
+    LongTier0Alpha,
+    LongTier0Blank,
     BetaBlankNoLongE2,
 }
 
 fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<WitchRoomKind> {
+    if ops.len() < 3 {
+        return None;
+    }
     if !has_witch_e2(ops, table) {
         return None;
     }
@@ -576,9 +575,9 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
     }
 
     let long = find_op(ops, "龙舌兰");
-    let long_e2 = long.is_some_and(|o| o.elite >= 2);
-    let long_e0_only = long.is_some_and(|o| o.elite == 0);
-    let long_e1_only = long.is_some_and(|o| o.elite == 1);
+    // 龙舌兰是 5 星：精 0 / 精 1 都解析为运行时 tier_0，精 2 才是 tier_up。
+    let long_tier_up = long.is_some_and(|o| o.elite >= 2);
+    let long_tier_0 = long.is_some_and(|o| o.elite < 2);
 
     let has_beta = ops
         .iter()
@@ -587,31 +586,25 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
         .iter()
         .any(|o| o.name != "巫恋" && has_tailor_alpha(o, table));
 
-    if long_e2 && has_beta {
-        return Some(WitchRoomKind::LongE2Beta);
+    if long_tier_up && has_beta {
+        return Some(WitchRoomKind::LongTierUpBeta);
     }
-    if long_e2 && has_alpha && !has_beta {
-        return Some(WitchRoomKind::LongE2Alpha);
+    if long_tier_up && has_alpha && !has_beta {
+        return Some(WitchRoomKind::LongTierUpAlpha);
     }
-    if long_e2 && !has_beta && !has_alpha {
-        return Some(WitchRoomKind::LongE2Blank);
+    if long_tier_up && !has_beta && !has_alpha {
+        return Some(WitchRoomKind::LongTierUpBlank);
     }
-    if long_e0_only && has_beta {
-        return Some(WitchRoomKind::LongE0Beta);
+    if long_tier_0 && has_beta {
+        return Some(WitchRoomKind::LongTier0Beta);
     }
-    if long_e0_only && has_alpha && !has_beta {
-        return Some(WitchRoomKind::LongE0Alpha);
+    if long_tier_0 && has_alpha && !has_beta {
+        return Some(WitchRoomKind::LongTier0Alpha);
     }
-    if long_e0_only && !has_beta && !has_alpha {
-        return Some(WitchRoomKind::LongE0Blank);
+    if long_tier_0 && !has_beta && !has_alpha {
+        return Some(WitchRoomKind::LongTier0Blank);
     }
-    if long_e1_only && has_alpha && !has_beta {
-        return Some(WitchRoomKind::LongE1Alpha);
-    }
-    if long_e1_only && !has_beta && !has_alpha {
-        return Some(WitchRoomKind::LongE1Blank);
-    }
-    if !long_e2 && has_beta && has_blank_third(ops, table) {
+    if !long_tier_up && has_beta && has_blank_third(ops, table) {
         return Some(WitchRoomKind::BetaBlankNoLongE2);
     }
     None

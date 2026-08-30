@@ -4,7 +4,7 @@
   "entries": [
     {
       "id": "gsl_witch_long_beta",
-      "label": "巫恋Ⅱ+龙舌兰Ⅱ+裁缝β",
+      "label": "巫恋Ⅱ+龙舌兰 tier_up + 裁缝β",
       "mechanic_equivalent_efficiency": 0.46,
       "tailor_tier": "beta",
       "unit_gsl_gold_anchor": 2328.77,
@@ -20,23 +20,23 @@
     },
     {
       "id": "gsl_witch_long_alpha",
-      "label": "巫恋Ⅱ+龙舌兰Ⅱ + 裁缝a",
+      "label": "巫恋Ⅱ+龙舌兰 tier_up + 裁缝a",
       "mechanic_equivalent_efficiency": 0.38,
       "tailor_tier": "alpha",
-      "unit_gsl_gold_anchor": 1675.127,
+      "unit_gsl_gold_anchor": 1915.521,
       "unit_output": {
         "kind": "enhanced_unit_output_per_day",
-        "value": 12030.46
+        "value": 12288.8
       },
-      "unit_output_source": "工具人表26.5 (2).xlsx!Sheet1 B41：等效129%贸；按需求文档等效公式，以纸面1.93、非技能1.03反算",
-      "unit_output_precision": "derived_from_rounded_equivalent",
+      "unit_output_source": "用户校准：龙舌兰 tier_up + 第三人裁缝 α，单位日产出 12288.8 贸易 + 1915.521 赤金",
+      "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
       }
     },
     {
       "id": "gsl_witch_long0_alpha",
-      "label": "巫恋Ⅱ+龙舌兰精0 + 裁缝α",
+      "label": "巫恋Ⅱ+龙舌兰 tier_0 + 裁缝α",
       "mechanic_equivalent_efficiency": 0.0,
       "tailor_tier": "alpha",
       "unit_gsl_gold_anchor": 957.76,
@@ -44,7 +44,7 @@
         "kind": "enhanced_unit_output_per_day",
         "value": 11331.04
       },
-      "unit_output_source": "用户裁决：三级贸易站、精0龙舌兰+巫恋自身裁缝α+外部裁缝α",
+      "unit_output_source": "用户裁决：三级贸易站、龙舌兰 tier_0 + 巫恋自身裁缝α+外部裁缝α",
       "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
@@ -52,7 +52,7 @@
     },
     {
       "id": "gsl_witch_long0_beta",
-      "label": "巫恋Ⅱ+龙舌兰精0 + 裁缝β",
+      "label": "巫恋Ⅱ+龙舌兰 tier_0 + 裁缝β",
       "mechanic_equivalent_efficiency": 0.0,
       "tailor_tier": "beta",
       "unit_gsl_gold_anchor": 1164.384,
@@ -60,23 +60,7 @@
         "kind": "enhanced_unit_output_per_day",
         "value": 11575.34
       },
-      "unit_output_source": "用户裁决：三级贸易站、精0龙舌兰+巫恋自身裁缝α+外部裁缝β",
-      "unit_output_precision": "exact",
-      "match": {
-        "kind": "witch"
-      }
-    },
-    {
-      "id": "gsl_witch_long1_alpha",
-      "label": "巫恋Ⅱ+龙舌兰精1 + 裁缝α（旧低练锚点）",
-      "mechanic_equivalent_efficiency": 0.0,
-      "tailor_tier": "alpha",
-      "unit_gsl_gold_anchor": 837.56,
-      "unit_output": {
-        "kind": "enhanced_unit_output_per_day",
-        "value": 11192.9
-      },
-      "unit_output_source": "既有精0/精1低练兼容锚点；本轮未新增精1社区数值",
+      "unit_output_source": "用户裁决：三级贸易站、龙舌兰 tier_0 + 巫恋自身裁缝α+外部裁缝β",
       "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
@@ -84,30 +68,32 @@
     },
     {
       "id": "gsl_witch_long_blank",
-      "label": "巫恋Ⅱ+龙舌兰Ⅱ + 白板",
+      "label": "巫恋Ⅱ+龙舌兰 tier_up + 白板",
       "mechanic_equivalent_efficiency": 0.33,
       "tailor_tier": "regular",
+      "unit_gsl_gold_anchor": 1675.127,
       "unit_output": {
         "kind": "enhanced_unit_output_per_day",
-        "value": 12073.341969
+        "value": 12030.46
       },
-      "unit_output_source": "工具人表26.5 (2).xlsx!Sheet1 B42：等效124%贸；按需求文档等效公式，以纸面1.93、非技能1.03反算",
-      "unit_output_precision": "derived_from_rounded_equivalent",
+      "unit_output_source": "用户校准：龙舌兰 tier_up + 第三人白板，单位日产出 12030.46 贸易 + 1675.127 赤金",
+      "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
       }
     },
     {
       "id": "gsl_witch_long0_blank",
-      "label": "巫恋Ⅱ+龙舌兰0 + 白板",
+      "label": "巫恋Ⅱ+龙舌兰 tier_0 + 白板",
       "mechanic_equivalent_efficiency": 0.17,
       "tailor_tier": "regular",
+      "unit_gsl_gold_anchor": 837.5635,
       "unit_output": {
         "kind": "enhanced_unit_output_per_day",
-        "value": 11222.357513
+        "value": 11192.89
       },
-      "unit_output_source": "工具人表26.5 (2).xlsx!Sheet1 B43：等效108%贸；按需求文档等效公式，以纸面1.93、非技能1.03反算",
-      "unit_output_precision": "derived_from_rounded_equivalent",
+      "unit_output_source": "用户校准：龙舌兰 tier_0 + 第三人白板，单位日产出 11192.89 贸易 + 837.5635 赤金",
+      "unit_output_precision": "exact",
       "match": {
         "kind": "witch"
       }
@@ -207,21 +193,6 @@
       "unit_output_precision": "exact",
       "match": {
         "kind": "docus"
-      }
-    },
-    {
-      "id": "gsl_witch_long1_blank",
-      "label": "巫恋Ⅱ+龙舌兰精1 + 白板（旧低练锚点）",
-      "mechanic_equivalent_efficiency": 0.17,
-      "tailor_tier": "regular",
-      "unit_output": {
-        "kind": "enhanced_unit_output_per_day",
-        "value": 11222.357513
-      },
-      "unit_output_source": "既有精0/精1低练兼容锚点；本轮未新增精1社区数值",
-      "unit_output_precision": "derived_from_rounded_equivalent",
-      "match": {
-        "kind": "witch"
       }
     },
     {

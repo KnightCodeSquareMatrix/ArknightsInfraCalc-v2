@@ -150,8 +150,8 @@ fn verify_unit_anchors(
         let final_tol = expected_final.as_f64().abs() * case.tolerance_pct / 100.0;
         let final_ok =
             (efficiency.final_efficiency.as_f64() - expected_final.as_f64()).abs() <= final_tol;
-        let expected_daily =
-            efficiency.production_basis.reference_unit_output_per_day * expected_final.as_f64();
+        // Special shortcuts replace the unit output; daily yield uses that anchor directly.
+        let expected_daily = case.expect_unit_trade * efficiency.total_efficiency.as_f64();
         let daily_tol = expected_daily.abs() * case.tolerance_pct / 100.0;
         let daily_ok =
             (result.production.daily_at_shift.trade_lmd - expected_daily).abs() <= daily_tol;

@@ -21,7 +21,7 @@ use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
 use crate::types::Action;
 
 use super::commit::{commit_trade_room, pick_disjoint_from_report, trade_hit_names};
-use super::AssignBaseOptions;
+use super::{AssignBaseOptions, TradeRolePreference};
 
 const WITCH_TRADE_NAME: &str = "巫恋";
 const BLACKKEY_NAME: &str = "黑键";
@@ -585,6 +585,30 @@ pub(super) fn pick_trade_meta_then_plain(
     let mut role_used = used.clone();
     for name in required_names {
         role_used.remove(name);
+    }
+    let witch_preferred = order == TradeOrderKind::Gold
+        && options.trade_role_preference == Some(TradeRolePreference::Witch);
+    if witch_preferred && !role_used.contains(WITCH_TRADE_NAME) {
+        if let Ok(hit) = pick_trade_role_hit_requiring(
+            "witch",
+            pool,
+            table,
+            trade_room_options(
+                layout,
+                gold_lines,
+                options,
+                TradeOrderKind::Gold,
+                room_level,
+            ),
+            layout,
+            &role_used,
+            options.top_k,
+            required_names,
+        ) {
+            if hit.names.iter().any(|name| name == WITCH_TRADE_NAME) {
+                return Ok(hit);
+            }
+        }
     }
     if order == TradeOrderKind::Gold
         && !role_used.contains(DOCUS_TRADE_NAME)

@@ -85,7 +85,7 @@ L1 自然 winner 为中枢灵知 E2 + 贸易站双技能孑 / 银灰 / 琳琅诗
 
 与佩佩共用 `PeerEffAbsorb` 原语；巫恋 `rate_per_peer=45`，佩佩 `rate=0`（只清零、不吸收）。
 
-**编排**：`trade_segments.roles.witch` 强制包含精二巫恋、持有即可的龙舌兰（精0/精1/精2）和合法龙巫候选；精二龙舌兰优先使用裁缝 β/α 路径，低练度龙舌兰允许 `gsl_witch_long0_alpha` 或 `gsl_witch_long0_blank` 排班路径。普通白板第三人不得伪造成完整高练度龙巫候选；`witch_long_beta` 不作为主路径 fixed registry 早占站。此处是排班 admission 规则，不改变练卡推荐口径。
+**编排**：`trade_segments.roles.witch` 强制包含精二巫恋、持有即可的龙舌兰（`tier_0` / `tier_up`）和合法龙巫候选；`tier_up` 龙舌兰优先使用裁缝 β/α 路径，`tier_0` 龙舌兰允许 β/α/白板三档 `gsl_witch_long0_*` 排班路径。普通白板第三人不得伪造成完整高练度龙巫候选；`witch_long_beta` 不作为主路径 fixed registry 早占站。此处是排班 admission 规则，不改变练卡推荐口径。
 
 ## 4.6 佩佩
 

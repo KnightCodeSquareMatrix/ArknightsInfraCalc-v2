@@ -1,8 +1,10 @@
 case_id,rule_id,operators,trade_level,expect_final_efficiency,expect_mechanic_equivalent_efficiency,tolerance
 reg_gsl_witch_long_beta,gsl_witch_long_beta,see_roster,3,2.395,0.460,0.001
-reg_gsl_witch_long_alpha,gsl_witch_long_alpha,see_roster,3,2.320,0.380,0.001
-reg_gsl_witch_long_blank,gsl_witch_long_blank,see_roster,3,2.270,0.330,0.001
-reg_gsl_witch_long0_blank,gsl_witch_long0_blank,see_roster,3,2.109,0.170,0.001
+reg_gsl_witch_long_alpha,gsl_witch_long_alpha,see_roster,3,2.310,0.380,0.001
+reg_gsl_witch_long_blank,gsl_witch_long_blank,see_roster,3,2.262,0.330,0.001
+reg_gsl_witch_long0_alpha,gsl_witch_long0_alpha,see_roster,3,2.131,0.000,0.001
+reg_gsl_witch_long0_beta,gsl_witch_long0_beta,see_roster,3,2.177,0.000,0.001
+reg_gsl_witch_long0_blank,gsl_witch_long0_blank,see_roster,3,2.104,0.170,0.001
 reg_gsl_witch_beta_blank,gsl_witch_beta_blank,see_roster,3,1.961,0.000,0.001
 reg_gsl_closure_tier90,gsl_closure_tier90,可露希尔+挂件,3,2.490,0.420,0.001
 reg_gsl_closure_tier80,gsl_closure_tier80,可露希尔+挂件,3,2.081,0.400,0.001

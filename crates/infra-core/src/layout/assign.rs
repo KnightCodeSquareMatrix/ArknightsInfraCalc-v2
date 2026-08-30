@@ -35,6 +35,14 @@ use crate::scoring::{ScoringPolicyId, TradeManufactureEfficiencyWeights};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
+/// 未被 Plan 认领的金单贸易站的 role 首选顺序偏好。
+/// 只改变 `pick_trade_meta_then_plain` 的候选尝试顺序（顺序驱动、不看效率），
+/// 首选 role 不可行时回退默认顺序，不构成 required admission。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TradeRolePreference {
+    Witch,
+}
+
 #[derive(Debug, Clone)]
 pub struct AssignBaseOptions {
     pub top_k: usize,
@@ -44,6 +52,10 @@ pub struct AssignBaseOptions {
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// 金单贸易站自然搜索的 role 首选顺序偏好（B 分支：巫恋组优先）。
+    pub trade_role_preference: Option<TradeRolePreference>,
+    /// 启用菲亚候选分支时，把 N/A/B 三份最终排班报告写入该目录（调试/对比用）。
+    pub fiammetta_candidates_out: Option<std::path::PathBuf>,
     /// 菲亚梅塔主力回岗覆盖开关；`false` 时 ABC 排班不生成回岗动作。
     pub fiammetta_enable: bool,
     /// Dynamic producer prefix comparator. The public baseline remains V0;
@@ -60,6 +72,8 @@ impl Default for AssignBaseOptions {
             shift_hours: 24.0,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
+            trade_role_preference: None,
+            fiammetta_candidates_out: None,
             fiammetta_enable: true,
             dynamic_producer_policy: ScoringPolicyId::ControlInjectRawSumV0,
             trade_manufacture_weights: TradeManufactureEfficiencyWeights::default(),

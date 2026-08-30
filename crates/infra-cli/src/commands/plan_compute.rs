@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use infra_core::box_profile::{
     build_box_profile_from_current_probe, run_user_rotation_probe_with_profile_and_preferences,
@@ -128,6 +128,7 @@ pub(super) struct PlanComputeInput<'a> {
     pub rotation_profile: TimedRotationProfile,
     pub system_preferences: &'a HashMap<String, String>,
     pub maa_title: Option<&'a str>,
+    pub fiammetta_candidates_out: Option<PathBuf>,
     pub fiammetta_enable: bool,
     pub assert_invariants: bool,
 }
@@ -158,6 +159,7 @@ pub(super) fn compute_plan(
         input.rotation_profile,
         input.system_preferences,
         input.fiammetta_enable,
+        input.fiammetta_candidates_out.clone(),
     )?;
 
     if input.assert_invariants {

@@ -6,7 +6,8 @@
 > 摘要：记录将求解器 Linux CLI 更新到 quality-check 的操作规则与热路径部署
 
 `scripts/update_solver_quality.py` 是指向远端 quality-check（114.66.55.78）的点对点投递脚本，
-无参数运行。quality-check 为每个 solver 建立不可变 bundle；
+无参数运行。它只构建并原子投递 Linux ELF，完成 partial → final handoff 后退出；runner
+异步建立不可变 bundle，但不会自动创建 job。
 不要直接覆盖已有 bundle、运行中的 CLI 或共享 data 目录。
 
 ## 1. 更新前提
@@ -30,8 +31,8 @@
 |---|---|
 | 存储目录 | `/var/lib/arknights-infra-quality`（`QUALITY_STORAGE_DIR`） |
 | 投递目录 | `/var/lib/arknights-infra-quality/solver-incoming` |
-| 归档目录 | `/var/lib/arknights-infra-quality/solver-archive/<bundleId>/` |
-| 失败目录 | `/var/lib/arknights-infra-quality/solver-failed/` |
+| 归档目录 | `/var/lib/arknights-infra-quality/v2/discovery-archive/<bundleId>/` |
+| 失败目录 | `/var/lib/arknights-infra-quality/v2/discovery-processing/`（保留供重试） |
 | Runner | `arknights-infra-quality-next-runner.service`，轮询 2s |
 | Next 服务 | `arknights-infra-quality-next.service`，`127.0.0.1:4385` |
 | nginx 回环 | `127.0.0.1:4376` |
@@ -57,36 +58,40 @@ worktree。**当前工作树 dirty 时**可手动构建 release bundle（跳过 
 
 ## 4. 上传并原子改名
 
-使用固定远端脚本（等待 bundle 和 job 完成）：
+使用唯一入口（脚本自行执行一次 release 构建，不要预先重复构建）：
 
 ```bash
 python3 scripts/update_solver_quality.py
 ```
 
-脚本先通过 scp 写入 `infra-cli.partial`，再在远端原子 rename，避免 runner 领取不完整的文件，
-随后轮询远端 status API，直到新 bundle 与质量 job 达到终态。正常的代表性矩阵通常在数十秒内完成；
-脚本最多等待 1800 秒，并在终态输出 case 计数：
+脚本先通过 scp 写入带制品 SHA 的临时文件，再在远端锁保护下检查目标不存在并原子 rename，
+避免 runner 领取不完整的文件或并发投递互相覆盖。
+handoff 完成后 runner 可能立即取走 final 文件，因此脚本不以 incoming 中持续存在 `infra-cli`
+作为成功条件。脚本不会等待 bundle 或 job，也不会调用创建 job 的 API：
 
 ```bash
 scp dist/arknights-infra-linux-x86_64/infra-cli \
-  root@114.66.55.78:/var/lib/arknights-infra-quality/solver-incoming/infra-cli.partial
+  root@114.66.55.78:/var/lib/arknights-infra-quality/solver-incoming/infra-cli.<sha256>.partial
 ```
 
 上传完成后，在远端执行权限设置和原子改名：
 
 ```bash
 ssh root@114.66.55.78 '
-  chown arkinfra:arkinfra /var/lib/arknights-infra-quality/solver-incoming/infra-cli.partial &&
-  chmod 750 /var/lib/arknights-infra-quality/solver-incoming/infra-cli.partial &&
-  mv /var/lib/arknights-infra-quality/solver-incoming/infra-cli.partial \
-     /var/lib/arknights-infra-quality/solver-incoming/infra-cli
+  chown arkinfra:arkinfra /var/lib/arknights-infra-quality/solver-incoming/infra-cli.<sha256>.partial &&
+  chmod 750 /var/lib/arknights-infra-quality/solver-incoming/infra-cli.<sha256>.partial &&
+  test ! -e /var/lib/arknights-infra-quality/solver-incoming/infra-cli &&
+  mv /var/lib/arknights-infra-quality/solver-incoming/infra-cli.<sha256>.partial \
+      /var/lib/arknights-infra-quality/solver-incoming/infra-cli
 '
 ```
+
+目标文件已存在、远端锁持续 30 秒，或临时文件不存在时，脚本失败并保留现场；不得用覆盖或删除旧文件的方式重试。
 
 正式文件名出现后，quality runner 在 2 秒轮询周期内领取它。不要把新的 CLI 直接
 复制到已有 `bundles/<bundleId>/`，也不要修改已有 bundle 的 `infra-cli` 或 `data/`。
 
-## 5. runner 的自动处理规则
+## 5. runner 规则
 
 `arknights-infra-quality-next-runner.service` 会：
 
@@ -97,10 +102,12 @@ ssh root@114.66.55.78 '
    `embeddedData=true`，跳过 `bake all`，直接使用 CLI 内置 data（热路径）。**
 5. 将 CLI 复制到新的不可变 bundle，记录 executable hash；`dataFiles` 为空、
    `bakedManifestSha256` 为 null。
-6. 安装成功后将原文件归档到 `solver-archive/<bundleId>/`。
-7. 自动创建一份固定质量矩阵 job。已有非终态 job 时不会抢占；新文件会留在 incoming 等待。
+6. 安装成功后将原文件归档到 `v2/discovery-archive/<bundleId>/`。
+7. **不会自动创建 job，也不会读取部署机的 `matrix.json`。**
 
-自动发现失败时，文件移动到 `solver-failed/`。
+自动发现失败时，文件保留在 `v2/discovery-processing/`，并由 discovery event 记录失败阶段。
+
+需要计算时，另行手动调用现有 Quality API；该动作不属于 ELF 投递脚本。
 
 ## 6. 监控与验收
 
@@ -111,7 +118,7 @@ ssh root@114.66.55.78 'journalctl -u arknights-infra-quality-next-runner.service
 成功时应看到：
 
 ```text
-自动发现 solver：bundle=solver-<commit>... job=<jobId>
+ELF atomically handed to the runner; no job created
 ```
 
 查看质量服务公开状态：
@@ -120,12 +127,15 @@ ssh root@114.66.55.78 'journalctl -u arknights-infra-quality-next-runner.service
 curl -sS https://instance-pi2ohhfj.tail2dca9.ts.net:10000/api/quality/status
 ```
 
-验收至少确认：
+脚本退出只证明 ELF handoff 完成；异步验收至少确认：
 
-- `bundles` 出现新的 `bundleId`、`gitCommit` 和 `executableSha256`，且
-  `embeddedData: true`（确认走热路径）。
-- 新 bundle 的质量 job 已创建并进入 `running`，最终 `completed`。
-- `/quality` 页面可打开该 job，并能查看 case 结果。
+- 公开 status API 的 `bundles` 出现新的 `bundleId`、`gitCommit` 和
+  `executableSha256`。该摘要当前不提供 `embeddedData`，字段缺失不是部署失败。
+- 对应 bundle definition 的 `fingerprint.dataMode` 为 `embedded`、`dataFiles` 为空，
+  这是热路径证据；不要从 status 摘要重新推断。
+- discovery event 出现 `bundle_published` 和 `archived`，且 `error=null`。
+  自动发现不创建 job，因此 `jobId=null` 是正常结果。
+- 如需计算，再由人工显式创建 job，并在 `/quality` 页面查看结果。
 - runner 日志没有 bake、权限或 fingerprint mismatch 错误。
 - 新旧 bundle 均保留，旧 job 的结果仍引用旧 `bundleId`。
 - **失败 case 集合与旧 bundle 对比**：新版本不应引入新的失败；同一批 case
@@ -136,11 +146,11 @@ curl -sS https://instance-pi2ohhfj.tail2dca9.ts.net:10000/api/quality/status
 | 现象 | 处理 |
 |---|---|
 | 文件长期留在 `solver-incoming` | 检查 runner 状态、文件大小、owner 和 `0750` 权限 |
-| 文件进入 `solver-failed` | 查看 runner 日志；优先检查 Linux 架构、ELF 有效性和 `serve` probe |
+| discovery processing 长期未归档或 event 带 error | 查看 discovery event 与 runner 日志；优先检查 Linux 架构、ELF 有效性和 `serve` probe |
 | job 全部 `infra_interrupted` | 检查 bundle 内 `infra-cli` 是否为 `0750` 可执行文件 |
 | preflight 报 executable/data 被修改 | 不要修补旧 bundle；重新投递新 CLI，生成新 bundle |
 | `serve` 报 operbox 路径或解析错误 | 使用与 solver 匹配的合法 operbox；`plan.compute` 内联传入 |
-| 新 job 未出现 | 当前已有非终态 job；等待完成或按 quality-check 运维规则取消后再投递 |
+| 投递后没有新 job | 正常；投递入口不创建 job，需要时显式调用 Quality API |
 | case 报 `solver_failed` | 打开 job case 看 `errorCode` / `errorMessage`；已知失败集合（如 12F 练度不可能、中枢 required anchors 超容量）需与旧 bundle 比对确认非回归 |
 
 修复后必须使用新的 CLI 文件再次投递。禁止通过修改现有 bundle 文件、删除
@@ -152,10 +162,10 @@ manifest 或手工改 job 的 `bundleId` 绕过 preflight。
 
 - solver Git commit（`bundle.json` 的 `gitCommit`）和 `builtAt`；
 - `infra-cli` SHA-256（`executableSha256`）；
-- `embeddedData` 是否为 true（热路径）；
-- quality-check 新建的 `bundleId` 和 job ID；
-- `/api/quality/status` 验收结果（completedCount / failedCount / caseStatuses）；
-- 失败 case 与旧 bundle 的对比结论（是否引入回归）；
+- bundle definition 的 `fingerprint.dataMode` 是否为 `embedded`（热路径）；
+- quality-check 新建的 `bundleId`；若另行创建 job，再记录 job ID；
+- 显式 job 的 `/api/quality/status` 验收结果（completedCount / failedCount / caseStatuses）；
+- 如运行显式 job，记录失败 case 与旧 bundle 的对比结论（是否引入回归）；
 - 未解决的失败 case 或数据兼容风险。
 
 该流程只更新 quality-check 的独立 bundle，不会替换 dev 或生产 beta 的 CLI。

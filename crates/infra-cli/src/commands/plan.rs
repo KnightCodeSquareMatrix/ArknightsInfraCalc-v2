@@ -62,6 +62,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             rotation_profile,
             system_preferences: &system_preferences,
             maa_title,
+            fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
             fiammetta_enable,
             assert_invariants,
         },
@@ -202,6 +203,12 @@ fn output_dir_from_args(args: &[String]) -> Option<PathBuf> {
 fn maa_out_from_args(args: &[String]) -> Option<PathBuf> {
     args.windows(2)
         .find(|w| w[0] == "--maa-out")
+        .map(|w| PathBuf::from(&w[1]))
+}
+
+fn fiammetta_candidates_out_from_args(args: &[String]) -> Option<PathBuf> {
+    args.windows(2)
+        .find(|w| w[0] == "--fiammetta-candidates-out")
         .map(|w| PathBuf::from(&w[1]))
 }
 

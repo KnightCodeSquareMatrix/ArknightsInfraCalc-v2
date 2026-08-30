@@ -60,6 +60,8 @@ pub fn witch_fixture(shortcut_id: &str, level: u8) -> TradeRoomInput {
         "gsl_witch_long_beta" => vec![shamare, long_e2, kafka_beta],
         "gsl_witch_long_alpha" => vec![shamare, long_e2, zheguang_alpha],
         "gsl_witch_long_blank" => vec![shamare, long_e2, blank],
+        "gsl_witch_long0_alpha" => vec![shamare, long_e0, zheguang_alpha],
+        "gsl_witch_long0_beta" => vec![shamare, long_e0, kafka_beta],
         "gsl_witch_long0_blank" => vec![shamare, long_e0, blank],
         "gsl_witch_beta_blank" => vec![shamare, kafka_beta, blank],
         _ => vec![shamare, long_e2, blank],

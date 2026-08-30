@@ -142,6 +142,7 @@ pub fn build_box_profile(
         options.rotation_profile,
         &options.system_preferences,
         options.fiammetta_enable,
+        None,
     )?;
     build_box_profile_from_current_probe(
         &current,

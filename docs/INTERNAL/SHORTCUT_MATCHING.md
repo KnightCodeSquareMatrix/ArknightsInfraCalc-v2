@@ -99,11 +99,13 @@ None → 走 L2
 
 | 条件 | shortcut id |
 |------|-------------|
-| 龙舌兰精二 + 裁缝 β（第三人） | `gsl_witch_long_beta` |
-| 龙舌兰精二 + 裁缝 α（无 β） | `gsl_witch_long_alpha` |
-| 龙舌兰精二 + 空白第三人 | `gsl_witch_long_blank` |
-| 龙舌兰精0 + 空白第三人 | `gsl_witch_long0_blank` |
-| 无龙舌兰精二 + β + 空白第三人 | `gsl_witch_beta_blank` |
+| 龙舌兰 `tier_up` + 裁缝 β（第三人） | `gsl_witch_long_beta` |
+| 龙舌兰 `tier_up` + 裁缝 α（无 β） | `gsl_witch_long_alpha` |
+| 龙舌兰 `tier_up` + 白板第三人 | `gsl_witch_long_blank` |
+| 龙舌兰 `tier_0` + 裁缝 β（第三人） | `gsl_witch_long0_beta` |
+| 龙舌兰 `tier_0` + 裁缝 α（无 β） | `gsl_witch_long0_alpha` |
+| 龙舌兰 `tier_0` + 白板第三人 | `gsl_witch_long0_blank` |
+| 无龙舌兰 `tier_up` + β + 空白第三人 | `gsl_witch_beta_blank` |
 
 表内 `unit_output` 是社区单位产出真源，`mechanic_equivalent_efficiency` 是解释锚点；L1 仍计算纸面效率。
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "rotation_profile": "abc_12_12_12",
+  "rotation_profile": "abc_12_6_6",
   "layout_label": "data/fixtures/243/layout.json",
   "operbox_label": "data/fixtures/243/operbox_full_e2.json",
   "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
@@ -66,7 +66,7 @@
           "清流",
           "温蒂"
         ],
-        "final_efficiency": 8.75
+        "final_efficiency": 8.99
       },
       "baseline": {
         "operators": [
@@ -76,7 +76,7 @@
         ],
         "final_efficiency": 8.102
       },
-      "gap_ratio": 0.07998025178968152,
+      "gap_ratio": 0.10960256726734138,
       "severity": "ok"
     },
     {
@@ -88,7 +88,7 @@
           "清流",
           "温蒂"
         ],
-        "final_efficiency": 2.285
+        "final_efficiency": 2.335
       },
       "baseline": {
         "operators": [
@@ -98,7 +98,7 @@
         ],
         "final_efficiency": 2.093
       },
-      "gap_ratio": 0.0917343526039179,
+      "gap_ratio": 0.11562350692785475,
       "severity": "ok"
     },
     {
@@ -106,11 +106,11 @@
       "label": "制造·经验产线",
       "current": {
         "operators": [
+          "乌尔比安",
           "弑君者",
-          "断罪者",
-          "裂响"
+          "断罪者"
         ],
-        "final_efficiency": 2.09
+        "final_efficiency": 2.16
       },
       "baseline": {
         "operators": [
@@ -120,47 +120,47 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": 0.0674157303370786,
+      "gap_ratio": 0.10316649642492348,
       "severity": "ok"
     },
     {
       "id": "rotation_trade",
-      "label": "轮休·36h周期归一化日均贸易加权",
+      "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 3.966
+        "final_efficiency": 3.946
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 3.84
       },
-      "gap_ratio": 0.03281250000000009,
+      "gap_ratio": 0.02760416666666675,
       "severity": "ok"
     },
     {
       "id": "rotation_manufacture",
-      "label": "轮休·36h周期归一化日均制造加权",
+      "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 9.07
+        "final_efficiency": 9.215
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 8.938
       },
-      "gap_ratio": 0.014768404564779555,
+      "gap_ratio": 0.030991273215484363,
       "severity": "ok"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 3.966,
-    "daily_manufacture_efficiency": 9.07,
-    "daily_power_efficiency": 3.656
+    "daily_trade_efficiency": 3.946,
+    "daily_manufacture_efficiency": 9.215,
+    "daily_power_efficiency": 1.664
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
     "daily_manufacture_efficiency": 8.938,
-    "daily_power_efficiency": 3.627
+    "daily_power_efficiency": 1.627
   },
   "actions": [],
   "flags": [

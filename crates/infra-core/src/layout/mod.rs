@@ -19,7 +19,7 @@ pub use assign::{
     assign_shift_with_plan, assign_shift_with_plan_skip, assign_team_gamma_half,
     assign_team_producer_rooms, assignment_operator_names, blackkey_witch_same_trade_room,
     explain_assignment_systems, pinned_assignment, pinned_assignment_excluding, rotating_workers,
-    AssignBaseOptions, AssignShiftResult,
+    AssignBaseOptions, AssignShiftResult, TradeRolePreference,
 };
 pub(crate) use assign::{beta_tailor_names, refill_witch_room_with_tailor};
 pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment, RoomEfficiencySnapshot};
