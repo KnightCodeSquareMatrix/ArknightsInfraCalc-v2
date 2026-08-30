@@ -187,6 +187,18 @@ fn compute_plan_inner(
         input.fiammetta_candidates_out.clone(),
     );
     let stage_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_resolve_stage(
+        "plan_compute_resolve",
+        "current_probe",
+        if current_result.is_ok() {
+            "ok"
+        } else {
+            "error"
+        },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
     infra_core::profile::emit_solver_stage(
         "plan_compute",
         "current_probe",

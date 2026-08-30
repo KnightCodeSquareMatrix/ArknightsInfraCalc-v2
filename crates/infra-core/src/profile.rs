@@ -53,6 +53,18 @@ pub fn record_trade_solve() {
 pub struct OperationMetrics {
     pub calls: u64,
     pub wall_nanos: u64,
+    pub workforce_nanos: u64,
+    pub layout_nanos: u64,
+    pub mechanics_nanos: u64,
+    pub cross_facility_nanos: u64,
+    pub support_nanos: u64,
+    pub support_registry_load_nanos: u64,
+    pub room_materialize_nanos: u64,
+    pub support_registry_loads: u64,
+    pub layout_clones: u64,
+    pub blueprint_clones: u64,
+    pub assignment_clones: u64,
+    pub room_context_clones: u64,
     pub prepare_nanos: u64,
     pub bake_lookup_nanos: u64,
     pub evaluate_nanos: u64,
@@ -70,6 +82,32 @@ impl OperationMetrics {
         Self {
             calls: self.calls.saturating_sub(before.calls),
             wall_nanos: self.wall_nanos.saturating_sub(before.wall_nanos),
+            workforce_nanos: self.workforce_nanos.saturating_sub(before.workforce_nanos),
+            layout_nanos: self.layout_nanos.saturating_sub(before.layout_nanos),
+            mechanics_nanos: self.mechanics_nanos.saturating_sub(before.mechanics_nanos),
+            cross_facility_nanos: self
+                .cross_facility_nanos
+                .saturating_sub(before.cross_facility_nanos),
+            support_nanos: self.support_nanos.saturating_sub(before.support_nanos),
+            support_registry_load_nanos: self
+                .support_registry_load_nanos
+                .saturating_sub(before.support_registry_load_nanos),
+            room_materialize_nanos: self
+                .room_materialize_nanos
+                .saturating_sub(before.room_materialize_nanos),
+            support_registry_loads: self
+                .support_registry_loads
+                .saturating_sub(before.support_registry_loads),
+            layout_clones: self.layout_clones.saturating_sub(before.layout_clones),
+            blueprint_clones: self
+                .blueprint_clones
+                .saturating_sub(before.blueprint_clones),
+            assignment_clones: self
+                .assignment_clones
+                .saturating_sub(before.assignment_clones),
+            room_context_clones: self
+                .room_context_clones
+                .saturating_sub(before.room_context_clones),
             prepare_nanos: self.prepare_nanos.saturating_sub(before.prepare_nanos),
             bake_lookup_nanos: self
                 .bake_lookup_nanos
@@ -121,6 +159,16 @@ pub enum SearchOperation {
     Power,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ResolvePhase {
+    Workforce,
+    Layout,
+    Mechanics,
+    CrossFacility,
+    Support,
+    RoomMaterialize,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SearchPhaseDurations {
     pub prepare: Duration,
@@ -135,6 +183,7 @@ struct PerfTraceState {
     layout: String,
     operbox: String,
     metrics: SolverPerfSnapshot,
+    resolve_depth: u32,
 }
 
 thread_local! {
@@ -165,6 +214,7 @@ pub fn start_solver_perf_trace(layout: &str, operbox: &str) -> SolverPerfTraceGu
         layout: layout.to_string(),
         operbox: operbox.to_string(),
         metrics: SolverPerfSnapshot::default(),
+        resolve_depth: 0,
     };
     let previous = PERF_TRACE.with(|trace| trace.borrow_mut().replace(state));
     SolverPerfTraceGuard {
@@ -206,6 +256,35 @@ pub fn solver_perf_snapshot() -> SolverPerfSnapshot {
     })
 }
 
+pub struct ResolvePerfGuard {
+    active: bool,
+}
+
+pub fn begin_resolve_perf() -> ResolvePerfGuard {
+    let active = PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return false;
+        };
+        state.resolve_depth = state.resolve_depth.saturating_add(1);
+        true
+    });
+    ResolvePerfGuard { active }
+}
+
+impl Drop for ResolvePerfGuard {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        PERF_TRACE.with(|trace| {
+            if let Some(state) = trace.borrow_mut().as_mut() {
+                state.resolve_depth = state.resolve_depth.saturating_sub(1);
+            }
+        });
+    }
+}
+
 pub fn record_resolve(elapsed: Duration) {
     PERF_TRACE.with(|trace| {
         let mut trace = trace.borrow_mut();
@@ -217,6 +296,66 @@ pub fn record_resolve(elapsed: Duration) {
             .metrics
             .resolve
             .wall_nanos
+            .saturating_add(duration_nanos(elapsed));
+    });
+}
+
+pub fn record_resolve_phase(phase: ResolvePhase, elapsed: Duration) {
+    PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return;
+        };
+        let target = match phase {
+            ResolvePhase::Workforce => &mut state.metrics.resolve.workforce_nanos,
+            ResolvePhase::Layout => &mut state.metrics.resolve.layout_nanos,
+            ResolvePhase::Mechanics => &mut state.metrics.resolve.mechanics_nanos,
+            ResolvePhase::CrossFacility => &mut state.metrics.resolve.cross_facility_nanos,
+            ResolvePhase::Support => &mut state.metrics.resolve.support_nanos,
+            ResolvePhase::RoomMaterialize => &mut state.metrics.resolve.room_materialize_nanos,
+        };
+        *target = target.saturating_add(duration_nanos(elapsed));
+    });
+}
+
+pub fn record_resolve_construction(
+    support_registry_loads: u64,
+    layout_clones: u64,
+    blueprint_clones: u64,
+    assignment_clones: u64,
+    room_context_clones: u64,
+) {
+    PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return;
+        };
+        let metrics = &mut state.metrics.resolve;
+        metrics.support_registry_loads = metrics
+            .support_registry_loads
+            .saturating_add(support_registry_loads);
+        metrics.layout_clones = metrics.layout_clones.saturating_add(layout_clones);
+        metrics.blueprint_clones = metrics.blueprint_clones.saturating_add(blueprint_clones);
+        metrics.assignment_clones = metrics.assignment_clones.saturating_add(assignment_clones);
+        metrics.room_context_clones = metrics
+            .room_context_clones
+            .saturating_add(room_context_clones);
+    });
+}
+
+pub fn record_support_registry_load(elapsed: Duration) {
+    PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return;
+        };
+        if state.resolve_depth == 0 {
+            return;
+        }
+        state.metrics.resolve.support_registry_load_nanos = state
+            .metrics
+            .resolve
+            .support_registry_load_nanos
             .saturating_add(duration_nanos(elapsed));
     });
 }
@@ -448,6 +587,39 @@ pub fn emit_solver_stage_metrics(
     });
 }
 
+pub fn emit_resolve_stage(
+    scope: &'static str,
+    stage: &'static str,
+    status: &'static str,
+    elapsed: Duration,
+    before: SolverPerfSnapshot,
+    after: SolverPerfSnapshot,
+) {
+    let metrics = after.delta(before).resolve;
+    if metrics.calls == 0 {
+        return;
+    }
+    PERF_TRACE.with(|trace| {
+        let trace = trace.borrow();
+        let Some(state) = trace.as_ref() else {
+            return;
+        };
+        let event = serde_json::json!({
+            "schema_version": 1,
+            "event": "solver_stage",
+            "trace_id": state.trace_id,
+            "layout": state.layout,
+            "operbox": state.operbox,
+            "scope": scope,
+            "stage": stage,
+            "status": status,
+            "elapsed_ms": duration_ms(elapsed),
+            "metrics": {"resolve": operation_json(metrics)}
+        });
+        eprintln!("[perf] {event}");
+    });
+}
+
 fn search_operation_name(operation: SearchOperation) -> &'static str {
     match operation {
         SearchOperation::Control => "control",
@@ -461,6 +633,18 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
     serde_json::json!({
         "calls": metrics.calls,
         "wall_ms": nanos_ms(metrics.wall_nanos),
+        "workforce_ms": nanos_ms(metrics.workforce_nanos),
+        "layout_ms": nanos_ms(metrics.layout_nanos),
+        "mechanics_ms": nanos_ms(metrics.mechanics_nanos),
+        "cross_facility_ms": nanos_ms(metrics.cross_facility_nanos),
+        "support_ms": nanos_ms(metrics.support_nanos),
+        "support_registry_load_ms": nanos_ms(metrics.support_registry_load_nanos),
+        "room_materialize_ms": nanos_ms(metrics.room_materialize_nanos),
+        "support_registry_loads": metrics.support_registry_loads,
+        "layout_clones": metrics.layout_clones,
+        "blueprint_clones": metrics.blueprint_clones,
+        "assignment_clones": metrics.assignment_clones,
+        "room_context_clones": metrics.room_context_clones,
         "prepare_ms": nanos_ms(metrics.prepare_nanos),
         "bake_lookup_ms": nanos_ms(metrics.bake_lookup_nanos),
         "evaluate_ms": nanos_ms(metrics.evaluate_nanos),

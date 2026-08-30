@@ -329,6 +329,7 @@ impl WorkforceIndex {
         operator_name: &str,
         instances: Option<&OperatorInstances>,
     ) -> LayoutContext {
+        crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
         let mut layout = base.clone();
         layout.other_power_has_platform = self.other_power_has_platform(room_id);
         layout.other_platform_in_power = self.other_platform_in_power(room_id, operator_name);

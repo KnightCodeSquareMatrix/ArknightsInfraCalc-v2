@@ -5128,6 +5128,14 @@ pub fn schedule_timed_rotation(
     let result =
         schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile);
     let after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_resolve_stage(
+        "rotation_resolve",
+        "total",
+        if result.is_ok() { "ok" } else { "error" },
+        started.elapsed(),
+        before,
+        after,
+    );
     crate::profile::emit_solver_stage(
         "rotation",
         "total",

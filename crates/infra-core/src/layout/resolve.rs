@@ -78,6 +78,7 @@ impl ResolvedBase {
     }
 
     pub fn layout_snapshot(&self) -> LayoutContext {
+        crate::profile::record_resolve_construction(0, 1, 0, 0, 0);
         self.layout.clone()
     }
 }
@@ -91,6 +92,7 @@ pub fn resolve_base(
     durin_dorm_planning: Option<u8>,
 ) -> Result<ResolvedBase> {
     let started = Instant::now();
+    let _resolve_perf = crate::profile::begin_resolve_perf();
     let result = resolve_base_inner(
         blueprint,
         assignment,
@@ -114,6 +116,7 @@ pub fn resolve_base_with_trace(
     durin_dorm_planning: Option<u8>,
 ) -> Result<(ResolvedBase, ResolveTrace)> {
     let started = Instant::now();
+    let _resolve_perf = crate::profile::begin_resolve_perf();
     let result = resolve_base_inner(
         blueprint,
         assignment,
@@ -140,8 +143,14 @@ fn resolve_base_inner(
     blueprint.validate()?;
     let mut trace = ResolveTrace::default();
 
+    let phase_started = Instant::now();
     let workforce = WorkforceIndex::build(blueprint, assignment, instances);
+    crate::profile::record_resolve_phase(
+        crate::profile::ResolvePhase::Workforce,
+        phase_started.elapsed(),
+    );
 
+    let phase_started = Instant::now();
     let mut layout = LayoutContext {
         meeting_max_level: blueprint.meeting_max_level(),
         training_room_level: blueprint.training_room_max_level(),
@@ -170,9 +179,14 @@ fn resolve_base_inner(
         layout.apply_durin_dorm_planning(count);
     }
     layout.gold_manu_line_count = blueprint.gold_manu_line_count();
+    crate::profile::record_resolve_phase(
+        crate::profile::ResolvePhase::Layout,
+        phase_started.elapsed(),
+    );
 
     let mut active_global_buffs = std::collections::HashSet::new();
     if let (Some(instances), Some(table)) = (instances, table) {
+        let mechanics_started = Instant::now();
         let power_ops: Vec<(RoomId, PowerOperator)> = workforce
             .power_stations
             .iter()
@@ -192,11 +206,21 @@ fn resolve_base_inner(
             &workforce,
             instances,
         )?;
+        crate::profile::record_resolve_phase(
+            crate::profile::ResolvePhase::Mechanics,
+            mechanics_started.elapsed(),
+        );
 
         // 琴柳的中枢条件读取办公室当前联络速度。办公室的实际技能值必须在
         // 中枢结算前可见，避免把后续办公室成员错误地当成不存在。
+        let support_started = Instant::now();
         layout.office_hire_spd_pct =
             support_office_hire_speed(blueprint, assignment, &layout, mood)?;
+        crate::profile::record_resolve_phase(
+            crate::profile::ResolvePhase::Support,
+            support_started.elapsed(),
+        );
+        let mechanics_started = Instant::now();
         let control_ops: Vec<ControlOperator> = assignment
             .control_operators()
             .iter()
@@ -228,10 +252,15 @@ fn resolve_base_inner(
             table,
             mood,
         );
+        crate::profile::record_resolve_phase(
+            crate::profile::ResolvePhase::Mechanics,
+            mechanics_started.elapsed(),
+        );
     }
 
     // 跨设施编排层 — 执行 scope=Global 的 atom（在 control/power/office 之后）
     if let (Some(instances), Some(table)) = (instances, table) {
+        let phase_started = Instant::now();
         let global_atoms = crate::cross_facility::collect_global_atoms(
             blueprint, assignment, instances, table, &layout,
         );
@@ -248,15 +277,30 @@ fn resolve_base_inner(
             );
             layout.global = snapshot.global;
         }
+        crate::profile::record_resolve_phase(
+            crate::profile::ResolvePhase::CrossFacility,
+            phase_started.elapsed(),
+        );
     }
 
     layout.global.run_conversions(&active_global_buffs);
 
+    let support_started = Instant::now();
     let (office_rooms, meeting_rooms) = build_support_rooms(blueprint, assignment, &layout, mood)?;
+    crate::profile::record_resolve_phase(
+        crate::profile::ResolvePhase::Support,
+        support_started.elapsed(),
+    );
 
+    let materialize_started = Instant::now();
     let trade_rooms = build_trade_rooms(blueprint, assignment, instances, table, &layout);
     let manu_rooms = build_manu_rooms(blueprint, assignment, instances, table, &layout);
     let power_rooms = build_power_rooms(&workforce, instances, &layout);
+    crate::profile::record_resolve_phase(
+        crate::profile::ResolvePhase::RoomMaterialize,
+        materialize_started.elapsed(),
+    );
+    crate::profile::record_resolve_construction(0, 0, 1, 1, 0);
 
     Ok((
         ResolvedBase {
@@ -282,6 +326,7 @@ fn support_office_hire_speed(
     use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
 
     let registry = SupportRegistry::load_default()?;
+    crate::profile::record_resolve_construction(1, 0, 0, 0, 0);
     let extra_recruit_slots = blueprint
         .rooms
         .iter()
@@ -307,7 +352,10 @@ fn support_office_hire_speed(
                 extra_recruit_slots,
                 elapsed_hours: 24.0,
                 external_speed_bonus_pct: 0.0,
-                layout: layout.clone(),
+                layout: {
+                    crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
+                    layout.clone()
+                },
             },
             &registry,
         )?;
@@ -325,6 +373,7 @@ fn build_support_rooms(
     use crate::support_facility::{SupportFacility, SupportRegistry, SupportRoomInput};
 
     let registry = SupportRegistry::load_default()?;
+    crate::profile::record_resolve_construction(1, 0, 0, 0, 0);
     let extra_recruit_slots = blueprint
         .rooms
         .iter()
@@ -356,7 +405,10 @@ fn build_support_rooms(
                 extra_recruit_slots,
                 elapsed_hours: 24.0,
                 external_speed_bonus_pct: 0.0,
-                layout: layout.clone(),
+                layout: {
+                    crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
+                    layout.clone()
+                },
             },
             &registry,
         )?;
@@ -391,7 +443,10 @@ fn build_support_rooms(
                 extra_recruit_slots,
                 elapsed_hours: 24.0,
                 external_speed_bonus_pct: meeting_inject,
-                layout: layout.clone(),
+                layout: {
+                    crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
+                    layout.clone()
+                },
             },
             &registry,
         )?;
@@ -564,6 +619,7 @@ fn scope_global_contribution(atom: &crate::types::EffectAtom, layout: &LayoutCon
 
 /// 贸易房：扣回 scope=Global atom（编排层已产出）。
 fn room_layout_for_trade(layout: &LayoutContext, operators: &[TradeOperator]) -> LayoutContext {
+    crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
     let mut room_layout = layout.clone();
     deduct_room_global_atoms(
         &mut room_layout,
@@ -579,6 +635,7 @@ fn room_layout_for_manu(
     operators: &[crate::manufacture::ManuOperator],
     table: Option<&SkillTable>,
 ) -> LayoutContext {
+    crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
     let mut room_layout = layout.clone();
     if let Some(table) = table {
         for op in operators {

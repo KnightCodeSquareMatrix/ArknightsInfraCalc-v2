@@ -14,7 +14,9 @@ use crate::layout::blueprint::BaseBlueprint;
 use crate::layout::context::LayoutContext;
 use crate::layout::resolve::resolve_base;
 use crate::operbox::OperBox;
-use crate::profile::{emit_solver_stage, solver_perf_snapshot, SolverPerfSnapshot};
+use crate::profile::{
+    emit_resolve_stage, emit_solver_stage, solver_perf_snapshot, SolverPerfSnapshot,
+};
 use crate::skill_table::SkillTable;
 
 use super::AssignBaseOptions;
@@ -131,6 +133,14 @@ impl StageTimer {
         );
         for (stage, elapsed, before, after) in &self.stages {
             emit_solver_stage("shift_pipeline", stage, "ok", *elapsed, *before, *after);
+            emit_resolve_stage(
+                "shift_pipeline_resolve",
+                stage,
+                "ok",
+                *elapsed,
+                *before,
+                *after,
+            );
         }
         emit_solver_stage(
             "shift_pipeline",

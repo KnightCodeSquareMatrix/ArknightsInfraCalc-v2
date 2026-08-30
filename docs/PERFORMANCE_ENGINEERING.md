@@ -264,7 +264,10 @@ stderr，每行以 `[perf] ` 开头，后接单行 JSON；stdout、profile、rot
 | `rotation_finalize` | `dorm_prepare`、`rescore`、`dorm_assign_and_totals`、`invariants`、`total` |
 | `shift` / `shift_pipeline` | `plan_build`、`pipeline`；`plan_execute`、`pool_build`、`peak_prepare_control`、`peak_prefixes`、Recovery 各阶段、最终快照、会客室、排序、`total` |
 
-仅 `scope=search` 的 leaf 事件包含 `metrics`；父阶段事件只包含 wall time，避免同一工作在父子事件中重复累计。leaf 事件的 `metrics` 始终包含 `resolve`、`control`、`trade`、`manufacture`、`power` 五个对象；没有活动时字段为 0，不省略。每个对象固定包含：
+`scope=search` 的 leaf 事件包含五类 operation metrics；`scope=shift_pipeline_resolve`、
+`scope=rotation_resolve` 和 `scope=plan_compute_resolve` 的阶段事件只包含 resolve metrics，
+用于观察 resolve 内部构造成本。其他父阶段事件只包含 wall time，避免同一工作在父子事件中重复累计。
+没有活动时字段为 0，不省略。每个 operation 对象固定包含：
 
 - `calls` / `wall_ms`：该阶段内完成的 leaf 调用数及 inclusive wall time；
 - `prepare_ms` / `bake_lookup_ms` / `evaluate_ms` / `sort_topk_ms`：leaf 内候选准备、
@@ -276,6 +279,12 @@ stderr，每行以 `[perf] ` 开头，后接单行 JSON；stdout、profile、rot
   其他搜索为该操作返回的 top 结果数；
 - `bake_hits` / `live_calls`：leaf 搜索的数据来源。
 
+resolve operation 额外包含 `workforce_ms`、`layout_ms`、`mechanics_ms`、
+`cross_facility_ms`、`support_ms`、`room_materialize_ms`，以及显式构造计数
+`support_registry_loads`、`layout_clones`、`blueprint_clones`、`assignment_clones`、
+`room_context_clones`。这些计数只覆盖源码中已确认的显式构造/clone，不是全局 allocator 统计；
+隐式 derive clone、Rust 标准容器扩容和 Rayon worker 内部临时分配仍需外部 profiler。
+
 唯一计数 owner 是单订单贸易搜索、单配方制造搜索、中枢组合搜索、发电 assignment 和公开
 `resolve_base` wrapper。多订单 / 多产线聚合层和父阶段只报告 wall time，不重复累计 leaf 指标。
 父子阶段以及不同 operation 的 `wall_ms` 都是 inclusive 观察量，不能相加后冒充总耗时；应在同一
@@ -284,6 +293,54 @@ stderr，每行以 `[perf] ` 开头，后接单行 JSON；stdout、profile、rot
 trace 由 RAII guard 保存并恢复线程局部状态，错误返回后不会污染常驻 worker 的下一请求。Rayon
 worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一次，因此日志锁不进入组合热循环。
 测 warm worker 时应先发送一条不计入统计的同输入预热请求，再记录至少三条测量请求。
+
+### 11.2 2026-08-31 构造与复制 drill-down
+
+本轮没有启用 allocator 级 profiler；以下是源码显式 clone/构造和 release trace 的交叉结果，
+不是把每次堆分配都精确折算成字节。
+
+- `243 + full-E2` 的 `shift_pipeline_resolve / peak_prefixes` 阶段执行 75 次 resolve：
+  产生 126 次 support registry parse/validate、759 次 `LayoutContext` clone、750 次
+  room-context clone，以及 75 次 `Blueprint` 和 75 次 `BaseAssignment` clone。该阶段
+  resolve wall time 为约 39.9 ms，其中 support registry load 约 22.3 ms，约占 resolve
+  support 子阶段的 94%。`153 + high-owned` 的对应数据是 70 次 resolve、112 次 registry
+  load、670 次 layout clone、664 次 room-context clone。
+- 在包含完整 current rotation 的 `rotation_resolve / total` 聚合中，`243 + full-E2`
+  共 537 次 resolve、1,045 次 registry load、6,175 次 layout clone、6,109 次
+  room-context clone，以及 537 次 blueprint/assignment clone；resolve wall 约 292.5 ms，
+  其中 registry parse/validate 约 173.6 ms，support 阶段约 188.4 ms。平均每次 resolve
+  约 1.95 次 registry load、11.5 次 layout clone、11.4 次 room-context clone，并固定复制
+  一次 blueprint 和一次 assignment。`153 + high-owned` 对应为 259 次 resolve、483 次
+  registry load、2,734 次 layout clone，resolve wall 约 110.2 ms。
+- `SupportRegistry::load_default()` 使用编译期字符串，但每次仍执行 serde parse 和 110
+  行 validate；它当前不是文件 I/O，却确实是重复 CPU 和分配。它在单次 resolve 中通常出现
+  两次：办公室前置条件一次、最终 support room 构造一次。
+- `resolve_snapshot()` 只需要 `LayoutContext`，但当前先构造完整 `ResolvedBase`，包含
+  support/trade/manufacture/power room vectors、`blueprint.clone()` 和 `assignment.clone()`，
+  再执行一次 `layout.clone()`。因此每次 snapshot 至少支付一次最终 layout clone 和完整
+  resolved-room 构造；这在 Peak prefix 中被 75 次重复。
+- 制造搜索的每个候选都会从 pool entry 深复制 `ManuOperator` 的 name/buff/tags，之后
+  evaluator 又复制 `ManuRoomInput` 的 operator vector；solver 再构造 runtime operators，
+  `apply_manu_phases` 还复制 `ctx.operators` 并重新生成 names 和 atom owner strings。以
+  `243 + full-E2` 核心 trace 为例，单次 current probe 有约 1,203,480 candidate attempts、
+  其中制造 leaf wall 约 1,792 ms；其排序约 984 ms、求值约 760 ms。制造每个三人候选至少
+  生成三份 pool-to-input operator 描述，mood-gap 长班次还会按窗口重复 runtime solve。
+- 中枢与贸易也有同形的 per-candidate owned String/Vec 复制，但当前量级通常低于制造；
+  发电在代表样本中只有几十到几百候选，clone 不是优先项。
+
+因此当前最可信的根因排序是：
+
+1. 制造 hits 全量物化和串行全排序；
+2. 制造候选到 runtime solver 的多层 owned object 重建；
+3. Peak prefix 重复完整制造后缀和 resolve；
+4. resolve 内重复解析 support registry；
+5. `resolve_snapshot` 为只读 context 构造完整 `ResolvedBase`。
+
+低风险优化边界是先把 support registry 变成进程级只读缓存，并增加仅生成
+`LayoutContext` 的 resolve owner；两者都不改变候选或公式。制造 operator/runtime 缓存、
+top-K heap、Peak prefix 结果复用和 resolve context cache 需要分别证明 recipe、mood、
+`used`、candidate projection、global inject、producer presence 和稳定 tie-break 不变，
+不能仅凭 clone 出现次数直接实现。
 
 ## 12. 下一步：A+ 候选列烘焙（未实现）
 
