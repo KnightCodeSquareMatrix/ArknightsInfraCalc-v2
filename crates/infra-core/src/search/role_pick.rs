@@ -310,6 +310,7 @@ mod tests {
     use crate::layout::LayoutContext;
     use crate::pool::{add_jie_market_to_trade_pool, build_trade_pool};
     use crate::roster::Roster;
+    use crate::search::TradeEfficiencyBreakdown;
     use crate::skill_table::{default_skill_table_path, SkillTable};
     use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
     use std::collections::{HashMap, HashSet};

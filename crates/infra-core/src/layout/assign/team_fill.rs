@@ -412,6 +412,7 @@ mod tests {
             &table,
             &AssignBaseOptions::default(),
             &[RoomId::from("trade_b")],
+            &[],
             &mut from_coexist,
             &mut HashSet::from(["伺夜".to_string()]),
         )
@@ -445,6 +446,7 @@ mod tests {
             &table,
             &AssignBaseOptions::default(),
             &[RoomId::from("trade_a"), RoomId::from("trade_b")],
+            &[],
             &mut partial,
             &mut HashSet::new(),
         )
