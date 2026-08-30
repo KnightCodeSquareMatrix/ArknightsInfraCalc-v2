@@ -15,6 +15,7 @@ Thumbs.db
 # Logs & CLI output
 *.log
 /out/
+/output/
 out_*.json
 
 # Generated LLM / RAG artifacts
