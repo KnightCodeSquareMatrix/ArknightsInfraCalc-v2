@@ -287,8 +287,9 @@ resolve operation 额外包含 `workforce_ms`、`layout_ms`、`mechanics_ms`、
 
 唯一计数 owner 是单订单贸易搜索、单配方制造搜索、中枢组合搜索、发电 assignment 和公开
 `resolve_base` wrapper。多订单 / 多产线聚合层和父阶段只报告 wall time，不重复累计 leaf 指标。
-父子阶段以及不同 operation 的 `wall_ms` 都是 inclusive 观察量，不能相加后冒充总耗时；应在同一
-`scope` 的互斥 sibling 间比较，并用父阶段 `elapsed_ms` 计算占比。
+父子阶段、不同 operation，以及 `plan_compute_resolve` / `rotation_resolve` 等不同 scope 的
+`wall_ms` 都是 inclusive 观察量，不能跨事件或跨 scope 相加后冒充总耗时；应在同一 `scope`
+的互斥 sibling 间比较，并用对应父阶段 `elapsed_ms` 计算占比。
 
 trace 由 RAII guard 保存并恢复线程局部状态，错误返回后不会污染常驻 worker 的下一请求。Rayon
 worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一次，因此日志锁不进入组合热循环。
@@ -319,6 +320,9 @@ worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一�
   support/trade/manufacture/power room vectors、`blueprint.clone()` 和 `assignment.clone()`，
   再执行一次 `layout.clone()`。因此每次 snapshot 至少支付一次最终 layout clone 和完整
   resolved-room 构造；这在 Peak prefix 中被 75 次重复。
+- `layout_snapshot()` 发生在 `resolve_base()` 返回之后，因此它的额外 `LayoutContext` clone
+  计数属于 snapshot consumer 的构造成本，不应从 `resolve.wall_ms` 中再次扣除或解释为
+  `resolve_base_inner` 内部耗时。
 - 制造搜索的每个候选都会从 pool entry 深复制 `ManuOperator` 的 name/buff/tags，之后
   evaluator 又复制 `ManuRoomInput` 的 operator vector；solver 再构造 runtime operators，
   `apply_manu_phases` 还复制 `ctx.operators` 并重新生成 names 和 atom owner strings。以
