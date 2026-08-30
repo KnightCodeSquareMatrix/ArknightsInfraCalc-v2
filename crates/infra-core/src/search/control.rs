@@ -924,6 +924,8 @@ pub fn search_control_combos(
     table: &SkillTable,
     options: &ControlSearchOptions,
 ) -> Result<Vec<ControlSearchHit>> {
+    let leaf_started = Instant::now();
+    let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Control);
     // Skill-less operators are equivalent for control output. Keep only enough
     // stable-name fallbacks to fill the room, avoiding C(account_size, 5).
     let automatically_excluded: HashSet<_> = pool
@@ -972,10 +974,10 @@ pub fn search_control_combos(
     );
     let n = entries.len();
     if n == 0 {
+        perf.finish(0, 0, 0, 0, false, Default::default());
         return Ok(Vec::new());
     }
 
-    let start = Instant::now();
     let max_k = options.max_operators.min(5).min(n as u8) as usize;
     let required_indices: Vec<_> = entries
         .iter()
@@ -984,6 +986,7 @@ pub fn search_control_combos(
         .map(|(index, _)| index)
         .collect();
     if required_indices.len() != options.must_include.len() || required_indices.len() > max_k {
+        perf.finish(0, 0, 0, 0, false, Default::default());
         return Ok(Vec::new());
     }
     let optional_indices: Vec<_> = (0..n)
@@ -998,11 +1001,21 @@ pub fn search_control_combos(
             combo
         })
         .collect();
+    let combinations_count = combos.len() as u64;
+    perf.set_progress(
+        combinations_count,
+        combinations_count,
+        0,
+        Default::default(),
+    );
 
     let layout = options.layout.clone();
     let mood = options.mood;
     let mood_model = crate::mood::MoodModel::load_default()?;
+    let prepare_elapsed = leaf_started.elapsed();
 
+    let evaluate_started = Instant::now();
+    perf.mark_live_started();
     let mut hits: Vec<RankedControlSearchHit> = combos
         .par_iter()
         .filter_map(|idxs| {
@@ -1109,7 +1122,9 @@ pub fn search_control_combos(
             })
         })
         .collect();
+    let evaluate_elapsed = evaluate_started.elapsed();
 
+    let sort_started = Instant::now();
     if !options.candidate_requirements.is_empty() {
         hits.retain(|hit| {
             options
@@ -1126,10 +1141,26 @@ pub fn search_control_combos(
         });
     }
 
+    let combinations = combinations_count;
+    let accepted_hits = hits.len() as u64;
     hits.sort_by(compare_ranked_control_hits);
     hits.truncate(options.top_k);
-    let _elapsed = start.elapsed();
-    Ok(hits.into_iter().map(|ranked| ranked.hit).collect())
+    let result: Vec<_> = hits.into_iter().map(|ranked| ranked.hit).collect();
+    let sort_topk_elapsed = sort_started.elapsed();
+    perf.finish(
+        combinations,
+        combinations,
+        accepted_hits,
+        result.len() as u64,
+        false,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            evaluate: evaluate_elapsed,
+            sort_topk: sort_topk_elapsed,
+            ..Default::default()
+        },
+    );
+    Ok(result)
 }
 
 #[cfg(test)]

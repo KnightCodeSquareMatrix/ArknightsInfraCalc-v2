@@ -413,9 +413,18 @@ impl From<&TeamRotationReport> for RotationSummary {
 
 fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::Value> {
     let start = Instant::now();
+    let _trace = infra_core::profile::start_solver_perf_trace("request", "unparsed");
     let request: ServeRequest = match serde_json::from_str(line) {
         Ok(request) => request,
         Err(err) => {
+            infra_core::profile::emit_solver_stage(
+                "serve_request",
+                "request_parse",
+                "error",
+                start.elapsed(),
+                infra_core::profile::solver_perf_snapshot(),
+                infra_core::profile::solver_perf_snapshot(),
+            );
             return error_response(
                 serde_json::Value::Null,
                 start.elapsed().as_millis(),
@@ -424,6 +433,12 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
         }
     };
     let id = request.id.clone();
+    let request_label = id.to_string();
+    infra_core::profile::update_solver_perf_trace_labels(
+        "request",
+        &format!("{}:{request_label}", request.method),
+    );
+    let request_before = infra_core::profile::solver_perf_snapshot();
     let (result, error_code, error_stage) = match request.method.as_str() {
         "plan" => (handle_plan(state, request.params), None, None),
         "plan.compute" => (
@@ -457,6 +472,15 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             None,
         ),
     };
+    let request_status = if result.is_ok() { "ok" } else { "error" };
+    infra_core::profile::emit_solver_stage(
+        "serve_request",
+        "request_total",
+        request_status,
+        start.elapsed(),
+        request_before,
+        infra_core::profile::solver_perf_snapshot(),
+    );
     match result {
         Ok(result) => ServeResponse {
             id,

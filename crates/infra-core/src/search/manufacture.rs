@@ -227,6 +227,8 @@ fn search_manufacture_single_recipe(
     table: &SkillTable,
     options: &ManuSearchOptions,
 ) -> Result<ManuSearchReport> {
+    let leaf_started = Instant::now();
+    let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Manufacture);
     let ManuSearchRecipeMode::Single(recipe) = options.recipe_mode else {
         return Err(crate::error::Error::msg(
             "search_manufacture_single_recipe requires Single recipe mode",
@@ -270,21 +272,60 @@ fn search_manufacture_single_recipe(
         combinations_indices(n, operator_capacity).collect()
     };
     let combinations = combos.len() as u64;
+    let prepare_elapsed = leaf_started.elapsed();
+    perf.set_progress(
+        combinations,
+        0,
+        0,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            ..Default::default()
+        },
+    );
     let start = Instant::now();
 
-    if options.bake_mode != crate::bake::BakeMode::Disabled {
-        if let Some(report) = crate::bake::try_baked_manufacture_search(
+    let bake_started = Instant::now();
+    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
+        crate::bake::try_baked_manufacture_search(
             &sub,
             table,
             options,
             recipe,
             combinations,
             start,
-        )? {
-            return Ok(report);
-        }
+        )?
+    } else {
+        None
+    };
+    let bake_lookup_elapsed = bake_started.elapsed();
+    if let Some(report) = baked_report {
+        perf.finish(
+            combinations,
+            0,
+            report.evaluated,
+            report.top.len() as u64,
+            true,
+            crate::profile::SearchPhaseDurations {
+                prepare: prepare_elapsed,
+                bake_lookup: bake_lookup_elapsed,
+                ..Default::default()
+            },
+        );
+        return Ok(report);
     }
 
+    perf.set_progress(
+        combinations,
+        combinations,
+        0,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            ..Default::default()
+        },
+    );
+    let evaluate_started = Instant::now();
+    perf.mark_live_started();
     let mut hits: Vec<ManuSearchHit> = combos
         .par_iter()
         .filter_map(|combo| {
@@ -306,15 +347,30 @@ fn search_manufacture_single_recipe(
             evaluate_manufacture_room_with_shift(&base, table, recipe, options.shift_hours)
         })
         .collect();
+    let evaluate_elapsed = evaluate_started.elapsed();
 
+    let accepted_hits = hits.len() as u64;
+    perf.set_progress(
+        combinations,
+        combinations,
+        accepted_hits,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            evaluate: evaluate_elapsed,
+            ..Default::default()
+        },
+    );
+    let sort_started = Instant::now();
     hits.sort_by(compare_manufacture_hits);
 
     let evaluated = hits.len() as u64;
     let best = hits.first().cloned().unwrap_or(empty_hit());
     let top_k = options.top_k.min(hits.len());
     let top = hits.into_iter().take(top_k).collect();
+    let sort_topk_elapsed = sort_started.elapsed();
 
-    Ok(ManuSearchReport {
+    let report = ManuSearchReport {
         recipe_mode: options.recipe_mode,
         best,
         top,
@@ -323,7 +379,21 @@ fn search_manufacture_single_recipe(
         elapsed: start.elapsed(),
         gold_line: None,
         battle_record_line: None,
-    })
+    };
+    perf.finish(
+        combinations,
+        combinations,
+        evaluated,
+        report.top.len() as u64,
+        false,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            evaluate: evaluate_elapsed,
+            sort_topk: sort_topk_elapsed,
+        },
+    );
+    Ok(report)
 }
 
 pub(crate) fn manufacture_combo_allowed_for_shift(

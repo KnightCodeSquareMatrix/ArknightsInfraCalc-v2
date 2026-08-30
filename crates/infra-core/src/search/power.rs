@@ -112,9 +112,11 @@ pub fn search_power_assignment(
     options: &PowerSearchOptions,
 ) -> Result<PowerSearchReport> {
     let start = Instant::now();
+    let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Power);
     let mut used = HashSet::new();
     let mut assignments = Vec::new();
     let mut evaluated = 0u64;
+    perf.mark_live_started();
 
     for station in 0..options.station_count as usize {
         let mut best: Option<PowerSearchHit> = None;
@@ -158,7 +160,7 @@ pub fn search_power_assignment(
         });
     }
 
-    Ok(PowerSearchReport {
+    let report = PowerSearchReport {
         total_efficiency: aggregate_power_efficiency(
             assignments
                 .iter()
@@ -167,7 +169,19 @@ pub fn search_power_assignment(
         assignments,
         evaluated,
         elapsed: start.elapsed(),
-    })
+    };
+    perf.finish(
+        0,
+        evaluated,
+        evaluated,
+        report.assignments.len() as u64,
+        false,
+        crate::profile::SearchPhaseDurations {
+            evaluate: report.elapsed,
+            ..Default::default()
+        },
+    );
+    Ok(report)
 }
 
 /// 单站 Top-K（用于调试）。

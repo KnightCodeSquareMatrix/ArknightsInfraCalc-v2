@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Instant;
 
 mod commit;
 mod control_fill;
@@ -315,7 +316,9 @@ where
     skip_trade_core_registry_systems(&mut skip_system_ids);
     let mut disabled_conditional_packs = HashSet::new();
     loop {
-        let mut plan = crate::layout::orchestrate::build_plan_with_runtime_and_disabled_packs(
+        let stage_started = Instant::now();
+        let stage_before = crate::profile::solver_perf_snapshot();
+        let plan_result = crate::layout::orchestrate::build_plan_with_runtime_and_disabled_packs(
             blueprint,
             operbox,
             instances,
@@ -326,10 +329,22 @@ where
             planning_seed,
             &skip_system_ids,
             &mut disabled_conditional_packs,
-        )?;
+        );
+        let stage_after = crate::profile::solver_perf_snapshot();
+        crate::profile::emit_solver_stage(
+            "shift",
+            "plan_build",
+            if plan_result.is_ok() { "ok" } else { "error" },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
+        let mut plan = plan_result?;
         augment_plan(&mut plan)?;
 
-        let assignment = pipeline::run_shift_pipeline(
+        let stage_started = Instant::now();
+        let stage_before = crate::profile::solver_perf_snapshot();
+        let assignment_result = pipeline::run_shift_pipeline(
             blueprint,
             operbox,
             instances,
@@ -338,7 +353,21 @@ where
             mode,
             execution_seed,
             &plan,
-        )?;
+        );
+        let stage_after = crate::profile::solver_perf_snapshot();
+        crate::profile::emit_solver_stage(
+            "shift",
+            "pipeline",
+            if assignment_result.is_ok() {
+                "ok"
+            } else {
+                "error"
+            },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
+        let assignment = assignment_result?;
 
         let requires_final_pack_check = plan.rotation_reserves.iter().any(|reserve| {
             reserve.require_pre_split_halves

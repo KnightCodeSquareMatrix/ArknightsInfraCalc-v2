@@ -5,7 +5,7 @@
 > 当前真源：docs/QUALITY_AND_AUDIT.md；docs/SCORING_MODEL.md
 > 摘要：记录当前性能事实、测量入口和风险边界
 
-> 实现快照：当前实现与本地数据快照，核对日期 2026-07-14。本文解释性能事实，不改变搜索语义；未来设计只在文末单独标明。
+> 实现快照：当前实现与本地数据快照，核对日期 2026-08-31。本文解释性能事实，不改变搜索语义；未来设计只在文末单独标明。
 
 本项目房间少、每房人数少，但候选池大。主要成本不是生成一个 `Vec`，而是对大量 `C(n,k)` 组合执行真实 solver，并在动态全基建上下文中重复这些搜索。
 
@@ -246,6 +246,44 @@ catalog missing / stale / schema mismatch / generator mismatch / input mismatch
 6. 只有确认 solver 热点后，才考虑缓存中间结果或扩大 Bake；不能先加人员白名单。
 
 验证和性能证据必须按 [AGENTS.md](../AGENTS.md) 的日志模板保存，重复运行不得覆盖旧日志。
+
+### 11.1 stderr 阶段计时协议
+
+`plan`、`plan.compute` 和共用 core 路径在请求线程内建立一次性能 trace。机器记录统一写入
+stderr，每行以 `[perf] ` 开头，后接单行 JSON；stdout、profile、rotation 和 MAA 不承载计时。
+当前协议 `schema_version=1`，事件固定为 `event=solver_stage`。
+
+每条事件都有 `trace_id`、`layout`、`operbox`、`scope`、`stage`、`status` 和
+`elapsed_ms`。`status` 只取 `ok` / `error`；时间统一为毫秒并保留到 0.001 ms。阶段枚举为：
+
+| scope | stage |
+|---|---|
+| `plan_cli` | `resource_load`、`compute_plan`、`prefix_shadow`、`output_serialize_write` |
+| `plan_compute` | `current_probe`、`explicit_invariants`、`profile_baseline`、`maa_build`、`total` |
+| `rotation` / `rotation_abc` | `total`；`peak`、`shared_pool_split`、`gamma`、`shift_1`～`shift_3`、`shifts_and_postprocess` |
+| `rotation_finalize` | `dorm_prepare`、`rescore`、`dorm_assign_and_totals`、`invariants`、`total` |
+| `shift` / `shift_pipeline` | `plan_build`、`pipeline`；`plan_execute`、`pool_build`、`peak_prepare_control`、`peak_prefixes`、Recovery 各阶段、最终快照、会客室、排序、`total` |
+
+仅 `scope=search` 的 leaf 事件包含 `metrics`；父阶段事件只包含 wall time，避免同一工作在父子事件中重复累计。leaf 事件的 `metrics` 始终包含 `resolve`、`control`、`trade`、`manufacture`、`power` 五个对象；没有活动时字段为 0，不省略。每个对象固定包含：
+
+- `calls` / `wall_ms`：该阶段内完成的 leaf 调用数及 inclusive wall time；
+- `prepare_ms` / `bake_lookup_ms` / `evaluate_ms` / `sort_topk_ms`：leaf 内候选准备、
+  Bake 检查、live 求值、过滤排序截断的互斥子阶段；
+- `generated_combinations`：搜索定义的合法组合规模；
+- `candidate_attempts`：实际交给 live 求值循环的候选数；Bake 命中时为 0；
+- `accepted_hits`：求值及过滤后保留的 hit 数，不等同于尝试数；
+- `selected_assignments`：最终被贪心 assignment 选中的岗位数；只对发电搜索有实际意义，
+  其他搜索为该操作返回的 top 结果数；
+- `bake_hits` / `live_calls`：leaf 搜索的数据来源。
+
+唯一计数 owner 是单订单贸易搜索、单配方制造搜索、中枢组合搜索、发电 assignment 和公开
+`resolve_base` wrapper。多订单 / 多产线聚合层和父阶段只报告 wall time，不重复累计 leaf 指标。
+父子阶段以及不同 operation 的 `wall_ms` 都是 inclusive 观察量，不能相加后冒充总耗时；应在同一
+`scope` 的互斥 sibling 间比较，并用父阶段 `elapsed_ms` 计算占比。
+
+trace 由 RAII guard 保存并恢复线程局部状态，错误返回后不会污染常驻 worker 的下一请求。Rayon
+worker 不逐组合写日志；调用线程只在 `par_iter` 完成后累计一次，因此日志锁不进入组合热循环。
+测 warm worker 时应先发送一条不计入统计的同输入预热请求，再记录至少三条测量请求。
 
 ## 12. 下一步：A+ 候选列烘焙（未实现）
 

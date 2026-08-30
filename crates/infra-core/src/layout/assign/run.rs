@@ -5,7 +5,7 @@
 //! 本结构只用于 `layout::assign` 内部，不对外暴露，也不承载机制公式。
 
 use std::collections::HashSet;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
@@ -14,6 +14,7 @@ use crate::layout::blueprint::BaseBlueprint;
 use crate::layout::context::LayoutContext;
 use crate::layout::resolve::resolve_base;
 use crate::operbox::OperBox;
+use crate::profile::{emit_solver_stage, solver_perf_snapshot, SolverPerfSnapshot};
 use crate::skill_table::SkillTable;
 
 use super::AssignBaseOptions;
@@ -80,16 +81,26 @@ pub(super) struct StageTimer {
     start: Instant,
     last: Instant,
     label: &'static str,
-    stages: Vec<(&'static str, f64)>,
+    start_metrics: SolverPerfSnapshot,
+    last_metrics: SolverPerfSnapshot,
+    stages: Vec<(
+        &'static str,
+        Duration,
+        SolverPerfSnapshot,
+        SolverPerfSnapshot,
+    )>,
 }
 
 impl StageTimer {
     pub(super) fn new(label: &'static str) -> Self {
         let now = Instant::now();
+        let metrics = solver_perf_snapshot();
         Self {
             start: now,
             last: now,
             label,
+            start_metrics: metrics,
+            last_metrics: metrics,
             stages: Vec::new(),
         }
     }
@@ -97,9 +108,12 @@ impl StageTimer {
     /// 记录一个阶段耗时（自上次 `mark` 起）。
     pub(super) fn mark(&mut self, stage: &'static str) {
         let now = Instant::now();
-        let ms = now.duration_since(self.last).as_secs_f64() * 1000.0;
-        self.stages.push((stage, ms));
+        let elapsed = now.duration_since(self.last);
+        let metrics = solver_perf_snapshot();
+        self.stages
+            .push((stage, elapsed, self.last_metrics, metrics));
         self.last = now;
+        self.last_metrics = metrics;
     }
 
     /// 输出全部阶段耗时与总计到 stderr。
@@ -108,12 +122,23 @@ impl StageTimer {
         let body = self
             .stages
             .iter()
-            .map(|(s, ms)| format!("{s}={ms:.2}ms"))
+            .map(|(s, elapsed, _, _)| format!("{s}={:.2}ms", elapsed.as_secs_f64() * 1000.0))
             .collect::<Vec<_>>()
             .join("  ");
         eprintln!(
             "[计时] {} {body}  {}总计={total:.2}ms",
             self.label, self.label
+        );
+        for (stage, elapsed, before, after) in &self.stages {
+            emit_solver_stage("shift_pipeline", stage, "ok", *elapsed, *before, *after);
+        }
+        emit_solver_stage(
+            "shift_pipeline",
+            "total",
+            "ok",
+            self.last.duration_since(self.start),
+            self.start_metrics,
+            self.last_metrics,
         );
     }
 }

@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use super::plan_compute::{compute_plan, PlanComputeInput, PlanResources, RequestedOutputs};
 use crate::output::{print_box_profile_report, print_team_rotation_text};
@@ -30,16 +31,31 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
     let system_preferences = system_preferences_from_args(args)?;
     let fiammetta_enable = !args.iter().any(|arg| arg == "--no-fiammetta");
     let assert_invariants = args.iter().any(|arg| arg == "--assert-invariants");
-
-    let blueprint = BaseBlueprint::load(&layout_path)?;
-    let operbox = OperBox::load(&operbox_path)?;
-    let instances = OperatorInstances::load(&default_instances_path()?)?;
-    let table = SkillTable::load(&default_skill_table_path()?)?;
-
-    let baseline_path = baseline_path_or_default(baseline_path_from_args(args).as_deref())?;
-
     let layout_label = layout_path.to_string_lossy().into_owned();
     let operbox_label = operbox_path.to_string_lossy().into_owned();
+    let _trace = infra_core::profile::start_solver_perf_trace(&layout_label, &operbox_label);
+
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let load_result = (|| {
+        Ok::<_, Error>((
+            BaseBlueprint::load(&layout_path)?,
+            OperBox::load(&operbox_path)?,
+            OperatorInstances::load(&default_instances_path()?)?,
+            SkillTable::load(&default_skill_table_path()?)?,
+            baseline_path_or_default(baseline_path_from_args(args).as_deref())?,
+        ))
+    })();
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_solver_stage(
+        "plan_cli",
+        "resource_load",
+        if load_result.is_ok() { "ok" } else { "error" },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let (blueprint, operbox, instances, table, baseline_path) = load_result?;
     let owned = operbox.owned_count();
 
     let maa_out = maa_out_from_args(args);
@@ -47,7 +63,9 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         .windows(2)
         .find(|w| w[0] == "--maa-title")
         .map(|w| w[1].as_str());
-    let computed = compute_plan(
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let computed_result = compute_plan(
         PlanResources {
             instances: &instances,
             table: &table,
@@ -70,7 +88,21 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             profile: true,
             maa: maa_out.is_some(),
         },
-    )?;
+    );
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_solver_stage(
+        "plan_cli",
+        "compute_plan",
+        if computed_result.is_ok() {
+            "ok"
+        } else {
+            "error"
+        },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let computed = computed_result?;
     let profile = computed
         .profile
         .as_ref()
@@ -83,7 +115,9 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             fiammetta_enable,
             ..AssignBaseOptions::default()
         };
-        run_prefix_shadow(PrefixShadowInput {
+        let stage_started = Instant::now();
+        let stage_before = infra_core::profile::solver_perf_snapshot();
+        let prefix_ok = run_prefix_shadow(PrefixShadowInput {
             path: &path,
             layout_label: &layout_label,
             operbox_label: &operbox_label,
@@ -95,61 +129,83 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             profile: rotation_profile,
             baseline: rotation,
         });
+        let stage_after = infra_core::profile::solver_perf_snapshot();
+        infra_core::profile::emit_solver_stage(
+            "plan_cli",
+            "prefix_shadow",
+            if prefix_ok { "ok" } else { "error" },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
     }
 
-    let profile_out = profile_out_path(args, &operbox_path);
-    let profile_json = serde_json::to_string_pretty(&profile)?;
-    ensure_parent_dir(&profile_out)?;
-    fs::write(&profile_out, format!("{profile_json}\n"))?;
-    eprintln!("profile JSON → {}", profile_out.display());
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let output_result = (|| {
+        let profile_out = profile_out_path(args, &operbox_path);
+        let profile_json = serde_json::to_string_pretty(&profile)?;
+        ensure_parent_dir(&profile_out)?;
+        fs::write(&profile_out, format!("{profile_json}\n"))?;
+        eprintln!("profile JSON → {}", profile_out.display());
 
-    if let Some(dir) = output_dir_from_args(args) {
-        fs::create_dir_all(&dir)?;
-        for shift in &rotation.shifts {
-            let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
-            shift.assignment.save(&path)?;
-            eprintln!("排班 assignment → {}", path.display());
+        if let Some(dir) = output_dir_from_args(args) {
+            fs::create_dir_all(&dir)?;
+            for shift in &rotation.shifts {
+                let path = dir.join(format!("team_shift_{}.json", shift.index + 1));
+                shift.assignment.save(&path)?;
+                eprintln!("排班 assignment → {}", path.display());
+            }
         }
-    }
 
-    if let Some(path) = rotation_out_from_args(args) {
-        let rotation_json = serde_json::to_string_pretty(rotation)?;
-        ensure_parent_dir(&path)?;
-        fs::write(&path, format!("{rotation_json}\n"))?;
-        eprintln!("rotation JSON → {}", path.display());
-    }
+        if let Some(path) = rotation_out_from_args(args) {
+            let rotation_json = serde_json::to_string_pretty(rotation)?;
+            ensure_parent_dir(&path)?;
+            fs::write(&path, format!("{rotation_json}\n"))?;
+            eprintln!("rotation JSON → {}", path.display());
+        }
 
-    if let Some(maa_path) = maa_out {
-        let schedule = computed
-            .maa
-            .as_ref()
-            .expect("MAA schedule was requested when --maa-out is present");
-        schedule.save(&maa_path)?;
-        eprintln!("MAA 排班 JSON → {}", maa_path.display());
-    }
+        if let Some(maa_path) = maa_out {
+            let schedule = computed
+                .maa
+                .as_ref()
+                .expect("MAA schedule was requested when --maa-out is present");
+            schedule.save(&maa_path)?;
+            eprintln!("MAA 排班 JSON → {}", maa_path.display());
+        }
 
-    // ── 3. 输出：分析 + 排班 → stdout；路径提示 → stderr ─────────────────
-    let json_only = args.iter().any(|a| a == "--json");
-    if json_only {
-        print!("{profile_json}");
-    } else {
-        eprintln!("layout={layout_label}");
-        eprintln!("operbox={operbox_label} owned={owned}");
-        println!();
-        println!("╔══════════════════════════════════════╗");
-        println!("║  infra-cli plan · 243 基建方案         ║");
-        println!("╚══════════════════════════════════════╝");
-        println!();
-        print_box_profile_report(&profile);
-        println!();
-        println!("══════════════════════════════════════");
-        println!("  {}", rotation.profile.display_name());
-        println!("══════════════════════════════════════");
-        println!();
-        print_team_rotation_text(&layout_label, &operbox_label, owned, &rotation)?;
-    }
-
-    Ok(())
+        // ── 3. 输出：分析 + 排班 → stdout；路径提示 → stderr ─────────────────
+        let json_only = args.iter().any(|a| a == "--json");
+        if json_only {
+            print!("{profile_json}");
+        } else {
+            eprintln!("layout={layout_label}");
+            eprintln!("operbox={operbox_label} owned={owned}");
+            println!();
+            println!("╔══════════════════════════════════════╗");
+            println!("║  infra-cli plan · 243 基建方案         ║");
+            println!("╚══════════════════════════════════════╝");
+            println!();
+            print_box_profile_report(profile);
+            println!();
+            println!("══════════════════════════════════════");
+            println!("  {}", rotation.profile.display_name());
+            println!("══════════════════════════════════════");
+            println!();
+            print_team_rotation_text(&layout_label, &operbox_label, owned, rotation)?;
+        }
+        Ok::<(), Error>(())
+    })();
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_solver_stage(
+        "plan_cli",
+        "output_serialize_write",
+        if output_result.is_ok() { "ok" } else { "error" },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    output_result
 }
 
 fn system_preferences_from_args(

@@ -94,7 +94,7 @@ fn run_shift_pipeline_with_producer_pruning(
         executed.assignment,
         executed.used,
     );
-    timer.mark("编排落位");
+    timer.mark("plan_execute");
 
     // 建池（中枢 / 贸易 / 制造 / 发电）+ tier 标注 + anchor 注入。
     let mut control_pool = build_control_pool_with_fillers(operbox, instances, table)?;
@@ -118,7 +118,7 @@ fn run_shift_pipeline_with_producer_pruning(
     let gold_lines = blueprint.gold_manu_line_count();
     // forbid-same-room 约束（迷迭香 ≠ 清流/温蒂同制造站）从统一 plan 提取，供 anchor 房搜索排除。
     let forbid_same_room = forbid_same_room_pairs(plan);
-    timer.mark("建池");
+    timer.mark("pool_build");
 
     match mode {
         AssignShiftMode::Peak => {
@@ -159,7 +159,7 @@ fn run_shift_pipeline_with_producer_pruning(
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| left.stable_order.cmp(&right.stable_order))
             });
-            timer.mark("中枢候选上界");
+            timer.mark("peak_prepare_control");
             let mut best = None;
             for prepared in prepared {
                 if should_prune_peak_candidate(
@@ -195,9 +195,7 @@ fn run_shift_pipeline_with_producer_pruning(
             run = best
                 .ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?
                 .run;
-            timer.mark("中枢-生产前缀候选");
-
-            timer.mark("制造");
+            timer.mark("peak_prefixes");
         }
         AssignShiftMode::Recovery => {
             if !operator_is_in_normal_base(blueprint, &run.assignment, ULPIANUS_NAME) {
@@ -207,6 +205,7 @@ fn run_shift_pipeline_with_producer_pruning(
                 run.used.insert(SPHINX_NAME.to_string());
             }
             let layout = run.resolve_snapshot(true)?;
+            timer.mark("recovery_prepare");
             if karlan_precision_active(&layout.global_inject) {
                 add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
             }
@@ -254,8 +253,7 @@ fn run_shift_pipeline_with_producer_pruning(
                     &mut run.used,
                 )?;
             }
-            timer.mark("trade孑余站");
-            timer.mark("制造");
+            timer.mark("recovery_production_fill");
             assign_power_stations(
                 blueprint,
                 &power_pool,
@@ -265,7 +263,7 @@ fn run_shift_pipeline_with_producer_pruning(
                 &mut run.assignment,
                 &mut run.used,
             )?;
-            timer.mark("发电");
+            timer.mark("recovery_power");
         }
     }
 
@@ -285,6 +283,7 @@ fn run_shift_pipeline_with_producer_pruning(
         options,
         Some(run.durin_plan),
     )?;
+    timer.mark("final_snapshot_refresh");
 
     assign_meeting_rooms(
         blueprint,
@@ -295,9 +294,10 @@ fn run_shift_pipeline_with_producer_pruning(
         &mut run.assignment,
         &mut run.used,
     )?;
-    timer.mark("会客室");
+    timer.mark("meeting_fill");
 
     run.assignment.sort_room_operators_stably();
+    timer.mark("stable_sort");
 
     timer.report();
     Ok(run.assignment)

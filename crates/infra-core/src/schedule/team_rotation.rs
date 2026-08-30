@@ -2373,6 +2373,10 @@ fn finalize_timed_rotation(
     table: &SkillTable,
     mut report: TeamRotationReport,
 ) -> Result<TeamRotationReport> {
+    let total_started = Instant::now();
+    let total_before = crate::profile::solver_perf_snapshot();
+    let stage_started = Instant::now();
+    let stage_before = total_before;
     for shift in &report.shifts {
         print_trade_rotation_debug(
             &format!("finalize shift {} input", shift.index + 1),
@@ -2382,6 +2386,17 @@ fn finalize_timed_rotation(
     for shift in &mut report.shifts {
         finalize_shift_dorms(blueprint, operbox, shift)?;
     }
+    let mut stage_after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_solver_stage(
+        "rotation_finalize",
+        "dorm_prepare",
+        "ok",
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let stage_started = Instant::now();
+    let stage_before = stage_after;
     for shift in &mut report.shifts {
         clear_production_efficiencies(blueprint, &mut shift.assignment);
         shift.efficiencies = if shift.transition == ShiftTransition::FiammettaOnly {
@@ -2418,6 +2433,17 @@ fn finalize_timed_rotation(
             &shift.assignment,
         );
     }
+    stage_after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_solver_stage(
+        "rotation_finalize",
+        "rescore",
+        "ok",
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let stage_started = Instant::now();
+    let stage_before = stage_after;
     report.daily = DailyTotals {
         trade: report.shifts.iter().map(|shift| shift.weighted_trade).sum(),
         manufacture: report
@@ -2441,7 +2467,41 @@ fn finalize_timed_rotation(
                 warning.omitted_names.join(", ")
             )
         }));
-    assert_final_rotation_invariants(blueprint, operbox, instances, table, &report)?;
+    stage_after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_solver_stage(
+        "rotation_finalize",
+        "dorm_assign_and_totals",
+        "ok",
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let stage_started = Instant::now();
+    let stage_before = stage_after;
+    let invariant_result =
+        assert_final_rotation_invariants(blueprint, operbox, instances, table, &report);
+    stage_after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_solver_stage(
+        "rotation_finalize",
+        "invariants",
+        if invariant_result.is_ok() {
+            "ok"
+        } else {
+            "error"
+        },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    invariant_result?;
+    crate::profile::emit_solver_stage(
+        "rotation_finalize",
+        "total",
+        "ok",
+        total_started.elapsed(),
+        total_before,
+        stage_after,
+    );
     Ok(report)
 }
 
@@ -5063,6 +5123,30 @@ pub fn schedule_timed_rotation(
     options: &AssignBaseOptions,
     profile: TimedRotationProfile,
 ) -> Result<TeamRotationReport> {
+    let started = Instant::now();
+    let before = crate::profile::solver_perf_snapshot();
+    let result =
+        schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile);
+    let after = crate::profile::solver_perf_snapshot();
+    crate::profile::emit_solver_stage(
+        "rotation",
+        "total",
+        if result.is_ok() { "ok" } else { "error" },
+        started.elapsed(),
+        before,
+        after,
+    );
+    result
+}
+
+fn schedule_timed_rotation_inner(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    profile: TimedRotationProfile,
+) -> Result<TeamRotationReport> {
     if matches!(
         profile,
         TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
@@ -5150,6 +5234,7 @@ fn schedule_abc_rotation(
     skip_systems: &[&str],
 ) -> Result<TeamRotationReport> {
     let t0 = Instant::now();
+    let m0 = crate::profile::solver_perf_snapshot();
     let cycle_hours: f64 = shift_hours.iter().sum();
     blueprint.validate()?;
 
@@ -5213,6 +5298,7 @@ fn schedule_abc_rotation(
     let mut scaffold_used: HashSet<String> = operators_of(&shared).into_iter().collect();
     scaffold_used.extend(peak_plan.excluded_operators.iter().cloned());
     let t1 = Instant::now();
+    let m1 = crate::profile::solver_perf_snapshot();
 
     // 2) 以脚手架解算共享 layout；γ 生产搜索稍后按实际 bind 半区构造各自中枢上下文。
     let layout = resolve_base(
@@ -5279,6 +5365,7 @@ fn schedule_abc_rotation(
         used.insert(name);
     }
     let t2 = Instant::now();
+    let m2 = crate::profile::solver_perf_snapshot();
 
     // 4) γ 为替补：S2 接 H1、S3 接 H2，干员与 α/β 互斥（两次各自从剩余池取，可复用同人）。
     let mut used_ab = used.clone();
@@ -5403,6 +5490,7 @@ fn schedule_abc_rotation(
         &gamma_h2,
     )?;
     let t3 = Instant::now();
+    let m3 = crate::profile::solver_perf_snapshot();
 
     // 中枢每班独立分配：体系绑定干员跟随生产队同上同下，散件均分三队，
     // 每班仅允许活跃两队的中枢干员入池（保证每人休息一班）。
@@ -5660,6 +5748,8 @@ fn schedule_abc_rotation(
     let mut meeting_worked_hours: HashMap<String, f64> = HashMap::new();
     let mut short_segment_office: HashMap<RoomId, AssignedOperator> = HashMap::new();
     for (index, (hours, active, resting, parts)) in shift_specs.into_iter().enumerate() {
+        let shift_started = Instant::now();
+        let shift_before = crate::profile::solver_perf_snapshot();
         // 活跃两队的中枢干员名册
         let active_names: HashSet<String> = active
             .iter()
@@ -6182,6 +6272,19 @@ fn schedule_abc_rotation(
             hours,
             &mut sui_mood,
         );
+        let shift_after = crate::profile::solver_perf_snapshot();
+        crate::profile::emit_solver_stage(
+            "rotation_abc",
+            match index {
+                0 => "shift_1",
+                1 => "shift_2",
+                _ => "shift_3",
+            },
+            "ok",
+            shift_started.elapsed(),
+            shift_before,
+            shift_after,
+        );
     }
 
     if enable_fiammetta_return {
@@ -6245,6 +6348,7 @@ fn schedule_abc_rotation(
     };
     let warnings = rotation_shortfall_warnings(blueprint, &shifts);
     let t4 = Instant::now();
+    let m4 = crate::profile::solver_perf_snapshot();
 
     fn ms(a: Instant, b: Instant) -> f64 {
         a.duration_since(b).as_secs_f64() * 1000.0
@@ -6254,6 +6358,15 @@ fn schedule_abc_rotation(
         "[计时] 轮换·peak班={:.2}ms  resolve+建池+切半={:.2}ms  γ替补={:.2}ms  三班评分={:.2}ms  轮换总计={:.2}ms",
         ms(t1, t0), ms(t2, t1), ms(t3, t2), ms(t4, t3), ms(t4, t0),
     );
+    for (stage, elapsed, before, after) in [
+        ("peak", t1.duration_since(t0), m0, m1),
+        ("shared_pool_split", t2.duration_since(t1), m1, m2),
+        ("gamma", t3.duration_since(t2), m2, m3),
+        ("shifts_and_postprocess", t4.duration_since(t3), m3, m4),
+        ("total", t4.duration_since(t0), m0, m4),
+    ] {
+        crate::profile::emit_solver_stage("rotation_abc", stage, "ok", elapsed, before, after);
+    }
 
     Ok(TeamRotationReport {
         profile,

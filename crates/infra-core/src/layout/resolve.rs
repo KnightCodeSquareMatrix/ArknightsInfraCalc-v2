@@ -3,6 +3,7 @@ use crate::control::{
     ControlSettlementTrace,
 };
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
@@ -89,7 +90,8 @@ pub fn resolve_base(
     mood: f64,
     durin_dorm_planning: Option<u8>,
 ) -> Result<ResolvedBase> {
-    Ok(resolve_base_inner(
+    let started = Instant::now();
+    let result = resolve_base_inner(
         blueprint,
         assignment,
         instances,
@@ -97,8 +99,10 @@ pub fn resolve_base(
         mood,
         durin_dorm_planning,
         false,
-    )?
-    .0)
+    )
+    .map(|resolved| resolved.0);
+    crate::profile::record_resolve(started.elapsed());
+    result
 }
 
 pub fn resolve_base_with_trace(
@@ -109,7 +113,8 @@ pub fn resolve_base_with_trace(
     mood: f64,
     durin_dorm_planning: Option<u8>,
 ) -> Result<(ResolvedBase, ResolveTrace)> {
-    resolve_base_inner(
+    let started = Instant::now();
+    let result = resolve_base_inner(
         blueprint,
         assignment,
         instances,
@@ -117,7 +122,9 @@ pub fn resolve_base_with_trace(
         mood,
         durin_dorm_planning,
         true,
-    )
+    );
+    crate::profile::record_resolve(started.elapsed());
+    result
 }
 
 #[allow(clippy::too_many_arguments)]

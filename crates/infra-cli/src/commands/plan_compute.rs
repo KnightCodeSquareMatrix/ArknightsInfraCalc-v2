@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use infra_core::box_profile::{
     build_box_profile_from_current_probe, run_user_rotation_probe_with_profile_and_preferences,
@@ -150,7 +151,31 @@ pub(super) fn compute_plan(
     input: PlanComputeInput<'_>,
     requested: RequestedOutputs,
 ) -> Result<ComputedPlan, Error> {
-    let current = run_user_rotation_probe_with_profile_and_preferences(
+    let _trace =
+        infra_core::profile::ensure_solver_perf_trace(input.layout_label, input.operbox_label);
+    let total_started = Instant::now();
+    let total_before = infra_core::profile::solver_perf_snapshot();
+    let result = compute_plan_inner(resources, input, requested);
+    let total_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_solver_stage(
+        "plan_compute",
+        "total",
+        if result.is_ok() { "ok" } else { "error" },
+        total_started.elapsed(),
+        total_before,
+        total_after,
+    );
+    result
+}
+
+fn compute_plan_inner(
+    resources: PlanResources<'_>,
+    input: PlanComputeInput<'_>,
+    requested: RequestedOutputs,
+) -> Result<ComputedPlan, Error> {
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let current_result = run_user_rotation_probe_with_profile_and_preferences(
         input.blueprint,
         input.operbox,
         resources.instances,
@@ -160,19 +185,51 @@ pub(super) fn compute_plan(
         input.system_preferences,
         input.fiammetta_enable,
         input.fiammetta_candidates_out.clone(),
-    )?;
+    );
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    infra_core::profile::emit_solver_stage(
+        "plan_compute",
+        "current_probe",
+        if current_result.is_ok() {
+            "ok"
+        } else {
+            "error"
+        },
+        stage_started.elapsed(),
+        stage_before,
+        stage_after,
+    );
+    let current = current_result?;
 
     if input.assert_invariants {
-        assert_final_rotation_invariants(
+        let stage_started = Instant::now();
+        let stage_before = infra_core::profile::solver_perf_snapshot();
+        let invariant_result = assert_final_rotation_invariants(
             input.blueprint,
             input.operbox,
             resources.instances,
             resources.table,
             &current.rotation,
-        )?;
+        );
+        let stage_after = infra_core::profile::solver_perf_snapshot();
+        infra_core::profile::emit_solver_stage(
+            "plan_compute",
+            "explicit_invariants",
+            if invariant_result.is_ok() {
+                "ok"
+            } else {
+                "error"
+            },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
+        invariant_result?;
     }
 
-    let profile = requested
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let profile_result = requested
         .profile
         .then(|| {
             build_box_profile_from_current_probe(
@@ -193,9 +250,27 @@ pub(super) fn compute_plan(
                 },
             )
         })
-        .transpose()?;
+        .transpose();
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    if requested.profile {
+        infra_core::profile::emit_solver_stage(
+            "plan_compute",
+            "profile_baseline",
+            if profile_result.is_ok() {
+                "ok"
+            } else {
+                "error"
+            },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
+    }
+    let profile = profile_result?;
 
-    let maa = requested
+    let stage_started = Instant::now();
+    let stage_before = infra_core::profile::solver_perf_snapshot();
+    let maa_result = requested
         .maa
         .then(|| {
             let mut options = MaaExportOptions::for_blueprint(input.blueprint);
@@ -207,7 +282,19 @@ pub(super) fn compute_plan(
             }
             build_from_team_rotation(input.blueprint, &current.rotation, &options)
         })
-        .transpose()?;
+        .transpose();
+    let stage_after = infra_core::profile::solver_perf_snapshot();
+    if requested.maa {
+        infra_core::profile::emit_solver_stage(
+            "plan_compute",
+            "maa_build",
+            if maa_result.is_ok() { "ok" } else { "error" },
+            stage_started.elapsed(),
+            stage_before,
+            stage_after,
+        );
+    }
+    let maa = maa_result?;
 
     Ok(ComputedPlan {
         current,

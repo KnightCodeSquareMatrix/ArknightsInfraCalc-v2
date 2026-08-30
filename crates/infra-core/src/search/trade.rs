@@ -257,6 +257,8 @@ fn search_trade_single_order(
     order_kind: TradeOrderKind,
     filter: SearchTripleFilter,
 ) -> Result<TradeSearchReport> {
+    let leaf_started = Instant::now();
+    let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Trade);
     let sub = trade_search_pool_for_order(pool, order_kind, options, &filter);
     let n = sub.entries.len();
     let operator_capacity = options.operator_capacity.clamp(1, 3);
@@ -309,10 +311,21 @@ fn search_trade_single_order(
             operator_capacity.saturating_sub(must_indices.len()),
         )
     };
+    let setup_elapsed = leaf_started.elapsed();
+    perf.set_progress(
+        combo_count,
+        0,
+        0,
+        crate::profile::SearchPhaseDurations {
+            prepare: setup_elapsed,
+            ..Default::default()
+        },
+    );
 
     let start = Instant::now();
-    if options.bake_mode != crate::bake::BakeMode::Disabled {
-        if let Some(report) = crate::bake::try_baked_trade_search(
+    let bake_started = Instant::now();
+    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
+        crate::bake::try_baked_trade_search(
             &sub,
             table,
             options,
@@ -320,11 +333,28 @@ fn search_trade_single_order(
             &filter,
             combo_count,
             start,
-        )? {
-            return Ok(report);
-        }
+        )?
+    } else {
+        None
+    };
+    let bake_lookup_elapsed = bake_started.elapsed();
+    if let Some(report) = baked_report {
+        perf.finish(
+            combo_count,
+            0,
+            report.evaluated,
+            report.top.len() as u64,
+            true,
+            crate::profile::SearchPhaseDurations {
+                prepare: setup_elapsed,
+                bake_lookup: bake_lookup_elapsed,
+                ..Default::default()
+            },
+        );
+        return Ok(report);
     }
 
+    let prepare_started = Instant::now();
     let override_op = filter.must_operator_override.clone();
     let must_name = filter.must_include_name.clone();
     let hit_filter = filter.hit_filter;
@@ -334,6 +364,19 @@ fn search_trade_single_order(
     if !must_indices.is_empty() {
         combos.retain(|combo| must_indices.iter().all(|idx| combo.contains(idx)));
     }
+    let prepare_elapsed = setup_elapsed + prepare_started.elapsed();
+    perf.set_progress(
+        combo_count,
+        combos.len() as u64,
+        0,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            ..Default::default()
+        },
+    );
+    let evaluate_started = Instant::now();
+    perf.mark_live_started();
     let mut hits: Vec<TradeSearchHit> = combos
         .par_iter()
         .filter_map(|combo| {
@@ -354,8 +397,22 @@ fn search_trade_single_order(
             })
         })
         .collect();
+    let evaluate_elapsed = evaluate_started.elapsed();
 
+    let candidate_attempts = combos.len() as u64;
     let evaluated = hits.len() as u64;
+    perf.set_progress(
+        combo_count,
+        candidate_attempts,
+        evaluated,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            evaluate: evaluate_elapsed,
+            ..Default::default()
+        },
+    );
+    let sort_started = Instant::now();
     hits.sort_by(|a, b| trade_efficiency_sort_key(b).cmp(&trade_efficiency_sort_key(a)));
     let best = hits.first().cloned().ok_or_else(|| {
         crate::error::Error::msg(
@@ -371,8 +428,9 @@ fn search_trade_single_order(
         )
     })?;
     let top = hits.into_iter().take(options.top_k).collect();
+    let sort_topk_elapsed = sort_started.elapsed();
 
-    Ok(TradeSearchReport {
+    let report = TradeSearchReport {
         order_mode: TradeSearchOrderMode::Single(order_kind),
         best,
         top,
@@ -381,7 +439,21 @@ fn search_trade_single_order(
         elapsed: start.elapsed(),
         gold_order_line: None,
         originium_order_line: None,
-    })
+    };
+    perf.finish(
+        combo_count,
+        candidate_attempts,
+        evaluated,
+        report.top.len() as u64,
+        false,
+        crate::profile::SearchPhaseDurations {
+            prepare: prepare_elapsed,
+            bake_lookup: bake_lookup_elapsed,
+            evaluate: evaluate_elapsed,
+            sort_topk: sort_topk_elapsed,
+        },
+    );
+    Ok(report)
 }
 
 fn trade_search_pool_for_order(

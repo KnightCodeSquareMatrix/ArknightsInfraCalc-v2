@@ -45,13 +45,17 @@ pub(super) struct PrefixShadowInput<'a> {
     pub baseline: &'a TeamRotationReport,
 }
 
-pub(super) fn run_prefix_shadow(input: PrefixShadowInput<'_>) {
-    handle_prefix_shadow_result(write_prefix_shadow_report(input));
+pub(super) fn run_prefix_shadow(input: PrefixShadowInput<'_>) -> bool {
+    handle_prefix_shadow_result(write_prefix_shadow_report(input))
 }
 
-fn handle_prefix_shadow_result(result: Result<(), Error>) {
-    if let Err(error) = result {
-        eprintln!("prefix shadow failed: {error}");
+fn handle_prefix_shadow_result(result: Result<(), Error>) -> bool {
+    match result {
+        Ok(()) => true,
+        Err(error) => {
+            eprintln!("prefix shadow failed: {error}");
+            false
+        }
     }
 }
 
