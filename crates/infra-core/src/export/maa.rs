@@ -145,6 +145,7 @@ struct PlanInput<'a> {
     assignment: &'a BaseAssignment,
     name: String,
     description: String,
+    dorm_autofill: bool,
     fiammetta_target: Option<&'a str>,
     fiammetta_priority: &'a [String],
     fiammetta_room: Option<&'a RoomId>,
@@ -196,6 +197,9 @@ pub fn build_from_team_rotation(
                     shift.duration_hours,
                     team_label_zh(report.profile, shift.resting_team)
                 ),
+                dorm_autofill: report.warnings.iter().any(|warning| {
+                    warning.starts_with(&format!("shift {} 宿舍普通休息候选", shift.index + 1))
+                }),
                 fiammetta_target: shift
                     .fiammetta
                     .as_ref()
@@ -236,7 +240,7 @@ fn wrap_schedule(
 }
 
 fn build_plan(blueprint: &BaseBlueprint, input: &PlanInput) -> MaaPlan {
-    let rooms = if input.transition == ShiftTransition::FiammettaOnly {
+    let mut rooms = if input.transition == ShiftTransition::FiammettaOnly {
         build_fiammetta_transition_rooms(
             blueprint,
             input.assignment,
@@ -247,6 +251,12 @@ fn build_plan(blueprint: &BaseBlueprint, input: &PlanInput) -> MaaPlan {
     } else {
         build_rooms(blueprint, input.assignment)
     };
+    if input.dorm_autofill {
+        for slot in &mut rooms.dormitory {
+            slot.skip = false;
+            slot.autofill = true;
+        }
+    }
     MaaPlan {
         name: input.name.clone(),
         description: input.description.clone(),

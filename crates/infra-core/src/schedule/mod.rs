@@ -1,4 +1,5 @@
 mod base_rotation;
+mod dorm_finalizer;
 mod shift_bind;
 mod team_rotation;
 

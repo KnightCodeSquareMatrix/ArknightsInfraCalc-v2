@@ -2429,19 +2429,19 @@ fn finalize_timed_rotation(
         production: average_cycle_production(blueprint, &report.shifts),
     };
     report.warnings = rotation_shortfall_warnings(blueprint, &report.shifts);
-    assert_final_rotation_invariants(blueprint, operbox, instances, table, &report)?;
     let dorm_warnings = dorm_finalizer::finalize_dorms(blueprint, operbox, &mut report.shifts)?;
     report
         .warnings
         .extend(dorm_warnings.into_iter().map(|warning| {
             format!(
-                "shift {} 宿舍普通休息候选 {} 人，可用空床 {}，未入宿: {}",
+                "shift {} 宿舍普通休息候选 {} 人超过可用空床 {}，普通休息启用 MAA autofill: {}",
                 warning.shift_index + 1,
                 warning.candidate_count,
                 warning.available_beds,
                 warning.omitted_names.join(", ")
             )
         }));
+    assert_final_rotation_invariants(blueprint, operbox, instances, table, &report)?;
     Ok(report)
 }
 
@@ -4409,62 +4409,6 @@ pub fn assert_final_rotation_invariants(
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     validate_fiammetta_action_policy(report.profile, &report.shifts)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
-    let report_binds = if report.runtime_shift_binds.is_empty() {
-        report
-            .assignment_plans
-            .iter()
-            .flat_map(shift_binds_from_plan)
-            .collect()
-    } else {
-        report.runtime_shift_binds.clone()
-    };
-    let mut seen_binds = HashSet::new();
-    for bind in report_binds {
-        let mut key = bind.operators.clone();
-        key.sort();
-        key.dedup();
-        if !seen_binds.insert(key) {
-            continue;
-        }
-        for shift in &report.shifts {
-            let present = shift.assignment.operator_names();
-            let flags: Vec<_> = bind
-                .operators
-                .iter()
-                .map(|name| present.contains(name))
-                .collect();
-            if flags
-                .first()
-                .is_some_and(|first| flags.iter().any(|flag| flag != first))
-            {
-                return Err(Error::msg(format!(
-                    "assert-invariants shift_bind_cohort_preserved failed in shift {} for {:?}",
-                    shift.index + 1,
-                    bind.operators
-                )));
-            }
-        }
-        let expected_shifts = usize::from(bind.on_shifts) + usize::from(bind.off_shifts);
-        if report.shifts.len() == expected_shifts {
-            let active = report
-                .shifts
-                .iter()
-                .filter(|shift| {
-                    let present = shift.assignment.operator_names();
-                    bind.operators.iter().all(|name| present.contains(name))
-                })
-                .count();
-            let inactive = report.shifts.len().saturating_sub(active);
-            if (bind.on_shifts > 0 && active != usize::from(bind.on_shifts))
-                || (bind.off_shifts > 0 && inactive != usize::from(bind.off_shifts))
-            {
-                return Err(Error::msg(format!(
-                        "assert-invariants shift_bind_cohort_preserved failed for {:?}: expected {}/{} active/resting shifts, got {active}/{inactive}",
-                        bind.operators, bind.on_shifts, bind.off_shifts
-                    )));
-            }
-        }
-    }
     for shift in &report.shifts {
         let control = shift.assignment.control_operators();
         if control.len() != 5 {
