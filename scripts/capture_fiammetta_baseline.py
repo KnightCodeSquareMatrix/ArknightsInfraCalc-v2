@@ -84,7 +84,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", help="Unique output directory name")
     parser.add_argument("--box-dir", type=Path, default=DEFAULT_BOX_DIR)
     parser.add_argument("--box-ids", nargs="+", help="Optional Box IDs for a smoke subset")
+    parser.add_argument(
+        "--box-min-owned",
+        type=int,
+        help="Keep only Box filenames whose final numeric ownership count meets this threshold",
+    )
     parser.add_argument("--binary", type=Path, default=DEFAULT_BINARY)
+    parser.add_argument(
+        "--solver-origin-packet",
+        type=Path,
+        help="Existing evidence packet whose provenance identifies an external or old binary",
+    )
     parser.add_argument("--layouts", nargs="+", default=list(DEFAULT_LAYOUTS))
     parser.add_argument("--rotations", nargs="+", default=list(DEFAULT_ROTATIONS))
     parser.add_argument("--top", type=int, default=20)
@@ -101,6 +111,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--jobs must be positive")
     if args.timeout < 1:
         parser.error("--timeout must be positive")
+    if args.box_min_owned is not None and args.box_min_owned < 0:
+        parser.error("--box-min-owned must be non-negative")
     return args
 
 
@@ -308,6 +320,27 @@ def box_id_from_path(path: Path) -> str:
     return path.stem[: -len(suffix)] if path.stem.endswith(suffix) else path.stem
 
 
+def owned_count_from_path(path: Path) -> int | None:
+    match = re.search(r"-(\d+)$", box_id_from_path(path))
+    return int(match.group(1)) if match else None
+
+
+def discover_boxes(directory: Path, min_owned: int | None) -> list[Path]:
+    boxes = sorted(
+        path.resolve()
+        for path in directory.glob("*.json")
+        if not path.stem.endswith("_profile")
+    )
+    if min_owned is None:
+        return boxes
+    return [
+        path
+        for path in boxes
+        if owned_count_from_path(path) is not None
+        and owned_count_from_path(path) >= min_owned
+    ]
+
+
 def display_path(path: Path) -> str:
     try:
         return path.resolve().relative_to(ROOT).as_posix()
@@ -326,6 +359,28 @@ def rotation_label(argument: str) -> str:
         "abc-12-12-12": "abc_12_12_12",
     }
     return aliases.get(argument, argument.replace("/", "_"))
+
+
+def solver_origin(packet: Path | None, run_dir: Path) -> dict[str, Any] | None:
+    if packet is None:
+        return None
+    provenance = packet.resolve() / "provenance.json"
+    if not provenance.is_file():
+        raise CaptureError(f"--solver-origin-packet lacks provenance.json: {packet}")
+    raw = provenance.read_bytes()
+    try:
+        origin = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise CaptureError(f"invalid solver origin provenance: {provenance}: {error}") from error
+    snapshot = run_dir / "solver/origin-provenance.json"
+    write_new_bytes(snapshot, raw)
+    return {
+        "packet": display_path(packet),
+        "provenance_snapshot": snapshot.relative_to(run_dir).as_posix(),
+        "provenance_sha256": hashlib.sha256(raw).hexdigest(),
+        "git_head": origin.get("git", {}).get("head"),
+        "binary_sha256": origin.get("binary", {}).get("sha256"),
+    }
 
 
 def enumerate_cases(
@@ -767,11 +822,7 @@ def main() -> int:
         missing_layouts = [str(path) for path in layouts.values() if not path.is_file()]
         if missing_layouts:
             raise CaptureError(f"missing layouts: {missing_layouts}")
-        boxes = sorted(
-            path.resolve()
-            for path in args.box_dir.glob("*-operbox.json")
-            if not path.stem.endswith("_profile")
-        )
+        boxes = discover_boxes(args.box_dir.resolve(), args.box_min_owned)
         if args.box_ids:
             requested = set(args.box_ids)
             boxes = [path for path in boxes if box_id_from_path(path) in requested]
@@ -779,7 +830,9 @@ def main() -> int:
             if missing:
                 raise CaptureError(f"requested Box IDs not found: {missing}")
         if not boxes:
-            raise CaptureError(f"no *-operbox.json inputs in {args.box_dir}")
+            raise CaptureError(
+                f"no Box JSON inputs in {args.box_dir} after applying filters"
+            )
         source_before = capture_source_state(run_dir, "before-build")
         inputs, frozen_layouts, frozen_boxes = snapshot_inputs(run_dir, layouts, boxes)
         cases = enumerate_cases(frozen_layouts, args.rotations, frozen_boxes)
@@ -817,6 +870,7 @@ def main() -> int:
                 "sha256": sha256_file(binary),
                 "bytes": binary.stat().st_size,
             },
+            "solver_origin": solver_origin(args.solver_origin_packet, run_dir),
             "source": {
                 "before_build_inventory": "source/inventory-before-build.json",
                 "after_build_inventory": "source/inventory-after-build.json",
@@ -833,6 +887,7 @@ def main() -> int:
                 "rotation_args": args.rotations,
                 "fiammetta_modes": [mode for mode, _ in FIAMMETTA_MODES],
                 "boxes": [box_id_from_path(path) for path in boxes],
+                "box_min_owned": args.box_min_owned,
                 "case_count": len(cases),
                 "top": args.top,
                 "timeout_seconds": args.timeout,
