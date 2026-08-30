@@ -42,6 +42,7 @@ use crate::trade::shortcut::match_witch_group_shortcut;
 use super::base_rotation::{
     evaluate_base_assignment_efficiencies, RoomEfficiencyLine, ShiftEfficiencies,
 };
+use super::dorm_finalizer;
 use super::shift_bind::{shift_binds_from_plan, RuntimeShiftBind};
 
 const HALF_HOUR_SAFETY_MARGIN: f64 = 0.5;
@@ -2380,6 +2381,8 @@ fn finalize_timed_rotation(
     }
     for shift in &mut report.shifts {
         finalize_shift_dorms(blueprint, operbox, shift)?;
+    }
+    for shift in &mut report.shifts {
         clear_production_efficiencies(blueprint, &mut shift.assignment);
         shift.efficiencies = if shift.transition == ShiftTransition::FiammettaOnly {
             let action = shift
@@ -2427,6 +2430,18 @@ fn finalize_timed_rotation(
     };
     report.warnings = rotation_shortfall_warnings(blueprint, &report.shifts);
     assert_final_rotation_invariants(blueprint, operbox, instances, table, &report)?;
+    let dorm_warnings = dorm_finalizer::finalize_dorms(blueprint, operbox, &mut report.shifts)?;
+    report
+        .warnings
+        .extend(dorm_warnings.into_iter().map(|warning| {
+            format!(
+                "shift {} 宿舍普通休息候选 {} 人，可用空床 {}，未入宿: {}",
+                warning.shift_index + 1,
+                warning.candidate_count,
+                warning.available_beds,
+                warning.omitted_names.join(", ")
+            )
+        }));
     Ok(report)
 }
 
@@ -4638,12 +4653,13 @@ pub fn assert_final_rotation_invariants(
     Ok(())
 }
 
-/// N/A/B 三候选各自独立完整求解后的完整周期收益。分值只用于候选之间比较，
-/// 不进入最终报告；沿用当前 profile 的既有 trade/manufacture 加权口径。
-fn fiammetta_candidate_score(report: &TeamRotationReport, options: &AssignBaseOptions) -> i64 {
-    i64::from(report.daily.trade.millis()) * i64::from(options.trade_manufacture_weights.trade)
-        + i64::from(report.daily.manufacture.millis())
-            * i64::from(options.trade_manufacture_weights.manufacture)
+/// N/A/B 三候选各自独立完整求解后的唯一策略价值。
+///
+/// 三项产物先按完整轮换周期归一为 daily.production，再按用户裁决的策略权重
+/// 统一为可比较的值。该值只用于菲亚候选比较，不改变报告中的原始产物字段。
+fn fiammetta_candidate_value(report: &TeamRotationReport) -> f64 {
+    let production = &report.daily.production;
+    production.lmd + production.pure_gold + production.battle_records * 1.25
 }
 
 /// A 分支 trade_core 偏好的 alternative id。按 D4 降级：单金单贸易站 153 布局优先
@@ -4794,13 +4810,18 @@ pub fn schedule_abc_rotation_candidates(
     )?;
     let baseline = finalize_timed_rotation(blueprint, operbox, instances, table, baseline)?;
     write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &baseline);
+    let value = fiammetta_candidate_value(&baseline);
     eprintln!(
-        "[fiammetta-candidate] N {} trade={} manufacture={} targets=[]",
+        "[fiammetta-candidate] N {} trade={} manufacture={} production={:?} value={value:.3} targets=[]",
         profile.cli_name(),
         baseline.daily.trade,
         baseline.daily.manufacture,
+        baseline.daily.production,
     );
     let mut winner = baseline;
+    let baseline_for_tie = winner.clone();
+    let mut winner_value = fiammetta_candidate_value(&winner);
+    let mut winner_value_tied = false;
     let mut winner_targets = Vec::<String>::new();
 
     if a_eligible {
@@ -4852,17 +4873,22 @@ pub fn schedule_abc_rotation_candidates(
                             "A",
                             &candidate,
                         );
-                        let score = fiammetta_candidate_score(&candidate, options);
+                        let value = fiammetta_candidate_value(&candidate);
                         let targets = candidate_target_names(&candidate);
                         eprintln!(
-                            "[fiammetta-candidate] A {} trade={} manufacture={} targets={targets:?} score={score}",
+                            "[fiammetta-candidate] A {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
                             profile.cli_name(),
                             candidate.daily.trade,
                             candidate.daily.manufacture,
+                            candidate.daily.production,
                         );
-                        if score > fiammetta_candidate_score(&winner, options) {
+                        if value > winner_value + 1e-9 {
                             winner = candidate;
+                            winner_value = value;
+                            winner_value_tied = false;
                             winner_targets = targets;
+                        } else if (value - winner_value).abs() <= 1e-9 {
+                            winner_value_tied = true;
                         }
                     }
                     Err(error) => {
@@ -4918,17 +4944,22 @@ pub fn schedule_abc_rotation_candidates(
                             "B",
                             &candidate,
                         );
-                        let score = fiammetta_candidate_score(&candidate, options);
+                        let value = fiammetta_candidate_value(&candidate);
                         let targets = candidate_target_names(&candidate);
                         eprintln!(
-                            "[fiammetta-candidate] B {} trade={} manufacture={} targets={targets:?} score={score}",
+                            "[fiammetta-candidate] B {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
                             profile.cli_name(),
                             candidate.daily.trade,
                             candidate.daily.manufacture,
+                            candidate.daily.production,
                         );
-                        if score > fiammetta_candidate_score(&winner, options) {
+                        if value > winner_value + 1e-9 {
                             winner = candidate;
+                            winner_value = value;
+                            winner_value_tied = false;
                             winner_targets = targets;
+                        } else if (value - winner_value).abs() <= 1e-9 {
+                            winner_value_tied = true;
                         }
                     }
                     Err(error) => {
@@ -4948,11 +4979,17 @@ pub fn schedule_abc_rotation_candidates(
         }
     }
 
+    if winner_value_tied {
+        winner = baseline_for_tie;
+        winner_targets.clear();
+    }
+    let value = fiammetta_candidate_value(&winner);
     eprintln!(
-        "[fiammetta-candidate] winner {} trade={} manufacture={} targets={winner_targets:?}",
+        "[fiammetta-candidate] winner {} trade={} manufacture={} production={:?} value={value:.3} targets={winner_targets:?}",
         winner.profile.cli_name(),
         winner.daily.trade,
         winner.daily.manufacture,
+        winner.daily.production,
     );
     Ok(winner)
 }
@@ -4979,7 +5016,20 @@ fn write_candidate_report(
     let Ok(()) = std::fs::create_dir_all(directory) else {
         return;
     };
-    let Ok(json) = serde_json::to_string_pretty(report) else {
+    let value = fiammetta_candidate_value(report);
+    let payload = serde_json::json!({
+        "schema_version": 1,
+        "candidate": name,
+        "value_policy": {
+            "lmd": 1.0,
+            "pure_gold": 1.0,
+            "battle_records": 1.25
+        },
+        "value": value,
+        "daily_production": report.daily.production,
+        "report": report
+    });
+    let Ok(json) = serde_json::to_string_pretty(&payload) else {
         return;
     };
     let _ = std::fs::write(directory.join(format!("{name}.json")), json);
