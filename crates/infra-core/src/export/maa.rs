@@ -698,7 +698,7 @@ mod tests {
     }
 
     #[test]
-    fn special_rest_lancet_overrides_occupied_single_processing_slot() {
+    fn finalized_special_rest_is_exported_from_processing_assignment() {
         let mut blueprint = sample_blueprint();
         blueprint.rooms.push(RoomBlueprint {
             id: RoomId::new("workshop"),
@@ -709,14 +709,9 @@ mod tests {
             dorm_ambience_level: None,
         });
         let mut assignment = BaseAssignment::default();
-        assignment.set_room("workshop", vec![AssignedOperator::new("共享加工干员", 2)]);
+        assignment.set_room("workshop", vec![AssignedOperator::new("Lancet-2", 2)]);
 
-        let rooms = build_rooms(
-            &blueprint,
-            &assignment,
-            &[],
-            &[(FacilityKind::Workshop, "Lancet-2".to_string())],
-        );
+        let rooms = build_rooms(&blueprint, &assignment);
 
         assert_eq!(rooms.processing.len(), 1);
         assert_eq!(rooms.processing[0].operators, vec!["Lancet-2"]);
@@ -726,13 +721,15 @@ mod tests {
     fn occupied_dorm_keeps_manager_and_uses_spare_beds_for_resting_team() {
         let blueprint = sample_blueprint();
         let mut assignment = BaseAssignment::default();
-        assignment.set_room("dorm_1", vec![AssignedOperator::new("宿管", 2)]);
-        let rooms = build_rooms(
-            &blueprint,
-            &assignment,
-            &["休息甲".to_string(), "休息乙".to_string()],
-            &[],
+        assignment.set_room(
+            "dorm_1",
+            vec![
+                AssignedOperator::new("宿管", 2),
+                AssignedOperator::new("休息甲", 2),
+                AssignedOperator::new("休息乙", 2),
+            ],
         );
+        let rooms = build_rooms(&blueprint, &assignment);
         assert_eq!(
             rooms.dormitory[0].operators,
             vec!["宿管", "休息甲", "休息乙"]
@@ -740,21 +737,19 @@ mod tests {
     }
 
     #[test]
-    fn explicit_dorm_rest_preserves_manager_target_order() {
+    fn finalized_dorm_rest_preserves_manager_target_order() {
         let blueprint = sample_blueprint();
         let mut assignment = BaseAssignment::default();
-        assignment.set_room("dorm_1", vec![AssignedOperator::new("原宿舍成员", 2)]);
-        let mut rooms = build_rooms(&blueprint, &assignment, &[], &[]);
-        apply_dorm_rest(
-            &blueprint,
-            &mut rooms,
-            &DormRestPlan {
-                room_id: RoomId::new("dorm_1"),
-                target: "歌蕾蒂娅".into(),
-                single_manager: "单回宿管".into(),
-                group_manager: "群回宿管".into(),
-            },
+        assignment.set_room(
+            "dorm_1",
+            vec![
+                AssignedOperator::new("单回宿管", 2),
+                AssignedOperator::new("群回宿管", 2),
+                AssignedOperator::new("歌蕾蒂娅", 2),
+                AssignedOperator::new("原宿舍成员", 2),
+            ],
         );
+        let rooms = build_rooms(&blueprint, &assignment);
         assert_eq!(
             rooms.dormitory[0].operators,
             vec!["单回宿管", "群回宿管", "歌蕾蒂娅", "原宿舍成员"]
@@ -775,6 +770,13 @@ mod tests {
             ],
         );
         assignment.set_power_operator("power_1", AssignedOperator::new("格雷伊", 2));
+        assignment.set_room(
+            "dorm_1",
+            vec![
+                AssignedOperator::new("被换下干员", 2),
+                AssignedOperator::new("休息干员", 2),
+            ],
+        );
 
         let report = TeamRotationReport {
             profile: crate::schedule::TimedRotationProfile::default(),
@@ -784,6 +786,7 @@ mod tests {
             assignment_plans: vec![crate::layout::AssignmentPlan::recovery(
                 crate::layout::AssignShiftMode::Peak,
             )],
+            runtime_shift_binds: vec![],
             peak_mood_eta: None,
             teams: vec![TeamAssignment {
                 label: TeamLabel::Gamma,
@@ -847,11 +850,13 @@ mod tests {
             ],
         );
         assignment.set_power_operator("power_1", AssignedOperator::new("格雷伊", 2));
+        assignment.set_room("dorm_1", vec![AssignedOperator::new("菲亚梅塔", 2)]);
         let plan = crate::layout::AssignmentPlan::recovery(crate::layout::AssignShiftMode::Peak);
         let report = TeamRotationReport {
             profile: crate::schedule::TimedRotationProfile::Fiammetta8_8_4_4,
             peak_plan: plan.clone(),
             assignment_plans: vec![plan],
+            runtime_shift_binds: vec![],
             peak_mood_eta: None,
             teams: vec![TeamAssignment {
                 label: TeamLabel::Gamma,
@@ -896,8 +901,11 @@ mod tests {
         );
         assert!(schedule.plans[0].rooms.power[0].skip);
         assert!(schedule.plans[0].rooms.power[0].operators.is_empty());
-        assert!(schedule.plans[0].rooms.dormitory[0].skip);
-        assert!(schedule.plans[0].rooms.dormitory[0].operators.is_empty());
+        assert!(!schedule.plans[0].rooms.dormitory[0].skip);
+        assert_eq!(
+            schedule.plans[0].rooms.dormitory[0].operators,
+            vec!["菲亚梅塔"]
+        );
         assert!(!schedule.plans[0].drones.enable);
     }
 
@@ -982,18 +990,16 @@ mod tests {
     }
 
     #[test]
-    fn shared_slot_partial_fill_marks_autofill_for_meeting() {
+    fn shared_slot_exports_finalized_meeting_without_autofill() {
         let mut assignment = BaseAssignment::default();
         assignment.set_room("meeting", vec![AssignedOperator::new("麦哲伦", 2)]);
-        // 容量 2、只有 1 名成员 → 部分填充必须提示 autofill。
-        let slot = shared_slot_with_extra(&assignment, "meeting", true, Vec::new(), Some(2));
+        let slot = shared_slot(&assignment, "meeting");
         assert!(
-            slot.autofill,
-            "partial meeting fill must keep autofill=true"
+            !slot.autofill,
+            "finalized meeting must not request autofill"
         );
         assert_eq!(slot.operators, vec!["麦哲伦".to_string()]);
 
-        // 容量 2、2 名成员 → 填满，autofill=false。
         assignment.set_room(
             "meeting",
             vec![
@@ -1001,7 +1007,7 @@ mod tests {
                 AssignedOperator::new("和弦", 2),
             ],
         );
-        let full = shared_slot_with_extra(&assignment, "meeting", true, Vec::new(), Some(2));
+        let full = shared_slot(&assignment, "meeting");
         assert!(!full.autofill, "full meeting fill must clear autofill");
         assert_eq!(full.operators.len(), 2);
     }

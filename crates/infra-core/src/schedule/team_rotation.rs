@@ -8720,8 +8720,15 @@ mod tests {
         )
         .unwrap()
         .layout_snapshot();
-        let candidates =
-            office_candidates(&operbox, &instances, &table, &layout, 24.0, &HashSet::new());
+        let candidates = office_candidates(
+            &operbox,
+            &instances,
+            &table,
+            &layout,
+            24.0,
+            &HashSet::new(),
+            &OfficeFallbackPool::empty(),
+        );
         let position = |name: &str| {
             candidates
                 .iter()
@@ -8873,8 +8880,15 @@ mod tests {
         )
         .unwrap()
         .layout_snapshot();
-        let all_candidates =
-            office_candidates(&operbox, &instances, &table, &layout, 24.0, &HashSet::new());
+        let all_candidates = office_candidates(
+            &operbox,
+            &instances,
+            &table,
+            &layout,
+            24.0,
+            &HashSet::new(),
+            &OfficeFallbackPool::empty(),
+        );
         let Some(top) = all_candidates.first() else {
             return; // 办公室候选为空时该 fixture 无法测禁用语义
         };
@@ -12695,7 +12709,8 @@ mod tests {
             weighted_power: Efficiency::default(),
         };
 
-        let error = validate_final_rotation_invariants(&[shift], &[], &[]).unwrap_err();
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let error = validate_final_rotation_invariants(&blueprint, &[shift], &[], &[]).unwrap_err();
         assert!(error.to_string().contains("appears in multiple room slots"));
     }
 
@@ -12816,6 +12831,7 @@ mod tests {
         }
 
         assert!(validate_final_rotation_invariants(
+            &BaseBlueprint::template_243_use_this().unwrap(),
             &shifts,
             &[],
             std::slice::from_ref(&dependency),
@@ -12826,6 +12842,7 @@ mod tests {
             .rooms
             .retain(|room| room.room_id.0 != "meeting");
         assert!(validate_final_rotation_invariants(
+            &BaseBlueprint::template_243_use_this().unwrap(),
             &shifts,
             &[],
             std::slice::from_ref(&dependency),
