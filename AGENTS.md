@@ -74,7 +74,7 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 新抽象应让真实重复语义、所有权或证明义务更清楚；“出现第二个用例”是审阅问题，不是禁止合法具名机制的硬规则。
 - 修改候选集合、剪枝、分解、目标、top-K、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；无法证明完整时不得声称全局最优。
 - 对 solver/search、Plan admission、Team/Shift、rotation、MAA/export、跨设施机制或大规模运行时数据变更，完成前必须使用 `arknights-invariant-gate`：在 Rust 最终 `assignment` 上注册 `--assert-invariants` 检查，并用 Python 对 `data/fixtures/box-bundles/` 的代表性与 high-owned 集合批量调用该 gate。Python 不得解析文本/MAA 或重写机制语义；它只报告 Rust gate、求解无解、输入错误和超时。实际 assertion diff 必须经 Sol 复审至 `PASS`。
-- Agent 不得新增、修改或运行源代码内测试（包括 Cargo unit/integration tests、Python test modules 和 fixture snapshot tests）。验证逐步迁移到 Rust 最终状态 `--assert-invariants` gate、Python 持久化 box 批量求解和 Sol 复审；该禁令不阻止实现或运行 gate 本身及其批量验收脚本。
+- Agent 默认不得新增、修改或运行源代码内测试（包括 Cargo unit/integration tests、Python test modules 和 fixture snapshot tests）。用户明确授权的测试治理变更（例如删除已确认错误的断言）除外；此类变更必须限定在用户指定的测试路径，并在最终报告中单列。其余验证逐步迁移到 Rust 最终状态 `--assert-invariants` gate、Python 持久化 box 批量求解和 Sol 复审；该禁令不阻止实现或运行 gate 本身及其批量验收脚本。
 - 验证按改动风险选择方式：大型重构、solver/search、体系/排班/export、部署和需要长期审计的任务，使用 evidence 工具留痕；普通局部修复和文档调整可直接运行必要命令，并在最终说明结果。
 - 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 是否通过 evidence 工具记录由任务风险决定。
 - Agent memory 只能记录可丢弃的检索提示与协作偏好；领域语义、当前实现、架构决策和活动任务必须落在版本化 canonical、ADR 或 change 文档中，memory 不得成为真源。

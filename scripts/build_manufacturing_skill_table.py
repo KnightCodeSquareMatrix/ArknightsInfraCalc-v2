@@ -47,7 +47,7 @@ MANUAL_SKILL: dict[str, tuple[str, str]] = {
     "manu_formula_spd&cost_bd[100]": ("造价高昂", "tier_up"),
     "manu_skill_change[000]": ("意识兼容", "tier_0"),
     "manu_token_prod_spd[010]": ("机械精通·β", "tier_up"),
-    "manu_formula_spd[102]": ("原质塑金副产物", "tier_up"),
+    "manu_formula_spd[102]": ("金属工艺·α", "tier_0"),
     "manu_prod_spd&trade[1000]": ("原质塑金副产物", "tier_up"),
     "manu_formula_limit[020]": ("合理利用", "tier_up"),
     "manu_prod_limit&cost[003]": ("智慧之境", "tier_0"),

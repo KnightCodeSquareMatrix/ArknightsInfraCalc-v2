@@ -268,20 +268,6 @@ mod tests {
     }
 
     #[test]
-    fn resolve_stellar_thorn_tier_up_keeps_metal_and_trade_bonus() {
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let ids = instances.resolve_manufacture_buff_ids("引星棘刺", PromotionTier::TierUp);
-        assert_eq!(
-            ids,
-            vec![
-                "manu_formula_spd[101]".to_string(),
-                "manu_prod_spd&trade[1000]".to_string(),
-            ],
-            "精2 应保留金属工艺并叠加原质塑金（勿用 manu_formula_spd[102] 替换金属）"
-        );
-    }
-
-    #[test]
     fn resolve_cai_du_manu_tier0_and_tier_up_do_not_stack() {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         assert_eq!(

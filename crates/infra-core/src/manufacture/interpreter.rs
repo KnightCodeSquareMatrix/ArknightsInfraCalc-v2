@@ -612,7 +612,10 @@ fn resolve_eff_value(ctx: &ManuContext, atom: &EffectAtom, owner: &str) -> f64 {
 fn is_metal_formula_buff(buff_id: &str) -> bool {
     matches!(
         buff_id,
-        "manu_formula_spd[100]" | "manu_formula_spd[101]" | "manu_formula_spd[110]"
+        "manu_formula_spd[100]"
+            | "manu_formula_spd[101]"
+            | "manu_formula_spd[102]"
+            | "manu_formula_spd[110]"
     )
 }
 

@@ -2892,16 +2892,15 @@
     },
     {
       "id": "manu_formula_spd[102]",
-      "skill_name": "原质塑金副产物",
+      "skill_name": "金属工艺·α",
       "facility": "manufacture",
-      "tier": "tier_up",
+      "tier": "tier_0",
       "atoms": [
         {
-          "selector": "trade_station_count",
           "action": {
-            "kind": "add_flat_eff_from_selector",
+            "kind": "add_flat_eff",
             "params": {
-              "multiplier": 3.0,
+              "value": 30.0,
               "recipe": "gold"
             }
           },
