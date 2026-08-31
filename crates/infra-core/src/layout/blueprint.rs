@@ -58,14 +58,14 @@ pub struct RoomBlueprint {
     /// 宿舍床位数；缺省时按等级查表。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dorm_beds: Option<u8>,
-    /// “每间宿舍每级”技能读取的有效宿舍等级；必须由布局事实显式提供。
+    /// 宿舍建筑等级；“每间宿舍每级”技能直接读取该等级。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dorm_ambience_level: Option<u8>,
 }
 
 impl RoomBlueprint {
     pub fn dorm_skill_level(&self) -> u8 {
-        self.dorm_ambience_level.unwrap_or(0)
+        self.level.min(5)
     }
 
     pub fn operator_capacity(&self) -> usize {
@@ -282,24 +282,6 @@ impl BaseBlueprint {
                 if matches!(room.dorm_beds, Some(0)) {
                     return Err(Error::msg(format!(
                         "dorm room {} dorm_beds must be >= 1",
-                        room.id.0
-                    )));
-                }
-                if matches!(room.dorm_ambience_level, Some(0)) {
-                    return Err(Error::msg(format!(
-                        "dorm room {} dorm_ambience_level must be >= 1",
-                        room.id.0
-                    )));
-                }
-                if matches!(room.dorm_ambience_level, Some(level) if level > 5) {
-                    return Err(Error::msg(format!(
-                        "dorm room {} dorm_ambience_level must be <= 5",
-                        room.id.0
-                    )));
-                }
-                if room.dorm_ambience_level.is_none() {
-                    return Err(Error::msg(format!(
-                        "dorm room {} requires dorm_ambience_level",
                         room.id.0
                     )));
                 }
