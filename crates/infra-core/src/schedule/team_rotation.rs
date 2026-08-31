@@ -6741,8 +6741,8 @@ fn schedule_main_backup_12_12(
             operators: sorted_assignment_names(&backup.assignment),
         },
     ];
-    let first_fiammetta = operbox
-        .owns("菲亚梅塔")
+    let fiammetta_enabled = options.fiammetta_enable && operbox.owns("菲亚梅塔");
+    let first_fiammetta = fiammetta_enabled
         .then(|| {
             first_fiammetta_assignment_target(
                 TimedRotationProfile::MainBackup12_12,
@@ -6757,8 +6757,7 @@ fn schedule_main_backup_12_12(
             })
         })
         .flatten();
-    let second_fiammetta = operbox
-        .owns("菲亚梅塔")
+    let second_fiammetta = fiammetta_enabled
         .then(|| {
             let used = first_fiammetta
                 .as_ref()
