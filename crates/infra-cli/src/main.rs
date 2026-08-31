@@ -48,19 +48,27 @@ fn run() -> Result<(), Error> {
         return Ok(());
     }
 
+    let perf_enabled = !args[2..].iter().any(|arg| arg == "--no-perf");
+    infra_core::profile::set_solver_perf_enabled(perf_enabled);
+    let command_args: Vec<String> = args[2..]
+        .iter()
+        .filter(|arg| arg.as_str() != "--no-perf")
+        .cloned()
+        .collect();
+
     match args[1].as_str() {
-        "plan" => plan_cmd(&args[2..])?,
-        "advice" => advice_cmd(&args[2..])?,
-        "verify" => verify_cmd(&args[2..])?,
-        "pool" => pool_cmd(&args[2..])?,
-        "search" => search_cmd(&args[2..])?,
-        "trade" => trade_cmd(&args[2..])?,
-        "bench" => bench_cmd(&args[2..])?,
-        "bake" => bake_cmd(&args[2..])?,
-        "debug" => debug_cmd(&args[2..])?,
-        "serve" => serve_cmd(&args[2..])?,
-        "layout" => layout_cmd(&args[2..])?,
-        "profile" => profile_cmd(&args[2..])?,
+        "plan" => plan_cmd(&command_args)?,
+        "advice" => advice_cmd(&command_args)?,
+        "verify" => verify_cmd(&command_args)?,
+        "pool" => pool_cmd(&command_args)?,
+        "search" => search_cmd(&command_args)?,
+        "trade" => trade_cmd(&command_args)?,
+        "bench" => bench_cmd(&command_args)?,
+        "bake" => bake_cmd(&command_args)?,
+        "debug" => debug_cmd(&command_args)?,
+        "serve" => serve_cmd(&command_args)?,
+        "layout" => layout_cmd(&command_args)?,
+        "profile" => profile_cmd(&command_args)?,
         other => {
             print_usage();
             return Err(Error::msg(format!("unknown command {other:?}")));
@@ -99,6 +107,7 @@ fn print_usage() {
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");
     eprintln!("  infra-cli trade yield <fixture> [--level <n>] [--shift <hours>] [-o <file.csv>] [--text]");
     eprintln!();
+    eprintln!("Global: append --no-perf to disable [perf] stderr trace output");
     eprintln!("Output: CSV by default (UTF-8 BOM when writing to file). Use --text for human-readable stderr.");
 }
 

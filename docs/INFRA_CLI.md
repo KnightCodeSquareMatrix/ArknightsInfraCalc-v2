@@ -125,7 +125,10 @@ crates/infra-cli/src/
 | `emit_bench` | `bench` |
 | `emit_trade_yield` | `trade yield` |
 
-约定：默认 **CSV**（写文件时 UTF-8 BOM）；`--text` 走 stderr 人类可读。新增子命令时先定 `emit_*` API，再在 `commands/*.rs` 里调用。
+约定：默认 **CSV**（写文件时 UTF-8 BOM）；`--text` 走 stderr 人类可读。全局追加
+`--no-perf` 可关闭 `[perf]` 求解阶段 trace，避免业务请求承担计时、metrics 和 JSON
+trace 写入；普通错误、进度和 `--text` 输出不受影响。新增子命令时先定 `emit_*` API，再在
+`commands/*.rs` 里调用。
 
 ---
 

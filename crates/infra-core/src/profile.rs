@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 /// 轻量运行时计数器，供 `infra-cli profile` 对比优化前后热路径行为。
@@ -195,6 +195,11 @@ thread_local! {
 }
 
 static NEXT_TRACE_ID: AtomicU64 = AtomicU64::new(1);
+static SOLVER_PERF_ENABLED: AtomicBool = AtomicBool::new(true);
+
+pub fn set_solver_perf_enabled(enabled: bool) {
+    SOLVER_PERF_ENABLED.store(enabled, Ordering::Relaxed);
+}
 
 /// Restores the previous request-local trace even when the measured operation returns early.
 pub struct SolverPerfTraceGuard {
@@ -213,6 +218,12 @@ impl Drop for SolverPerfTraceGuard {
 }
 
 pub fn start_solver_perf_trace(layout: &str, operbox: &str) -> SolverPerfTraceGuard {
+    if !SOLVER_PERF_ENABLED.load(Ordering::Relaxed) {
+        return SolverPerfTraceGuard {
+            previous: None,
+            owns_trace: false,
+        };
+    }
     let state = PerfTraceState {
         trace_id: NEXT_TRACE_ID.fetch_add(1, Ordering::Relaxed),
         layout: layout.to_string(),
