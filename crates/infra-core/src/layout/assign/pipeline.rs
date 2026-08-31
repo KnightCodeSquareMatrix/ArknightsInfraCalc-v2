@@ -26,7 +26,7 @@ use crate::search::{
 };
 use crate::skill_table::SkillTable;
 
-use super::commit::{commit_manu_room, commit_trade_room};
+use super::commit::{commit_manu_room, commit_trade_room, manu_hit_names, trade_hit_names};
 use super::control_fill::{
     assign_control_matching_dynamic_set_with_saileach, assign_control_with_saileach,
 };
@@ -47,6 +47,8 @@ use super::{inject_search_anchor_pool_entries, tag_pool_from_plan, AssignBaseOpt
 
 const SPHINX_NAME: &str = "深巡";
 const ULPIANUS_NAME: &str = "乌尔比安";
+/// 唯一需要贸易/制造跨设施归属比较的干员（能力影子候选适用域，用户裁决 2026-09-01）。
+const SHADOW_TRADE_MANUFACTURE_OPERATOR: &str = "夜烟";
 
 /// 执行单班填房流水线，返回最终编制。
 ///
@@ -195,6 +197,26 @@ fn run_shift_pipeline_with_producer_pruning(
             run = best
                 .ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?
                 .run;
+            // 只对最终 winner 做一次夜烟 trade/manufacture 归属比较；候选循环内不再
+            // 为每个中枢候选重算整套生产填充。候选循环使用含喀兰杰市场的 trade_pool，
+            // 这里的比较必须使用同一池，否则重填结果会与 winner 原结果漂移。
+            let mut winner_trade_pool = trade_pool.clone();
+            let winner_layout = run.resolve_snapshot(true)?;
+            if karlan_precision_active(&winner_layout.global_inject) {
+                add_jie_market_to_trade_pool(&mut winner_trade_pool, run.instances, run.table);
+            }
+            if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
+                &run,
+                plan,
+                &winner_trade_pool,
+                &manu_pool,
+                gold_lines,
+                &forbid_same_room,
+                AssignShiftMode::Peak,
+            )? {
+                run.assignment = assignment;
+                run.used = used;
+            }
             timer.mark("peak_prefixes");
         }
         AssignShiftMode::Recovery => {
@@ -211,8 +233,8 @@ fn run_shift_pipeline_with_producer_pruning(
             }
             let shadow_allowed = karlan_precision_active(&layout.global_inject)
                 || jie_e0_trade_operator(instances, table).is_none();
-            let shadow_assignment = if shadow_allowed {
-                apply_shadow_trade_manufacture_pair(
+            if shadow_allowed {
+                if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
                     &run,
                     plan,
                     &trade_pool,
@@ -220,13 +242,35 @@ fn run_shift_pipeline_with_producer_pruning(
                     gold_lines,
                     &forbid_same_room,
                     AssignShiftMode::Recovery,
-                )?
-            } else {
-                None
-            };
-            if let Some((assignment, used)) = shadow_assignment {
-                run.assignment = assignment;
-                run.used = used;
+                )? {
+                    run.assignment = assignment;
+                    run.used = used;
+                } else {
+                    assign_trade_jie_remainder(
+                        blueprint,
+                        &trade_pool,
+                        table,
+                        instances,
+                        gold_lines,
+                        options,
+                        Some(run.durin_plan),
+                        &mut run.assignment,
+                        &mut run.used,
+                    )?;
+                    let layout = run.resolve_snapshot(true)?;
+                    assign_manufacture_lines(
+                        blueprint,
+                        operbox,
+                        instances,
+                        &manu_pool,
+                        table,
+                        &layout,
+                        options,
+                        &forbid_same_room,
+                        &mut run.assignment,
+                        &mut run.used,
+                    )?;
+                }
             } else {
                 assign_trade_jie_remainder(
                     blueprint,
@@ -307,9 +351,12 @@ fn producer_pruning_enabled(requested: bool, policy: ScoringPolicyId) -> bool {
     requested && policy == ScoringPolicyId::ControlInjectRawSumV0
 }
 
-/// Compare the two non-cartesian assignments of the first pair of empty
-/// production rooms. The base assignment is never mutated until a winner is
-/// available, so the physical `used` set remains authoritative.
+/// 夜烟 trade/manufacture 归属比较（能力影子候选适用域仅夜烟，用户裁决 2026-09-01）。
+///
+/// 只比较首个空贸易站与首个空制造站的实际 pick：仅当两侧都选中夜烟时，才构造
+/// “夜烟进贸易”与“夜烟进制造”两条分支并结算完整分支；否则走普通贸易+制造填充。
+/// Peak 的每个中枢候选在循环内已填满生产房，本函数从 clone 上清空生产房再探测，
+/// 因此只对最终 winner 执行一次，候选循环内不产生重复重算。
 #[allow(clippy::too_many_arguments)]
 fn apply_shadow_trade_manufacture_pair(
     run: &AssignmentRun<'_>,
@@ -320,29 +367,48 @@ fn apply_shadow_trade_manufacture_pair(
     forbid_same_room: &[(String, String)],
     mode: AssignShiftMode,
 ) -> Result<Option<(BaseAssignment, HashSet<String>)>> {
-    if !has_shadow_candidate_overlap(trade_pool, manu_pool, &run.used) {
-        return Ok(None);
-    }
+    let mut assignment = run.assignment.clone();
+    let mut used = run.used.clone();
+    clear_production_rooms(run.blueprint, &mut assignment, &mut used);
 
-    let trade_first = shadow_full_branch(
+    let Some((trade_room, manu_room, trade_hit, manu_hit)) = probe_shadow_pair(
         run,
+        plan,
+        trade_pool,
+        manu_pool,
+        gold_lines,
+        &assignment,
+        &used,
+    )?
+    else {
+        return Ok(None);
+    };
+
+    let trade_first = shadow_trade_first_branch(
+        run,
+        plan,
         trade_pool,
         manu_pool,
         gold_lines,
         forbid_same_room,
-        plan,
         mode,
-        true,
+        &assignment,
+        &used,
+        &trade_room,
+        &trade_hit,
     );
-    let manu_first = shadow_full_branch(
+    let manu_first = shadow_manufacture_first_branch(
         run,
+        plan,
         trade_pool,
         manu_pool,
         gold_lines,
         forbid_same_room,
-        plan,
         mode,
-        false,
+        &assignment,
+        &used,
+        &manu_room,
+        &manu_hit,
     );
 
     let winner = match (trade_first, manu_first) {
@@ -364,67 +430,178 @@ fn apply_shadow_trade_manufacture_pair(
     Ok(Some((winner.assignment, winner.used)))
 }
 
-fn has_shadow_candidate_overlap(
+/// 首个空贸易站与首个空制造站的实际 pick 是否都选中夜烟（探测不提交占用）。
+#[allow(clippy::too_many_arguments)]
+fn probe_shadow_pair(
+    run: &AssignmentRun<'_>,
+    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
+    gold_lines: u32,
+    assignment: &BaseAssignment,
     used: &HashSet<String>,
-) -> bool {
-    let manu_names: HashSet<_> = manu_pool
-        .entries
+) -> Result<
+    Option<(
+        crate::layout::blueprint::RoomBlueprint,
+        crate::layout::blueprint::RoomBlueprint,
+        TradeSearchHit,
+        ManuSearchHit,
+    )>,
+> {
+    let Some((trade_room, manu_room)) =
+        first_shadow_rooms(run.blueprint, assignment, trade_pool, used)
+    else {
+        return Ok(None);
+    };
+    let layout = run.resolve_snapshot(true)?;
+    let mut probe_used = used.clone();
+    let trade_hit = pick_trade_meta_then_plain(
+        trade_pool,
+        run.table,
+        &layout,
+        gold_lines,
+        run.options,
+        trade_order_from_room(trade_room)?,
+        trade_room.level,
+        &mut probe_used,
+        &forbid_trade_station_pairs(plan),
+        &[],
+    )?;
+    let manu_hit = pick_shadow_manufacture(
+        manu_pool,
+        run.table,
+        manu_options(
+            &layout,
+            run.options,
+            room_recipe(manu_room)?,
+            manu_room.level,
+        ),
+        used,
+    )?;
+    let trade_takes_night_smoke = trade_hit_names(&trade_hit)
         .iter()
-        .filter(|entry| !used.contains(&entry.name))
-        .map(|entry| entry.name.as_str())
-        .collect();
-    trade_pool
-        .entries
+        .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
+    let manu_takes_night_smoke = manu_hit_names(&manu_hit)
         .iter()
-        .any(|entry| !used.contains(&entry.name) && manu_names.contains(entry.name.as_str()))
+        .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
+    if !(trade_takes_night_smoke && manu_takes_night_smoke) {
+        return Ok(None);
+    }
+    Ok(Some((
+        trade_room.clone(),
+        manu_room.clone(),
+        trade_hit,
+        manu_hit,
+    )))
 }
 
+/// 从工作副本上清空全部贸易/制造房占用，并释放对应 `used` 条目。
+/// Peak winner 已由候选循环填满生产房，先清空才能回到“首个空房对”边界。
+fn clear_production_rooms(
+    blueprint: &BaseBlueprint,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) {
+    let filled: HashSet<String> = assignment
+        .rooms
+        .iter()
+        .filter(|room| {
+            blueprint.room(&room.room_id).is_some_and(|spec| {
+                matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
+            })
+        })
+        .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
+        .collect();
+    if filled.is_empty() {
+        return;
+    }
+    for room in &mut assignment.rooms {
+        if blueprint.room(&room.room_id).is_some_and(|spec| {
+            matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
+        }) {
+            room.operators.clear();
+        }
+    }
+    used.retain(|name| !filled.contains(name));
+}
+
+/// 分支 A：夜烟进贸易（commit 首个空贸易站 pick），制造侧排除夜烟后正常填充。
 #[allow(clippy::too_many_arguments)]
-fn shadow_full_branch(
+fn shadow_trade_first_branch(
     run: &AssignmentRun<'_>,
+    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
-    plan: &AssignmentPlan,
     mode: AssignShiftMode,
-    trade_first: bool,
+    base_assignment: &BaseAssignment,
+    base_used: &HashSet<String>,
+    trade_room: &crate::layout::blueprint::RoomBlueprint,
+    trade_hit: &TradeSearchHit,
 ) -> Result<ShadowBranch> {
-    let mut assignment = run.assignment.clone();
-    let mut used = run.used.clone();
-
-    if trade_first {
-        fill_shadow_trade(
-            run,
-            trade_pool,
-            gold_lines,
-            plan,
-            mode,
-            &mut assignment,
-            &mut used,
-        )?;
-        cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
-        fill_shadow_manufacture(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
-    } else {
-        fill_shadow_manufacture(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
-        fill_shadow_trade(
-            run,
-            trade_pool,
-            gold_lines,
-            plan,
-            mode,
-            &mut assignment,
-            &mut used,
-        )?;
-        cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
-    }
-
+    let mut assignment = base_assignment.clone();
+    let mut used = base_used.clone();
+    commit_trade_room(
+        &mut assignment,
+        &trade_room.id,
+        trade_hit,
+        trade_pool,
+        &mut used,
+    )?;
+    fill_trade_remainder(
+        run,
+        trade_pool,
+        gold_lines,
+        plan,
+        mode,
+        &mut assignment,
+        &mut used,
+    )?;
+    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+    fill_manufacture_remainder(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
     settle_shadow_branch(run, assignment, used)
 }
 
-fn fill_shadow_trade(
+/// 分支 B：夜烟进制造（commit 首个空制造站 pick），贸易侧排除夜烟后正常填充。
+#[allow(clippy::too_many_arguments)]
+fn shadow_manufacture_first_branch(
+    run: &AssignmentRun<'_>,
+    plan: &AssignmentPlan,
+    trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+    mode: AssignShiftMode,
+    base_assignment: &BaseAssignment,
+    base_used: &HashSet<String>,
+    manu_room: &crate::layout::blueprint::RoomBlueprint,
+    manu_hit: &ManuSearchHit,
+) -> Result<ShadowBranch> {
+    let mut assignment = base_assignment.clone();
+    let mut used = base_used.clone();
+    commit_manu_room(
+        &mut assignment,
+        &manu_room.id,
+        manu_hit,
+        manu_pool,
+        &mut used,
+    )?;
+    fill_trade_remainder(
+        run,
+        trade_pool,
+        gold_lines,
+        plan,
+        mode,
+        &mut assignment,
+        &mut used,
+    )?;
+    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
+    fill_manufacture_remainder(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
+    settle_shadow_branch(run, assignment, used)
+}
+
+fn fill_trade_remainder(
     run: &AssignmentRun<'_>,
     trade_pool: &TradePool,
     gold_lines: u32,
@@ -461,7 +638,7 @@ fn fill_shadow_trade(
     }
 }
 
-fn fill_shadow_manufacture(
+fn fill_manufacture_remainder(
     run: &AssignmentRun<'_>,
     manu_pool: &crate::pool::ManuPool,
     forbid_same_room: &[(String, String)],
@@ -563,179 +740,6 @@ fn pick_shadow_manufacture(
     let candidate_pool = manufacture_candidate_pool_for_demand(pool, used);
     pick_manu_hit(&candidate_pool, table, options.clone(), used, top_k)
         .or_else(|_| pick_manu_hit(pool, table, options, used, top_k))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn shadow_trade_first_branch(
-    run: &AssignmentRun<'_>,
-    trade_pool: &TradePool,
-    manu_pool: &crate::pool::ManuPool,
-    trade_hit: &TradeSearchHit,
-    trade_room: &crate::layout::blueprint::RoomBlueprint,
-    manu_room: &crate::layout::blueprint::RoomBlueprint,
-    gold_lines: u32,
-    forbid_same_room: &[(String, String)],
-    plan: &AssignmentPlan,
-) -> Result<ShadowBranch> {
-    let mut assignment = run.assignment.clone();
-    let mut used = run.used.clone();
-    commit_trade_room(
-        &mut assignment,
-        &trade_room.id,
-        trade_hit,
-        trade_pool,
-        &mut used,
-    )?;
-    let layout = crate::layout::resolve_base(
-        run.blueprint,
-        &assignment,
-        Some(run.instances),
-        Some(run.table),
-        run.options.mood,
-        Some(run.durin_plan),
-    )?
-    .layout;
-    let manu_hit = pick_shadow_manufacture(
-        manu_pool,
-        run.table,
-        manu_options(
-            &layout,
-            run.options,
-            room_recipe(manu_room)?,
-            manu_room.level,
-        ),
-        &used,
-    )?;
-    commit_manu_room(
-        &mut assignment,
-        &manu_room.id,
-        &manu_hit,
-        manu_pool,
-        &mut used,
-    )?;
-    assign_trade_remainder(
-        run.blueprint,
-        trade_pool,
-        run.table,
-        run.instances,
-        gold_lines,
-        run.options,
-        Some(run.durin_plan),
-        &forbid_trade_station_pairs(plan),
-        &mut assignment,
-        &mut used,
-    )?;
-    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
-    let manu_layout = crate::layout::resolve_base(
-        run.blueprint,
-        &assignment,
-        Some(run.instances),
-        Some(run.table),
-        run.options.mood,
-        Some(run.durin_plan),
-    )?
-    .layout;
-    assign_manufacture_lines(
-        run.blueprint,
-        run.operbox,
-        run.instances,
-        manu_pool,
-        run.table,
-        &manu_layout,
-        run.options,
-        forbid_same_room,
-        &mut assignment,
-        &mut used,
-    )?;
-    settle_shadow_branch(run, assignment, used)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn shadow_manufacture_first_branch(
-    run: &AssignmentRun<'_>,
-    trade_pool: &TradePool,
-    manu_pool: &crate::pool::ManuPool,
-    manu_hit: &ManuSearchHit,
-    trade_room: &crate::layout::blueprint::RoomBlueprint,
-    manu_room: &crate::layout::blueprint::RoomBlueprint,
-    gold_lines: u32,
-    forbid_same_room: &[(String, String)],
-    plan: &AssignmentPlan,
-) -> Result<ShadowBranch> {
-    let mut assignment = run.assignment.clone();
-    let mut used = run.used.clone();
-    commit_manu_room(
-        &mut assignment,
-        &manu_room.id,
-        manu_hit,
-        manu_pool,
-        &mut used,
-    )?;
-    let layout = crate::layout::resolve_base(
-        run.blueprint,
-        &assignment,
-        Some(run.instances),
-        Some(run.table),
-        run.options.mood,
-        Some(run.durin_plan),
-    )?
-    .layout;
-    let trade_order = trade_order_from_room(trade_room)?;
-    let mut trade_used = used.clone();
-    let trade_hit = pick_trade_meta_then_plain(
-        trade_pool,
-        run.table,
-        &layout,
-        gold_lines,
-        run.options,
-        trade_order,
-        trade_room.level,
-        &mut trade_used,
-        &forbid_trade_station_pairs(plan),
-        &[],
-    )?;
-    commit_trade_room(
-        &mut assignment,
-        &trade_room.id,
-        &trade_hit,
-        trade_pool,
-        &mut used,
-    )?;
-    assign_trade_remainder(
-        run.blueprint,
-        trade_pool,
-        run.table,
-        run.instances,
-        gold_lines,
-        run.options,
-        Some(run.durin_plan),
-        &forbid_trade_station_pairs(plan),
-        &mut assignment,
-        &mut used,
-    )?;
-    cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
-    let manu_layout = crate::layout::resolve_base(
-        run.blueprint,
-        &assignment,
-        Some(run.instances),
-        Some(run.table),
-        run.options.mood,
-        Some(run.durin_plan),
-    )?
-    .layout;
-    assign_manufacture_lines(
-        run.blueprint,
-        run.operbox,
-        run.instances,
-        manu_pool,
-        run.table,
-        &manu_layout,
-        run.options,
-        forbid_same_room,
-        &mut assignment,
-        &mut used,
-    )?;
-    settle_shadow_branch(run, assignment, used)
 }
 
 fn settle_shadow_branch(
@@ -1177,18 +1181,6 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
-    if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
-        &run,
-        plan,
-        &trade_pool,
-        manu_pool,
-        gold_lines,
-        forbid_same_room,
-        AssignShiftMode::Peak,
-    )? {
-        run.assignment = assignment;
-        run.used = used;
-    }
     let remaining_trade_slots: usize = run
         .blueprint
         .rooms
