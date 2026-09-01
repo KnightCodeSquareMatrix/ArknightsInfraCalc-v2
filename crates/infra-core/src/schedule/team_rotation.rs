@@ -20,8 +20,8 @@ use crate::layout::{
     RoomProduct, SelectedRuleAlternative, ShiftBind, SlotFill, SystemAnchor, TradeRolePreference,
 };
 use crate::mood::{
-    dorm_recovery_rates, operator_net_drain, shift_eta, shift_eta_with_instances, workable_hours,
-    DormOccupant, DrainInputs, MoodModel, ShiftEta,
+    dorm_recovery_rates, operator_net_drain, shift_eta, shift_eta_with_instances, DormOccupant,
+    DrainInputs, MoodModel, ShiftEta,
 };
 use crate::notes::annotate_assignment;
 use crate::operbox::OperBox;
@@ -45,7 +45,6 @@ use super::base_rotation::{
 use super::dorm_finalizer;
 use super::shift_bind::{shift_binds_from_plan, RuntimeShiftBind};
 
-const HALF_HOUR_SAFETY_MARGIN: f64 = 0.5;
 const FIAMMETTA_NAME: &str = "菲亚梅塔";
 const SPHINX_NAME: &str = "深巡";
 const ULPIANUS_NAME: &str = "乌尔比安";
@@ -53,17 +52,6 @@ struct FacilityRotationEligibility<'a> {
     worked_hours: &'a HashMap<String, f64>,
     shift_hours: f64,
     full_control: bool,
-}
-
-#[derive(Debug, Default)]
-struct OfficeFallbackPool {
-    entries: Vec<AssignedOperator>,
-}
-
-impl OfficeFallbackPool {
-    fn empty() -> Self {
-        Self::default()
-    }
 }
 
 /// Closed set of timed-rotation products supported by the runtime.
@@ -698,12 +686,12 @@ fn pin_active_dependency_required(
     Ok(())
 }
 
-/// 办公室轮换候选：全 roster 按 `support_skill_registry` 静态办公室速度评分排序
+/// 办公室候选：全 roster 按 `support_skill_registry` 办公室速度评分排序
 /// （无技能干员 0 分，按名序兜底）。
 ///
-/// 评分固定使用单人办公室语义（办公室一人房）与 24 小时、0 额外招募位和 shared
-/// 脚手架 layout；`hire_spd_cost[210]` 等动态条件按注册表求值。这是静态 heuristic，
-/// 不反映当班全局资源或短班时长，不声称办公室全局最优。与 `meeting_candidates` 同口径。
+/// 评分固定使用单人办公室语义（办公室一人房）与当前调用方提供的 layout；
+/// `hire_spd_cost[210]` 等动态条件按注册表求值。该排序只负责当前班的候选优先级，
+/// 当前班已占用成员由调用方在填充前裁剪，不保存跨班办公室状态。
 fn office_candidates(
     operbox: &OperBox,
     _instances: &OperatorInstances,
@@ -711,9 +699,7 @@ fn office_candidates(
     layout: &LayoutContext,
     _mood: f64,
     excluded: &HashSet<String>,
-    fallback_pool: &OfficeFallbackPool,
 ) -> Vec<AssignedOperator> {
-    debug_assert!(fallback_pool.entries.is_empty());
     let roster = operbox.roster();
     let mut registry = None;
     let mut candidates: Vec<(f64, AssignedOperator)> = roster
@@ -757,6 +743,26 @@ fn office_candidates(
     candidates.into_iter().map(|(_, op)| op).collect()
 }
 
+fn office_remainder_pool(
+    ranked_pool: &[AssignedOperator],
+    assignment: &BaseAssignment,
+) -> Vec<AssignedOperator> {
+    let assigned = occupied_operator_names(assignment);
+    ranked_pool
+        .iter()
+        .filter(|operator| !assigned.contains(&operator.name))
+        .cloned()
+        .collect()
+}
+
+fn occupied_operator_names(assignment: &BaseAssignment) -> HashSet<String> {
+    let mut names = assignment.operator_names();
+    if let Some(assistant) = &assignment.training_assist {
+        names.insert(assistant.name.clone());
+    }
+    names
+}
+
 fn candidate_fits_facility_shift(
     assignment: &BaseAssignment,
     blueprint: &BaseBlueprint,
@@ -768,6 +774,39 @@ fn candidate_fits_facility_shift(
     let Some(eligibility) = eligibility else {
         return true;
     };
+    let model = MoodModel::load_default().expect("mood model loads for rotation eligibility");
+    let drain = facility_candidate_drain(
+        &model,
+        assignment,
+        blueprint,
+        room_id,
+        candidate,
+        facility,
+        eligibility.full_control,
+    );
+    let max_hours = if drain <= 0.0 {
+        f64::INFINITY
+    } else {
+        model.workable_mood() / drain
+    };
+    let already_worked = eligibility
+        .worked_hours
+        .get(&candidate.name)
+        .copied()
+        .unwrap_or(0.0);
+    eligibility.shift_hours <= max_hours + 1e-9
+        && (drain <= 0.0 || already_worked + eligibility.shift_hours <= max_hours + 1e-9)
+}
+
+fn facility_candidate_drain(
+    model: &MoodModel,
+    assignment: &BaseAssignment,
+    blueprint: &BaseBlueprint,
+    room_id: &RoomId,
+    candidate: &AssignedOperator,
+    facility: FacilityKind,
+    full_control: bool,
+) -> f64 {
     let mut room_ops: Vec<(String, u8)> = assignment
         .operators_in(room_id)
         .iter()
@@ -779,13 +818,12 @@ fn candidate_fits_facility_shift(
         .iter()
         .map(|operator| (operator.name.clone(), operator.elite))
         .collect::<Vec<_>>();
-    let model = MoodModel::load_default().expect("mood model loads for rotation eligibility");
     let inputs = DrainInputs {
         name: &candidate.name,
         elite: candidate.elite,
         facility,
         room_ops: &room_ops,
-        full_control: eligibility.full_control,
+        full_control,
         control_ops: &control_ops,
         recipe: blueprint.room(room_id).and_then(|room| match room.product {
             Some(RoomProduct::Factory { recipe }) => match recipe {
@@ -797,228 +835,127 @@ fn candidate_fits_facility_shift(
             _ => None,
         }),
     };
-    let drain = operator_net_drain(&model, &inputs);
-    let max_hours = workable_hours(&model, &inputs);
-    let already_worked = eligibility
-        .worked_hours
-        .get(&candidate.name)
-        .copied()
-        .unwrap_or(0.0);
-    drain <= 0.0
-        || (eligibility.shift_hours <= max_hours + 1e-9
-            && already_worked + eligibility.shift_hours <= max_hours + 1e-9)
+    operator_net_drain(&model, &inputs)
 }
 
-/// 为当班办公室满编选人。
-///
-/// 候选来源是当前活跃的两个 cohort（D4：候选仅在所属 cohort 活跃时具备上岗资格）。
-/// 排序规则：绑定成员始终优先且不受轮换限制（必须随消费方同上同下）；
-/// 普通成员优先选本完整循环尚未上岗者（跨班次轮换），同一普通成员不会在多个班次
-/// 连续复用导致心情超限。不保证普通成员个人上二休一，出勤受当班办公室席位约束。
-/// `fixed_segment_members` keeps ordinary office members in one combined segment.
-/// Bound members still follow their consumer team's presence.
-/// 返回本班新上岗的普通成员，供调用方更新跨班次轮换集合。
-#[allow(clippy::too_many_arguments)]
-fn assign_rotating_offices_with_context(
+fn candidate_fits_current_shift(
+    model: &MoodModel,
+    assignment: &BaseAssignment,
+    blueprint: &BaseBlueprint,
+    room_id: &RoomId,
+    candidate: &AssignedOperator,
+    shift_hours: f64,
+) -> bool {
+    let drain = facility_candidate_drain(
+        model,
+        assignment,
+        blueprint,
+        room_id,
+        candidate,
+        FacilityKind::Office,
+        assignment.control_operators().len() >= 5,
+    );
+    drain <= 0.0 || shift_hours <= model.workable_mood() / drain + 1e-9
+}
+
+fn assign_office_for_shift(
     assignment: &mut BaseAssignment,
     blueprint: &BaseBlueprint,
-    active_teams: &[TeamLabel],
-    rotating_team: &HashMap<String, TeamLabel>,
+    active_bound_names: &HashSet<String>,
     bound_names: &HashSet<String>,
     candidates: &[AssignedOperator],
-    used_office: &HashSet<String>,
-    fixed_segment_members: Option<&HashMap<RoomId, AssignedOperator>>,
-    eligibility: Option<&FacilityRotationEligibility<'_>>,
-) -> Result<Vec<String>> {
-    let mut used = assignment.operator_names();
-    let reuse_short_segment_requested =
-        fixed_segment_members.is_some_and(|members| !members.is_empty());
-    // 绑定成员受 cohort 约束；未绑定办公室成员可以跨 cohort 复用。
-    let mut active_rotating: Vec<&String> = rotating_team
-        .iter()
-        .filter(|(_, team)| active_teams.contains(team))
-        .map(|(name, _)| name)
-        .collect();
-    active_rotating.sort_by_key(|name| {
-        let rank = candidates
+    shift_hours: f64,
+) -> Result<()> {
+    let model = MoodModel::load_default()?;
+    let available_candidates = office_remainder_pool(candidates, assignment);
+    let mut used = occupied_operator_names(assignment);
+    let mut active_bound: Vec<&String> = active_bound_names.iter().collect();
+    active_bound.sort_by_key(|name| {
+        available_candidates
             .iter()
-            .position(|op| op.name == name.as_str())
-            .unwrap_or(usize::MAX);
-        (
-            !bound_names.contains(*name),
-            !used_office.contains(*name),
-            rank,
-        )
+            .position(|candidate| candidate.name == name.as_str())
+            .unwrap_or(usize::MAX)
     });
-    let mut newly_used = Vec::new();
-    for room in blueprint
+
+    let office_rooms: Vec<(RoomId, usize)> = blueprint
         .rooms
         .iter()
         .filter(|room| room.kind == FacilityKind::Office)
-    {
-        let mut operators = assignment.operators_in(&room.id).to_vec();
-        while operators.len() < room.operator_capacity() {
-            let bound = active_rotating
-                .iter()
-                .find(|name| {
-                    !used.contains(name.as_str())
-                        && bound_names.contains(name.as_str())
-                        && !used_office.contains(name.as_str())
-                })
-                .or_else(|| {
-                    active_rotating.iter().find(|name| {
-                        !used.contains(name.as_str()) && bound_names.contains(name.as_str())
-                    })
-                })
-                .and_then(|name| candidates.iter().find(|op| op.name == name.as_str()))
-                .filter(|operator| {
-                    candidate_fits_facility_shift(
+        .map(|room| (room.id.clone(), room.operator_capacity()))
+        .collect();
+
+    // A bound office member cannot be replaced independently: place every active
+    // member first, then use ordinary candidates for the remaining seats.
+    for name in active_bound {
+        if used.contains(name.as_str()) {
+            return Err(Error::msg(format!(
+                "active bound office operator {name} is already occupied in the current shift"
+            )));
+        }
+        let candidate = available_candidates
+            .iter()
+            .find(|candidate| candidate.name == name.as_str())
+            .ok_or_else(|| {
+                Error::msg(format!(
+                    "active bound office operator {name} is unavailable in the current shift"
+                ))
+            })?;
+        let Some((room_id, _)) = office_rooms.iter().find(|(room_id, capacity)| {
+            assignment.operators_in(room_id).len() < *capacity
+                && candidate_fits_current_shift(
+                    &model,
+                    assignment,
+                    blueprint,
+                    room_id,
+                    candidate,
+                    shift_hours,
+                )
+        }) else {
+            return Err(Error::msg(format!(
+                "active bound office operator {name} cannot cover the current shift ETA"
+            )));
+        };
+        let mut operators = assignment.operators_in(room_id).to_vec();
+        operators.push(candidate.clone());
+        assignment.set_room(room_id.clone(), operators);
+        used.insert(candidate.name.clone());
+    }
+
+    for (room_id, capacity) in office_rooms {
+        let mut operators = assignment.operators_in(&room_id).to_vec();
+        while operators.len() < capacity {
+            let ordinary = available_candidates.iter().find(|candidate| {
+                !used.contains(&candidate.name)
+                    && !bound_names.contains(&candidate.name)
+                    && candidate_fits_current_shift(
+                        &model,
                         assignment,
                         blueprint,
-                        &room.id,
-                        operator,
-                        FacilityKind::Office,
-                        eligibility,
+                        &room_id,
+                        candidate,
+                        shift_hours,
                     )
-                });
-            let fixed = fixed_segment_members
-                .and_then(|members| members.get(&room.id))
-                .filter(|operator| !used.contains(&operator.name))
-                .and_then(|operator| candidates.iter().find(|op| op.name == operator.name))
-                .filter(|operator| {
-                    candidate_fits_facility_shift(
-                        assignment,
-                        blueprint,
-                        &room.id,
-                        operator,
-                        FacilityKind::Office,
-                        eligibility,
-                    )
-                });
-            let reuse_short_segment = reuse_short_segment_requested && fixed.is_some();
-            let rotating = (!reuse_short_segment)
-                .then(|| {
-                    candidates
-                        .iter()
-                        .find(|op| {
-                            !used.contains(&op.name)
-                                && !bound_names.contains(&op.name)
-                                && (!rotating_team.contains_key(&op.name)
-                                    || rotating_team
-                                        .get(&op.name)
-                                        .is_some_and(|team| active_teams.contains(team)))
-                                && used_office.contains(&op.name)
-                                && candidate_fits_facility_shift(
-                                    assignment,
-                                    blueprint,
-                                    &room.id,
-                                    op,
-                                    FacilityKind::Office,
-                                    eligibility,
-                                )
-                        })
-                        .or_else(|| {
-                            candidates.iter().find(|op| {
-                                !used.contains(&op.name)
-                                    && !bound_names.contains(&op.name)
-                                    && (!rotating_team.contains_key(&op.name)
-                                        || rotating_team
-                                            .get(&op.name)
-                                            .is_some_and(|team| active_teams.contains(team)))
-                                    && !used_office.contains(&op.name)
-                                    && candidate_fits_facility_shift(
-                                        assignment,
-                                        blueprint,
-                                        &room.id,
-                                        op,
-                                        FacilityKind::Office,
-                                        eligibility,
-                                    )
-                            })
-                        })
-                })
-                .flatten();
-            let replacement = (!reuse_short_segment)
-                .then(|| {
-                    candidates.iter().find(|op| {
-                        !used.contains(&op.name)
-                            && !bound_names.contains(&op.name)
-                            && (!rotating_team.contains_key(&op.name)
-                                || rotating_team
-                                    .get(&op.name)
-                                    .is_some_and(|team| active_teams.contains(team)))
-                            && candidate_fits_facility_shift(
-                                assignment,
-                                blueprint,
-                                &room.id,
-                                op,
-                                FacilityKind::Office,
-                                eligibility,
-                            )
-                    })
-                })
-                .flatten();
-            let Some(op) = bound.or(rotating).or(fixed).or(replacement).cloned() else {
-                // 候选不足：保留空位，缺额由 `rotation_shortfall_warnings` 报告。
+            });
+            let Some(operator) = ordinary.cloned() else {
                 break;
             };
-            if !bound_names.contains(&op.name) {
-                newly_used.push(op.name.clone());
-            }
-            used.insert(op.name.clone());
-            operators.push(op);
+            used.insert(operator.name.clone());
+            operators.push(operator);
         }
-        assignment.set_room(room.id.clone(), operators);
+        assignment.set_room(room_id, operators);
     }
-    Ok(newly_used)
+    Ok(())
 }
 
-#[cfg(test)]
-fn assign_rotating_offices(
-    assignment: &mut BaseAssignment,
-    blueprint: &BaseBlueprint,
+fn active_bound_office_names(
+    bound_office_team: &HashMap<String, TeamLabel>,
     active_teams: &[TeamLabel],
-    rotating_team: &HashMap<String, TeamLabel>,
-    bound_names: &HashSet<String>,
-    candidates: &[AssignedOperator],
-    used_office: &HashSet<String>,
-    fixed_segment_members: Option<&HashMap<RoomId, AssignedOperator>>,
-) -> Result<Vec<String>> {
-    assign_rotating_offices_with_context(
-        assignment,
-        blueprint,
-        active_teams,
-        rotating_team,
-        bound_names,
-        candidates,
-        used_office,
-        fixed_segment_members,
-        None,
-    )
-}
-
-fn record_office_usage_hours(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    bound_names: &HashSet<String>,
-    used_office: &mut HashSet<String>,
-    hours: f64,
-    mut worked_hours: Option<&mut HashMap<String, f64>>,
-) {
-    for room in assignment.rooms.iter().filter(|room| {
-        blueprint
-            .room(&room.room_id)
-            .is_some_and(|bp| bp.kind == FacilityKind::Office)
-    }) {
-        for operator in &room.operators {
-            if !bound_names.contains(&operator.name) {
-                used_office.insert(operator.name.clone());
-                if let Some(worked_hours) = worked_hours.as_deref_mut() {
-                    *worked_hours.entry(operator.name.clone()).or_default() += hours;
-                }
-            }
-        }
-    }
+) -> HashSet<String> {
+    bound_office_team
+        .iter()
+        .filter(|(_, team)| active_teams.contains(team))
+        .map(|(name, _)| name.clone())
+        .collect()
 }
 
 fn record_meeting_usage_hours(
@@ -1036,104 +973,6 @@ fn record_meeting_usage_hours(
             *worked_hours.entry(operator.name.clone()).or_default() += hours;
         }
     }
-}
-
-fn office_operator_names(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    bound_names: &HashSet<String>,
-) -> HashSet<String> {
-    assignment
-        .rooms
-        .iter()
-        .filter(|room| {
-            blueprint
-                .room(&room.room_id)
-                .is_some_and(|bp| bp.kind == FacilityKind::Office)
-        })
-        .flat_map(|room| room.operators.iter())
-        .filter(|operator| !bound_names.contains(&operator.name))
-        .map(|operator| operator.name.clone())
-        .collect()
-}
-
-fn ordinary_office_operators_by_room(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    bound_names: &HashSet<String>,
-) -> HashMap<RoomId, AssignedOperator> {
-    assignment
-        .rooms
-        .iter()
-        .filter(|room| {
-            blueprint
-                .room(&room.room_id)
-                .is_some_and(|bp| bp.kind == FacilityKind::Office)
-        })
-        .filter_map(|room| {
-            room.operators
-                .iter()
-                .find(|operator| !bound_names.contains(&operator.name))
-                .cloned()
-                .map(|operator| (room.room_id.clone(), operator))
-        })
-        .collect()
-}
-
-fn complete_rotating_office_teams(
-    blueprint: &BaseBlueprint,
-    peak_office_names: &HashSet<String>,
-    rotating_team: &mut HashMap<String, TeamLabel>,
-    office_pool: &[AssignedOperator],
-    reserved: &mut HashSet<String>,
-) -> Result<()> {
-    let capacity = blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::Office)
-        .map(|room| room.operator_capacity())
-        .sum::<usize>();
-    if capacity == 0 {
-        return Ok(());
-    }
-
-    let mut unbound_peak: Vec<_> = peak_office_names
-        .iter()
-        .filter(|name| !rotating_team.contains_key(*name))
-        .cloned()
-        .collect();
-    unbound_peak.sort();
-    for name in unbound_peak {
-        let team = TeamLabel::ALL
-            .into_iter()
-            .min_by_key(|team| {
-                rotating_team
-                    .values()
-                    .filter(|assigned| *assigned == team)
-                    .count()
-            })
-            .expect("TeamLabel::ALL is non-empty");
-        rotating_team.insert(name, team);
-    }
-
-    for team in TeamLabel::ALL {
-        while rotating_team
-            .values()
-            .filter(|assigned| **assigned == team)
-            .count()
-            < capacity
-        {
-            let Some(operator) = office_pool.iter().find(|operator| {
-                !reserved.contains(&operator.name) && !rotating_team.contains_key(&operator.name)
-            }) else {
-                // 候选不足：该队不补满，缺额由 `rotation_shortfall_warnings` 报告。
-                break;
-            };
-            rotating_team.insert(operator.name.clone(), team);
-            reserved.insert(operator.name.clone());
-        }
-    }
-    Ok(())
 }
 
 /// 会客室候选：全 roster 按线索搜集速度加成排序（无技能干员 0 分，按名序兜底）。
@@ -2070,13 +1909,91 @@ fn first_fiammetta_assignment_target(
         })
 }
 
+fn validate_office_assignment_disjoint(
+    blueprint: &BaseBlueprint,
+    shift: &TeamShiftResult,
+) -> Result<()> {
+    let mut production_names = HashSet::new();
+    let mut office_names = HashSet::new();
+    for room in &shift.assignment.rooms {
+        let Some(spec) = blueprint.room(&room.room_id) else {
+            continue;
+        };
+        for operator in &room.operators {
+            match spec.kind {
+                FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant => {
+                    production_names.insert(operator.name.clone());
+                }
+                FacilityKind::Office => {
+                    office_names.insert(operator.name.clone());
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut conflicts: Vec<String> = office_names
+        .intersection(&production_names)
+        .cloned()
+        .collect();
+    if let Some(assistant) = &shift.assignment.training_assist {
+        if office_names.contains(&assistant.name) {
+            conflicts.push(assistant.name.clone());
+        }
+    }
+    conflicts.sort();
+    conflicts.dedup();
+    if !conflicts.is_empty() {
+        return Err(Error::msg(format!(
+            "office_current_assignment_disjoint failed in shift {}: {:?}",
+            shift.index + 1,
+            conflicts
+        )));
+    }
+    Ok(())
+}
+
+fn validate_office_shift_eta(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    shift: &TeamShiftResult,
+) -> Result<()> {
+    let model = MoodModel::load_default()?;
+    let eta = shift_eta_with_instances(&model, blueprint, &shift.assignment, instances);
+    for room in shift.assignment.rooms.iter().filter(|room| {
+        blueprint
+            .room(&room.room_id)
+            .is_some_and(|spec| spec.kind == FacilityKind::Office)
+    }) {
+        for operator in &room.operators {
+            let Some(detail) = eta
+                .per_op
+                .iter()
+                .find(|detail| detail.name == operator.name && detail.room_id == room.room_id.0)
+            else {
+                continue;
+            };
+            if detail.drain_per_hour > 0.0
+                && detail.drain_per_hour * shift.duration_hours > model.workable_mood() + 1e-9
+            {
+                return Err(Error::msg(format!(
+                    "office_current_shift_eta failed in shift {} for {}",
+                    shift.index + 1,
+                    operator.name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_final_rotation_invariants(
-    _blueprint: &BaseBlueprint,
+    blueprint: &BaseBlueprint,
     shifts: &[TeamShiftResult],
     binds: &[RuntimeShiftBind],
     active_dependencies: &[crate::layout::ActiveDependency],
 ) -> Result<()> {
     for shift in shifts {
+        validate_office_assignment_disjoint(blueprint, shift)?;
         let mut seen = HashSet::new();
         for room in &shift.assignment.rooms {
             for operator in &room.operators {
@@ -4297,7 +4214,7 @@ fn move_control_operator_to_team(
 /// - **设施每班全部满编，绝不空转**：每班由当班两队合力铺满所有贸易/制造/发电站。
 /// - 生产设施切成两半 H1/H2：α 跑 H1、β 跑 H2；γ 作为轮换替补，第 2 班接 H1、第 3 班接 H2。
 /// - 班次结构 12h + 6h + 6h；每队休息一个班次（α 休 S2、β 休 S3、γ 休 S1）。
-/// - 宿舍共享；所有办公室成员按 αβγ cohort 上二休一，绑定成员随消费方体系同上同下。
+/// - 宿舍共享；普通办公室成员按每班效率独立选择，真实绑定成员随消费方体系同上同下。
 /// - 中枢按 αβγ 队伍轮休重分配：每班只用活跃两队候选，体系中枢先 pin，再补满 5 人。
 pub fn schedule_team_rotation(
     blueprint: &BaseBlueprint,
@@ -4333,6 +4250,10 @@ pub fn assert_final_rotation_invariants(
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
     for shift in &report.shifts {
+        validate_office_assignment_disjoint(blueprint, shift)
+            .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+        validate_office_shift_eta(blueprint, instances, shift)
+            .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
         let mut expected_notes = shift.assignment.clone();
         annotate_assignment(blueprint, &mut expected_notes);
         let actual_note_rows: Vec<_> = shift
@@ -5257,7 +5178,7 @@ fn schedule_abc_rotation(
     let mut gamma_h2_options = options.clone();
     gamma_h2_options.shift_hours = shift_hours[2];
 
-    // 1) 参考高峰班 + 编排计划 → 只取宿舍作为三班共享脚手架；办公室随后按 cohort 重排。
+    // 1) 参考高峰班 + 编排计划 → 只取宿舍作为三班共享脚手架；办公室不钉死到 peak。
     // 中枢后续按 αβγ 队伍轮休重分配，不能从 peak 直接钉死。
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
@@ -5276,11 +5197,10 @@ fn schedule_abc_rotation(
     let mut peak_plan = peak_result.plan;
     peak_plan.resolve_actual_producer_dependencies(blueprint, &peak, instances, table)?;
     let mut shift_binds = shift_binds_from_plan(&peak_plan);
-    let bound_office_names = bound_office_operators(blueprint, &peak, &shift_binds);
-    let rotating_office_names = peak_office_operators(blueprint, &peak);
+    let peak_office_names = peak_office_operators(blueprint, &peak);
     let rotating_anchor_names = bound_rotating_anchor_operators(blueprint, &peak, &shift_binds);
     let rotating_meeting_names = peak_meeting_operators(blueprint, &peak);
-    let excluded_shared_names: HashSet<String> = rotating_office_names
+    let excluded_shared_names: HashSet<String> = peak_office_names
         .iter()
         .chain(&rotating_anchor_names)
         .cloned()
@@ -5360,6 +5280,7 @@ fn schedule_abc_rotation(
             });
         }
     }
+    let bound_office_names = bound_office_operators(blueprint, &peak, &shift_binds);
     let [h1, h2] =
         split_production_facilities(blueprint, &peak, &shift_binds, &peak_plan.rotation_reserves)?;
     let required_manu_by_room =
@@ -5381,8 +5302,9 @@ fn schedule_abc_rotation(
     // 4) γ 为替补：S2 接 H1、S3 接 H2，干员与 α/β 互斥（两次各自从剩余池取，可复用同人）。
     let mut used_ab = used.clone();
     used_ab.extend(bound_control_operators(blueprint, &peak, &shift_binds));
-    // Keep office cohort members available for S2/S3 office placement.
-    used_ab.extend(rotating_office_names.iter().cloned());
+    // A bound office member must remain available for the office assignment;
+    // do not let gamma production consume the other side of the bind first.
+    used_ab.extend(bound_office_names.iter().cloned());
 
     let mut gamma_h1 = BaseAssignment::default();
     let mut used_g1 = used_ab.clone();
@@ -5539,21 +5461,6 @@ fn schedule_abc_rotation(
             .entry(name)
             .or_insert(TeamLabel::Gamma);
     }
-    let mut rotating_office_team = rotating_team_for_names(
-        &shift_binds,
-        &rotating_office_names,
-        &production_team_by_name,
-    );
-    let rotating_anchor_team = rotating_team_for_names(
-        &shift_binds,
-        &rotating_anchor_names,
-        &production_team_by_name,
-    );
-    let mut rotating_meeting_team = rotating_team_for_names(
-        &shift_binds,
-        &rotating_meeting_names,
-        &production_team_by_name,
-    );
     let entry_by_name: HashMap<String, crate::pool::ControlPoolEntry> = control_pool
         .entries
         .iter()
@@ -5592,6 +5499,13 @@ fn schedule_abc_rotation(
             .operators
             .iter()
             .find_map(|name| production_team_by_name.get(name).copied())
+            .or_else(|| {
+                bind.operators.iter().find_map(|name| {
+                    team_ctrl.iter().find_map(|(team, names)| {
+                        names.iter().any(|member| member == name).then_some(*team)
+                    })
+                })
+            })
         else {
             continue;
         };
@@ -5605,6 +5519,21 @@ fn schedule_abc_rotation(
         names.sort();
         names.dedup();
     }
+    let mut rotation_team_by_name = production_team_by_name.clone();
+    for team in TeamLabel::ALL {
+        for name in team_ctrl.get(&team).into_iter().flatten() {
+            rotation_team_by_name.entry(name.clone()).or_insert(team);
+        }
+    }
+    let bound_office_team =
+        rotating_team_for_names(&shift_binds, &bound_office_names, &rotation_team_by_name);
+    let rotating_anchor_team =
+        rotating_team_for_names(&shift_binds, &rotating_anchor_names, &rotation_team_by_name);
+    let mut rotating_meeting_team = rotating_team_for_names(
+        &shift_binds,
+        &rotating_meeting_names,
+        &rotation_team_by_name,
+    );
     let assigned_control: HashSet<String> = team_ctrl.values().flatten().cloned().collect();
     let mut fallback_entry_names = HashSet::new();
     let mut control_fallback_entries: Vec<_> = control_pool
@@ -5614,19 +5543,20 @@ fn schedule_abc_rotation(
         .filter(|entry| !assigned_control.contains(&entry.name))
         .filter(|entry| !production_team_by_name.contains_key(&entry.name))
         .filter(|entry| !scaffold_used.contains(&entry.name))
-        .filter(|entry| !rotating_office_names.contains(&entry.name))
+        .filter(|entry| !bound_office_names.contains(&entry.name))
         .filter(|entry| !rotating_anchor_names.contains(&entry.name))
         .filter(|entry| fallback_entry_names.insert(entry.name.clone()))
         .collect();
     control_fallback_entries.sort_by(|a, b| a.name.cmp(&b.name));
-    let office_pool = office_candidates(
+    let office_plan_excluded: HashSet<String> =
+        peak_plan.excluded_operators.iter().cloned().collect();
+    let office_ranked_pool = office_candidates(
         operbox,
         instances,
         table,
         &layout,
         options.mood,
-        &peak_plan.excluded_operators.iter().cloned().collect(),
-        &OfficeFallbackPool::empty(),
+        &office_plan_excluded,
     );
     let mut reserved: HashSet<String> = operators_of(&alpha)
         .into_iter()
@@ -5635,16 +5565,9 @@ fn schedule_abc_rotation(
         .chain(operators_of(&gamma_h2))
         .chain(team_ctrl.values().flatten().cloned())
         .chain(operators_of(&shared))
-        .chain(rotating_office_names.iter().cloned())
+        .chain(bound_office_names.iter().cloned())
         .chain(rotating_anchor_names.iter().cloned())
         .collect();
-    complete_rotating_office_teams(
-        blueprint,
-        &rotating_office_names,
-        &mut rotating_office_team,
-        &office_pool,
-        &mut reserved,
-    )?;
     let meeting_pool = meeting_candidates(
         operbox,
         &layout,
@@ -5684,7 +5607,7 @@ fn schedule_abc_rotation(
     );
     gamma_ops.sort();
     gamma_ops.dedup();
-    for (name, team) in rotating_office_team.iter().chain(&rotating_anchor_team) {
+    for (name, team) in bound_office_team.iter().chain(&rotating_anchor_team) {
         match team {
             TeamLabel::Alpha => alpha_ops.push(name.clone()),
             TeamLabel::Beta => beta_ops.push(name.clone()),
@@ -5753,11 +5676,8 @@ fn schedule_abc_rotation(
         .map(|name| (name.to_string(), options.mood.min(mood_model.mood_cap)))
         .collect();
     let mut warmup_sticky_rooms: HashMap<String, RoomId> = HashMap::new();
-    // S1 与 S2+S3 是办公室的两个日内值班段；S2 选出的普通成员固定到 S3。
-    let mut used_office: HashSet<String> = HashSet::new();
-    let mut office_worked_hours: HashMap<String, f64> = HashMap::new();
+    // 办公室不保存跨班成员状态；每个班次在当前 assignment 完成后独立填充。
     let mut meeting_worked_hours: HashMap<String, f64> = HashMap::new();
-    let mut short_segment_office: HashMap<RoomId, AssignedOperator> = HashMap::new();
     for (index, (hours, active, resting, parts)) in shift_specs.into_iter().enumerate() {
         let shift_started = Instant::now();
         let shift_before = crate::profile::solver_perf_snapshot();
@@ -5981,20 +5901,16 @@ fn schedule_abc_rotation(
                 merge_rooms(&mut base, part);
             }
             assign_rotating_anchors(&mut base, &peak, &active, &rotating_anchor_team)?;
-            assign_rotating_offices_with_context(
+            clear_room(&mut base, "control");
+            let mut base_used = base.operator_names();
+            assign_ctrl(&mut base, &mut base_used, &[])?;
+            assign_office_for_shift(
                 &mut base,
                 blueprint,
-                &active,
-                &rotating_office_team,
+                &active_bound_office_names(&bound_office_team, &active),
                 &bound_office_names,
-                &office_pool,
-                &used_office,
-                None,
-                Some(&FacilityRotationEligibility {
-                    worked_hours: &office_worked_hours,
-                    shift_hours: hours,
-                    full_control: true,
-                }),
+                &office_ranked_pool,
+                hours,
             )?;
             assign_rotating_meetings_with_context(
                 &mut base,
@@ -6010,9 +5926,6 @@ fn schedule_abc_rotation(
                     full_control: true,
                 }),
             )?;
-            clear_room(&mut base, "control");
-            let mut base_used = base.operator_names();
-            assign_ctrl(&mut base, &mut base_used, &[])?;
             let mut base_warmup_rooms = warmup_sticky_rooms.clone();
             align_warmup_rooms(blueprint, instances, &mut base, &mut base_warmup_rooms);
             clear_production_efficiencies(blueprint, &mut base);
@@ -6055,20 +5968,21 @@ fn schedule_abc_rotation(
                     &active,
                     &rotating_anchor_team,
                 )?;
-                assign_rotating_offices_with_context(
+                clear_room(&mut candidate.assignment, "control");
+                let mut aby_used = candidate.assignment.operator_names();
+                let control_producer = candidate.control_producer.clone();
+                assign_ctrl(
+                    &mut candidate.assignment,
+                    &mut aby_used,
+                    &[control_producer.as_str()],
+                )?;
+                assign_office_for_shift(
                     &mut candidate.assignment,
                     blueprint,
-                    &active,
-                    &rotating_office_team,
+                    &active_bound_office_names(&bound_office_team, &active),
                     &bound_office_names,
-                    &office_pool,
-                    &used_office,
-                    None,
-                    Some(&FacilityRotationEligibility {
-                        worked_hours: &office_worked_hours,
-                        shift_hours: hours,
-                        full_control: true,
-                    }),
+                    &office_ranked_pool,
+                    hours,
                 )?;
                 assign_rotating_meetings_with_context(
                     &mut candidate.assignment,
@@ -6083,14 +5997,6 @@ fn schedule_abc_rotation(
                         shift_hours: hours,
                         full_control: true,
                     }),
-                )?;
-                clear_room(&mut candidate.assignment, "control");
-                let mut aby_used = candidate.assignment.operator_names();
-                let control_producer = candidate.control_producer.clone();
-                assign_ctrl(
-                    &mut candidate.assignment,
-                    &mut aby_used,
-                    &[control_producer.as_str()],
                 )?;
                 let mut candidate_warmup_rooms = warmup_sticky_rooms.clone();
                 align_warmup_rooms(
@@ -6150,17 +6056,7 @@ fn schedule_abc_rotation(
             print_trade_rotation_debug("S2 final candidate", &assignment);
             let scores = best_scores;
             warmup_sticky_rooms = best_warmup_rooms;
-            record_office_usage_hours(
-                blueprint,
-                &assignment,
-                &bound_office_names,
-                &mut used_office,
-                hours,
-                Some(&mut office_worked_hours),
-            );
             record_meeting_usage_hours(blueprint, &assignment, &mut meeting_worked_hours, hours);
-            short_segment_office =
-                ordinary_office_operators_by_room(blueprint, &assignment, &bound_office_names);
             let weighted_trade = scores.weighted_trade_for_cycle(hours, cycle_hours);
             let weighted_manufacture = scores.weighted_manufacture_for_cycle(hours, cycle_hours);
             let weighted_power = scores.weighted_power_for_cycle(hours, cycle_hours);
@@ -6188,33 +6084,17 @@ fn schedule_abc_rotation(
             }
             print_trade_rotation_debug("S1/S3 merged before extras", &assignment);
             assign_rotating_anchors(&mut assignment, &peak, &active, &rotating_anchor_team)?;
-            assign_rotating_offices_with_context(
+            clear_room(&mut assignment, "control");
+            let mut s13_used = assignment.operator_names();
+            assign_ctrl(&mut assignment, &mut s13_used, &[])?;
+            assign_office_for_shift(
                 &mut assignment,
                 blueprint,
-                &active,
-                &rotating_office_team,
+                &active_bound_office_names(&bound_office_team, &active),
                 &bound_office_names,
-                &office_pool,
-                &used_office,
-                if index == 2 {
-                    Some(&short_segment_office)
-                } else {
-                    None
-                },
-                Some(&FacilityRotationEligibility {
-                    worked_hours: &office_worked_hours,
-                    shift_hours: hours,
-                    full_control: true,
-                }),
-            )?;
-            record_office_usage_hours(
-                blueprint,
-                &assignment,
-                &bound_office_names,
-                &mut used_office,
+                &office_ranked_pool,
                 hours,
-                Some(&mut office_worked_hours),
-            );
+            )?;
             assign_rotating_meetings_with_context(
                 &mut assignment,
                 blueprint,
@@ -6230,9 +6110,6 @@ fn schedule_abc_rotation(
                 }),
             )?;
             record_meeting_usage_hours(blueprint, &assignment, &mut meeting_worked_hours, hours);
-            clear_room(&mut assignment, "control");
-            let mut s13_used = assignment.operator_names();
-            assign_ctrl(&mut assignment, &mut s13_used, &[])?;
             align_warmup_rooms(
                 blueprint,
                 instances,
@@ -6490,8 +6367,7 @@ fn solve_policy_disjoint_backup(
 /// - 不清除已有办公室成员（execute_plan / 体系可能已预占，如人间烟火桑葚）。
 /// - 空槽位候选 = `office_candidates` 静态评分降序，排除 owner 已用、其他 owner
 ///   全 assignment、`plan.excluded_operators` 与 `plan.rotation_reserves`。
-/// - `rollback_on_mood`（二班/深海）时按评分逐个试填并复用单班连续工作判定，
-///   不可持续则试下一个；ABC 不传该参数，仅按最高分直接填充。
+/// - 按当前 owner 的班次时长检查候选 ETA；不读取其他班次的办公室状态。
 /// - 候选不足或全部不可持续时留空，缺额由 `rotation_shortfall_warnings` 报告。
 #[allow(clippy::too_many_arguments)]
 fn fill_owner_office_seats(
@@ -6500,9 +6376,9 @@ fn fill_owner_office_seats(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
+    shift_hours: f64,
     owner: &mut OwnedRotationAssignment,
     other_forbidden: &HashSet<String>,
-    rollback_on_mood: bool,
 ) -> Result<()> {
     let has_office = blueprint
         .rooms
@@ -6533,76 +6409,15 @@ fn fill_owner_office_seats(
             excluded.insert(operator.clone());
         }
     }
-    let candidates = office_candidates(
-        operbox,
-        instances,
-        table,
-        &layout,
-        options.mood,
-        &excluded,
-        &OfficeFallbackPool::empty(),
-    );
-    let model = MoodModel::load_default()?;
-    let worked_hours = HashMap::new();
-    let eligibility = FacilityRotationEligibility {
-        worked_hours: &worked_hours,
-        shift_hours: options.shift_hours,
-        full_control: owner.assignment.control_operators().len() >= 5,
-    };
-    for room in blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::Office)
-    {
-        let mut operators = owner.assignment.operators_in(&room.id).to_vec();
-        while operators.len() < room.operator_capacity() {
-            let used_now: HashSet<String> = owner_used
-                .iter()
-                .cloned()
-                .chain(operators.iter().map(|op| op.name.clone()))
-                .collect();
-            let picked = candidates.iter().find(|candidate| {
-                !excluded.contains(&candidate.name)
-                    && !used_now.contains(&candidate.name)
-                    && candidate_fits_facility_shift(
-                        &owner.assignment,
-                        blueprint,
-                        &room.id,
-                        candidate,
-                        FacilityKind::Office,
-                        Some(&eligibility),
-                    )
-            });
-            let Some(candidate) = picked else {
-                break;
-            };
-            let candidate_name = candidate.name.clone();
-            let mut trial = owner.assignment.clone();
-            let mut trial_ops = trial.operators_in(&room.id).to_vec();
-            trial_ops.push(candidate.clone());
-            trial.set_room(room.id.clone(), trial_ops);
-            if rollback_on_mood {
-                let eta = shift_eta_with_instances(&model, blueprint, &trial, instances);
-                let feasible = eta
-                    .per_op
-                    .iter()
-                    .find(|op| op.name == candidate_name)
-                    .is_none_or(|op| {
-                        // 单班准入仍保留 0.5h 余量；跨班累计按实际工作时长结算。
-                        op.drain_per_hour <= 0.0
-                            || op.drain_per_hour * (options.shift_hours + HALF_HOUR_SAFETY_MARGIN)
-                                <= model.workable_mood() + 1e-9
-                    });
-                if !feasible {
-                    excluded.insert(candidate_name);
-                    continue;
-                }
-            }
-            excluded.insert(candidate_name.clone());
-            operators.push(candidate.clone());
-        }
-        owner.assignment.set_room(room.id.clone(), operators);
-    }
+    let candidates = office_candidates(operbox, instances, table, &layout, options.mood, &excluded);
+    assign_office_for_shift(
+        &mut owner.assignment,
+        blueprint,
+        &HashSet::new(),
+        &HashSet::new(),
+        &candidates,
+        shift_hours,
+    )?;
     Ok(())
 }
 
@@ -6697,9 +6512,9 @@ fn schedule_main_backup_12_12(
         instances,
         table,
         options,
+        12.0,
         &mut main,
         &HashSet::new(),
-        true,
     )?;
     repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
     let main_forbidden: HashSet<String> = main.assignment.operator_names();
@@ -6718,9 +6533,9 @@ fn schedule_main_backup_12_12(
         instances,
         table,
         options,
+        12.0,
         &mut backup,
         &main_forbidden,
-        true,
     )?;
     let backup_operbox = operbox.excluding(&main_forbidden);
     repair_owner_meeting_seats(
@@ -6974,9 +6789,9 @@ fn schedule_fiammetta_witch_12_12(
         instances,
         table,
         options,
+        12.0,
         &mut main,
         &HashSet::new(),
-        true,
     )?;
     repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
     let mut main_forbidden = main.assignment.operator_names();
@@ -7005,9 +6820,9 @@ fn schedule_fiammetta_witch_12_12(
         instances,
         table,
         options,
+        12.0,
         &mut backup,
         &main_forbidden,
-        true,
     )?;
     repair_owner_meeting_seats(
         blueprint,
@@ -7657,9 +7472,9 @@ fn schedule_abyssal_7_5_7_5(
         instances,
         table,
         options,
+        7.0,
         &mut main,
         &HashSet::new(),
-        true,
     )?;
     let main_forbidden: HashSet<String> = main.assignment.operator_names();
     let mut backup = solve_policy_disjoint_backup(
@@ -7677,9 +7492,9 @@ fn schedule_abyssal_7_5_7_5(
         instances,
         table,
         options,
+        5.0,
         &mut backup,
         &main_forbidden,
-        true,
     )?;
     let dorm_rest = plan_abyssal_dorm_rest(
         blueprint,
@@ -8556,244 +8371,106 @@ mod tests {
     }
 
     #[test]
-    fn rotating_office_uses_bound_member_then_replacement() {
-        let blueprint: BaseBlueprint =
-            serde_json::from_str(r#"{"rooms":[{"id":"office_any","kind":"office","level":3}]}"#)
-                .expect("blueprint");
-        let candidates = vec![
-            AssignedOperator::new("体系办公室", 2),
-            AssignedOperator::new("办公室替补", 2),
-        ];
-        let teams = HashMap::from([
-            ("体系办公室".to_string(), TeamLabel::Alpha),
-            ("办公室替补".to_string(), TeamLabel::Beta),
-        ]);
-        let bound = HashSet::from(["体系办公室".to_string()]);
-
-        let mut active = BaseAssignment::default();
-        assign_rotating_offices(
-            &mut active,
-            &blueprint,
-            &[TeamLabel::Alpha, TeamLabel::Beta],
-            &teams,
-            &bound,
-            &candidates,
-            &HashSet::new(),
-            None,
-        )
-        .expect("active office");
-        assert_eq!(
-            active.operators_in(&RoomId::from("office_any"))[0].name,
-            "体系办公室"
-        );
-
-        let mut resting = BaseAssignment::default();
-        assign_rotating_offices(
-            &mut resting,
-            &blueprint,
-            &[TeamLabel::Beta, TeamLabel::Gamma],
-            &teams,
-            &bound,
-            &candidates,
-            &HashSet::new(),
-            None,
-        )
-        .expect("replacement office");
-        assert_eq!(
-            resting.operators_in(&RoomId::from("office_any"))[0].name,
-            "办公室替补"
-        );
-    }
-
-    #[test]
-    fn rotating_office_keeps_ordinary_members_in_combined_short_segment() {
-        let blueprint: BaseBlueprint =
-            serde_json::from_str(r#"{"rooms":[{"id":"office_any","kind":"office","level":3}]}"#)
-                .expect("blueprint");
-        let candidates = vec![
-            AssignedOperator::new("办公室甲", 2),
-            AssignedOperator::new("办公室乙", 2),
-        ];
-        let teams = HashMap::from([
-            ("办公室甲".to_string(), TeamLabel::Beta),
-            ("办公室乙".to_string(), TeamLabel::Gamma),
-        ]);
-        let mut second_shift = BaseAssignment::default();
-        assign_rotating_offices(
-            &mut second_shift,
-            &blueprint,
-            &[TeamLabel::Beta, TeamLabel::Gamma],
-            &teams,
-            &HashSet::new(),
-            &candidates,
-            &HashSet::new(),
-            None,
-        )
-        .expect("second shift office");
-        let fixed = ordinary_office_operators_by_room(&blueprint, &second_shift, &HashSet::new());
-
-        let mut third_shift = BaseAssignment::default();
-        assign_rotating_offices(
-            &mut third_shift,
-            &blueprint,
-            &[TeamLabel::Gamma, TeamLabel::Alpha],
-            &teams,
-            &HashSet::new(),
-            &candidates,
-            &HashSet::new(),
-            Some(&fixed),
-        )
-        .expect("third shift office");
-        assert_eq!(
-            third_shift.operators_in(&RoomId::from("office_any"))[0].name,
-            second_shift.operators_in(&RoomId::from("office_any"))[0].name,
-            "S2/S3 must retain the same ordinary office member"
-        );
-    }
-
-    #[test]
-    fn rotating_office_keeps_each_room_stable_in_combined_short_segment() {
+    fn office_selection_recomputes_remaining_pool_for_each_shift() {
         let blueprint: BaseBlueprint = serde_json::from_str(
             r#"{"rooms":[
-                {"id":"office_1","kind":"office","level":3},
-                {"id":"office_2","kind":"office","level":3}
+                {"id":"trade_1","kind":"trade_post","level":3},
+                {"id":"office_any","kind":"office","level":3}
             ]}"#,
         )
         .expect("blueprint");
         let candidates = vec![
-            AssignedOperator::new("办公室甲", 2),
-            AssignedOperator::new("办公室乙", 2),
+            AssignedOperator::new("办公室高效", 2),
+            AssignedOperator::new("办公室次高效", 2),
         ];
-        let teams = HashMap::from([
-            ("办公室甲".to_string(), TeamLabel::Beta),
-            ("办公室乙".to_string(), TeamLabel::Gamma),
-        ]);
+
+        let mut first_shift = BaseAssignment::default();
+        first_shift.set_room("trade_1", vec![candidates[0].clone()]);
+        assign_office_for_shift(
+            &mut first_shift,
+            &blueprint,
+            &HashSet::new(),
+            &HashSet::new(),
+            &candidates,
+            6.0,
+        )
+        .expect("first office shift");
+        assert_eq!(
+            first_shift.operators_in(&RoomId::from("office_any"))[0].name,
+            "办公室次高效"
+        );
+
         let mut second_shift = BaseAssignment::default();
-        assign_rotating_offices(
+        second_shift.set_room("trade_1", vec![candidates[1].clone()]);
+        assign_office_for_shift(
             &mut second_shift,
             &blueprint,
-            &[TeamLabel::Beta, TeamLabel::Gamma],
-            &teams,
+            &HashSet::new(),
             &HashSet::new(),
             &candidates,
-            &HashSet::new(),
-            None,
+            6.0,
         )
-        .expect("second shift office");
-        let fixed = ordinary_office_operators_by_room(&blueprint, &second_shift, &HashSet::new());
-
-        let mut third_shift = BaseAssignment::default();
-        assign_rotating_offices(
-            &mut third_shift,
-            &blueprint,
-            &[TeamLabel::Gamma, TeamLabel::Alpha],
-            &teams,
-            &HashSet::new(),
-            &candidates,
-            &HashSet::new(),
-            Some(&fixed),
-        )
-        .expect("third shift office");
-        for room_id in [RoomId::from("office_1"), RoomId::from("office_2")] {
-            assert_eq!(
-                third_shift.operators_in(&room_id)[0].name,
-                second_shift.operators_in(&room_id)[0].name,
-                "{} must retain its S2 member in S3",
-                room_id.0
-            );
-        }
+        .expect("second office shift");
+        assert_eq!(
+            second_shift.operators_in(&RoomId::from("office_any"))[0].name,
+            "办公室高效"
+        );
     }
 
     #[test]
-    fn rotating_office_rejects_chizui_after_cumulative_limit() {
-        let blueprint: BaseBlueprint =
-            serde_json::from_str(r#"{"rooms":[{"id":"office_any","kind":"office","level":3}]}"#)
-                .expect("blueprint");
+    fn office_selection_skips_candidate_without_current_shift_eta() {
+        let blueprint: BaseBlueprint = serde_json::from_str(
+            r#"{"rooms":[
+                {"id":"control","kind":"control_center","level":5},
+                {"id":"office_any","kind":"office","level":3}
+            ]}"#,
+        )
+        .expect("blueprint");
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room(
+            "control",
+            (0..5)
+                .map(|index| AssignedOperator::new(format!("中枢{index}"), 0))
+                .collect(),
+        );
         let candidates = vec![
-            AssignedOperator::new("斥罪", 2),
+            AssignedOperator::new("地灵", 1),
             AssignedOperator::new("办公室替补", 2),
         ];
-        let teams = HashMap::from([
-            ("斥罪".to_string(), TeamLabel::Alpha),
-            ("办公室替补".to_string(), TeamLabel::Beta),
-        ]);
-        let mut assignment = BaseAssignment::default();
-        let worked_hours = HashMap::from([("斥罪".to_string(), 12.0)]);
-        assign_rotating_offices_with_context(
+
+        assign_office_for_shift(
             &mut assignment,
             &blueprint,
-            &[TeamLabel::Alpha, TeamLabel::Beta],
-            &teams,
+            &HashSet::new(),
             &HashSet::new(),
             &candidates,
-            &HashSet::from(["斥罪".to_string()]),
-            None,
-            Some(&FacilityRotationEligibility {
-                worked_hours: &worked_hours,
-                shift_hours: 12.0,
-                full_control: true,
-            }),
+            12.0,
         )
         .expect("office replacement");
         assert_eq!(
             assignment.operators_in(&RoomId::from("office_any"))[0].name,
             "办公室替补"
         );
-    }
 
-    #[test]
-    fn rotating_office_reuses_plain_operator_for_aab_until_mood_limit() {
-        let blueprint: BaseBlueprint =
-            serde_json::from_str(r#"{"rooms":[{"id":"office_any","kind":"office","level":3}]}"#)
-                .expect("blueprint");
-        let candidates = vec![
-            AssignedOperator::new("办公室A", 2),
-            AssignedOperator::new("办公室B", 2),
-        ];
-        let mut used_office = HashSet::new();
-        let mut worked_hours = HashMap::new();
-        let teams = HashMap::new();
-        let mut assignments = Vec::new();
-        for _ in 0..3 {
-            let mut assignment = BaseAssignment::default();
-            let eligibility = FacilityRotationEligibility {
-                worked_hours: &worked_hours,
-                shift_hours: 12.0,
-                full_control: true,
-            };
-            assign_rotating_offices_with_context(
-                &mut assignment,
-                &blueprint,
-                &[TeamLabel::Alpha],
-                &teams,
-                &HashSet::new(),
-                &candidates,
-                &used_office,
-                None,
-                Some(&eligibility),
-            )
-            .expect("office shift");
-            record_office_usage_hours(
-                &blueprint,
-                &assignment,
-                &HashSet::new(),
-                &mut used_office,
-                12.0,
-                Some(&mut worked_hours),
-            );
-            assignments.push(assignment);
-        }
-        assert_eq!(
-            assignments[0].operators_in(&RoomId::from("office_any"))[0].name,
-            "办公室A"
+        let mut short_assignment = BaseAssignment::default();
+        short_assignment.set_room(
+            "control",
+            (0..5)
+                .map(|index| AssignedOperator::new(format!("中枢{index}"), 0))
+                .collect(),
         );
+        assign_office_for_shift(
+            &mut short_assignment,
+            &blueprint,
+            &HashSet::new(),
+            &HashSet::new(),
+            &candidates[..1],
+            6.0,
+        )
+        .expect("short office shift");
         assert_eq!(
-            assignments[1].operators_in(&RoomId::from("office_any"))[0].name,
-            "办公室A"
-        );
-        assert_eq!(
-            assignments[2].operators_in(&RoomId::from("office_any"))[0].name,
-            "办公室B"
+            short_assignment.operators_in(&RoomId::from("office_any"))[0].name,
+            "地灵"
         );
     }
 
@@ -8843,15 +8520,8 @@ mod tests {
         )
         .unwrap()
         .layout_snapshot();
-        let candidates = office_candidates(
-            &operbox,
-            &instances,
-            &table,
-            &layout,
-            24.0,
-            &HashSet::new(),
-            &OfficeFallbackPool::empty(),
-        );
+        let candidates =
+            office_candidates(&operbox, &instances, &table, &layout, 24.0, &HashSet::new());
         let position = |name: &str| {
             candidates
                 .iter()
@@ -9003,15 +8673,8 @@ mod tests {
         )
         .unwrap()
         .layout_snapshot();
-        let all_candidates = office_candidates(
-            &operbox,
-            &instances,
-            &table,
-            &layout,
-            24.0,
-            &HashSet::new(),
-            &OfficeFallbackPool::empty(),
-        );
+        let all_candidates =
+            office_candidates(&operbox, &instances, &table, &layout, 24.0, &HashSet::new());
         let Some(top) = all_candidates.first() else {
             return; // 办公室候选为空时该 fixture 无法测禁用语义
         };
@@ -9025,9 +8688,9 @@ mod tests {
             &instances,
             &table,
             &AssignBaseOptions::default(),
+            12.0,
             &mut owner,
             &other_forbidden,
-            false,
         )
         .unwrap();
         for room in &blueprint.rooms {
@@ -11626,57 +11289,6 @@ mod tests {
             }
         }
         assert_eq!(active_count, 2, "纯烟火绑定组应上二休一");
-    }
-
-    #[test]
-    fn team_rotation_keeps_office_member_across_combined_short_segment() {
-        use crate::schedule::shift_bind::team_of_operator;
-
-        let (blueprint, operbox, instances, table) = fixtures();
-        let report = schedule_team_rotation(
-            &blueprint,
-            &operbox,
-            &instances,
-            &table,
-            &AssignBaseOptions {
-                top_k: 5,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-
-        let office_operator = |shift: &TeamShiftResult| {
-            shift
-                .assignment
-                .rooms
-                .iter()
-                .filter(|room| {
-                    blueprint
-                        .room(&room.room_id)
-                        .is_some_and(|bp| bp.kind == FacilityKind::Office)
-                })
-                .flat_map(|room| room.operators.iter())
-                .next()
-                .expect("每个班次办公室必须满编")
-                .name
-                .clone()
-        };
-        for shift in &report.shifts[..2] {
-            let office_operator = office_operator(shift);
-            let team = team_of_operator(&report, &office_operator)
-                .expect("办公室轮换成员必须归属一个 cohort");
-            assert!(
-                shift.active_teams.contains(&team),
-                "办公室成员 {} 所属 {:?} 在休息班仍上岗",
-                office_operator,
-                team
-            );
-        }
-        assert_eq!(
-            office_operator(&report.shifts[1]),
-            office_operator(&report.shifts[2]),
-            "S2/S3 must be one 12h office segment"
-        );
     }
 
     #[test]

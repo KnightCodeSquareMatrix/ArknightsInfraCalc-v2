@@ -439,10 +439,10 @@ pub fn pinned_assignment(assignment: &BaseAssignment, blueprint: &BaseBlueprint)
     pinned_assignment_excluding(assignment, blueprint, &HashSet::new())
 }
 
-/// 宿舍与不参与体系轮换的办公室共享脚手架。
+/// 生成宿舍共享脚手架，并允许调用方从中排除 peak 办公室成员。
 ///
-/// `excluded` 来自实际 `shift_bind` 中已在办公室落位的成员；这些岗位由 schedule
-/// 按 cohort 每班重新填充，不能在 shared 阶段再次钉死。
+/// 定时轮换的普通办公室不在 shared 中钉死，而是在每个班次的当前剩余池中重新选择；
+/// 真实绑定成员仍由 schedule 根据实际 `shift_bind` 处理。
 pub fn pinned_assignment_excluding(
     assignment: &BaseAssignment,
     blueprint: &BaseBlueprint,
