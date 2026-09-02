@@ -168,6 +168,8 @@ manifest 或手工改 job 的 `bundleId` 绕过 preflight。
 - 如运行显式 job，记录失败 case 与旧 bundle 的对比结论（是否引入回归）；
 - 未解决的失败 case 或数据兼容风险。
 
-该流程只更新 quality-check 的独立 bundle，不会替换 dev 或生产 beta 的 CLI。
-dev 更新见 [更新服务器求解器（dev 环境）](UPDATE_SOLVER.md)；生产 beta 的 CLI
-更新仍遵循前端仓库的 `docs/UPDATE_SOLVER.md`。
+该流程只更新 quality-check 的独立 bundle，不会替换主站或开发环境的共享 CLI。
+主站与开发环境的求解器更新见
+[arknights-solver-deploy skill](../.agents/skills/arknights-solver-deploy/SKILL.md)，
+唯一入口为 `scripts/update_solver_production.py`（默认生产，`--environment development`
+用于开发环境）。
