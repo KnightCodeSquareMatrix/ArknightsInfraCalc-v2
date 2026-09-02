@@ -17,12 +17,12 @@
 |---|---|---|---|
 | `abc_12_6_6` | 省略 `--rotation` 或传 `3` | 现有 αβγ ABC；一个 peak Plan 派生三态 | 保持现有行为 |
 | `abc_12_12_12` | `--rotation 12/12/12` 或 `abc-121212` | 复用 ABC 三队结构，三段各 12h，总周期 36h；菲亚次数与时机见 [菲亚梅塔使用规则](菲亚梅塔使用规则.md)，不启用深海短班 | 沿用 ABC 编排与既有机制约束 |
-| `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 排除边界求 backup），各自保留 `AssignmentPlan`；主替 assignment 全成员互斥；办公室按主/替上 1 休 1 | 互斥 policy 下无解即报错，不回退；办公室/会客室缺员仅 warnings |
+| `main_backup_12_12` | `--rotation 2` | 主替完整 Peak 求解（main 优先填充，再以最终 main 工作岗位排除边界求 backup），各自保留 `AssignmentPlan`；中枢、贸易、制造、发电、办公室成员跨班互斥；活动室、加工室、基建副手、宿舍、训练室可复用；办公室按主/替上 1 休 1 | 工作岗位互斥 policy 下无解即报错，不回退；活动室缺员仅 warnings |
 | `fiammetta_witch_12_12` | `--rotation fiammetta-witch-1212` | 两个预认领 Plan owner 共享巫恋+龙舌兰，同一三级赤金贸易站内由两只不同裁缝 β 按 AB 轮换；每班一个菲亚目标 | 缺菲亚、完整龙巫、两只裁缝 β、合法房间或完整 owner 即报错；不回退普通二班 |
 | `fiammetta_8_8_4_4` | `--rotation fiammetta-8844` | ABC `16/4/4` 展开首态；第二个 8h 是具名菲亚事件 transition | 缺菲亚或合法目标即报错；办公室/会客室缺员随 ABC 语义 warnings |
 | `abyssal_7_5_7_5` | `--rotation abyssal-7575` | profile required Plan 锚定一个能力 producer 与四名 tag consumer；main 填充后独立替补交替两次，5h 恢复态固定 dorm_rest | hard claims 或替补不可满足即报错；办公室/会客室缺员仅 warnings |
 
-所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；普通二班的 Team 仍全员互斥，只有 `fiammetta_witch_12_12` 具名允许巫恋、龙舌兰属于两个 Team 并跨班连续工作。默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
+所有显式 profile 都是 hard constraint，不静默降级。显式 2/4 班最终状态统一校验生产房容量、中枢 5 人、profile 自有 hard anchors、owner-scoped dependency、Team presence、连续工作段与 `0.5h` 余量；普通二班的工作岗位 Team 互斥，活动室、加工室、基建副手、宿舍、训练室不参与跨班互斥，只有 `fiammetta_witch_12_12` 具名允许巫恋、龙舌兰属于两个 Team 并跨班连续工作。默认 ABC 校验生产房容量、中枢 5 人、显式 bind 与 mood-gap 12h 限制，但只展示 `peak_mood_eta`，不执行完整循环连续工作段 hard validation。普通 Plan anchors 已由各自 `execute_plan` 在 assignment 构造时验证，不在 rotation 终验重复宣称。搜索仍是现有编排/设施 policy，不宣称全局最优。`TeamRotationReport.assignment_plans` 保留每套独立 assignment 的 Plan，`shifts[].plan_index` 声明 owner；`peak_plan` 仅保留兼容主力别名。
 
 `DailyTotals.production` 对传入的全部 `shifts` 做时长加权，并按总周期归一到 24h：
 `sum(产出率 × 班次时长) / sum(班次时长) × 24`。因此汇总器本身不依赖固定班次数量或固定时长；但当前 `TimedRotationProfile` 仍是闭集，CLI 和 `schedule_timed_rotation` 尚不能接受任意自定义班次数组。当前六个已落地 profile 均复用该汇总路径。
@@ -84,7 +84,7 @@ S3 (6h):  shared + control(γ+α) + γ(H2) + α(H1)   休息 β
 
 ### 3.1 普通日周期二班
 
-`main_backup_12_12` 下，普通中枢使用两个固定的 12h 状态，不复用 ABC 的生产切半和 αβγ 中枢轮休逻辑。主状态与替状态各自独立求解、各自填满 5 个合法席位，并遵守二班完整状态互斥策略。
+`main_backup_12_12` 下，普通中枢使用两个固定的 12h 状态，不复用 ABC 的生产切半和 αβγ 中枢轮休逻辑。主状态与替状态各自独立求解、各自填满 5 个合法席位，并遵守二班工作岗位互斥策略；活动室、加工室、基建副手、宿舍、训练室不参与跨班互斥。
 
 中枢效果账本在每个 12h 状态内独立结算。同一种全局效果只允许其 `Winner` / `TiedWinner` 来源获得该状态的有效候选价值；`Suppressed` 来源不得与 winner 同班。因此，阿米娅和阿斯卡纶可以分别承担两个状态的贸易全局效果，但不能同时进入同一个 12h 中枢状态。
 

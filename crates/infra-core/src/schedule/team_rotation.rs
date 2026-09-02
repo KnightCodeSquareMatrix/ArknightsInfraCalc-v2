@@ -534,6 +534,29 @@ fn peak_office_operators(blueprint: &BaseBlueprint, peak: &BaseAssignment) -> Ha
         .collect()
 }
 
+fn work_position_operator_names(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+) -> HashSet<String> {
+    assignment
+        .rooms
+        .iter()
+        .filter(|room| {
+            blueprint.room(&room.room_id).is_some_and(|bp| {
+                matches!(
+                    bp.kind,
+                    FacilityKind::ControlCenter
+                        | FacilityKind::TradePost
+                        | FacilityKind::Factory
+                        | FacilityKind::PowerPlant
+                        | FacilityKind::Office
+                )
+            })
+        })
+        .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
+        .collect()
+}
+
 /// exact bind 中已经实际落在 peak 中枢的成员属于其生产 cohort；γ 生产搜索必须
 /// 预留这些名字，避免后续中枢重建再次放入同一干员。
 fn bound_control_operators(
@@ -6342,10 +6365,9 @@ fn solve_policy_disjoint_backup(
     main: &BaseAssignment,
     shift_hours: f64,
 ) -> Result<OwnedRotationAssignment> {
-    // Initial two-team policy: no operator assigned anywhere in the main state
-    // may be selected by the backup solver. This is a policy restriction, not
-    // a completeness-preserving reduction of all possible two-shift plans.
-    let unavailable = main.operator_names();
+    // Two-team policy: operators in main work positions may not be selected by
+    // the backup solver. Non-work positions are allowed to reuse operators.
+    let unavailable = work_position_operator_names(blueprint, main);
     let available = operbox.excluding(&unavailable);
     solve_owned_peak_assignment(
         blueprint,
@@ -6517,7 +6539,7 @@ fn schedule_main_backup_12_12(
         &HashSet::new(),
     )?;
     repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
-    let main_forbidden: HashSet<String> = main.assignment.operator_names();
+    let main_forbidden = work_position_operator_names(blueprint, &main.assignment);
     let mut backup = solve_policy_disjoint_backup(
         blueprint,
         operbox,
@@ -8047,7 +8069,21 @@ fn validate_profile_rotation(
             .find(|team| team.label == TeamLabel::Beta)
             .map(|team| team.operators.iter().cloned().collect())
             .unwrap_or_default();
-        let overlap: HashSet<_> = alpha.intersection(&beta).cloned().collect();
+        let alpha_work = report
+            .shifts
+            .first()
+            .map(|shift| work_position_operator_names(blueprint, &shift.assignment))
+            .unwrap_or_default();
+        let beta_work = report
+            .shifts
+            .get(1)
+            .map(|shift| work_position_operator_names(blueprint, &shift.assignment))
+            .unwrap_or_default();
+        let overlap: HashSet<_> = alpha
+            .intersection(&beta)
+            .filter(|operator| alpha_work.contains(*operator) && beta_work.contains(*operator))
+            .cloned()
+            .collect();
         let allowed_overlap = if report.profile == TimedRotationProfile::FiammettaWitch12_12 {
             HashSet::from(["巫恋".to_string(), "龙舌兰".to_string()])
         } else {
@@ -8055,7 +8091,7 @@ fn validate_profile_rotation(
         };
         if overlap != allowed_overlap {
             return Err(Error::msg(
-                "two-team rotation violates complete-state-disjoint policy",
+                "two-team rotation violates work-position-disjoint policy",
             ));
         }
     }
