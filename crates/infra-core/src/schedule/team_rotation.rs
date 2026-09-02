@@ -6365,9 +6365,9 @@ fn solve_policy_disjoint_backup(
     main: &BaseAssignment,
     shift_hours: f64,
 ) -> Result<OwnedRotationAssignment> {
-    // Two-team policy: operators in main work positions may not be selected by
-    // the backup solver. Non-work positions are allowed to reuse operators.
-    let unavailable = work_position_operator_names(blueprint, main);
+    // Two-team policy: the backup state is generated from the operators not
+    // present anywhere in the complete main assignment.
+    let unavailable = main.operator_names();
     let available = operbox.excluding(&unavailable);
     solve_owned_peak_assignment(
         blueprint,
@@ -6539,7 +6539,7 @@ fn schedule_main_backup_12_12(
         &HashSet::new(),
     )?;
     repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
-    let main_forbidden = work_position_operator_names(blueprint, &main.assignment);
+    let main_forbidden = main.assignment.operator_names();
     let mut backup = solve_policy_disjoint_backup(
         blueprint,
         operbox,
