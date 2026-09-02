@@ -13,8 +13,8 @@ use crate::pool::{
     TradePool, JIE_TRADE_NAME,
 };
 use crate::search::{
-    pick_trade_role_hit_requiring, search_trade_triples, search_trade_triples_filtered,
-    SearchTripleFilter, TradeSearchHit, TradeSearchOptions,
+    pick_trade_role_hit_requiring, search_trade_triples_filtered, SearchTripleFilter,
+    TradeSearchHit, TradeSearchOptions,
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{TradeOrderKind, TradeSearchOrderMode};
@@ -801,12 +801,20 @@ pub(super) fn pick_trade_hit(
     // anchor 搜索（must_include）下不做 standalone 收窄：anchor 干员（如黑键这类
     // 机械/订单速度 buffer）通常不是 standalone，收窄会把 anchor 本身滤掉，
     // 触发 "missing must-include"。standalone 收窄仅用于无 anchor 的常规余站搜索。
-    let sub = if filter.has_must_include() {
+    let reduced_sub = if filter.has_must_include() {
         sub
     } else if karlan_precision_active(&search_opts.layout.global_inject) {
         sub
     } else {
         try_filter_standalone(&sub, FacilityKind::TradePost, search_opts.operator_capacity)
+    };
+    // standalone is only a search reduction. A production room still needs to
+    // be filled from every legal trade-post operator before failing.
+    let full_pool = filter_trade_pool(pool, &used_for_filter);
+    let sub = if reduced_sub.entries.len() >= search_opts.operator_capacity {
+        reduced_sub
+    } else {
+        full_pool.clone()
     };
     if sub.entries.len() < search_opts.operator_capacity {
         return Err(Error::msg(format!(
@@ -819,8 +827,13 @@ pub(super) fn pick_trade_hit(
     opts.top_k = top_k;
     let report = match search_trade_triples_filtered(&sub, table, &opts, filter.clone()) {
         Ok(r) => r,
-        Err(_) if filter.hit_filter.is_some() && !filter.has_must_include() => {
-            search_trade_triples(&sub, table, &opts)?
+        Err(_) if !filter.has_must_include() => {
+            let mut fallback_filter = filter.clone();
+            fallback_filter.hit_filter = None;
+            match search_trade_triples_filtered(&full_pool, table, &opts, fallback_filter) {
+                Ok(r) => r,
+                Err(error) => return Err(error),
+            }
         }
         Err(e) => return Err(e),
     };

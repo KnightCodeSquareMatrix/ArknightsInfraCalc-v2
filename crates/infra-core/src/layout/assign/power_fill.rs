@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
 use crate::layout::context::LayoutContext;
-use crate::pool::{try_filter_standalone, PowerPool};
+use crate::pool::PowerPool;
 use crate::search::{search_power_assignment, PowerSearchOptions};
 use crate::skill_table::SkillTable;
 
@@ -74,8 +74,9 @@ pub fn assign_power_rooms(
         return Ok(());
     }
 
+    // The final fill must consider every legal power operator. Standalone is
+    // a search reduction, not an eligibility rule.
     let sub = filter_power_pool(pool, used);
-    let sub = try_filter_standalone(&sub, FacilityKind::PowerPlant, empty_rooms.len());
     if sub.entries.is_empty() {
         return Err(Error::msg("power: no available operators"));
     }
