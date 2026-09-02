@@ -9,8 +9,7 @@ use crate::layout::blueprint::{
 };
 use crate::layout::context::LayoutContext;
 use crate::pool::{
-    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, try_filter_standalone,
-    TradePool, JIE_TRADE_NAME,
+    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, TradePool, JIE_TRADE_NAME,
 };
 use crate::search::{
     pick_trade_role_hit_requiring, search_trade_triples_filtered, SearchTripleFilter,
@@ -797,25 +796,11 @@ pub(super) fn pick_trade_hit(
     for anchor in filter.must_include_names() {
         used_for_filter.remove(&anchor);
     }
+    // Production fill must search the complete legal trade-post pool. The
+    // standalone catalog is only for optional priority reduction, never
+    // eligibility or final fallback.
     let sub = filter_trade_pool(pool, &used_for_filter);
-    // anchor 搜索（must_include）下不做 standalone 收窄：anchor 干员（如黑键这类
-    // 机械/订单速度 buffer）通常不是 standalone，收窄会把 anchor 本身滤掉，
-    // 触发 "missing must-include"。standalone 收窄仅用于无 anchor 的常规余站搜索。
-    let reduced_sub = if filter.has_must_include() {
-        sub
-    } else if karlan_precision_active(&search_opts.layout.global_inject) {
-        sub
-    } else {
-        try_filter_standalone(&sub, FacilityKind::TradePost, search_opts.operator_capacity)
-    };
-    // standalone is only a search reduction. A production room still needs to
-    // be filled from every legal trade-post operator before failing.
-    let full_pool = filter_trade_pool(pool, &used_for_filter);
-    let sub = if reduced_sub.entries.len() >= search_opts.operator_capacity {
-        reduced_sub
-    } else {
-        full_pool.clone()
-    };
+    let full_pool = sub.clone();
     if sub.entries.len() < search_opts.operator_capacity {
         return Err(Error::msg(format!(
             "trade pool has {} ready operators (need {})",
