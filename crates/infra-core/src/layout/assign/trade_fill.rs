@@ -9,7 +9,8 @@ use crate::layout::blueprint::{
 };
 use crate::layout::context::LayoutContext;
 use crate::pool::{
-    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, TradePool, JIE_TRADE_NAME,
+    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, try_filter_standalone,
+    TradePool, JIE_TRADE_NAME,
 };
 use crate::search::{
     pick_trade_role_hit_requiring, search_trade_triples_filtered, SearchTripleFilter,
@@ -796,11 +797,26 @@ pub(super) fn pick_trade_hit(
     for anchor in filter.must_include_names() {
         used_for_filter.remove(&anchor);
     }
-    // Production fill must search the complete legal trade-post pool. The
-    // standalone catalog is only for optional priority reduction, never
-    // eligibility or final fallback.
-    let sub = filter_trade_pool(pool, &used_for_filter);
-    let full_pool = sub.clone();
+    let base_sub = filter_trade_pool(pool, &used_for_filter);
+    // Search the reduced standalone pool first; expand only when it cannot
+    // provide a complete legal room.
+    let reduced_sub = if filter.has_must_include() {
+        base_sub.clone()
+    } else if karlan_precision_active(&search_opts.layout.global_inject) {
+        base_sub.clone()
+    } else {
+        try_filter_standalone(
+            &base_sub,
+            FacilityKind::TradePost,
+            search_opts.operator_capacity,
+        )
+    };
+    let full_pool = base_sub;
+    let sub = if reduced_sub.entries.len() < search_opts.operator_capacity {
+        full_pool.clone()
+    } else {
+        reduced_sub
+    };
     if sub.entries.len() < search_opts.operator_capacity {
         return Err(Error::msg(format!(
             "trade pool has {} ready operators (need {})",
