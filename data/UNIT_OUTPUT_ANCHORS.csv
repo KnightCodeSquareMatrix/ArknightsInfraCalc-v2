@@ -4,7 +4,7 @@ reg_unit_closure_tier90,3,gsl_closure_tier90,12000,2000,0.01
 reg_unit_closure_tier80,3,gsl_closure_tier80,12000,2000,0.01
 reg_unit_closure_tier60,3,gsl_closure_tier60,12000,2000,0.01
 reg_unit_blackkey_closure,3,gsl_blackkey_closure,12000,2000,0.01
-reg_unit_docus_lv3,3,docus_solo,15910.75,0,0.01
+reg_unit_docus_lv3,3,docus_solo,15929.2,0,0.01
 reg_unit_docus_lv2,2,docus_solo,18591.55,0,0.01
 reg_unit_docus_lv1,1,docus_solo,20000,0,0.01
 reg_unit_witch_beta,3,gsl_witch_long_beta,12739.73,2328.77,0.01
