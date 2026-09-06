@@ -120,8 +120,8 @@ layout / operbox / runtime data
 
 | 命令 | 用途 |
 |---|---|
-| `plan` | 用户完整模拟入口：账号画像 + timed rotation + 可选 MAA/JSON |
-| `advice --operbox <path>` | v2 练卡建议、确定性答卷或 explain/RAG 输入 |
+| `plan` | 用户完整模拟入口：账号画像 + timed rotation + 可选 MAA/JSON；不含练卡建议 |
+| `advice --operbox <path>` | legacy v2 机器诊断练卡、确定性答卷或 explain/RAG 输入；玩家练卡建议必须从 `serve plan.compute.training_advice` 消费 |
 | `verify --case <id>` / `verify --all` | 执行贸易回归和单位产出锚点 |
 | `pool [--trade] [--manufacture]` | 打印设施候选池统计与跳过原因 |
 | `search trade [--top N]` | 贸易候选搜索 |

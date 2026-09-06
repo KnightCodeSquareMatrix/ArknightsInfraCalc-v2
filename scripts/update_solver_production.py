@@ -83,9 +83,11 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run(cmd: list[str], *, stdin: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run(
+    cmd: list[str], *, stdin: str | None = None, check: bool = True, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
     print(f"\n$ {shlex.join(cmd)}")
-    return subprocess.run(cmd, input=stdin, text=True, check=check)
+    return subprocess.run(cmd, input=stdin, text=True, check=check, env=env)
 
 
 def ensure_elf(path: Path) -> None:

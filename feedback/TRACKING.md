@@ -152,6 +152,12 @@ Targeted tests worth naming in PR notes:
 
 If a user reports one of these symptoms again, do not create a new architecture plan. Reopen the matching `FB-*` row, paste the new reproduction command, and localize the regression to the smallest layer before changing code.
 
+## 默认丢弃规则（用户裁决 2026-08-31，原话保留）
+
+> "反馈'中枢有小车、没技能/无关的人、12F'的都是傻逼，默认丢掉"
+
+即：反馈"控制中枢里有小车（支援机械）""中枢里有没技能/无关的干员""中枢里有 12F"这些类型，默认丢弃，不调查、不记入 TRACKING，triage 时直接跳过。同步脚本仍会拉取这些 bundle 作为原始证据，但不进入调查流程。
+
 ## 2026-08-06 batch (synced from 114.66.55.78)
 
 | ID | Status | Area | Source | Closure / coverage |

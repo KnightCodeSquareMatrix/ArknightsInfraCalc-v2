@@ -99,9 +99,15 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
     let durin_plan = operbox.durin_dorm_planning_count(instances);
     let assignment = reference_shift_assignment(&rotation);
     let trade_report =
-        trade_report_from_assignment(blueprint, assignment, instances, table, durin_plan)?;
+        match trade_report_from_assignment(blueprint, assignment, instances, table, durin_plan) {
+            Ok(report) => report,
+            Err(error) => return Err(crate::error::Error::with_rotation(&rotation, error)),
+        };
     let manu_report =
-        manu_report_from_assignment(blueprint, assignment, instances, table, durin_plan)?;
+        match manu_report_from_assignment(blueprint, assignment, instances, table, durin_plan) {
+            Ok(report) => report,
+            Err(error) => return Err(crate::error::Error::with_rotation(&rotation, error)),
+        };
 
     let tier_up_owned = operbox
         .owned

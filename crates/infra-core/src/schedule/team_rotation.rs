@@ -2327,7 +2327,9 @@ fn finalize_timed_rotation(
         );
     }
     for shift in &mut report.shifts {
-        finalize_shift_dorms(blueprint, operbox, shift)?;
+        if let Err(error) = finalize_shift_dorms(blueprint, operbox, shift) {
+            return Err(Error::with_rotation(&report, error));
+        }
     }
     let mut stage_after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_solver_stage(
@@ -2347,23 +2349,29 @@ fn finalize_timed_rotation(
                 .fiammetta
                 .as_ref()
                 .expect("Fiammetta-only shift has action");
-            score_fiammetta_continuation(
+            match score_fiammetta_continuation(
                 blueprint,
                 &shift.assignment,
                 instances,
                 table,
                 operbox.durin_dorm_planning_count(instances),
                 &action.room_id,
-            )?
+            ) {
+                Ok(scores) => scores,
+                Err(error) => return Err(Error::with_rotation(&report, error)),
+            }
         } else {
-            evaluate_base_assignment_efficiencies(
+            match evaluate_base_assignment_efficiencies(
                 blueprint,
                 &shift.assignment,
                 instances,
                 table,
                 shift.duration_hours,
                 Some(operbox.durin_dorm_planning_count(instances)),
-            )?
+            ) {
+                Ok(scores) => scores,
+                Err(error) => return Err(Error::with_rotation(&report, error)),
+            }
         };
         shift.weighted_trade = shift.efficiencies.weighted_trade(shift.duration_hours);
         shift.weighted_manufacture = shift
@@ -2398,7 +2406,11 @@ fn finalize_timed_rotation(
         production: average_cycle_production(blueprint, &report.shifts),
     };
     report.warnings = rotation_shortfall_warnings(blueprint, &report.shifts);
-    let dorm_warnings = dorm_finalizer::finalize_dorms(blueprint, operbox, &mut report.shifts)?;
+    let dorm_warnings = match dorm_finalizer::finalize_dorms(blueprint, operbox, &mut report.shifts)
+    {
+        Ok(warnings) => warnings,
+        Err(error) => return Err(Error::with_rotation(&report, error)),
+    };
     report
         .warnings
         .extend(dorm_warnings.into_iter().map(|warning| {
@@ -2436,7 +2448,9 @@ fn finalize_timed_rotation(
         stage_before,
         stage_after,
     );
-    invariant_result?;
+    if let Err(error) = invariant_result {
+        return Err(Error::with_rotation(&report, error));
+    }
     crate::profile::emit_solver_stage(
         "rotation_finalize",
         "total",
@@ -6198,26 +6212,47 @@ fn schedule_abc_rotation(
         );
     }
 
+    let mut report = TeamRotationReport {
+        profile,
+        assignment_plans: vec![peak_plan.clone()],
+        peak_plan: peak_plan.clone(),
+        runtime_shift_binds: shift_binds.clone(),
+        peak_mood_eta,
+        teams: teams.clone(),
+        daily: DailyTotals {
+            trade: shifts.iter().map(|shift| shift.weighted_trade).sum(),
+            manufacture: shifts.iter().map(|shift| shift.weighted_manufacture).sum(),
+            power: shifts.iter().map(|shift| shift.weighted_power).sum(),
+            production: average_cycle_production(blueprint, &shifts),
+        },
+        warnings: rotation_shortfall_warnings(blueprint, &shifts),
+        shifts,
+        elapsed: t0.elapsed(),
+    };
+
     if enable_fiammetta_return {
-        for shift in &shifts {
+        for shift in &report.shifts {
             print_trade_rotation_debug(
                 &format!("before fiammetta shift {}", shift.index + 1),
                 &shift.assignment,
             );
         }
-        let applied_single_core = apply_profile_fiammetta_rotation(
+        let applied_single_core = match apply_profile_fiammetta_rotation(
             blueprint,
             operbox,
             instances,
             table,
             options,
             profile,
-            &teams,
-            &peak_plan.continuous_roles,
-            &shift_binds,
-            &mut shifts,
-        )?;
-        for shift in &shifts {
+            &report.teams,
+            &report.peak_plan.continuous_roles,
+            &report.runtime_shift_binds,
+            &mut report.shifts,
+        ) {
+            Ok(applied) => applied,
+            Err(error) => return Err(Error::with_rotation(&report, error)),
+        };
+        for shift in &report.shifts {
             print_trade_rotation_debug(
                 &format!("after single-core fiammetta shift {}", shift.index + 1),
                 &shift.assignment,
@@ -6226,38 +6261,38 @@ fn schedule_abc_rotation(
         let _applied_witch = if applied_single_core {
             false
         } else {
-            apply_witch_group_fiammetta_rotation(
+            match apply_witch_group_fiammetta_rotation(
                 blueprint,
                 operbox,
                 instances,
                 table,
                 options,
                 profile,
-                &shift_binds,
-                &mut shifts,
-            )?
+                &report.runtime_shift_binds,
+                &mut report.shifts,
+            ) {
+                Ok(applied) => applied,
+                Err(error) => return Err(Error::with_rotation(&report, error)),
+            }
         };
-        for shift in &shifts {
+        for shift in &report.shifts {
             print_trade_rotation_debug(
                 &format!("after all fiammetta shift {}", shift.index + 1),
                 &shift.assignment,
             );
         }
     }
-    validate_final_rotation_invariants(
-        blueprint,
-        &shifts,
-        &shift_binds,
-        &peak_plan.active_dependencies,
-    )?;
-    validate_mood_gap_decay_work_spans(blueprint, instances, table, profile, &shifts)?;
-    let daily = DailyTotals {
-        trade: shifts.iter().map(|shift| shift.weighted_trade).sum(),
-        manufacture: shifts.iter().map(|shift| shift.weighted_manufacture).sum(),
-        power: shifts.iter().map(|shift| shift.weighted_power).sum(),
-        production: average_cycle_production(blueprint, &shifts),
+    report.daily = DailyTotals {
+        trade: report.shifts.iter().map(|shift| shift.weighted_trade).sum(),
+        manufacture: report
+            .shifts
+            .iter()
+            .map(|shift| shift.weighted_manufacture)
+            .sum(),
+        power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
+        production: average_cycle_production(blueprint, &report.shifts),
     };
-    let warnings = rotation_shortfall_warnings(blueprint, &shifts);
+    report.warnings = rotation_shortfall_warnings(blueprint, &report.shifts);
     let t4 = Instant::now();
     let m4 = crate::profile::solver_perf_snapshot();
 
@@ -6279,18 +6314,21 @@ fn schedule_abc_rotation(
         crate::profile::emit_solver_stage("rotation_abc", stage, "ok", elapsed, before, after);
     }
 
-    Ok(TeamRotationReport {
-        profile,
-        assignment_plans: vec![peak_plan.clone()],
-        peak_plan,
-        runtime_shift_binds: shift_binds,
-        peak_mood_eta,
-        teams,
-        shifts,
-        daily,
-        warnings,
-        elapsed: t4.duration_since(t0),
-    })
+    report.elapsed = t4.duration_since(t0);
+    if let Err(error) = validate_final_rotation_invariants(
+        blueprint,
+        &report.shifts,
+        &report.runtime_shift_binds,
+        &report.peak_plan.active_dependencies,
+    ) {
+        return Err(Error::with_rotation(&report, error));
+    }
+    if let Err(error) =
+        validate_mood_gap_decay_work_spans(blueprint, instances, table, profile, &report.shifts)
+    {
+        return Err(Error::with_rotation(&report, error));
+    }
+    Ok(report)
 }
 
 #[derive(Debug, Clone)]
@@ -7006,7 +7044,7 @@ fn schedule_fiammetta_8_8_4_4(
     )?;
     report.runtime_shift_binds = binds;
     if options.fiammetta_enable {
-        if !apply_profile_fiammetta_rotation(
+        let applied = match apply_profile_fiammetta_rotation(
             blueprint,
             operbox,
             instances,
@@ -7017,8 +7055,13 @@ fn schedule_fiammetta_8_8_4_4(
             &raw.peak_plan.continuous_roles,
             &report.runtime_shift_binds,
             &mut report.shifts,
-        )? {
-            return Err(Error::msg(
+        ) {
+            Ok(applied) => applied,
+            Err(error) => return Err(Error::with_rotation(&report, error)),
+        };
+        if !applied {
+            return Err(Error::with_rotation(
+                &report,
                 "fiammetta-8844 requires an accepted Fiammetta action",
             ));
         }
@@ -7026,14 +7069,17 @@ fn schedule_fiammetta_8_8_4_4(
             if let Some(action) = shift.fiammetta.as_ref() {
                 shift.transition = ShiftTransition::FiammettaOnly;
                 shift.drone = None;
-                shift.efficiencies = score_fiammetta_continuation(
+                shift.efficiencies = match score_fiammetta_continuation(
                     blueprint,
                     &shift.assignment,
                     instances,
                     table,
                     operbox.durin_dorm_planning_count(instances),
                     &action.room_id,
-                )?;
+                ) {
+                    Ok(scores) => scores,
+                    Err(error) => return Err(Error::with_rotation(&report, error)),
+                };
                 shift.weighted_trade = shift.efficiencies.weighted_trade(shift.duration_hours);
                 shift.weighted_manufacture = shift
                     .efficiencies
@@ -7051,14 +7097,18 @@ fn schedule_fiammetta_8_8_4_4(
             power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
             production: average_cycle_production(blueprint, &report.shifts),
         };
-        validate_continuous_work_spans(blueprint, instances, &report)?;
+        if let Err(error) = validate_continuous_work_spans(blueprint, instances, &report) {
+            return Err(Error::with_rotation(&report, error));
+        }
     }
-    validate_final_rotation_invariants(
+    if let Err(error) = validate_final_rotation_invariants(
         blueprint,
         &report.shifts,
         &report.runtime_shift_binds,
         &raw.peak_plan.active_dependencies,
-    )?;
+    ) {
+        return Err(Error::with_rotation(&report, error));
+    }
     Ok(report)
 }
 
@@ -7832,15 +7882,21 @@ fn finalize_profile_rotation(
         warnings,
         elapsed: started.elapsed(),
     };
-    validate_profile_rotation(blueprint, instances, &report)?;
-    validate_continuous_work_spans(blueprint, instances, &report)?;
-    validate_mood_gap_decay_work_spans(
+    if let Err(error) = validate_profile_rotation(blueprint, instances, &report) {
+        return Err(Error::with_rotation(&report, error));
+    }
+    if let Err(error) = validate_continuous_work_spans(blueprint, instances, &report) {
+        return Err(Error::with_rotation(&report, error));
+    }
+    if let Err(error) = validate_mood_gap_decay_work_spans(
         blueprint,
         instances,
         table,
         report.profile,
         &report.shifts,
-    )?;
+    ) {
+        return Err(Error::with_rotation(&report, error));
+    }
     Ok(report)
 }
 

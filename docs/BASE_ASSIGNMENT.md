@@ -75,7 +75,7 @@ operbox + blueprint
 
 优先级从高到低（前者先占 `used`）：
 
-1. **registry 体系**（`base_systems.json` → `build_plan` → `execute_plan`；跨站优先，同站次之）
+1. **registry 体系**（`base_systems.json` → `build_plan` → `execute_plan`；跨站优先，同站次之；怪猎完整消费组合与龙门中枢组在 `control_global_effect` 内按消费方和 priority 互斥）
 2. **控制中枢补位** `control`（木天蓼 / 全局贸易·制造 % 等；不足 5 人时用 `search_control_combos` 补满）
 3. **宿舍 / 感知 producer**（如森西、爱丽丝/车尔尼的梦境/小节→感知源；塑心作为迷迭香/黑键链的宿舍无声共鸣可选插件；先落位再 `resolve_base`）
 4. **发电各站**（每站 1 人，`search_power_assignment` 同款 `used`）

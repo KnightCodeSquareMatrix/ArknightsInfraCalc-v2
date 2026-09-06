@@ -146,11 +146,49 @@ pub(super) struct ComputedPlan {
     pub maa: Option<MaaSchedule>,
 }
 
+pub(super) struct PlanComputeFailure {
+    pub current: Option<LayoutProbe>,
+    pub rotation: Option<infra_core::schedule::TeamRotationReport>,
+    pub profile: Option<BoxProfile>,
+    pub maa: Option<MaaSchedule>,
+    pub error: Error,
+}
+
+pub(super) enum PlanComputeAttempt {
+    Complete(ComputedPlan),
+    Failed(PlanComputeFailure),
+}
+
+impl PlanComputeAttempt {
+    fn is_complete(&self) -> bool {
+        matches!(self, Self::Complete(_))
+    }
+}
+
 pub(super) fn compute_plan(
     resources: PlanResources<'_>,
     input: PlanComputeInput<'_>,
     requested: RequestedOutputs,
 ) -> Result<ComputedPlan, Error> {
+    match compute_plan_attempt(resources, input, requested) {
+        PlanComputeAttempt::Complete(computed) => Ok(computed),
+        PlanComputeAttempt::Failed(failure) => Err(failure.error),
+    }
+}
+
+pub(super) fn compute_plan_for_plan_compute(
+    resources: PlanResources<'_>,
+    input: PlanComputeInput<'_>,
+    requested: RequestedOutputs,
+) -> PlanComputeAttempt {
+    compute_plan_attempt(resources, input, requested)
+}
+
+fn compute_plan_attempt(
+    resources: PlanResources<'_>,
+    input: PlanComputeInput<'_>,
+    requested: RequestedOutputs,
+) -> PlanComputeAttempt {
     let _trace =
         infra_core::profile::ensure_solver_perf_trace(input.layout_label, input.operbox_label);
     let total_started = Instant::now();
@@ -160,7 +198,7 @@ pub(super) fn compute_plan(
     infra_core::profile::emit_solver_stage(
         "plan_compute",
         "total",
-        if result.is_ok() { "ok" } else { "error" },
+        if result.is_complete() { "ok" } else { "error" },
         total_started.elapsed(),
         total_before,
         total_after,
@@ -172,7 +210,7 @@ fn compute_plan_inner(
     resources: PlanResources<'_>,
     input: PlanComputeInput<'_>,
     requested: RequestedOutputs,
-) -> Result<ComputedPlan, Error> {
+) -> PlanComputeAttempt {
     let stage_started = Instant::now();
     let stage_before = infra_core::profile::solver_perf_snapshot();
     let current_result = run_user_rotation_probe_with_profile_and_preferences(
@@ -211,7 +249,18 @@ fn compute_plan_inner(
         stage_before,
         stage_after,
     );
-    let current = current_result?;
+    let current = match current_result {
+        Ok(current) => current,
+        Err(error) => {
+            return PlanComputeAttempt::Failed(PlanComputeFailure {
+                current: None,
+                rotation: error.partial_rotation_report(),
+                profile: None,
+                maa: None,
+                error,
+            });
+        }
+    };
 
     if input.assert_invariants {
         let stage_started = Instant::now();
@@ -236,7 +285,15 @@ fn compute_plan_inner(
             stage_before,
             stage_after,
         );
-        invariant_result?;
+        if let Err(error) = invariant_result {
+            return PlanComputeAttempt::Failed(PlanComputeFailure {
+                current: Some(current),
+                rotation: None,
+                profile: None,
+                maa: None,
+                error,
+            });
+        }
     }
 
     let stage_started = Instant::now();
@@ -278,7 +335,18 @@ fn compute_plan_inner(
             stage_after,
         );
     }
-    let profile = profile_result?;
+    let profile = match profile_result {
+        Ok(profile) => profile,
+        Err(error) => {
+            return PlanComputeAttempt::Failed(PlanComputeFailure {
+                current: Some(current),
+                rotation: None,
+                profile: None,
+                maa: None,
+                error,
+            });
+        }
+    };
 
     let stage_started = Instant::now();
     let stage_before = infra_core::profile::solver_perf_snapshot();
@@ -306,9 +374,20 @@ fn compute_plan_inner(
             stage_after,
         );
     }
-    let maa = maa_result?;
+    let maa = match maa_result {
+        Ok(maa) => maa,
+        Err(error) => {
+            return PlanComputeAttempt::Failed(PlanComputeFailure {
+                current: Some(current),
+                rotation: None,
+                profile,
+                maa: None,
+                error,
+            });
+        }
+    };
 
-    Ok(ComputedPlan {
+    PlanComputeAttempt::Complete(ComputedPlan {
         current,
         profile,
         maa,

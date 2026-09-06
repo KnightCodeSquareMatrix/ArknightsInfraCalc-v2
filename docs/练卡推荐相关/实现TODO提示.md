@@ -9,7 +9,7 @@
 
 - `training_advice_knowledge` 与 player builder 已重建，不读取旧 `training_recommendations.json` 裁决玩家语义。
 - 前端得到全量基础缺口、固定 17 组完成度和最多 10 人建议；C1、C2、C3、C4、C5、C6、C8、C10、T1、T2、T3、T7、T9、T12 及已批封闭成员表已进入结构化层。
-- `plan.compute.training_advice` 消费本次 operbox/layout；独立 `advice --player` 可另收 `--player-context`。
+- 需要练卡建议时用 `plan.compute`：`plan.compute.training_advice` 随同一排班请求消费本次 operbox/layout 并返回结构化结果；`advice --player` 是 legacy 本地诊断入口（可另收 `--player-context`），不是练卡建议产品入口。
 - 五章自然语言报告和面向玩家的 AI 改写未实现，保留给未来 AI 接入。
 
 ## 本轮已完成

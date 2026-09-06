@@ -50,6 +50,13 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 
 根 `AGENTS.md` 是任务分类、真源顺序和项目硬门禁的唯一入口；`docs/INDEX.md` 只负责定位文档与后续阅读，不另行定义 Skill 触发词或真源优先级。
 
+### 影子候选设计入口
+
+凡讨论或实现“能力影子候选”、跨设施/跨产物共享干员归属、同房组合候选延迟占用或冲突分支重算，必须先完整读取
+`docs/TODO/能力影子候选设计.md`。该方案把 capability shadow 与 physical operator
+分离，在冲突闭包内比较候选后才提交真实 assignment；它与挂件 receiver、SupportPool、SupportClaim
+是两个独立问题，不得混为同一抽象或验收项。该文档当前是 `active-change / proposal`，不代表代码已经实现。
+
 ## 3. 所有任务通用硬门禁
 
 - 未授权修改时只读；诊断不自动等于实现。区分用户事实、用户推测、Agent 推断和关键未知项。
@@ -61,11 +68,11 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 对边界已明确的阶段性分析、计划、当前代码/diff 或 evidence packet，优先用 `stage-reviewer` 做快速对抗初审；它只能裁决当前阶段是否继续，不能替代用户语义裁决或适用的领域 Sol 最终审阅。
 - 用户明确授权无人值守修复时，按 `docs/QUALITY_AND_AUDIT.md` §2.3 的固定 `PAUSE_REASON`、冻结证据包和重试上限自动推进；未触发该枚举不得因一般不确定性暂停，也不得自行扩大业务语义、保证等级或外部副作用范围。
 - 体系或 conformance-rebuild 写入前简述：领域不变量、首次违规位置、修复后的单一责任边界、要删除或改写的冲突路径。
-- `shift_bind`、tag、priority、shortcut 只能消费各自语义，不能代替机制层的合法性判断。
+- `shift_bind`、tag、priority、shortcut 只能消费各自语义，不能代替 required admission。
 - 不为单一 operbox、room id、Shift 下标、fixture 或当前 top hit 写补偿特判。
 - 每个写入单元只有一个主要意图；旁支发现默认 deferred。达到唯一 owner、冲突路径删除和相应证明后停止扩张。
 - 新抽象应让真实重复语义、所有权或证明义务更清楚；“出现第二个用例”是审阅问题，不是禁止合法具名机制的硬规则。
-- 修改候选集合、优先级键、状态传播、目标、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；不得把动态优先级排班描述成未经验证的全局最优。
+- 修改候选集合、剪枝、分解、目标、top-K、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；无法证明完整时不得声称全局最优。
 - 对 solver/search、Plan admission、Team/Shift、rotation、MAA/export、跨设施机制或大规模运行时数据变更，完成前必须使用 `arknights-invariant-gate`：在 Rust 最终 `assignment` 上注册 `--assert-invariants` 检查，并用 Python 对 `data/fixtures/box-bundles/` 的代表性与 high-owned 集合批量调用该 gate。Python 不得解析文本/MAA 或重写机制语义；它只报告 Rust gate、求解无解、输入错误和超时。实际 assertion diff 必须经 Sol 复审至 `PASS`。
 - Agent 默认不得新增、修改或运行源代码内测试（包括 Cargo unit/integration tests、Python test modules 和 fixture snapshot tests）。用户明确授权的测试治理变更（例如删除已确认错误的断言）除外；此类变更必须限定在用户指定的测试路径，并在最终报告中单列。其余验证逐步迁移到 Rust 最终状态 `--assert-invariants` gate、Python 持久化 box 批量求解和 Sol 复审；该禁令不阻止实现或运行 gate 本身及其批量验收脚本。
 - 验证按改动风险选择方式：大型重构、solver/search、体系/排班/export、部署和需要长期审计的任务，使用 evidence 工具留痕；普通局部修复和文档调整可直接运行必要命令，并在最终说明结果。
@@ -101,39 +108,9 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 
 - L1 interpreter 只认 `buff_id`，不认识干员名。
 - L2 处理机制域；L3 shortcut 只结算实际组合，不负责体系选型或进编。
-- 求解器分为两层：机制还原层负责基建机制、效率、产出、心情、库存爆仓、无人机恢复等真实结算；动态优先级排班层只负责依据当前状态填充排班。
-- 动态优先级排班层是唯一的选人优先级 owner。干员或动作被选中后，其对其他候选的影响更新后续优先级键；不在各设施、组合或流水线中重复实现同一优先级。
-- 设施模块只提供当前状态下的合法候选及机制层可计算的收益；统一排班层按优先级依次填入，并在状态变化后继续处理后续候选。
-- 现有 `build_plan -> execute_plan -> fill -> resolve` 只作为迁移期间的兼容路径；新求解器不得把具体工序、特殊组合或工具人补位逻辑重新散落回该流水线。
+- Layout 主路径是 `build_plan -> execute_plan -> fill -> resolve`；排班不得绕过 Plan 修 admission。
+- 生产搜索使用各域具名目标；多目标优先显式词典序，中枢或 global heuristic 必须具名。
 - CLI / export 只编排调用和忠实输出，不写机制、公式或重新决策。
-
-### 动态优先级排班器计划
-
-本轮工作的唯一目标是获得更好的基建排班，不改变机制层的真实口径。
-
-1. **机制还原层**
-   - 统一承载技能解释、效率计算、产出计算、心情计算、库存与爆仓、无人机恢复，以及跨房间状态传播。
-   - 输入是当前基建状态和候选动作，输出是可验证的状态、效率、产出和约束结果。
-   - 裁缝等效效率、特殊订单等效倍率，以及海默、多萝西、水月等条件效率，均先由机制层结算，再提供给排班层使用。
-
-2. **动态优先级键**
-   - 将直接效率、产出价值、条件增益、工具人关系、设施/产物目标、占位影响和当前可行性统一编码为候选优先级键。
-   - 选中干员或动作后，只更新受影响候选的键；候选无法落位时跳过，不产生组合分支或回溯。
-   - 键是前瞻收益的决策表示，不是新的机制公式；最终结果仍由机制还原层复算。
-
-3. **按优先级填充**
-   - 以当前最高优先级的合法候选依次填充设施和岗位，统一维护占用、容量和已形成的机制状态。
-   - 特殊组合、工具人和跨设施关系优先通过键及其影响传播表达；只有机制本身无法拆解的整体约束才保留为合法性条件。
-   - 优先级键与影响关系集中管理，后续调整不再修改多个设施填充器和特殊分支。
-
-4. **迁移顺序**
-   - 先建立机制状态到优先级键的统一接口，再迁移贸易、制造、发电和中枢的选人逻辑。
-   - 每迁移一个设施，保留旧入口作为对照，使用真实 operbox 和机制结算比较排班结果。
-   - 逐步删除旧的局部排序、提前锁定、工具人补位和流水线补偿路径；不以删除机制约束换取速度。
-
-5. **保证边界**
-   - 新算法目标是动态优先级下的高质量排班，不因速度或键值模型自动宣称数学意义的全局最优。
-   - 每个优先级键必须注明其来源、影响范围和是否为精确收益、策略权重或近似；机制层结果必须能解释最终排班。
 
 ### 技能档位与精英化映射
 

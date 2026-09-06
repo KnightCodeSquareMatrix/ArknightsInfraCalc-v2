@@ -44,6 +44,14 @@
 {"id":1,"ok":false,"elapsed_ms":3,"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}}
 ```
 
+非 assert 的求解失败会在保留旧顶层错误的同时，尽可能保留 core 已真实构造的结果：
+
+```json
+{"id":1,"ok":false,"elapsed_ms":3,"result":{"schema_version":4,"rotation":null,"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}},"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}}
+```
+
+`result.error` 存在时，前端不得将响应导入 MAA。若 `result.rotation` 非空，它只会来自本次 core 已真实构造的 rotation 报告；若为空，表示错误发生在报告产生前，不得伪造或复用旧排班。`options.assert_invariants=true` 仍使用上面的顶层 `ok:false` 形状且不返回 `result`；请求 schema 和输入准入错误也只在非 assert 请求中附带 `result` 错误对象。
+
 ## 生命周期
 
 1. Next 进程按需启动一个 `infra-cli serve`。

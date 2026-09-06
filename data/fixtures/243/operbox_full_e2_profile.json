@@ -66,7 +66,7 @@
           "清流",
           "温蒂"
         ],
-        "final_efficiency": 8.99
+        "final_efficiency": 9.096
       },
       "baseline": {
         "operators": [
@@ -74,9 +74,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.102
+        "final_efficiency": 8.392
       },
-      "gap_ratio": 0.10960256726734138,
+      "gap_ratio": 0.0838894184938037,
       "severity": "ok"
     },
     {
@@ -88,7 +88,7 @@
           "清流",
           "温蒂"
         ],
-        "final_efficiency": 2.335
+        "final_efficiency": 2.363
       },
       "baseline": {
         "operators": [
@@ -96,9 +96,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.093
+        "final_efficiency": 2.238
       },
-      "gap_ratio": 0.11562350692785475,
+      "gap_ratio": 0.05585344057193923,
       "severity": "ok"
     },
     {
@@ -110,7 +110,7 @@
           "弑君者",
           "断罪者"
         ],
-        "final_efficiency": 2.16
+        "final_efficiency": 2.185
       },
       "baseline": {
         "operators": [
@@ -120,7 +120,7 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": 0.10316649642492348,
+      "gap_ratio": 0.11593462717058227,
       "severity": "ok"
     },
     {
@@ -142,24 +142,24 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 9.215
+        "final_efficiency": 9.27
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 8.938
+        "final_efficiency": 9.084
       },
-      "gap_ratio": 0.030991273215484363,
+      "gap_ratio": 0.020475561426684274,
       "severity": "ok"
     }
   ],
   "rotation": {
     "daily_trade_efficiency": 3.946,
-    "daily_manufacture_efficiency": 9.215,
+    "daily_manufacture_efficiency": 9.27,
     "daily_power_efficiency": 1.664
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
-    "daily_manufacture_efficiency": 8.938,
+    "daily_manufacture_efficiency": 9.084,
     "daily_power_efficiency": 1.627
   },
   "actions": [],

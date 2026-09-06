@@ -25,11 +25,36 @@ pub enum Error {
     /// CSV decoding or encoding failure.
     #[error(transparent)]
     Csv(#[from] csv::Error),
+    /// A rotation report was constructed, but a later validation/finalization step failed.
+    /// The report is retained for diagnostic consumers such as `plan.compute`.
+    #[error("{message}")]
+    PartialRotation {
+        report: Box<crate::schedule::TeamRotationReport>,
+        message: String,
+    },
 }
 
 impl Error {
     /// Construct a domain, unsupported-state, or contextualized error.
     pub fn msg(s: impl Into<String>) -> Self {
         Self::Msg(s.into())
+    }
+
+    /// Retain a report when a downstream rotation stage fails after construction.
+    pub fn with_rotation(
+        report: &crate::schedule::TeamRotationReport,
+        error: impl std::fmt::Display,
+    ) -> Self {
+        Self::PartialRotation {
+            report: Box::new(report.clone()),
+            message: error.to_string(),
+        }
+    }
+
+    pub fn partial_rotation_report(&self) -> Option<crate::schedule::TeamRotationReport> {
+        match self {
+            Self::PartialRotation { report, .. } => Some((**report).clone()),
+            _ => None,
+        }
     }
 }

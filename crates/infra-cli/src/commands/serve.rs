@@ -5,8 +5,8 @@ use std::thread;
 use std::time::Instant;
 
 use super::plan_compute::{
-    compute_plan, inline_operbox, PlanComputeInput, PlanComputeParams, PlanResources,
-    RequestedOutputs,
+    compute_plan, compute_plan_for_plan_compute, inline_operbox, PlanComputeAttempt,
+    PlanComputeInput, PlanComputeParams, PlanResources, RequestedOutputs,
 };
 use infra_core::box_profile::{baseline_path_or_default, BoxProfile};
 use infra_core::export::MaaSchedule;
@@ -358,10 +358,22 @@ struct PlanResult {
 #[derive(Debug, Serialize)]
 struct PlanComputeResult {
     schema_version: u32,
-    profile: BoxProfile,
-    rotation: RotationSummary,
-    maa: MaaSchedule,
-    training_advice: PlayerTrainingAdviceReport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<BoxProfile>,
+    rotation: Option<RotationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    maa: Option<MaaSchedule>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    training_advice: Option<PlayerTrainingAdviceReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<PlanComputeResultError>,
+}
+
+#[derive(Debug, Serialize)]
+struct PlanComputeResultError {
+    code: &'static str,
+    stage: &'static str,
+    message: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -438,6 +450,18 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
         "request",
         &format!("{}:{request_label}", request.method),
     );
+    let plan_compute_request = request.method == "plan.compute";
+    let plan_compute_asserts = request
+        .params
+        .get("options")
+        .and_then(|options| options.get("assert_invariants"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let plan_compute_schema_version = request
+        .params
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        .map(|version| version as u32);
     let request_before = infra_core::profile::solver_perf_snapshot();
     let (result, error_code, error_stage) = match request.method.as_str() {
         "plan" => (handle_plan(state, request.params), None, None),
@@ -472,7 +496,16 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
             None,
         ),
     };
-    let request_status = if result.is_ok() { "ok" } else { "error" };
+    let request_status = match &result {
+        Ok(value)
+            if request.method == "plan.compute"
+                && value.get("error").is_some_and(|error| !error.is_null()) =>
+        {
+            "error"
+        }
+        Ok(_) => "ok",
+        Err(_) => "error",
+    };
     infra_core::profile::emit_solver_stage(
         "serve_request",
         "request_total",
@@ -482,15 +515,53 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
         infra_core::profile::solver_perf_snapshot(),
     );
     match result {
-        Ok(result) => ServeResponse {
-            id,
-            ok: true,
-            elapsed_ms: start.elapsed().as_millis(),
-            solver: state.solver.clone(),
-            result: Some(result),
-            error: None,
-        },
+        Ok(result) => {
+            let nested_error_message = (request.method == "plan.compute")
+                .then(|| result.get("error"))
+                .flatten()
+                .filter(|error| !error.is_null())
+                .and_then(|error| error.get("message"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            if let Some(message) = nested_error_message {
+                ServeResponse {
+                    id,
+                    ok: false,
+                    elapsed_ms: start.elapsed().as_millis(),
+                    solver: state.solver.clone(),
+                    result: Some(result),
+                    error: Some(ServeError {
+                        code: Some("PLAN_FAILED"),
+                        stage: Some("plan.compute"),
+                        message,
+                    }),
+                }
+            } else {
+                ServeResponse {
+                    id,
+                    ok: true,
+                    elapsed_ms: start.elapsed().as_millis(),
+                    solver: state.solver.clone(),
+                    result: Some(result),
+                    error: None,
+                }
+            }
+        }
         Err(err) => match (error_code, error_stage) {
+            (Some(code), Some(stage)) if plan_compute_request && !plan_compute_asserts => {
+                let message = err.to_string();
+                coded_error_response_with_result(
+                    id,
+                    start.elapsed().as_millis(),
+                    code,
+                    stage,
+                    message.clone(),
+                    Some(plan_compute_error_result(
+                        plan_compute_schema_version,
+                        message,
+                    )),
+                )
+            }
             (Some(code), Some(stage)) => coded_error_response(
                 id,
                 start.elapsed().as_millis(),
@@ -529,18 +600,44 @@ fn coded_error_response(
     stage: &'static str,
     message: String,
 ) -> ServeResponse<serde_json::Value> {
+    coded_error_response_with_result(id, elapsed_ms, code, stage, message, None)
+}
+
+fn coded_error_response_with_result(
+    id: serde_json::Value,
+    elapsed_ms: u128,
+    code: &'static str,
+    stage: &'static str,
+    message: String,
+    result: Option<serde_json::Value>,
+) -> ServeResponse<serde_json::Value> {
     ServeResponse {
         id,
         ok: false,
         elapsed_ms,
         solver: SolverBuildInfo::current(),
-        result: None,
+        result,
         error: Some(ServeError {
             code: Some(code),
             stage: Some(stage),
             message,
         }),
     }
+}
+
+fn plan_compute_error_result(schema_version: Option<u32>, message: String) -> serde_json::Value {
+    let mut result = serde_json::json!({
+        "error": {
+            "code": "PLAN_FAILED",
+            "stage": "plan.compute",
+            "message": message,
+        },
+        "rotation": null,
+    });
+    if let Some(schema_version) = schema_version {
+        result["schema_version"] = serde_json::json!(schema_version);
+    }
+    result
 }
 
 fn handle_plan_compute(
@@ -583,7 +680,7 @@ fn handle_plan_compute(
     let operbox_label = validated_label(params.labels.operbox, "inline-operbox", "operbox label")?;
     let operbox = inline_operbox(params.operbox)?;
 
-    let computed = compute_plan(
+    let attempt = compute_plan_for_plan_compute(
         PlanResources {
             instances: &state.instances,
             table: &state.table,
@@ -606,28 +703,63 @@ fn handle_plan_compute(
             profile: true,
             maa: true,
         },
-    )?;
-
-    let profile = computed
-        .profile
-        .expect("profile is always requested by plan.compute");
-    let maa = computed
-        .maa
-        .expect("MAA schedule is always requested by plan.compute");
-    let training_advice = build_plan_compute_training_advice(
-        &operbox,
-        &params.layout,
-        &state.training_advice_knowledge,
-        Some(&computed.current.rotation),
     );
-    serde_json::to_value(PlanComputeResult {
-        schema_version: params.schema_version,
-        profile,
-        rotation: RotationSummary::from(&computed.current.rotation),
-        maa,
-        training_advice,
-    })
-    .map_err(Error::from)
+    let result = match attempt {
+        PlanComputeAttempt::Complete(computed) => {
+            let profile = computed
+                .profile
+                .expect("profile is always requested by plan.compute");
+            let maa = computed
+                .maa
+                .expect("MAA schedule is always requested by plan.compute");
+            let training_advice = build_plan_compute_training_advice(
+                &operbox,
+                &params.layout,
+                &state.training_advice_knowledge,
+                Some(&computed.current.rotation),
+            );
+            PlanComputeResult {
+                schema_version: params.schema_version,
+                profile: Some(profile),
+                rotation: Some(RotationSummary::from(&computed.current.rotation)),
+                maa: Some(maa),
+                training_advice: Some(training_advice),
+                error: None,
+            }
+        }
+        PlanComputeAttempt::Failed(failure) if !params.options.assert_invariants => {
+            let rotation_report = failure
+                .current
+                .as_ref()
+                .map(|current| &current.rotation)
+                .or(failure.rotation.as_ref());
+            let rotation = rotation_report.map(RotationSummary::from);
+            let training_advice = rotation_report.map(|report| {
+                build_plan_compute_training_advice(
+                    &operbox,
+                    &params.layout,
+                    &state.training_advice_knowledge,
+                    Some(report),
+                )
+            });
+            let message = failure.error.to_string();
+            let result = PlanComputeResult {
+                schema_version: params.schema_version,
+                profile: failure.profile,
+                rotation,
+                maa: failure.maa,
+                training_advice,
+                error: Some(PlanComputeResultError {
+                    code: "PLAN_FAILED",
+                    stage: "plan.compute",
+                    message,
+                }),
+            };
+            return serde_json::to_value(result).map_err(Error::from);
+        }
+        PlanComputeAttempt::Failed(failure) => return Err(failure.error),
+    };
+    serde_json::to_value(result).map_err(Error::from)
 }
 
 fn build_plan_compute_training_advice(

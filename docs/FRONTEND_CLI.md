@@ -278,7 +278,7 @@ infra-cli layout team-rotation \
 {"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
 ```
 
-响应 `result.schema_version` 等于请求参数的 schema 版本，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.shifts[].assignment.rooms[].notes[]` 是 core notes owner 在最终班次编制上生成的房间级解释；前端按 `room_id` 展示 `text`，用 `code` 做稳定识别，不自行推断原因。v3 响应可选返回 `training_room`（schema v1）；该字段缺失时前端按“当前 Worker 未提供训练室结果”处理，不视为错误。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。练卡字段的完整契约见下一节。
+正常响应的 `result.schema_version` 等于请求参数的 schema 版本，并内联返回 `profile`（schema v4）、`rotation`（profile/daily/shifts 摘要）、`maa` 和 `training_advice`（schema v2）。`rotation.shifts[].assignment.rooms[].notes[]` 是 core notes owner 在最终班次编制上生成的房间级解释；前端按 `room_id` 展示 `text`，用 `code` 做稳定识别，不自行推断原因。v3 响应可选返回 `training_room`（schema v1）；该字段缺失时前端按“当前 Worker 未提供训练室结果”处理，不视为错误。`rotation.warnings`（报告级缺员提示，办公室/会客室候选不足时逐班列出 shift、设施、房间 ID 与缺额；无缺员时省略）与 MAA `hire`/`meeting` 槽位的 `autofill:true` 对应。练卡字段的完整契约见下一节。
 
 `plan.compute` v1/v2/v3 参数的机器契约分别是 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json)、[`contracts/plan-compute-v2.schema.json`](../contracts/plan-compute-v2.schema.json) 与 [`contracts/plan-compute-v3.schema.json`](../contracts/plan-compute-v3.schema.json)，人类可读契约见对应的 `plan-compute-v1.md` / `plan-compute-v2.md` / `plan-compute-v3.md`。Worker 在 Serde 反序列化前执行对应 Draft 2020-12 schema；params、layout、room、scenario、operbox、labels 和 options 均拒绝未知字段。v1 保持原语义，`abc_12_12_12` 通过 v2 请求使用，`options.fiammetta_enable`（默认 `true`）通过 v3 请求使用；`fiammetta_enable=false` 与 `rotation: fiammetta_8_8_4_4` 组合直接失败。
 
@@ -403,7 +403,10 @@ infra-cli layout team-rotation \
 
 #### 4.5.4 成功、失败与实现边界
 
-- `plan.compute` 成功时 `ok: true`，读取 `result.training_advice`；失败时 `ok: false`、`error.code: "PLAN_FAILED"`、`error.stage: "plan.compute"`，没有部分练卡结果可用。
+- `plan.compute` 的非 assert 求解或结果阶段失败仍保持顶层 `ok: false`，并在返回 JSON 的 `result.error` 重复返回 `{ code: "PLAN_FAILED", stage: "plan.compute", message }`。若 core 已真实构造本次 rotation 报告，`result.rotation` 同时保留该报告（可能停在报告完成前的最后阶段）；profile/MAA/练卡字段只保留已经成功生成的部分。
+- 若错误发生在 rotation 报告产生前，`result.rotation` 为 `null`，不得用空 assignment 或旧结果补齐；这表示当前输入没有可供返回的最终排班。
+- `options.assert_invariants=true` 仍只返回顶层 `ok: false`、`error.code: "PLAN_FAILED"`、`error.stage: "plan.compute"`，不返回 `result`，以保持严格门禁 fail-fast。
+- 前端必须先检查 `result.error` 或顶层 `error`：只有两者都缺失时才能消费 `maa`、`profile`、`training_advice` 或把 rotation 标记为可执行。
 - 新手章节跳过不等于基础名单完成：`skipped_by_efficiency` 时仍保留全量 `incomplete_newbie`，只是其中条目不以新手理由占用 `recommendations` 的最多 10 人名额。
 - `recommendations` 是行动待办；`combinations` 是全量组合状态。不要从前者反推后者，也不要把灰色组合缺口计入 10 人限制。
 - 前端不得把旧 `training_recommendations.json`、legacy `advice` 的 `now`/`conditional` 输出或自然语言 `--answer` 混入本 schema。
