@@ -517,6 +517,11 @@ def check_agent_index(repo: Path) -> list[str]:
         registry = generate_agent_index.load_registry(repo)
     except (OSError, UnicodeError, ValueError) as error:
         return [f"invalid Agent route registry: {error}"]
+    if registry.get("schema") != 1:
+        errors.append(f"unsupported Agent route registry schema: {registry.get('schema')!r}")
+    routes = registry.get("routes")
+    if not isinstance(routes, list):
+        return errors + ["Agent route registry routes must be a list"]
     expected = {
         repo / "docs/生成索引/Agent路由.md": generate_agent_index.render_routes(repo, registry),
         repo / "docs/生成索引/代码与文档地图.md": generate_agent_index.render_code_map(repo, registry),
@@ -526,15 +531,39 @@ def check_agent_index(repo: Path) -> list[str]:
             errors.append(f"missing generated Agent index: {path.relative_to(repo)}")
         elif path.read_text(encoding="utf-8") != content:
             errors.append(f"generated Agent index drift: {path.relative_to(repo)}")
-    for route in registry.get("routes", []):
+    seen_ids: set[str] = set()
+    required_fields = {
+        "id", "title", "symptoms", "entrypoints", "chain_doc",
+        "module_docs", "mechanics", "verification",
+    }
+    for route in routes:
+        route_id = route.get("id", "?")
+        if route_id in seen_ids:
+            errors.append(f"duplicate Agent route id: {route_id}")
+        seen_ids.add(route_id)
+        missing = sorted(field for field in required_fields if field not in route)
+        if missing:
+            errors.append(f"Agent route {route_id} missing fields: {', '.join(missing)}")
+            continue
+        for field in ("symptoms", "entrypoints", "module_docs", "mechanics", "verification"):
+            if not isinstance(route[field], list) or not route[field]:
+                errors.append(f"Agent route {route_id} requires non-empty list: {field}")
         for field in ("chain_doc",):
             target = route.get(field, "")
             if not (repo / target).is_file():
-                errors.append(f"Agent route {route.get('id', '?')} points to missing {field}: {target}")
+                errors.append(f"Agent route {route_id} points to missing {field}: {target}")
         for field in ("module_docs",):
             for target in route.get(field, []):
                 if not (repo / target).is_file():
-                    errors.append(f"Agent route {route.get('id', '?')} points to missing {field}: {target}")
+                    errors.append(f"Agent route {route_id} points to missing {field}: {target}")
+        for field in ("mechanics",):
+            for target in route.get(field, []):
+                if not (repo / target.split("#", 1)[0]).is_file():
+                    errors.append(f"Agent route {route_id} points to missing {field}: {target}")
+        for entrypoint in route.get("entrypoints", []):
+            source = entrypoint.split("::", 1)[0]
+            if not (repo / source).is_file():
+                errors.append(f"Agent route {route_id} points to missing entrypoint file: {entrypoint}")
     return errors
 
 
