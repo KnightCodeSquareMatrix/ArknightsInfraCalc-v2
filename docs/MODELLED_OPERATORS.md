@@ -30,6 +30,6 @@
 
 当前贸易 shortcut 注册表（`data/trade_shortcuts.json`）包含 `gsl_witch_*`、`gsl_closure_*`、`gsl_docus_*`、`gsl_blackkey_closure`、`gsl_vina_lungmen` 与 `gsl_penguin_*`。segment 注册表（`data/trade_segments.json`）包含 `docus_syracusa`、`blackkey_closure`、`vina_lungmen`、`penguin_exusiai_lemuen`、`penguin_texangel_e2`、`penguin_texlap_e0`。这些 id 是运行时匹配入口，不是自动候选或游戏机制真源。
 
-跨设施能力应从 `scope=Global` atom、`GlobalResourceKey` 和 `GlobalInjectManifest` 追踪；要确认某名干员当前是否覆盖，运行 refs audit 并沿 [`docs/调用链/跨设施状态刷新.md`](docs/调用链/跨设施状态刷新.md) 核对实际 assignment。
+跨设施能力应从 `scope=Global` atom、`GlobalResourceKey` 和 `GlobalInjectManifest` 追踪；要确认某名干员当前是否覆盖，运行 refs audit 并沿 `docs/调用链/跨设施状态刷新.md` 核对实际 assignment。
 
 具体 operator 名单必须从当前 JSON 与 `SkillTable::validate_operator_refs` 生成，手工表格只作为导航。新增或修正干员时同时更新 instance、skill table、相关 L2/L3 数据、回归锚点和本页覆盖说明。
