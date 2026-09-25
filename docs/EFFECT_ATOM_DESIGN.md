@@ -2,10 +2,10 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
+> 摘要：定义 EffectAtom 的 L1/L2/L3 分层、phase/scope 语义和机制知识库的映射边界。
 > 领域键：mechanics.effect-atom
 > 当前真源：self
-> 摘要：定义 EffectAtom 的 L1/L2/L3 分层、phase/scope 语义和机制知识库的映射边界。
-> 代码范围：`crates/infra-core/src/types.rs`; `skill_table.rs`; `pool/{trade,manufacture,control,power}.rs`; `trade/interpreter.rs`; `manufacture/interpreter.rs`; `control/interpreter.rs`; `cross_facility/interpreter.rs`; `data/skill_table.json`
+> 代码范围：`crates/infra-core/src/types.rs`; `crates/infra-core/src/skill_table.rs`; `crates/infra-core/src/pool/{trade,manufacture,control,power}.rs`; `crates/infra-core/src/trade/interpreter.rs`; `crates/infra-core/src/manufacture/interpreter.rs`; `crates/infra-core/src/control/interpreter.rs`; `crates/infra-core/src/cross_facility/interpreter.rs`; `data/skill_table.json`
 > 代码锚点：`crates/infra-core/src/types.rs::{Phase,Selector,Condition,Action,AtomScope,EffectAtom,CompiledAtom}`; `crates/infra-core/src/skill_table.rs::SkillTable::load`; `crates/infra-core/src/trade/interpreter.rs::apply_trade_phases`; `crates/infra-core/src/manufacture/interpreter.rs::apply_manu_phases`; `crates/infra-core/src/control/interpreter.rs::solve_control_with_trace`; `crates/infra-core/src/cross_facility/interpreter.rs::orchestrate_global_atoms`
 > 关联链路：`docs/模块/输入与技能映射.md`; `docs/调用链/技能到房间结算.md`; `docs/模块/中枢与跨设施状态.md`
 > 核验基线：`947f1a2`

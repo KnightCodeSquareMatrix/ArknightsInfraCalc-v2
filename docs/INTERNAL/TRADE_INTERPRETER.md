@@ -3,7 +3,7 @@
 > 文档角色：current-reference
 > 生命周期状态：current
 > 当前真源：`crates/infra-core/src/trade/interpreter.rs`、`types.rs`
-> 代码范围：`crates/infra-core/src/trade/{interpreter,solver,gold_flow,order_mechanic}.rs`; `types.rs`; `data/skill_table.json`
+> 代码范围：`crates/infra-core/src/trade/{interpreter,solver,gold_flow,order_mechanic}.rs`; `crates/infra-core/src/types.rs`; `data/skill_table.json`
 > 代码锚点：`crates/infra-core/src/trade/interpreter.rs::{TradeContext,collect_atoms,apply_trade_phases}`; `crates/infra-core/src/trade/interpreter.rs::{apply_atom,apply_eff_action,apply_limit_action,apply_peer_absorb}`; `crates/infra-core/src/trade/solver.rs::solve_trade_with_shift`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/SHORTCUT_MATCHING.md`
 > 核验基线：`947f1a2`

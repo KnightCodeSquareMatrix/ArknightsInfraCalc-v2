@@ -3,7 +3,7 @@
 > 文档角色：current-reference
 > 生命周期状态：current
 > 当前真源：`crates/infra-core/src/cross_facility/`、`global_resource/`、`layout/resolve.rs`
-> 代码范围：`cross_facility/{collector,interpreter,mod}.rs`; `global_resource/{pool,inject,key,registry}.rs`; `layout/resolve.rs`
+> 代码范围：`crates/infra-core/src/cross_facility/{collector,interpreter,mod}.rs`; `crates/infra-core/src/global_resource/{pool,inject,key,registry}.rs`; `crates/infra-core/src/layout/resolve.rs`
 > 代码锚点：`crates/infra-core/src/cross_facility/collector.rs::{GlobalAtomEntry,collect_global_atoms}`; `crates/infra-core/src/cross_facility/interpreter.rs::orchestrate_global_atoms`; `crates/infra-core/src/cross_facility/interpreter.rs::{condition_met,apply_state_write}`; `crates/infra-core/src/global_resource/pool.rs::GlobalResourcePool`; `crates/infra-core/src/global_resource/inject.rs::GlobalInjectManifest`
 > 关联链路：`docs/模块/中枢与跨设施状态.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`947f1a2`

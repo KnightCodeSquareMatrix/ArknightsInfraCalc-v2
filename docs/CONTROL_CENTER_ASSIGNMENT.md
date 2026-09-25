@@ -2,10 +2,10 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
+> 摘要：说明控制中枢的 required anchor、顺序选位、EffectLedger 和全局注入责任边界。
 > 领域键：facility.control-assignment
 > 当前真源：self
-> 摘要：说明控制中枢的 required anchor、顺序选位、EffectLedger 和全局注入责任边界。
-> 代码范围：`crates/infra-core/src/control/{input,interpreter,ledger,mod}.rs`; `search/control.rs`; `pool/control.rs`; `layout/assign/{control_fill,pipeline}.rs`; `global_resource/inject.rs`
+> 代码范围：`crates/infra-core/src/control/{input,interpreter,ledger,mod}.rs`; `crates/infra-core/src/search/control.rs`; `crates/infra-core/src/pool/control.rs`; `crates/infra-core/src/layout/assign/{control_fill,pipeline}.rs`; `crates/infra-core/src/global_resource/inject.rs`
 > 代码锚点：`crates/infra-core/src/control/interpreter.rs::{solve_control,solve_control_with_trace}`; `crates/infra-core/src/control/ledger.rs::ControlEffectLedger`; `crates/infra-core/src/control/mod.rs::apply_control_to_layout_with_trace`; `crates/infra-core/src/search/control.rs::search_control_combos`; `crates/infra-core/src/layout/assign/control_fill.rs::assign_control`; `crates/infra-core/src/layout/assign/pipeline.rs::run_shift_pipeline`
 > 关联链路：`docs/模块/中枢与跨设施状态.md`; `docs/调用链/跨设施状态刷新.md`; `docs/模块/候选搜索与Bake.md`
 > 核验基线：`947f1a2`

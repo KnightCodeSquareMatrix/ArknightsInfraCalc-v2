@@ -2,10 +2,10 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
+> 摘要：说明发电效率、无人机库存和排班/导出动作之间的结算边界。
 > 领域键：production.drones
 > 当前真源：self
-> 摘要：说明发电效率、无人机库存和排班/导出动作之间的结算边界。
-> 代码范围：`crates/infra-core/src/power/{input,interpreter,solver}.rs`; `layout/resolve.rs`; `layout/assignment.rs`; `schedule/*`; `crates/infra-core/src/export/maa.rs`
+> 代码范围：`crates/infra-core/src/power/{input,interpreter,solver}.rs`; `crates/infra-core/src/layout/resolve.rs`; `crates/infra-core/src/layout/assignment.rs`; `crates/infra-core/src/schedule/*`; `crates/infra-core/src/export/maa.rs`
 > 代码锚点：`crates/infra-core/src/power/solver.rs::{aggregate_power_efficiency,solve_power,apply_power_to_layout}`; `crates/infra-core/src/power/interpreter.rs::apply_power_phases`; `crates/infra-core/src/layout/resolve.rs::build_power_rooms`; `crates/infra-core/src/schedule/team_rotation.rs`; `crates/infra-core/src/export/maa.rs`
 > 关联链路：`docs/模块/心情与辅助设施.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`947f1a2`

@@ -2,10 +2,10 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
+> 摘要：裁决千分整数效率、各生产域结算和排班输出字段的统一口径。
 > 领域键：scoring.efficiency
 > 当前真源：self
-> 摘要：裁决千分整数效率、各生产域结算和排班输出字段的统一口径。
-> 代码范围：`crates/infra-core/src/efficiency.rs`; `trade/solver.rs`; `search/trade.rs`; `manufacture/solver.rs`; `search/manufacture.rs`; `power/solver.rs`; `layout/assignment.rs`; `bake.rs`
+> 代码范围：`crates/infra-core/src/efficiency.rs`; `crates/infra-core/src/trade/solver.rs`; `crates/infra-core/src/search/trade.rs`; `crates/infra-core/src/manufacture/solver.rs`; `crates/infra-core/src/search/manufacture.rs`; `crates/infra-core/src/power/solver.rs`; `crates/infra-core/src/layout/assignment.rs`; `crates/infra-core/src/bake.rs`
 > 代码锚点：`crates/infra-core/src/efficiency.rs::Efficiency`; `crates/infra-core/src/search/trade.rs::TradeEfficiencyBreakdown`; `crates/infra-core/src/search/manufacture.rs::ManuEfficiencyBreakdown`; `crates/infra-core/src/layout/assignment.rs::RoomEfficiencySnapshot`; `crates/infra-core/src/bake.rs::BAKE_SCHEMA_VERSION`
 > 关联链路：`docs/调用链/技能到房间结算.md`; `docs/模块/贸易求解.md`; `docs/模块/制造求解.md`; `docs/模块/候选搜索与Bake.md`
 > 核验基线：`947f1a2`
