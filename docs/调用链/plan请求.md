@@ -5,8 +5,8 @@
 > 当前真源：docs/接口/CLI与Worker.md；docs/接口/输入输出与兼容.md；`commands/plan_compute.rs`
 > 摘要：沿一次 plan/plan.compute 请求定位入口、状态转换、共享求解、profile、MAA 和 advice
 > 代码范围：`crates/infra-cli/src/commands/{plan.rs,serve.rs,plan_compute.rs}`、`crates/infra-core/src/{box_profile,schedule,layout,export,training_advice}`
-> 代码锚点：`main::run` → `plan_cmd`/`handle_request` → `compute_plan`/`compute_plan_for_plan_compute` → `compute_plan_inner`
-> 关联链路：[CLI 与 Worker](../接口/CLI与Worker.md)、[输入输出与兼容](../接口/输入输出与兼容.md)、[debug 与验证](debug与验证.md)
+> 代码锚点：`crates/infra-cli/src/main.rs::run` → `crates/infra-cli/src/commands/plan.rs::plan_cmd` / `crates/infra-cli/src/commands/serve.rs::handle_request` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan` / `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_for_plan_compute` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_inner`
+> 关联链路：`docs/接口/CLI与Worker.md`; `docs/接口/输入输出与兼容.md`; `docs/调用链/debug与验证.md`
 > 核验基线：标准 243 layout + full-e2 operbox；Worker `ping` 与 `plan.compute`；`--assert-invariants`
 
 ## 两个入口汇合

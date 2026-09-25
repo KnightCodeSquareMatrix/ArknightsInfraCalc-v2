@@ -5,8 +5,8 @@
 > 当前真源：docs/接口/错误与诊断.md；`commands/debug.rs`；`commands/verify.rs`
 > 摘要：按错误症状选择复现、固定编制解释、生产 bundle 重跑和回归入口
 > 代码范围：`crates/infra-cli/src/commands/{debug.rs,verify.rs,layout.rs,profile.rs}`、`crates/infra-core/src/{layout,trade,manufacture,schedule,bake}`
-> 代码锚点：`rerun_cmd`、`layout_eval_cmd`、`verify_cmd`、`run_regressions`、`assert_final_rotation_invariants`
-> 关联链路：[plan 请求](plan请求.md)、[错误与诊断](../接口/错误与诊断.md)
+> 代码锚点：`crates/infra-cli/src/commands/debug.rs::rerun_cmd`; `crates/infra-cli/src/commands/layout.rs::layout_eval_cmd`; `crates/infra-cli/src/commands/verify.rs::verify_cmd`; `crates/infra-cli/src/commands/verify.rs::run_regressions`; `crates/infra-core/src/schedule/team_rotation.rs::assert_final_rotation_invariants`
+> 关联链路：`docs/调用链/plan请求.md`; `docs/接口/错误与诊断.md`
 > 核验基线：输入级最小复现；固定 assignment；代表性 243 plan；适用时 `verify --all`
 
 ## 选择入口

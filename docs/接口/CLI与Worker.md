@@ -6,8 +6,8 @@
 > 当前真源：self
 > 摘要：定位 infra-cli 命令、常驻 Worker 方法、标准流与代码入口
 > 代码范围：`crates/infra-cli/src/main.rs`、`crates/infra-cli/src/commands/`
-> 代码锚点：`main::run`、`commands::serve_cmd`、`commands::plan_cmd`、`commands::plan_compute::compute_plan`
-> 关联链路：[plan 请求](../调用链/plan请求.md)、[错误与诊断](错误与诊断.md)、[输入输出与兼容](输入输出与兼容.md)
+> 代码锚点：`crates/infra-cli/src/main.rs::run`; `crates/infra-cli/src/commands/serve.rs::serve_cmd`; `crates/infra-cli/src/commands/plan.rs::plan_cmd`; `crates/infra-cli/src/commands/plan_compute.rs::compute_plan`
+> 关联链路：`docs/调用链/plan请求.md`; `docs/接口/错误与诊断.md`; `docs/接口/输入输出与兼容.md`
 > 核验基线：`infra-cli --help`、`infra-cli serve --help`、`cargo run -q -p infra-cli -- plan --help`
 
 本页只记录接口和模块责任。游戏机制由机制知识库提供；求解器的候选、编排和结算行为由 `infra-core` 的领域文档与代码提供。
