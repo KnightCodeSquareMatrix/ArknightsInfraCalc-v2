@@ -534,7 +534,7 @@ def check_agent_index(repo: Path) -> list[str]:
     seen_ids: set[str] = set()
     required_fields = {
         "id", "title", "symptoms", "entrypoints", "chain_doc",
-        "module_docs", "mechanics", "verification",
+        "module_docs", "mechanics", "vault_refs", "verification", "priority", "when",
     }
     for route in routes:
         route_id = route.get("id", "?")
@@ -545,7 +545,11 @@ def check_agent_index(repo: Path) -> list[str]:
         if missing:
             errors.append(f"Agent route {route_id} missing fields: {', '.join(missing)}")
             continue
-        for field in ("symptoms", "entrypoints", "module_docs", "mechanics", "verification"):
+        if not isinstance(route["priority"], int) or route["priority"] < 0:
+            errors.append(f"Agent route {route_id} priority must be a non-negative integer")
+        if not isinstance(route["when"], str) or not route["when"].strip():
+            errors.append(f"Agent route {route_id} requires a non-empty when rule")
+        for field in ("symptoms", "entrypoints", "module_docs", "mechanics", "vault_refs", "verification"):
             if not isinstance(route[field], list) or not route[field]:
                 errors.append(f"Agent route {route_id} requires non-empty list: {field}")
         for field in ("chain_doc",):
@@ -560,10 +564,22 @@ def check_agent_index(repo: Path) -> list[str]:
             for target in route.get(field, []):
                 if not (repo / target.split("#", 1)[0]).is_file():
                     errors.append(f"Agent route {route_id} points to missing {field}: {target}")
+        for target in route.get("vault_refs", []):
+            if not isinstance(target, str) or not target.startswith("docs/") or target.startswith("docs/知识库引用.md"):
+                errors.append(f"Agent route {route_id} has invalid vault reference: {target!r}")
         for entrypoint in route.get("entrypoints", []):
             source = entrypoint.split("::", 1)[0]
-            if not (repo / source).is_file():
+            source_path = repo / source
+            if not source_path.is_file():
                 errors.append(f"Agent route {route_id} points to missing entrypoint file: {entrypoint}")
+                continue
+            if "::" in entrypoint:
+                symbol = entrypoint.rsplit("::", 1)[1]
+                # This is an existence guard, not a semantic parser. It catches
+                # renamed entrypoints while leaving Rust overload/generic syntax
+                # to the compiler and human review.
+                if not re.search(rf"\b{re.escape(symbol)}\b", source_path.read_text(encoding="utf-8")):
+                    errors.append(f"Agent route {route_id} points to missing entrypoint symbol: {entrypoint}")
     return errors
 
 

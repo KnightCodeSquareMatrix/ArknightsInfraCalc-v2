@@ -35,7 +35,11 @@ def render_routes(repo: Path, registry: dict) -> str:
     ]
     for route in registry["routes"]:
         lines.extend([f"## `{route['id']}`：{route['title']}", ""])
+        lines.append(f"**优先级**：`{route['priority']}`")
+        lines.append("")
         lines.append(f"**症状**：{'、'.join(route['symptoms'])}")
+        lines.append("")
+        lines.append(f"**判别**：{route['when']}")
         lines.append("")
         lines.append("**入口**：" + "；".join(f"`{item}`" for item in route["entrypoints"]))
         lines.append("")
@@ -45,6 +49,9 @@ def render_routes(repo: Path, registry: dict) -> str:
         lines.append("")
         lines.append("**机制引用**：" + "；".join(f"[{item}]({link(repo, item.split('#', 1)[0], 'docs/生成索引/Agent路由.md')}{'#' + item.split('#', 1)[1] if '#' in item else ''})" for item in route["mechanics"]))
         lines.append("")
+        if route.get("vault_refs"):
+            lines.append("**知识库原文**：" + "；".join(f"`{item}`" for item in route["vault_refs"]))
+            lines.append("")
         lines.append("**验证**：" + "；".join(f"`{item}`" for item in route["verification"]))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
@@ -78,9 +85,14 @@ def render_code_map(repo: Path, registry: dict) -> str:
         "| 模块 | 源码入口 | 当前路由 |",
         "|---|---|---|",
     ]
-    route_text = json.dumps(registry, ensure_ascii=False)
     for module in rust_modules(repo):
-        refs = [r["id"] for r in registry["routes"] if module in route_text and any(module in x for x in r["entrypoints"])]
+        refs = []
+        for route in registry["routes"]:
+            for entrypoint in route["entrypoints"]:
+                source = entrypoint.split("::", 1)[0]
+                if module in Path(source).parts:
+                    refs.append(route["id"])
+                    break
         lines.append(f"| `{module}` | `crates/infra-core/src/{module}` | {', '.join(f'`{x}`' for x in refs) or '按 docs/模块/ 定向检索'} |")
     lines.extend(["", "## `infra-cli` 顶层命令", "", "| 命令 | dispatch | 当前路由 |", "|---|---|---|"])
     for command in cli_commands(repo):

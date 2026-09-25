@@ -2,7 +2,8 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/接口/CLI与Worker.md；docs/接口/输入输出与兼容.md；`commands/plan_compute.rs`
+> 当前真源：docs/接口/CLI与Worker.md; docs/接口/输入输出与兼容.md
+> 机制依赖：docs/知识库引用.md；vault:docs/4-排班算法/可露希尔基建终端排班机制.md；vault:docs/5-换班操作/定时换班.md
 > 摘要：沿一次 plan/plan.compute 请求定位入口、状态转换、共享求解、profile、MAA 和 advice
 > 代码范围：`crates/infra-cli/src/commands/{plan.rs,serve.rs,plan_compute.rs}`、`crates/infra-core/src/{box_profile,schedule,layout,export,training_advice}`
 > 代码锚点：`crates/infra-cli/src/main.rs::run` → `crates/infra-cli/src/commands/plan.rs::plan_cmd` / `crates/infra-cli/src/commands/serve.rs::handle_request` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan` / `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_for_plan_compute` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_inner`

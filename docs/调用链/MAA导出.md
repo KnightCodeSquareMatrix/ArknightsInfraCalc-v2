@@ -2,11 +2,12 @@
 
 > 文档角色：call-chain
 > 生命周期状态：current
-> 当前真源：docs/文档生命周期.md
+> 当前真源：docs/模块/导出与岗位状态.md
+> 机制依赖：docs/知识库引用.md；vault:docs/5-换班操作/定时换班.md
 > 摘要：沿最终轮换报告定位 MAA 写出、读回和字段责任
 > 代码范围：crates/infra-core/src/export/maa.rs、crates/infra-cli/src/commands/plan_compute.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
-> 代码锚点：build_from_team_rotation、build_plan、resolve_drones、load_maa_schedule、assignment_from_maa_plan
+> 代码锚点：`crates/infra-core/src/export/maa.rs::{build_from_team_rotation,build_plan,resolve_drones,load_maa_schedule,assignment_from_maa_plan}`
 > 关联链路：docs/调用链/定时轮换.md、docs/模块/导出与岗位状态.md
 > 核验基线：MaaSchedule、MaaScheduleImport、plans 与 shifts 数量一致
 

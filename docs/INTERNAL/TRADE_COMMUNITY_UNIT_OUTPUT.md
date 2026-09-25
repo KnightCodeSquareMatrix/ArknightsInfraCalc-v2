@@ -2,7 +2,7 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：`data/trade_shortcuts.json` 的 `unit_output` 字段及其 source/precision
+> 当前真源：docs/模块/贸易求解.md
 > 代码范围：`crates/infra-core/src/trade/{shortcut,solver,unit_output}.rs`; `data/trade_shortcuts.json`; `data/REGRESSION_CASES.csv`
 > 代码锚点：`crates/infra-core/src/trade/shortcut.rs::CommunityUnitOutputRule`; `crates/infra-core/src/trade/shortcut.rs::validate_trade_shortcuts`; `crates/infra-core/src/trade/solver.rs::resolve_unit_output`; `crates/infra-core/src/trade/unit_output.rs::{compute_unit_output,daily_yield}`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/SHORTCUT_MATCHING.md`

@@ -16,9 +16,17 @@
 | `plan`、Worker、profile、MAA 结果不一致 | [`CLI.PLAN`](生成索引/Agent路由.md) | [plan 请求](调用链/plan请求.md) → [CLI 与 Worker](接口/CLI与Worker.md) |
 | 干员被抢、体系没激活、房间不满 | [`LAYOUT.SHIFT`](生成索引/Agent路由.md) | [跨设施状态刷新](调用链/跨设施状态刷新.md) → 候选与 Plan 模块 |
 | 贸易效率、订单、shortcut 或单位产出错误 | [`SOLVER.TRADE_ROOM`](生成索引/Agent路由.md#solvertrade_room) | [技能到房间结算](调用链/技能到房间结算.md) → 贸易求解模块 |
+| 制造配方、产线、仓储或效率错误 | [`SOLVER.MANUFACTURE_ROOM`](生成索引/Agent路由.md#solvermanufacture_room) | [技能到房间结算](调用链/技能到房间结算.md) → 制造求解模块 |
+| 发电效率、无人机或电站人数错误 | [`SOLVER.POWER_ROOM`](生成索引/Agent路由.md#solverpower_room) | [技能到房间结算](调用链/技能到房间结算.md) → 心情与辅助设施 |
+| 中枢、producer/consumer 或跨房间注入错误 | [`CONTROL.CROSS_FACILITY`](生成索引/Agent路由.md#controlcross_facility) | [跨设施状态刷新](调用链/跨设施状态刷新.md) → 中枢与跨设施状态 |
+| 干员未进池、tier、设施技能或 buff_id 错误 | [`INPUT.SKILL_MAPPING`](生成索引/Agent路由.md#inputskill_mapping) | [技能到房间结算](调用链/技能到房间结算.md) → 输入与技能映射 |
+| 候选未考虑、排序/剪枝或 Bake 异常 | [`SEARCH.BAKE`](生成索引/Agent路由.md#searchbake) | [候选搜索与 Bake](调用链/候选搜索与Bake.md) → 候选搜索模块 |
+| ETA、宿舍、办公室或会客室异常 | [`MOOD.SUPPORT`](生成索引/Agent路由.md#moodsupport) | [跨设施状态刷新](调用链/跨设施状态刷新.md) → 心情与辅助设施 |
 | 班次互斥、profile、休息或绑定错误 | [`ROTATION.TIMED`](生成索引/Agent路由.md#rotationtimed) | [定时轮换](调用链/定时轮换.md) → 排班模块 |
 | MAA 字段或房间与 assignment 不同 | [`EXPORT.MAA`](生成索引/Agent路由.md#exportmaa) | [MAA 导出](调用链/MAA导出.md) → 导出接口 |
 | 线上反馈、debug bundle 或求解错误 | [`DIAGNOSTICS.DEBUG`](生成索引/Agent路由.md#diagnosticsdebug) | [debug 与验证](调用链/debug与验证.md) → 错误诊断接口 |
+| 回归 case 失败或需要保留失败证据 | [`VERIFY.REGRESSION`](生成索引/Agent路由.md#verifyregression) | [debug 与验证](调用链/debug与验证.md) → 求解错误台账 |
+| training_advice 或练卡组合说明异常 | [`ADVICE.TRAINING`](生成索引/Agent路由.md#advicetraining) | [plan 请求](调用链/plan请求.md) → 练卡推荐领域 |
 
 ## 2. 按入口阅读
 

@@ -2,7 +2,8 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/接口/错误与诊断.md；`commands/debug.rs`；`commands/verify.rs`
+> 当前真源：docs/接口/错误与诊断.md
+> 机制依赖：docs/知识库引用.md；vault:docs/1-基础设定/README.md
 > 摘要：按错误症状选择复现、固定编制解释、生产 bundle 重跑和回归入口
 > 代码范围：`crates/infra-cli/src/commands/{debug.rs,verify.rs,layout.rs,profile.rs}`、`crates/infra-core/src/{layout,trade,manufacture,schedule,bake}`
 > 代码锚点：`crates/infra-cli/src/commands/debug.rs::rerun_cmd`; `crates/infra-cli/src/commands/layout.rs::layout_eval_cmd`; `crates/infra-cli/src/commands/verify.rs::verify_cmd`; `crates/infra-cli/src/commands/verify.rs::run_regressions`; `crates/infra-core/src/schedule/team_rotation.rs::assert_final_rotation_invariants`

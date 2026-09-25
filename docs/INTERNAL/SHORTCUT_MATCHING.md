@@ -2,7 +2,7 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：`crates/infra-core/src/trade/shortcut.rs`、`segment.rs`、JSON 注册表
+> 当前真源：docs/模块/贸易求解.md
 > 代码范围：`crates/infra-core/src/trade/{shortcut,segment,solver}.rs`; `crates/infra-core/src/search/role_pick.rs`; `data/trade_{shortcuts,segments}.json`
 > 代码锚点：`crates/infra-core/src/trade/shortcut.rs::{load_trade_shortcuts,resolve_trade_shortcut,trade_station_exclusive_violation}`; `crates/infra-core/src/trade/segment.rs::{load_trade_segments,match_registered_trade_segment}`; `crates/infra-core/src/trade/solver.rs::solve_trade_with_shift_inner`; `crates/infra-core/src/search/role_pick.rs::pick_trade_role_hit`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/TRADE_COMMUNITY_UNIT_OUTPUT.md`

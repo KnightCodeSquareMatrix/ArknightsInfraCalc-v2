@@ -2,7 +2,7 @@
 
 > 文档角色：module-reference
 > 生命周期状态：current
-> 当前真源：docs/文档生命周期.md
+> 当前真源：docs/BASE_ASSIGNMENT.md
 > 摘要：说明声明式规则如何编译为 AssignmentPlan 并交给 executor
 > 代码范围：crates/infra-core/src/layout/orchestrate/、layout/assign/、data/orchestration_rules.json
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
