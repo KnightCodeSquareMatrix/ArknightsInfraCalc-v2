@@ -8,7 +8,9 @@
 > 关联链路：[`../需要完成的干员建模.md`](../需要完成的干员建模.md)、[`../MODELLED_OPERATORS.md`](../MODELLED_OPERATORS.md)
 > 核验基线：`947f1a2`
 
-本页只定义如何读生成报告。运行 `python3 scripts/audit_mechanics_registry.py` 生成 stdout；使用 `--json-output` 写入 target 产物。报告按设施、标签、runtime scope、instances binding 和 skill-table name 做 triage。
+本页只定义如何读生成报告。基线快照（需重新生成确认）为 727 条 registry 行、453 条运行时 scope 行、制造 109 条、跨设施候选 100 条、`has_atoms` 249 条、`empty_atoms` 28 条、按名称未找到 176 条。该统计描述数据快照，不是语义完成度。
+
+运行 `python3 scripts/audit_mechanics_registry.py` 生成 stdout；使用 `--json-output` 写入 target 产物。报告按设施、标签、runtime scope、instances binding 和 skill-table name 做 triage。
 
 `has_atoms`、`empty_atoms`、`not_found_by_name`、`all_bound` 都是粗粒度信号，不是语义覆盖证明：名称漂移、同名技能、buff-id-only 行、多 operator 行和 L2/L3 委托都会产生误报。任何高风险行必须回代码 owner、知识库章节和实际 fixture；不要直接把候选行写入 `skill_table.json`。
 
