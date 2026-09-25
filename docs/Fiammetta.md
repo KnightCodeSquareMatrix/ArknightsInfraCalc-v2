@@ -1,10 +1,11 @@
-# 菲亚梅塔换心情规则
+# 菲亚梅塔换心情规则（导航）
 
-> 文档角色：current-reference
+> 文档角色：compatibility-reference
 > 生命周期状态：current
-> 当前真源：docs/菲亚梅塔使用规则.md
-> 摘要：菲亚梅塔定时换班规则的兼容导航入口
+> 代码范围：crates/infra-core/src/schedule/team_rotation.rs、crates/infra-core/src/export/maa.rs
+> 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
+> 代码锚点：FiammettaShiftAction、attach_fiammetta_target_actions、resolve_scheduled_fiammetta
+> 关联链路：docs/菲亚梅塔使用规则.md、docs/调用链/定时轮换.md
+> 核验基线：TeamShiftResult.fiammetta 与 MAA Fiammetta
 
-菲亚梅塔定时换班的唯一规则见 [菲亚梅塔使用规则](菲亚梅塔使用规则.md)。本文不重复维护使用次数、班次时机、目标优先级或目标去重语义。
-
-实现责任边界：排班层生成 `TeamShiftResult.fiammetta`，MAA export 只序列化排班层已确认的动作。`fiammetta_enable` 是全局开关，不是逐班输入；完整实时心情、跨周期永续排班、Mower 动态换班和宿舍槽位模拟不属于当前规则范围。
+规则唯一 owner 是菲亚梅塔使用规则。本页只说明责任边界：排班层决定动作，MAA export 序列化动作。fiammetta_enable 是全局开关，不是每班输入。实时心情、Mower 动态换班和跨周期永续不属于当前实现。

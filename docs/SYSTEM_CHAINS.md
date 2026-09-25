@@ -1,19 +1,22 @@
 # 基建体系链入口
 
-> 文档角色：current-reference
+> 文档角色：index-reference
 > 生命周期状态：current
-> 当前真源：docs/公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md；docs/公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md；docs/公孙长乐的体系分析文档/RED_PINE_FOREST_CHAIN.md；docs/公孙长乐的体系分析文档/RHINE_LAB_CHAIN.md
-> 摘要：导航已确认的具名体系 canonical 文档
+> 代码范围：data/orchestration_rules.json、crates/infra-core/src/layout/orchestrate/、global_resource/
+> 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
+> 代码锚点：build_plan、execute_plan、AssignmentPlan.resolved_producer_dependencies
+> 关联链路：docs/ORCHESTRATION_LAYER.md、docs/BASE_ASSIGNMENT.md、docs/FIREWORKS.md
+> 核验基线：知识库 canonical 章节与 runtime capability 映射
 
-本文只提供体系入口，不复制激活条件、成员规则、效率锚点、priority、降级或当前实现状态。所有规范性事实由对应体系 canonical 文档裁决。
+本文只做导航，不复制机制、成员、倍率、优先级或历史路线图。每条机制先查隔壁知识库 canonical，再沿 runtime capability 和 Plan/Execute 定位代码。
 
-| 体系 | Canonical owner | 当前实现入口 |
+| 链路 | 机制真源 | 实现入口 |
 |---|---|---|
-| 迷迭香感知体系 | [迷迭香感知链](公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md) | `data/orchestration_rules.json`、`layout/orchestrate/`、`global_resource/` |
-| 自动化组 | [自动化组](公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md) | `data/orchestration_rules.json`、`layout/orchestrate/`、`manufacture/`、`power/` |
-| 红松林 | [红松林](公孙长乐的体系分析文档/RED_PINE_FOREST_CHAIN.md) | `data/orchestration_rules.json`、`layout/orchestrate/`、`manufacture/` |
-| 莱茵 | [莱茵体系](公孙长乐的体系分析文档/RHINE_LAB_CHAIN.md) | `data/orchestration_rules.json`、`layout/orchestrate/`、`manufacture/`、`power/` |
+| 迷迭香/感知 | 隔壁知识库 canonical | data/orchestration_rules.json、layout/orchestrate/、global_resource/ |
+| 自动化/制造 | 隔壁知识库 canonical | layout/orchestrate/、manufacture/、power/ |
+| 红松林 | 隔壁知识库 canonical | layout/orchestrate/、manufacture/ |
+| 莱茵 | 隔壁知识库 canonical | layout/orchestrate/、manufacture/、power/ |
+| 人间烟火 | 隔壁知识库 canonical | trade/interpreter.rs、schedule/shift_bind.rs、FIREWORKS.md |
+| 贸易 core/producer | 隔壁知识库 canonical | layout/assign/trade_fill.rs、trade/、layout/orchestrate/ |
 
-人间烟火是独立全局资源链，见 [FIREWORKS.md](FIREWORKS.md)。贸易 required core 和完整进驻编排分别见 [BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md) 与 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)。
-
-2026-07-12 至 2026-07-14 的旧实现审计已移入 [ARCHIVE/audits/](ARCHIVE/audits/)，只用于追溯，不能覆盖上述 current owner。
+统一排查顺序：知识库章节 → runtime capability → data rule/alternative → build_plan → execute_plan → facility fill/resolve_base → schedule shift_bind/rotation → export。规则与代码冲突时，先记录 source/version/gap 到 docs/知识库引用.md，再分别修桥接和实现文档。

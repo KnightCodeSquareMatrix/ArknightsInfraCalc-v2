@@ -1,78 +1,13 @@
-# 人间烟火排班规则
+# 人间烟火排班链
 
-> 文档角色：canonical
+> 文档角色：system-bridge
 > 生命周期状态：current
-> 领域键：system.fireworks
-> 当前真源：self
-> 摘要：裁决人间烟火全局资源链的激活与结算边界
+> 代码范围：crates/infra-core/src/trade/interpreter.rs、schedule/team_rotation.rs、schedule/shift_bind.rs
+> 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
+> 代码锚点：human_fireworks capability、runtime shift bind、办公室绑定补位
+> 关联链路：docs/SYSTEM_CHAINS.md、docs/模块/排班与轮换.md
+> 核验基线：实际 provider/consumer presence 与 shift bind
 
-> 本文为人间烟火体系审计的仓库内真源。完整机制以用户提供的
-> `FIREWORKS.md` 为基础；用户裁决内容优先于旧实现。
+机制阈值和倍率引用隔壁知识库；本页只写 solver 如何消费 capability。Plan 先产生实际 provider、consumer 和办公室 producer presence；shift_bind 只绑定实际贡献成员，不能按拥有名单或 tag 预绑定。ABC 中绑定组同上同下，绑定办公室成员从 shared scaffold 排除，休息班再从合法未占候选按 ETA/效率补位。MAA 只导出最终 assignment。
 
-## 核心目标
-
-人间烟火自动排班的核心消费方是贸易站乌有。黍、截云、铎铃以及训练室、会客室挂件不作为自动启用该体系的主要目标。
-
-## 已确认分支
-
-人间烟火有两个互斥的排班分支，最低成员要求不同。
-
-### 不启用感知信息
-
-```text
-贸易站：乌有
-办公室：桑葚
-中枢：重岳或令至少一人
-```
-
-该分支的最低核心是乌有、桑葚，以及重岳/令二选一。
-
-### 全图鉴且启用感知信息
-
-```text
-贸易站：乌有
-中枢：重岳、令
-```
-
-该分支的最低核心是乌有、重岳、令三人。感知信息仍是主体系，人间烟火作为同班附带体系启用。
-
-## 轮换
-
-每个分支内的中枢 producer、贸易消费方和办公室 producer 必须同上同下。绑定必须由排班计划保证，不能只检查账号持有，也不能依赖队伍切分结果碰巧同班。
-
-公孙长乐提供的人工体系赋值不进入自动排班评分；合法组合内的具体候选继续使用已建模的实际效率自然搜索。
-
-人间烟火是全基建共享读取状态。乌有、截云等多个 consumer 各自读取同一份全量值，
-互不扣减；不得通过全局 conversion 把烟火消耗成巫术结晶。consumer 的换算由各自
-房间技能直接完成。
-
-## 心情阈值
-
-令与夕的状态边界为：
-
-```text
-令：mood > 12 时提供人间烟火；mood <= 12 时提供感知信息
-夕：mood >= 12 时提供感知信息；mood < 12 时提供人间烟火
-```
-
-夕在 `mood == 12` 的阈值瞬间归入感知信息分支。
-
-## 当前实现状态
-
-已实现：
-
-- 令、夕在 `12` 点心情边界的机制条件；
-- ABC 三班内令、夕的最小心情状态传播；
-- 从 peak 最终实际编制派生人间烟火跨设施轮换绑定；
-- 未形成实际消费链时不虚构 producer 或体系收益。
-- 纯分支以通用 `required_count=1` 中枢候选约束表达“重岳/令至少一人”，由实际
-  solver 在合法组合中选择，不使用 `pick_one` 列表顺序；
-- 感知分支以 `required_count=2` 硬保证重岳、令同时实际进编，并与乌有绑定；
-- 桑葚 E0/E1/E2 分别使用真实的 `+10`、`+20`、`+20 + 烟火` 技能映射；
-  E2 在三级办公室按 `(level - 1) * 10` 产生 20 点人间烟火；
-- 实际绑定的办公室成员不进入 shared 脚手架，而是随消费方 cohort 上二休一；
-  休息班从未占用的合法办公室候选中按实际办公室效率补位，办公室不空转。
-- 普通未绑定办公室成员在满足心情上限时尽量跨班复用，不能因为无绑定就强制每班换人；
-  额外消耗成员仍须同时满足当前班次和完整轮换累计工作时长。
-
-MAA 只导出 schedule 已决定的最终 assignment，不重新解释烟火分支或心情阈值。
+未形成实际消费链时，不写 producer dependency，不占中枢或办公室固定岗位。收益缺失时按 provider presence → consumer presence → resolved_producer_dependencies → shift_bind → final assignment 排查。机制真源变化时先更新知识库桥接，再更新 runtime 映射和本页锚点。
