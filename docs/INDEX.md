@@ -71,20 +71,20 @@
 | `architecture.cli` | [infra-cli 模块职责与命令地图](INFRA_CLI.md) |
 | `docs.knowledge-bridge` | [游戏机制知识库引用合同](知识库引用.md) |
 | `docs.lifecycle` | [文档生命周期与 Agent 维护规则](文档生命周期.md) |
-| `facility.control-assignment` | [控制中枢排班规则](CONTROL_CENTER_ASSIGNMENT.md) |
-| `facility.manufacture` | [制造站域状态](MANUFACTURE_STATUS.md) |
+| `facility.control-assignment` | [控制中枢编制与效果账本](CONTROL_CENTER_ASSIGNMENT.md) |
+| `facility.manufacture` | [制造站求解状态](MANUFACTURE_STATUS.md) |
 | `interface.cli-worker` | [CLI 与 Worker 接口入口](接口/CLI与Worker.md) |
 | `interface.errors` | [接口错误与诊断](接口/错误与诊断.md) |
 | `interface.frontend-cli` | [前端与 `plan.compute` 对接](FRONTEND_CLI.md) |
 | `interface.input-output` | [输入、输出与兼容契约](接口/输入输出与兼容.md) |
-| `mechanics.effect-atom` | [EffectAtom 设计文档](EFFECT_ATOM_DESIGN.md) |
-| `production.drones` | [无人机生成、分配与产出结算](DRONES.md) |
+| `mechanics.effect-atom` | [EffectAtom 机制解释分层](EFFECT_ATOM_DESIGN.md) |
+| `production.drones` | [发电与无人机结算](DRONES.md) |
 | `schedule.fiammetta` | [菲亚梅塔使用规则](菲亚梅塔使用规则.md) |
 | `schedule.fiammetta-candidates` | [菲亚梅塔候选分支适配层设计](菲亚梅塔候选分支适配层设计.md) |
 | `schedule.mode` | [排班模式](排班模式.md) |
 | `schedule.timed` | [定时换班](定时换班.md) |
-| `scoring.efficiency` | [直接效率与整数结算架构](EFFICIENCY_MODEL.md) |
-| `scoring.policy` | [评分口径审计](SCORING_MODEL.md) |
+| `scoring.efficiency` | [直接效率与整数结算](EFFICIENCY_MODEL.md) |
+| `scoring.policy` | [搜索评分与排序策略](SCORING_MODEL.md) |
 | `system.automation-group` | [自动化组体系论证（公孙长乐 × InfraCalc）](公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md) |
 | `system.red-pine-forest` | [红松林体系论证（公孙长乐 × InfraCalc）](公孙长乐的体系分析文档/RED_PINE_FOREST_CHAIN.md) |
 | `system.rhine-lab` | [莱茵生命体系论证（公孙长乐 × InfraCalc）](公孙长乐的体系分析文档/RHINE_LAB_CHAIN.md) |
