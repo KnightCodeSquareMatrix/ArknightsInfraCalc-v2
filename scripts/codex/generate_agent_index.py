@@ -50,7 +50,7 @@ def render_routes(repo: Path, registry: dict) -> str:
         lines.append("**机制引用**：" + "；".join(f"[{item}]({link(repo, item.split('#', 1)[0], 'docs/生成索引/Agent路由.md')}{'#' + item.split('#', 1)[1] if '#' in item else ''})" for item in route["mechanics"]))
         lines.append("")
         if route.get("vault_refs"):
-            lines.append("**知识库原文**：" + "；".join(f"`{item}`" for item in route["vault_refs"]))
+            lines.append(f"**知识库原文（vault @ {registry['vault_commit']}）**：" + "；".join(f"`{item}`" for item in route["vault_refs"]))
             lines.append("")
         lines.append("**验证**：" + "；".join(f"`{item}`" for item in route["verification"]))
         lines.append("")

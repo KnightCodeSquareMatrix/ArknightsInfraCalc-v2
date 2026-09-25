@@ -23,7 +23,7 @@
 
 **机制引用**：[docs/知识库引用.md#solver-文档的引用格式](../知识库引用.md#solver-文档的引用格式)
 
-**知识库原文**：`docs/4-排班算法/可露希尔基建终端排班机制.md`；`docs/5-换班操作/定时换班.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/4-排班算法/可露希尔基建终端排班机制.md`；`docs/5-换班操作/定时换班.md`
 
 **验证**：`infra-cli plan --operbox <path> --profile-out out/<task>-profile.json --maa-out out/<task>-maa.json`
 
@@ -43,7 +43,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/基建总览.md`；`docs/3-组合库/组合注册表.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/基建总览.md`；`docs/3-组合库/组合注册表.md`
 
 **验证**：`infra-cli layout test --layout <path> --operbox <path>`
 
@@ -63,7 +63,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/贸易站机制.md`；`docs/2-干员技能/技能-贸易站.md`；`docs/2-干员技能/释义/特别订单.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/贸易站机制.md`；`docs/2-干员技能/技能-贸易站.md`；`docs/2-干员技能/释义/特别订单.md`
 
 **验证**：`infra-cli verify --all`；`infra-cli trade yield <fixture>`
 
@@ -83,7 +83,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/5-换班操作/定时换班.md`；`docs/1-基础设定/设施与进驻/心情与宿舍.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/5-换班操作/定时换班.md`；`docs/1-基础设定/设施与进驻/心情与宿舍.md`
 
 **验证**：`infra-cli layout team-rotation --layout <path> --operbox <path> --json`
 
@@ -103,7 +103,7 @@
 
 **机制引用**：[docs/知识库引用.md#唯一边界](../知识库引用.md#唯一边界)
 
-**知识库原文**：`docs/5-换班操作/定时换班.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/5-换班操作/定时换班.md`
 
 **验证**：`infra-cli plan --operbox <path> --maa-out out/<task>-maa.json`
 
@@ -123,7 +123,7 @@
 
 **机制引用**：[docs/知识库引用.md#不可混淆的四种内容](../知识库引用.md#不可混淆的四种内容)
 
-**知识库原文**：`docs/1-基础设定/README.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/README.md`
 
 **验证**：`infra-cli debug rerun --bundle <debug-bundle.json>`
 
@@ -143,7 +143,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/制造站机制.md`；`docs/2-干员技能/技能-制造站.md`；`docs/1-基础设定/资源体系/产出常数表.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/制造站机制.md`；`docs/2-干员技能/技能-制造站.md`；`docs/1-基础设定/资源体系/产出常数表.md`
 
 **验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli plan --assert-invariants`
 
@@ -163,7 +163,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/发电站机制.md`；`docs/2-干员技能/技能-发电站.md`；`docs/1-基础设定/设施与进驻/心情与宿舍.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/发电站机制.md`；`docs/2-干员技能/技能-发电站.md`；`docs/1-基础设定/设施与进驻/心情与宿舍.md`
 
 **验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli plan --assert-invariants`
 
@@ -183,7 +183,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/控制中枢机制.md`；`docs/3-组合库/组合注册表.md`；`docs/3-组合库/跨设施体系/自动化组.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/控制中枢机制.md`；`docs/3-组合库/组合注册表.md`；`docs/3-组合库/跨设施体系/自动化组.md`
 
 **验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli plan --assert-invariants`
 
@@ -203,7 +203,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/2-干员技能/README.md`；`docs/2-干员技能/名册.md`；`docs/1-基础设定/设施与进驻/基建总览.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/2-干员技能/README.md`；`docs/2-干员技能/名册.md`；`docs/1-基础设定/设施与进驻/基建总览.md`
 
 **验证**：`infra-cli layout eval --explain-json <args>`；`python3 scripts/audit_mechanics_registry.py`
 
@@ -223,7 +223,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/基建总览.md`；`docs/3-组合库/组合注册表.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/基建总览.md`；`docs/3-组合库/组合注册表.md`
 
 **验证**：`infra-cli bake validate <args>`；`infra-cli bake verify <args>`；`infra-cli plan --assert-invariants`
 
@@ -243,7 +243,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/1-基础设定/设施与进驻/心情与宿舍.md`；`docs/1-基础设定/设施与进驻/办公室机制.md`；`docs/1-基础设定/设施与进驻/会客室机制.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/心情与宿舍.md`；`docs/1-基础设定/设施与进驻/办公室机制.md`；`docs/1-基础设定/设施与进驻/会客室机制.md`
 
 **验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli layout team-rotation --assert-invariants <args>`
 
@@ -263,7 +263,7 @@
 
 **机制引用**：[docs/知识库引用.md#不可混淆的四种内容](../知识库引用.md#不可混淆的四种内容)
 
-**知识库原文**：`docs/1-基础设定/README.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/README.md`
 
 **验证**：`infra-cli verify --all`；`infra-cli debug rerun --bundle <debug-bundle.json>`
 
@@ -283,7 +283,7 @@
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
-**知识库原文**：`docs/2-干员技能/README.md`；`docs/3-组合库/组合总览.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/2-干员技能/README.md`；`docs/3-组合库/组合总览.md`
 
 **验证**：`infra-cli plan --operbox <path> --maa-out out/<task>-maa.json`；`infra-cli serve`
 
@@ -303,6 +303,6 @@
 
 **机制引用**：[docs/知识库引用.md#不可混淆的四种内容](../知识库引用.md#不可混淆的四种内容)
 
-**知识库原文**：`docs/1-基础设定/README.md`
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/README.md`
 
 **验证**：`infra-cli debug rerun --bundle <debug-bundle.json>`；`python3 scripts/codex/check_repository_facts.py`

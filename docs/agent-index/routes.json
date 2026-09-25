@@ -478,5 +478,6 @@
       "priority": 40,
       "when": "需要记录失败证据、按 solver 指纹检索或复现线上 bundle 时选择。"
     }
-  ]
+  ],
+  "vault_commit": "977b6ab0cc0430053194f269d7b3ee0242e7be48"
 }

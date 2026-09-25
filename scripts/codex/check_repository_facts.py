@@ -519,6 +519,9 @@ def check_agent_index(repo: Path) -> list[str]:
         return [f"invalid Agent route registry: {error}"]
     if registry.get("schema") != 1:
         errors.append(f"unsupported Agent route registry schema: {registry.get('schema')!r}")
+    vault_commit = registry.get("vault_commit", "")
+    if not isinstance(vault_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", vault_commit):
+        errors.append("Agent route registry requires a 40-character lowercase vault_commit")
     routes = registry.get("routes")
     if not isinstance(routes, list):
         return errors + ["Agent route registry routes must be a list"]
