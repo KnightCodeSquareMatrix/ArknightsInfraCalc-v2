@@ -2,6 +2,8 @@
 
 > 文档角色：call-chain
 > 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：沿最终轮换报告定位 MAA 写出、读回和字段责任
 > 代码范围：crates/infra-core/src/export/maa.rs、crates/infra-cli/src/commands/plan_compute.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：build_from_team_rotation、build_plan、resolve_drones、load_maa_schedule、assignment_from_maa_plan

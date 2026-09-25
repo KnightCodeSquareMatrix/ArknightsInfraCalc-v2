@@ -2,7 +2,9 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 当前真源：`crates/infra-core/src/manufacture/`、`search/manufacture.rs`；游戏规则见 [`知识库引用.md`](知识库引用.md)
+> 领域键：facility.manufacture
+> 当前真源：self
+> 摘要：裁决制造站输入、阶段解释、产线聚合、仓储和班次心情结算边界。
 > 代码范围：`crates/infra-core/src/manufacture/{input,interpreter,solver}.rs`; `pool/manufacture.rs`; `search/manufacture.rs`; `layout/assign/manufacture_fill.rs`; `data/prts_manufacturing_skills.json`
 > 代码锚点：`manufacture/interpreter.rs::apply_manu_phases`; `manufacture/solver.rs::{solve_manufacture,solve_manufacture_with_shift,evaluate_manufacture_lines}`; `search/manufacture.rs::search_manufacture_triples`; `pool/manufacture.rs::build_manufacture_pool`; `layout/assign/manufacture_fill.rs::assign_manu_room_with_anchors`
 > 关联链路：[`模块/制造求解.md`](模块/制造求解.md)、[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)

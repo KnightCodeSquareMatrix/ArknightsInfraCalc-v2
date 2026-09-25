@@ -2,7 +2,8 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：`pool`、`search`、`bake.rs`；排序分类见 [`SCORING_MODEL.md`](../SCORING_MODEL.md)
+> 当前真源：docs/文档生命周期.md
+> 摘要：定位候选池、Plan 门禁、域搜索、排序与 Bake 回退的完整链路。
 > 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
 > 代码锚点：`pool/base.rs::{build_roster_pool,filter_pool}`; `search/{trade,manufacture,control,power,joint_trade}.rs`; `bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}`
 > 关联链路：[`调用链/技能到房间结算.md`](../调用链/技能到房间结算.md)、[`调用链/跨设施状态刷新.md`](../调用链/跨设施状态刷新.md)

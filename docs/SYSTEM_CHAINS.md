@@ -2,6 +2,8 @@
 
 > 文档角色：index-reference
 > 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：导航已注册体系 capability、Plan 和运行时 owner，不复制机制正文
 > 代码范围：data/orchestration_rules.json、crates/infra-core/src/layout/orchestrate/、global_resource/
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：build_plan、execute_plan、AssignmentPlan.resolved_producer_dependencies

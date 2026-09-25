@@ -12,7 +12,7 @@
 
 本文面向想真正理解 ArknightsInfraCalc v2 的策略作者、开发者和 AI 协作者。它解释当前实现如何把一份练度盒和一张基建蓝图，变成可结算的单班编制、具名 timed rotation 和 MAA JSON。
 
-如果只想先知道项目有什么用，读 [README](../README.md)；遇到陌生名词时查 [GLOSSARY](GLOSSARY.md)。文件级代码地图见 [PROJECT_MAP](PROJECT_MAP.md)。
+如果只想先知道项目有什么用，读 [README](../README.md)；遇到陌生名词时查 [GLOSSARY](GLOSSARY.md)。文件级代码地图见 [PROJECT_MAP](PROJECT_MAP.md)。遇到具体症状时，Agent 应先查 [INDEX](INDEX.md) 和 [Agent 路由](生成索引/Agent路由.md)，再进入对应 `docs/调用链/`；游戏机制正文只从 [知识库引用合同](知识库引用.md) 跳转。
 
 ## 1. 它实际上在求解什么
 

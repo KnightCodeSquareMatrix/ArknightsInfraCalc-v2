@@ -1242,7 +1242,7 @@ Phase 0B 已完成首个静态 preflight 工具：
 
 已完成本地环境探针，范围严格为命令发现和 SDK import：不启动 runtime、不联网、不读取私有输入、不写入项目工作树。
 
-报告：[runtime-adapter-probe.json](../target/codex-runs/harness-phase0c/runtime-adapter-probe.json)
+报告：`target/codex-runs/harness-phase0c/runtime-adapter-probe.json`（本地证据，缺失时以当前重新运行结果为准）
 
 当前事实：
 
@@ -1270,8 +1270,8 @@ evidence-entry         luna-extractor  succeeded
 
 wave 结果 artifact：
 
-- [research-wave-0c-join.md](../target/codex-runs/harness-phase0c/reports/research-wave-0c-join.md)
-- [research-wave-0c 计划](../target/codex-runs/harness-phase0c/research-wave-0c.json)
+- `target/codex-runs/harness-phase0c/reports/research-wave-0c-join.md`（本地证据）
+- `target/codex-runs/harness-phase0c/research-wave-0c.json`（本地证据）
 
 三个 child 均遵守公开只读范围并返回了文件/行号、claims、unknowns 和 negative evidence。join 没有通过，而是被正确标记为 `blocked`，原因是 cross-facility 调查发现当前文档与代码存在未裁决冲突：Global atom 的 per-room 语义、StateConvert 扣回、FacilityLevel selector 扣回和 P2/P3 迁移状态。
 
@@ -1288,7 +1288,7 @@ overall = blocked
 
 ### 14.14 Cross-facility 只读审计结果
 
-有界审计已完成，报告保存在 [cross-facility-audit.md](../target/codex-runs/harness-phase0c/reports/cross-facility-audit.md)。审计确认：
+有界审计已完成，报告保存在 `target/codex-runs/harness-phase0c/reports/cross-facility-audit.md`（本地证据）。审计确认：
 
 - manufacture 和 trade interpreter 都没有按 `AtomScope` 跳过 Global atom；
 - Global `StateConvert` 如果未来被标记为 Global，可能先由 cross-facility 执行，再由 room interpreter 执行，且当前扣回只覆盖部分 `StateProduce`；
@@ -1361,7 +1361,7 @@ cross       succeeded
 evidence    succeeded
 ```
 
-报告：[opencode-plan-wave-join.md](../target/codex-runs/harness-phase0c/reports/opencode-plan-wave-join.md)
+报告：`target/codex-runs/harness-phase0c/reports/opencode-plan-wave-join.md`（本地证据）
 
 已验证：OpenCode CLI subprocess 可作为外部 adapter，支持三路独立 JSON event stream 和只读结果返回。
 未验证：项目 subagent profile 直接透传、child session resume/cancel、外部 SDK import 和领域语义结论。

@@ -2,6 +2,8 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：提供排班轮换的短入口、profile 表和完整调用链链接
 > 代码范围：crates/infra-core/src/schedule/team_rotation.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：TimedRotationProfile、schedule_timed_rotation、TeamRotationReport

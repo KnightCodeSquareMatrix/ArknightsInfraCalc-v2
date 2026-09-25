@@ -2,6 +2,8 @@
 
 > 文档角色：system-bridge
 > 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：说明人间烟火 capability 在求解器中的 provider、consumer 和跨班绑定责任
 > 代码范围：crates/infra-core/src/trade/interpreter.rs、schedule/team_rotation.rs、schedule/shift_bind.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：human_fireworks capability、runtime shift bind、办公室绑定补位

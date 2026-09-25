@@ -79,7 +79,7 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 是否通过 evidence 工具记录由任务风险决定。
 - Agent memory 只能记录可丢弃的检索提示与协作偏好；领域语义、当前实现、架构决策和活动任务必须落在版本化 canonical、ADR 或 change 文档中，memory 不得成为真源。
 - 当前任务拥有 TODO、计划、change 或文档治理迁移时，生命周期语义唯一以 `docs/文档生命周期.md` 为准；`.agents/skills/_shared/CHANGE_LIFECYCLE.md` 只提供执行入口。完成时吸收 current facts、拆分开放项、自动归档并更新索引和引用。
-- 代码变化不自动要求文档变化；只在行为语义、接口、持久决策或活动任务状态改变时更新最近的 owner。不得维护摘要复核传播或全仓 docs-impact 声明。
+- 代码变化不要求全仓文档传播，但入口、状态写入、分支/fallback、错误、输出、机制映射和保证等级变化必须按 [`docs/文档生命周期.md`](docs/文档生命周期.md) 复核对应模块页、调用链页、接口页和 route registry；纯内部重构若锚点与行为仍成立，明确记录“已复核无需正文修改”。作者声明行为触点，不能只依赖路径映射；不得维护无边界的全仓摘要复核传播。
 - 新增面向人类阅读的文档时优先使用清晰的中文文件名；协议固定名、工具约定、代码生成物或外部兼容路径可保留英文。不要仅为改名批量移动现有文档。
 - 新建或恢复 `docs/TODO/` 任务时遵循 `docs/文档生命周期.md`；`docs/TODO/README.md` 只是生成的活动入口，不另行裁决状态。
 
@@ -150,3 +150,10 @@ bootstrap_context → classify_task → route_domain_owner → plan / plan-revie
 - 办公室选人由办公室模块按自身效率规则决定，候选池必须来自主路径当前 assignment 的统一裁剪结果。
 - 未来允许增加专门的办公室 fallback 池；当前 fallback 池为空实现，未启用。
 - fallback 池不得通过静默回读全 roster 扩大候选集合；池子耗尽或状态不一致继续 fail-fast。
+
+### Agent 文档定位入口
+
+- 文档首读是 [`docs/INDEX.md`](docs/INDEX.md)，按症状进入生成的 Agent 路由；任务分类和 Skill 仍只看本文。
+- 完整调用链必须读取 `docs/调用链/`，模块责任和代码锚点读取 `docs/模块/`，协议与字段读取 `docs/接口/`。
+- 游戏机制不在本仓复制；先读 [`docs/知识库引用.md`](docs/知识库引用.md)，再进入固定版本的 `arknights-base-vault` 具体章节。知识库草稿和旧 solver 镜像不能升级为当前事实。
+- 修改调用入口、状态传播、轮换/导出、机制映射或搜索保证时，同一变更复核关联文档并运行：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。

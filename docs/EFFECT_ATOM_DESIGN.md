@@ -2,7 +2,9 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 当前真源：`crates/infra-core/src/types.rs`、各域 interpreter 与 `data/skill_table.json`；游戏机制见 [`知识库引用.md`](知识库引用.md)
+> 领域键：mechanics.effect-atom
+> 当前真源：self
+> 摘要：定义 EffectAtom 的 L1/L2/L3 分层、phase/scope 语义和机制知识库的映射边界。
 > 代码范围：`crates/infra-core/src/types.rs`; `skill_table.rs`; `pool/{trade,manufacture,control,power}.rs`; `trade/interpreter.rs`; `manufacture/interpreter.rs`; `control/interpreter.rs`; `cross_facility/interpreter.rs`; `data/skill_table.json`
 > 代码锚点：`types.rs::{Phase,Selector,Condition,Action,AtomScope,EffectAtom,CompiledAtom}`; `skill_table.rs::SkillTable::load`; `trade/interpreter.rs::apply_trade_phases`; `manufacture/interpreter.rs::apply_manu_phases`; `control/interpreter.rs::solve_control_with_trace`; `cross_facility/interpreter.rs::orchestrate_global_atoms`
 > 关联链路：[`模块/输入与技能映射.md`](模块/输入与技能映射.md)、[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`模块/中枢与跨设施状态.md`](模块/中枢与跨设施状态.md)

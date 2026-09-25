@@ -54,7 +54,7 @@ runtime data + operbox + BaseBlueprint
 
 这里有一条重要边界：shortcut 负责“这个实际组合怎样结算”，不能代替“谁必须进编”；`shift_bind` 负责已入选成员怎样同上同下，也不能代替 required anchor。正因为这些责任被分开，项目才能同时容纳硬体系和自然搜索。
 
-更完整的运行说明见 [docs/OVERVIEW.md](docs/OVERVIEW.md)，术语见 [docs/GLOSSARY.md](docs/GLOSSARY.md)。
+Agent 首先按症状读取 [docs/INDEX.md](docs/INDEX.md) 和生成的 [Agent 路由](docs/生成索引/Agent路由.md)；游戏机制通过 [知识库引用合同](docs/知识库引用.md) 跳转到固定版本的相邻知识库。人类读者仍可从 [docs/OVERVIEW.md](docs/OVERVIEW.md) 和 [docs/GLOSSARY.md](docs/GLOSSARY.md) 开始。
 
 ## 直接运行一套真实方案
 
@@ -124,13 +124,14 @@ cargo run -q -p infra-cli -- bake validate
 | 你是谁 / 想做什么 | 入口 |
 |-------------------|------|
 | 第一次了解项目 | [docs/OVERVIEW.md](docs/OVERVIEW.md) → [docs/GLOSSARY.md](docs/GLOSSARY.md) |
-| 想沿一次真实请求看代码 | [docs/ARCHITECTURE_TOUR.md](docs/ARCHITECTURE_TOUR.md)、[docs/EXAMPLES/243_FULL_E2.md](docs/EXAMPLES/243_FULL_E2.md) |
+| Agent 按症状定位问题 | [docs/INDEX.md](docs/INDEX.md) → [Agent 路由](docs/生成索引/Agent路由.md) → `docs/调用链/` |
+| 想沿一次真实请求看代码 | [docs/调用链/plan请求.md](docs/调用链/plan请求.md)、[docs/EXAMPLES/243_FULL_E2.md](docs/EXAMPLES/243_FULL_E2.md) |
 | 懂基建策略，不关心代码 | [docs/GONGSUN_RUNTIME_OVERVIEW.md](docs/GONGSUN_RUNTIME_OVERVIEW.md) |
-| 想运行 CLI 或接前端 | [docs/INFRA_CLI.md](docs/INFRA_CLI.md)、[docs/FRONTEND_CLI.md](docs/FRONTEND_CLI.md) |
+| 想运行 CLI 或接前端 | [docs/接口/CLI与Worker.md](docs/接口/CLI与Worker.md)、[docs/接口/输入输出与兼容.md](docs/接口/输入输出与兼容.md) |
 | 想判断结果或性能是否可信 | [docs/QUALITY_AND_AUDIT.md](docs/QUALITY_AND_AUDIT.md)、[docs/PERFORMANCE_ENGINEERING.md](docs/PERFORMANCE_ENGINEERING.md) |
-| 想理解机制建模 | [docs/EFFECT_ATOM_DESIGN.md](docs/EFFECT_ATOM_DESIGN.md)、[docs/EFFICIENCY_MODEL.md](docs/EFFICIENCY_MODEL.md) |
-| 想理解编排与轮换 | [docs/BASE_ASSIGNMENT.md](docs/BASE_ASSIGNMENT.md)、[docs/排班模式.md](docs/排班模式.md)、[docs/SCHEDULE_ROTATION.md](docs/SCHEDULE_ROTATION.md) |
-| 想修 bug / 审计体系 | [AGENTS.md](AGENTS.md)、[docs/MAINTENANCE_MODE.md](docs/MAINTENANCE_MODE.md)、[docs/SYSTEM_AUDIT_WORKFLOW.md](docs/SYSTEM_AUDIT_WORKFLOW.md) |
+| 想理解机制映射 | [docs/知识库引用.md](docs/知识库引用.md) → [输入与技能映射](docs/模块/输入与技能映射.md) |
+| 想理解编排与轮换 | [排班与轮换](docs/模块/排班与轮换.md)、[定时轮换调用链](docs/调用链/定时轮换.md) |
+| 想修 bug / 审计体系 | [AGENTS.md](AGENTS.md)、[错误与诊断](docs/接口/错误与诊断.md)、[docs/QUALITY_AND_AUDIT.md](docs/QUALITY_AND_AUDIT.md) |
 | 想查文件和模块 | [docs/INDEX.md](docs/INDEX.md)、[docs/PROJECT_MAP.md](docs/PROJECT_MAP.md) |
 
 ## 明确的非目标

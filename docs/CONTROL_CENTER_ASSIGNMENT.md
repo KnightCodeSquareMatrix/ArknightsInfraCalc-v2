@@ -2,7 +2,9 @@
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 当前真源：`crates/infra-core/src/control/`、`search/control.rs`、`layout/assign/control_fill.rs`；游戏机制见 [`知识库引用.md`](知识库引用.md)
+> 领域键：facility.control-assignment
+> 当前真源：self
+> 摘要：说明控制中枢的 required anchor、顺序选位、EffectLedger 和全局注入责任边界。
 > 代码范围：`crates/infra-core/src/control/{input,interpreter,ledger,mod}.rs`; `search/control.rs`; `pool/control.rs`; `layout/assign/{control_fill,pipeline}.rs`; `global_resource/inject.rs`
 > 代码锚点：`control/interpreter.rs::{solve_control,solve_control_with_trace}`; `control/ledger.rs::ControlEffectLedger`; `control/mod.rs::apply_control_to_layout_with_trace`; `search/control.rs::search_control_combos`; `layout/assign/control_fill.rs::assign_control`; `layout/assign/pipeline.rs::run_shift_pipeline`
 > 关联链路：[`模块/中枢与跨设施状态.md`](模块/中枢与跨设施状态.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)、[`模块/候选搜索与Bake.md`](模块/候选搜索与Bake.md)

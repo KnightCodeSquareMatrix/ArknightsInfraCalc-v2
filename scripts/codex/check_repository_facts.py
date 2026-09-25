@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import docs_inventory
+import generate_agent_index
 from check_feedback_evidence import check_tracking
 
 
@@ -26,9 +27,9 @@ PROJECT_MAP_RETRIEVAL_FACTS = (
 
 
 INDEX_RETRIEVAL_FACTS = (
-    "[制造站](MANUFACTURE_STATUS.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
-    "[控制中枢](CONTROL_CENTER_ASSIGNMENT.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
-    "[前端接口](FRONTEND_CLI.md) → [项目地图 Owner 查询](PROJECT_MAP.md#常见-owner-查询)",
+    "[Agent 路由](生成索引/Agent路由.md)",
+    "[知识库引用合同](知识库引用.md)",
+    "[生成代码与文档地图](生成索引/代码与文档地图.md)",
 )
 
 
@@ -456,12 +457,11 @@ def check_navigation_contract(repo: Path) -> list[str]:
     if "本文不维护第二份分类表" not in index_text:
         errors.append("INDEX.md does not defer task classification to AGENTS.md")
     expected_sections = [
-        "## 1. 开始",
-        "## 2. 使用与集成",
-        "## 3. 概念与能力",
-        "## 4. 领域规范",
-        "## 5. 技术参考",
-        "## 6. 开发与项目治理",
+        "## 1. 从症状开始",
+        "## 2. 按入口阅读",
+        "## 3. 按模块阅读",
+        "## 4. 接口与验证",
+        "## 5. 外部机制与历史材料",
     ]
     actual_sections = re.findall(r"^## .+$", index_text, re.MULTILINE)
     if actual_sections != expected_sections:
@@ -502,6 +502,39 @@ def check_navigation_contract(repo: Path) -> list[str]:
             for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
                 if section_reference.search(line):
                     errors.append(f"fragile AGENTS section-number reference: {relative}:{line_no}")
+    if "docs/agent-index/routes.json" not in index_text:
+        errors.append("INDEX.md does not name the machine-readable route registry")
+    return errors
+
+
+def check_agent_index(repo: Path) -> list[str]:
+    """Check generated Agent navigation without rewriting it."""
+    errors: list[str] = []
+    registry_path = repo / "docs/agent-index/routes.json"
+    if not registry_path.is_file():
+        return ["missing machine-readable Agent route registry: docs/agent-index/routes.json"]
+    try:
+        registry = generate_agent_index.load_registry(repo)
+    except (OSError, UnicodeError, ValueError) as error:
+        return [f"invalid Agent route registry: {error}"]
+    expected = {
+        repo / "docs/生成索引/Agent路由.md": generate_agent_index.render_routes(repo, registry),
+        repo / "docs/生成索引/代码与文档地图.md": generate_agent_index.render_code_map(repo, registry),
+    }
+    for path, content in expected.items():
+        if not path.is_file():
+            errors.append(f"missing generated Agent index: {path.relative_to(repo)}")
+        elif path.read_text(encoding="utf-8") != content:
+            errors.append(f"generated Agent index drift: {path.relative_to(repo)}")
+    for route in registry.get("routes", []):
+        for field in ("chain_doc",):
+            target = route.get(field, "")
+            if not (repo / target).is_file():
+                errors.append(f"Agent route {route.get('id', '?')} points to missing {field}: {target}")
+        for field in ("module_docs",):
+            for target in route.get(field, []):
+                if not (repo / target).is_file():
+                    errors.append(f"Agent route {route.get('id', '?')} points to missing {field}: {target}")
     return errors
 
 
@@ -520,6 +553,7 @@ def main() -> int:
     errors.extend(check_cli_help_map(repo))
     errors.extend(check_project_map_owner_contract(repo))
     errors.extend(check_navigation_contract(repo))
+    errors.extend(check_agent_index(repo))
     if errors:
         for error in sorted(set(errors)):
             print(f"error: {error}", file=sys.stderr)

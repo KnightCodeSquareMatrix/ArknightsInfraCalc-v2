@@ -2,6 +2,8 @@
 
 > 文档角色：compatibility-reference
 > 生命周期状态：current
+> 当前真源：docs/菲亚梅塔使用规则.md
+> 摘要：说明菲亚梅塔动作由排班决定并由 MAA 导出的责任边界
 > 代码范围：crates/infra-core/src/schedule/team_rotation.rs、crates/infra-core/src/export/maa.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：FiammettaShiftAction、attach_fiammetta_target_actions、resolve_scheduled_fiammetta

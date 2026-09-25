@@ -52,7 +52,7 @@ scripts/codex/render_evidence.py \
   --output target/codex-runs/<task>/reports/evidence.md
 ```
 
-`docs_inventory.py` 统一解析 [文档生命周期](../../docs/文档生命周期.md) 元数据，检查角色/状态/路径矩阵、唯一领域 owner 和生成索引。`check_repository_facts.py` 检查稳定 Markdown 链接、feedback ledger 和 CLI 命令地图。两者都不根据源码 diff 推导文档影响。
+`docs_inventory.py` 统一解析 [文档生命周期](../../docs/文档生命周期.md) 元数据，检查角色/状态/路径矩阵、唯一领域 owner、结构化页的代码锚点和关联链路。`generate_agent_index.py` 从 route registry、Rust 公共模块和 CLI dispatch 生成 Agent 路由与代码地图；`check_repository_facts.py` 再检查稳定 Markdown 链接、feedback ledger、CLI 命令地图和当前模块事实。生成器不把符号存在性冒充调用语义证明；跨层行为变更仍由作者声明触点并人工复核。
 
 `check_task_scope.py` 检查实际 changed paths 是否属于 `change_scope`、带理由的 scope expansion 或证明路径；文档路径和其他消费者一样显式声明。显式 deferred 路径和 deferred side finding 被修改时硬失败。完成检查还要求 reviewer 登记最终不变量、精确 changed paths 和全部 expansion id。
 

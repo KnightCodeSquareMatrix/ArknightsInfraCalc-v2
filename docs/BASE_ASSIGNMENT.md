@@ -2,6 +2,8 @@
 
 > 文档角色：module-reference
 > 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：说明单班 BaseAssignment 的 Plan、落位、互斥和 resolve 责任
 > 代码范围：crates/infra-core/src/layout/、crates/infra-core/src/layout/resolve.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：build_plan、execute_plan、assign_shift、BaseAssignment、resolve_base

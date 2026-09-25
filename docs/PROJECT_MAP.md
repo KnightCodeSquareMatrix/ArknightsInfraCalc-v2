@@ -13,6 +13,7 @@
 - 查代码 owner、命令入口或调用链：按本文对应表格定位，不要求通读。
 - 查实现状态：以当前代码和生成 help 为准；本文只维护稳定 owner，不复制完整 wire schema、fixture 真值表或 top hit。
 - 查历史方案：进入 `docs/ARCHIVE/`；开放工作只看已由当前任务恢复的 `docs/TODO/`。
+- 按症状定位完整影响链：先查 [生成 Agent 路由](生成索引/Agent路由.md)，再进入 `docs/调用链/` 和对应 `docs/模块/`；本文只保留稳定 owner，不复制调用链正文。
 
 ## Workspace Owner
 
@@ -43,7 +44,7 @@ layout / operbox / runtime data
 
 - Layout 的概念主路径是 `build_plan -> execute_plan -> fill -> resolve`；`layout/assign/pipeline.rs` 是阶段顺序与 resolve 时机的实现 owner。
 - L1 interpreter 只认 `buff_id`；L2 处理领域机制；L3 shortcut 只结算实际组合，不负责体系选型或进编。
-- `schedule_timed_rotation` 支持默认 ABC、ABC `12/12/12`、二班和两个具名特殊四班 profile；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班模式](排班模式.md)，当前实现见 [SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)。
+- `schedule_timed_rotation` 当前接受六个闭集 profile：ABC `12/6/6`、ABC `12/12/12`、主备 `12/12`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班与轮换](模块/排班与轮换.md)，当前实现见 [定时轮换](调用链/定时轮换.md)。
 - CLI 和 export 只消费 core 结果；`plan`、`plan.compute` 与 legacy Worker `plan` 共享 `commands/plan_compute.rs` 的一次 rotation 结果。
 
 ## `infra-core` 模块索引
@@ -75,6 +76,7 @@ layout / operbox / runtime data
 | `tier` | `PromotionTier` 技能解锁档 |
 | `training_advice` | 练卡：玩家 knowledge/player 层生成基础名单、组合完成度与 ≤10 建议；v2 机器诊断继续兼容 |
 | `types` | EffectAtom 的 phase、selector、condition、action 等共享类型 |
+| `notes` | 结构化 Note 类型和可选诊断附注；不参与机制求解 |
 | `control` | 中枢求值、效果账本与全局注入写回 |
 | `export` | MAA 排班 JSON 投影；不重新计算机制 |
 | `layout` | 蓝图、编制、Plan、填房、resolve 和 workforce |

@@ -22,6 +22,15 @@ META_KEYS = {
     "替代项",
     "历史原因",
     "快照日期",
+    # Agent-facing ownership and evidence metadata. These fields are deliberately
+    # plain text so the Markdown remains readable; the checker validates their
+    # repository paths and required presence for structured current pages.
+    "代码范围",
+    "代码锚点",
+    "关联链路",
+    "核验基线",
+    "机制依赖",
+    "知识库桥接",
 }
 ROLES = {
     "canonical",
@@ -31,6 +40,13 @@ ROLES = {
     "generated-reference",
     "evidence",
     "archive",
+}
+ROLE_ALIASES = {
+    "module-reference": "current-reference",
+    "call-chain": "current-reference",
+    "compatibility-reference": "current-reference",
+    "index-reference": "current-reference",
+    "system-bridge": "current-reference",
 }
 ROLE_STATES = {
     "canonical": {"current"},
@@ -63,7 +79,8 @@ class Document:
 
     @property
     def role(self) -> str:
-        return self.metadata.get("文档角色", "")
+        raw = self.metadata.get("文档角色", "")
+        return ROLE_ALIASES.get(raw, raw)
 
     @property
     def status(self) -> str:
@@ -75,13 +92,123 @@ class Document:
 
     @property
     def owners(self) -> list[str]:
-        return split_values(self.metadata.get("当前真源", ""))
+        # ``当前真源`` used to be a mixed prose field.  Keep code hints and
+        # knowledge-base prose readable, but only treat repository Markdown
+        # references (or the explicit canonical ``self`` marker) as ownership.
+        return [
+            value
+            for value in split_values(self.metadata.get("当前真源", ""))
+            if value == "self" or value.startswith("docs/") or value.endswith(".md")
+        ]
 
 
 def split_values(value: str) -> list[str]:
     if not value:
         return []
-    return [item.strip().replace("\\", "/") for item in re.split(r"[；;]", value) if item.strip()]
+    values: list[str] = []
+    for item in re.split(r"[；;、,]", value):
+        item = item.strip()
+        if not item:
+            continue
+        link_match = re.fullmatch(r"\[[^]]+\]\(([^)]+)\)", item)
+        if link_match:
+            item = link_match.group(1)
+        item = item.strip().strip("`").replace("\\", "/")
+        values.append(item)
+    return values
+
+
+def split_structured_values(value: str) -> list[str]:
+    """Split metadata lists without splitting separators inside `{...}` globs."""
+    values: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for character in value:
+        if character == "{":
+            depth += 1
+        elif character == "}" and depth:
+            depth -= 1
+        if character in ";；、," and depth == 0:
+            item = "".join(current).strip()
+            if item:
+                values.append(item.strip("`").replace("\\", "/"))
+            current = []
+        else:
+            current.append(character)
+    item = "".join(current).strip()
+    if item:
+        values.append(item.strip("`").replace("\\", "/"))
+    return values
+
+
+def _validate_repo_refs(repo: Path, document: Document) -> list[str]:
+    errors: list[str] = []
+    structured = ("docs/模块/", "docs/调用链/", "docs/接口/")
+    if document.role == "current-reference" and document.path.startswith(structured):
+        for key in ("代码范围", "代码锚点", "关联链路", "核验基线"):
+            if not document.metadata.get(key):
+                errors.append(f"structured current page requires {key}: {document.path}")
+
+    def code_candidates(value: str) -> list[Path]:
+        candidates = [repo / value]
+        if not value.startswith("crates/"):
+            candidates.extend(
+                [repo / "crates/infra-core/src" / value, repo / "crates/infra-cli/src" / value]
+            )
+        return candidates
+
+    def brace_candidates(value: str) -> list[Path]:
+        """Expand one simple ``{a,b}`` path glob used in metadata."""
+        if "{" not in value or "}" not in value:
+            return code_candidates(value)
+        prefix, tail = value.split("{", 1)
+        options, suffix = tail.split("}", 1)
+        candidates: list[Path] = []
+        for option in options.split(","):
+            candidates.extend(code_candidates(f"{prefix}{option}{suffix}"))
+        return candidates
+
+    def code_exists(value: str) -> bool:
+        if "{" in value and "}" in value:
+            return any(candidate.exists() for candidate in brace_candidates(value))
+        if any(char in value for char in "*?["):
+            return any(any(candidate.parent.glob(candidate.name)) for candidate in code_candidates(value))
+        return any(candidate.exists() for candidate in code_candidates(value))
+
+    for value in split_structured_values(document.metadata.get("代码范围", "")):
+        if value.startswith("/") or ".." in Path(value).parts:
+            errors.append(f"code scope must be repository-relative: {document.path}: {value}")
+            continue
+        if "/" not in value:
+            continue
+        if not code_exists(value):
+            errors.append(f"code scope path does not exist: {document.path}: {value}")
+
+    for value in split_values(document.metadata.get("代码锚点", "")):
+        # Legacy pages use short symbols or an arrow chain. New pages should use
+        # full repository-relative `path::symbol` anchors; validate every path
+        # that is present while allowing old shorthand to be migrated gradually.
+        anchors = re.split(r"\s*(?:→|->)\s*", value)
+        for anchor in anchors:
+            if "/" not in anchor or "::" not in anchor:
+                continue
+            path = anchor.split("::", 1)[0].strip().strip("`")
+            if path.startswith("/") or ".." in Path(path).parts or not any(
+                candidate.is_file() for candidate in code_candidates(path)
+            ):
+                errors.append(f"code anchor file does not exist: {document.path}: {anchor}")
+
+    for value in split_values(document.metadata.get("关联链路", "")):
+        target = Path(value)
+        if value.startswith("/"):
+            resolved = target
+        elif value.startswith("docs/"):
+            resolved = repo / target
+        else:
+            resolved = repo / Path(document.path).parent / target
+        if value.startswith("/") or not resolved.is_file():
+            errors.append(f"related chain document does not exist: {document.path}: {value}")
+    return errors
 
 
 def _repo_relative(repo: Path, path: Path) -> str:
@@ -192,7 +319,8 @@ def validate_document(document: Document, *, final: bool) -> list[str]:
         errors.append(f"invalid lifecycle status {status!r} for {role}: {document.path}")
     if role != "canonical" and "self" in document.owners:
         errors.append(f"only canonical documents may use self as current owner: {document.path}")
-    if not document.metadata.get("摘要"):
+    structured = document.path.startswith(("docs/模块/", "docs/调用链/", "docs/接口/"))
+    if (role == "canonical" or structured) and not document.metadata.get("摘要"):
         errors.append(f"document summary is required: {document.path}")
     errors.extend(_path_role_errors(document))
 
@@ -201,7 +329,9 @@ def validate_document(document: Document, *, final: bool) -> list[str]:
             errors.append(f"canonical document requires at least one domain key: {document.path}")
         if document.owners != ["self"]:
             errors.append(f"canonical current owner must be self: {document.path}")
-    elif role in {"current-reference", "active-change", "decision", "generated-reference", "evidence"}:
+    elif role in {"active-change", "decision", "generated-reference", "evidence"} or (
+        role == "current-reference" and structured
+    ):
         if not document.owners:
             errors.append(f"{role} document requires current owner links: {document.path}")
     elif role == "archive" and not (
@@ -227,6 +357,7 @@ def validate_inventory(repo: Path, documents: list[Document], *, final: bool) ->
     by_path = {document.path: document for document in documents}
     for document in documents:
         errors.extend(validate_document(document, final=final))
+        errors.extend(_validate_repo_refs(repo, document))
         generator = document.metadata.get("生成器", "")
         if generator and not (repo / generator).is_file():
             errors.append(f"generator path does not exist: {document.path}: {generator}")
@@ -241,6 +372,10 @@ def validate_inventory(repo: Path, documents: list[Document], *, final: bool) ->
     for document in documents:
         for owner in document.owners:
             if owner == "self":
+                continue
+            # A few older pages used this field for a code hint. Keep those
+            # hints readable while current pages migrate to explicit 代码锚点.
+            if not owner.endswith(".md"):
                 continue
             target = by_path.get(owner)
             if target is None:

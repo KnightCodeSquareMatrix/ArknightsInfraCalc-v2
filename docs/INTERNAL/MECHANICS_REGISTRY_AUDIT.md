@@ -1,7 +1,9 @@
 # MECHANICS_REGISTRY 机制审计报告说明
 
-> 文档角色：generated-reference
-> 生命周期状态：generated
+> 文档角色：current-reference
+> 生命周期状态：current
+> 当前真源：docs/文档生命周期.md
+> 摘要：说明机制注册审计快照的生成入口、统计口径和误报边界。
 > 当前真源：`data/MECHANICS_REGISTRY.csv` 与 `scripts/audit_mechanics_registry.py`
 > 代码范围：`scripts/audit_mechanics_registry.py`; `data/MECHANICS_REGISTRY.csv`; `data/{operator_instances,skill_table}.json`
 > 代码锚点：审计脚本入口 `main`; runtime 对照 `SkillTable::validate_operator_refs`
