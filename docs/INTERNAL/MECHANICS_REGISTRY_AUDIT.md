@@ -7,7 +7,7 @@
 > 当前真源：`data/MECHANICS_REGISTRY.csv` 与 `scripts/audit_mechanics_registry.py`
 > 代码范围：`scripts/audit_mechanics_registry.py`; `data/MECHANICS_REGISTRY.csv`; `data/{operator_instances,skill_table}.json`
 > 代码锚点：审计脚本入口 `main`; runtime 对照 `SkillTable::validate_operator_refs`
-> 关联链路：[`../需要完成的干员建模.md`](../需要完成的干员建模.md)、[`../MODELLED_OPERATORS.md`](../MODELLED_OPERATORS.md)
+> 关联链路：`docs/需要完成的干员建模.md`; `docs/MODELLED_OPERATORS.md`
 > 核验基线：`947f1a2`
 
 本页只定义如何读生成报告。基线快照（需重新生成确认）为 727 条 registry 行、453 条运行时 scope 行、制造 109 条、跨设施候选 100 条、`has_atoms` 249 条、`empty_atoms` 28 条、按名称未找到 176 条。该统计描述数据快照，不是语义完成度。

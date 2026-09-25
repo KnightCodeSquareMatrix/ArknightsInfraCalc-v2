@@ -5,8 +5,8 @@
 > 当前真源：docs/文档生命周期.md
 > 摘要：定位候选池、Plan 门禁、域搜索、排序与 Bake 回退的完整链路。
 > 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
-> 代码锚点：`pool/base.rs::{build_roster_pool,filter_pool}`; `search/{trade,manufacture,control,power,joint_trade}.rs`; `bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}`
-> 关联链路：[`调用链/技能到房间结算.md`](../调用链/技能到房间结算.md)、[`调用链/跨设施状态刷新.md`](../调用链/跨设施状态刷新.md)
+> 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,joint_trade}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}`
+> 关联链路：`docs/调用链/技能到房间结算.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`947f1a2`
 
 ## 搜索链

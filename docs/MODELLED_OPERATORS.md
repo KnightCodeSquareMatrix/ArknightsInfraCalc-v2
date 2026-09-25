@@ -4,8 +4,8 @@
 > 生命周期状态：current
 > 当前真源：`data/operator_instances.json`、`data/skill_table.json`、各域 interpreter；游戏机制见 [`知识库引用.md`](知识库引用.md)
 > 代码范围：`crates/infra-core/src/{instances.rs,skill_table.rs,tier.rs,pool,trade,manufacture,control,cross_facility}`; `data/{operator_instances,skill_table}.json`
-> 代码锚点：`instances.rs::{OperatorInstances::get,resolve_trade_buff_ids,resolve_manufacture_buff_ids}`; `skill_table.rs::{SkillTable::load,validate_operator_refs}`; `pool/trade.rs::build_trade_pool`; `trade/shortcut.rs::resolve_trade_shortcut`; `cross_facility/collector.rs::collect_global_atoms`
-> 关联链路：[`模块/输入与技能映射.md`](模块/输入与技能映射.md)、[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`需要完成的干员建模.md`](需要完成的干员建模.md)
+> 代码锚点：`crates/infra-core/src/instances.rs::{OperatorInstances::get,resolve_trade_buff_ids,resolve_manufacture_buff_ids}`; `crates/infra-core/src/skill_table.rs::{SkillTable::load,validate_operator_refs}`; `crates/infra-core/src/pool/trade.rs::build_trade_pool`; `crates/infra-core/src/trade/shortcut.rs::resolve_trade_shortcut`; `crates/infra-core/src/cross_facility/collector.rs::collect_global_atoms`
+> 关联链路：`docs/模块/输入与技能映射.md`; `docs/调用链/技能到房间结算.md`; `docs/需要完成的干员建模.md`
 > 核验基线：`947f1a2`
 
 ## “已建模”的可核验定义

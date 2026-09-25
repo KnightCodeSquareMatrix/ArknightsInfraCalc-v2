@@ -6,8 +6,8 @@
 > 当前真源：self
 > 摘要：裁决千分整数效率、各生产域结算和排班输出字段的统一口径。
 > 代码范围：`crates/infra-core/src/efficiency.rs`; `trade/solver.rs`; `search/trade.rs`; `manufacture/solver.rs`; `search/manufacture.rs`; `power/solver.rs`; `layout/assignment.rs`; `bake.rs`
-> 代码锚点：`efficiency.rs::Efficiency`; `search/trade.rs::TradeEfficiencyBreakdown`; `search/manufacture.rs::ManuEfficiencyBreakdown`; `layout/assignment.rs::RoomEfficiencySnapshot`; `bake.rs::BAKE_SCHEMA_VERSION`
-> 关联链路：[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`模块/贸易求解.md`](模块/贸易求解.md)、[`模块/制造求解.md`](模块/制造求解.md)、[`模块/候选搜索与Bake.md`](模块/候选搜索与Bake.md)
+> 代码锚点：`crates/infra-core/src/efficiency.rs::Efficiency`; `crates/infra-core/src/search/trade.rs::TradeEfficiencyBreakdown`; `crates/infra-core/src/search/manufacture.rs::ManuEfficiencyBreakdown`; `crates/infra-core/src/layout/assignment.rs::RoomEfficiencySnapshot`; `crates/infra-core/src/bake.rs::BAKE_SCHEMA_VERSION`
+> 关联链路：`docs/调用链/技能到房间结算.md`; `docs/模块/贸易求解.md`; `docs/模块/制造求解.md`; `docs/模块/候选搜索与Bake.md`
 > 核验基线：`947f1a2`
 
 ## 口径

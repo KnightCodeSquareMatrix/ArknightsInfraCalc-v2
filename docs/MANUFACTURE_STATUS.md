@@ -6,8 +6,8 @@
 > 当前真源：self
 > 摘要：裁决制造站输入、阶段解释、产线聚合、仓储和班次心情结算边界。
 > 代码范围：`crates/infra-core/src/manufacture/{input,interpreter,solver}.rs`; `pool/manufacture.rs`; `search/manufacture.rs`; `layout/assign/manufacture_fill.rs`; `data/prts_manufacturing_skills.json`
-> 代码锚点：`manufacture/interpreter.rs::apply_manu_phases`; `manufacture/solver.rs::{solve_manufacture,solve_manufacture_with_shift,evaluate_manufacture_lines}`; `search/manufacture.rs::search_manufacture_triples`; `pool/manufacture.rs::build_manufacture_pool`; `layout/assign/manufacture_fill.rs::assign_manu_room_with_anchors`
-> 关联链路：[`模块/制造求解.md`](模块/制造求解.md)、[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)
+> 代码锚点：`crates/infra-core/src/manufacture/interpreter.rs::apply_manu_phases`; `crates/infra-core/src/manufacture/solver.rs::{solve_manufacture,solve_manufacture_with_shift,evaluate_manufacture_lines}`; `crates/infra-core/src/search/manufacture.rs::search_manufacture_triples`; `crates/infra-core/src/pool/manufacture.rs::build_manufacture_pool`; `crates/infra-core/src/layout/assign/manufacture_fill.rs::assign_manu_room_with_anchors`
+> 关联链路：`docs/模块/制造求解.md`; `docs/调用链/技能到房间结算.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`947f1a2`
 
 ## 责任边界

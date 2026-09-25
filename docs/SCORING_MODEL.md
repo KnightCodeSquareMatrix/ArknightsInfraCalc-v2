@@ -6,8 +6,8 @@
 > 当前真源：self
 > 摘要：裁决各域排序、跨域具名 policy、剪枝保证等级和失败传播。
 > 代码范围：`crates/infra-core/src/scoring/{mod,components,metric}.rs`; `search/{trade,manufacture,power,control,joint_trade}.rs`; `layout/assign/pipeline.rs`
-> 代码锚点：`scoring/components.rs::ScoringPolicyId`; `scoring/components.rs::evaluate_trade_manufacture_weighted_efficiency`; `search/trade.rs::trade_efficiency_sort_key`; `search/manufacture.rs::search_manufacture_triples`; `search/control.rs::evaluate_control_policy`; `layout/assign/pipeline.rs::dynamic_producer_candidates`
-> 关联链路：[`模块/候选搜索与Bake.md`](模块/候选搜索与Bake.md)、[`模块/中枢与跨设施状态.md`](模块/中枢与跨设施状态.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)
+> 代码锚点：`crates/infra-core/src/scoring/components.rs::ScoringPolicyId`; `crates/infra-core/src/scoring/components.rs::evaluate_trade_manufacture_weighted_efficiency`; `crates/infra-core/src/search/trade.rs::trade_efficiency_sort_key`; `crates/infra-core/src/search/manufacture.rs::search_manufacture_triples`; `crates/infra-core/src/search/control.rs::evaluate_control_policy`; `crates/infra-core/src/layout/assign/pipeline.rs::dynamic_producer_candidates`
+> 关联链路：`docs/模块/候选搜索与Bake.md`; `docs/模块/中枢与跨设施状态.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`947f1a2`
 
 ## 排序原则
