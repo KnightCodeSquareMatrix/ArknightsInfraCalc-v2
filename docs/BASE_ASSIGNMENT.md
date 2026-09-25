@@ -2,7 +2,7 @@
 
 > 文档角色：module-reference
 > 生命周期状态：current
-> 代码范围：crates/infra-core/src/layout/及 resolve_base
+> 代码范围：crates/infra-core/src/layout/、crates/infra-core/src/layout/resolve.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：build_plan、execute_plan、assign_shift、BaseAssignment、resolve_base
 > 关联链路：docs/ORCHESTRATION_LAYER.md、docs/模块/排班与轮换.md
