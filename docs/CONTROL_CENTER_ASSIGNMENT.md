@@ -1,188 +1,29 @@
-# 控制中枢排班规则
+# 控制中枢编制与效果账本
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 领域键：facility.control-assignment
-> 当前真源：self
-> 摘要：裁决中枢候选、注入和全局资源编制
+> 当前真源：`crates/infra-core/src/control/`、`search/control.rs`、`layout/assign/control_fill.rs`；游戏机制见 [`知识库引用.md`](知识库引用.md)
+> 代码范围：`crates/infra-core/src/control/{input,interpreter,ledger,mod}.rs`; `search/control.rs`; `pool/control.rs`; `layout/assign/{control_fill,pipeline}.rs`; `global_resource/inject.rs`
+> 代码锚点：`control/interpreter.rs::{solve_control,solve_control_with_trace}`; `control/ledger.rs::ControlEffectLedger`; `control/mod.rs::apply_control_to_layout_with_trace`; `search/control.rs::search_control_combos`; `layout/assign/control_fill.rs::assign_control`; `layout/assign/pipeline.rs::run_shift_pipeline`
+> 关联链路：[`模块/中枢与跨设施状态.md`](模块/中枢与跨设施状态.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)、[`模块/候选搜索与Bake.md`](模块/候选搜索与Bake.md)
+> 核验基线：`947f1a2`
 
-> 本文为控制中枢体系审计的仓库内真源。完整规则以用户提供的
-> `CONTROL_CENTER_ASSIGNMENT.md` 为基础；用户裁决内容优先于旧实现。
+## 编制硬约束
 
-## 已确认硬规则
+中枢容量由 blueprint 决定，当前标准布局为 5 人。可用角色足够时先满足 Plan 的 required anchor，再补齐合法席位；无中枢技能的 filler 仍可能提供 occupancy/mood 或满足跨设施条件。后续 filler 不能替换已认领的 required anchor。缺席、重复 operator、同房禁配和无法满足 required group 返回错误/无解。
 
-控制中枢目标容量为 5 人。中枢入驻角色即使没有中枢技能，也会因中枢满员产生的全局心情减免而具有有效收益；因此编排必须优先填满 5 个合法中枢席位。
+`search/control.rs` 的 `ControlFillPolicy` 是顺序 policy，不是全基建匿名总分。排序依次消费 Plan anchor、贸易/制造全局区域、训练/办公室/会客室、心情去重和普通补位；不回溯替换前序结果。
 
-补位顺序为：
+## Ledger 事实
 
-```text
-体系必需中枢位 > 有效产能/解锁入口 > 体系外效率散件 > 心情减免 > 无技能普通角色/其他补位
-```
+`ControlEffectKey {domain, unit}` 是结构化 key。`record_max` 记录候选来源，`freeze` 对同 key 取最大值，并标记 `Winner`、`TiedWinner` 或 `Suppressed`。注入、trace、candidate dependency 和投影视图都应读取冻结 ledger；不得按 operator 名、buff 前缀或数值单位猜同类效果。冲突来源仍是物理占位冲突，即使低值 atom 已 suppressed。
 
-只有在可用且合法的中枢角色少于 5 人时，才允许实际输出少于 5 人；不得因角色没有中枢技能而提前停止补位。
+`solve_control_with_trace` 返回 `ControlCenterResult` 和 `ControlSettlementTrace`；`apply_control_to_layout_with_trace` 把 global pool、`GlobalInjectManifest`、办公室和会客室速度写回 `LayoutContext`。下游 trade/manufacture 只消费 resolved facts。
 
-## 自动选择口径
+## 动态 producer
 
-公孙长乐提供的 `25 / 20 / 15`、`15`、`9`、`8`、`40` 等体系赋值只作为人工分析与优先级解释参考，不作为自动排班的固定评分，也不用于硬编码候选排列。
+中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；source 只有实际 assignment 在场时才进入 manifest。producer 变化应触发 resolve 和下一阶段搜索，不能靠标签存在或 export 补偿。
 
-自动排班应优先使用 solver 已经结算的实际技能效率自然搜索。全贸易、全制造等已建模收益不得再叠加一份体系赋值，以免重复计分。数值相同的候选只需要稳定 tie-break，不应通过匿名权重改变实际效率排序。
+## 核验
 
-同一具名 policy 完全同分时，替代关系只消费中枢结算 trace 已证明的
-`source_buff_id + inject_family` 事实：实际为 `Winner` 或 `TiedWinner` 的声明替代源才可获得稳定偏好；被同族更高值覆盖的 `Suppressed` 源不视为有效代表，等价候选优先选择没有该冗余源的组合。该 tie-break 不改变注入数值、family max 或跨设施目标函数。
-
-只有以下无法由普通单房效率搜索保证的领域不变量可以成为硬约束：
-
-- 中枢在合法可用角色足够时必须填满 5 人；
-- 已激活体系的 required anchor 不得被后续补位替换；
-- 依赖贸易或制造消费方的 producer 必须按本班实际落位判断是否有效；
-- 规定为完整组合的体系必须原子启用或关闭；
-- 明确要求同上同下的跨设施成员必须生成轮换绑定；
-- 明确的最长工作时间必须由排班层保证。
-
-某项收益尚未被 solver 建模时，不得直接使用上述人工赋值填补。应先确认该资源是否属于自动排班目标，再以具名、可解释的 policy 分量建模；否则只保留为文档参考。
-
-## 中枢心情恢复与普通补位
-
-### 实际心情结算
-
-中枢满 5 人提供全局 `-0.25/h` 心情消耗减免。该减免与中枢恢复、设施恢复和干员自身心情效果叠加。
-控制中枢内实际净消耗按以下顺序结算：
-
-```text
-基础消耗
-- 中枢满员 -0.25
-- 设施人数减免（贸易/制造）
-- 玛恩纳/维什戴尔/重岳的设施全局恢复 max
-- 彩虹小队/异格者派系恢复（仅控制中枢）
-- 玛恩纳扩散的笑脸恢复
-+ 自身技能与同房技能的消耗修正
-```
-
-净消耗下限为 `0`；因此控制中枢内无自身消耗的干员，在满足派系恢复时可以达到不减心情或回复心情。
-
-### 全局恢复与笑脸
-
-- 玛恩纳 E2 自身属于笑脸 provider，提供 `+0.05/h`；同时对发电站、人力办公室、会客室提供固定
-  `+0.1/h` 全局恢复。
-- 玛恩纳 E2 在中枢时，把中枢内全部笑脸 provider 的总恢复扩散到发电站、制造站、贸易站、人力办公室
-  和会客室。制造站、贸易站只获得 `笑脸数量 × 0.05/h`；发电站、办公室、会客室获得
-  `0.1 + 笑脸数量 × 0.05/h`。
-- 维什戴尔 E2 对发电站、制造站、贸易站、办公室、会客室提供 `+0.1/h`；魔王同在中枢时额外
-  `+0.1/h`，总计 `+0.2/h`。
-- 重岳 E2 对发电站、制造站、贸易站、办公室、会客室提供 `+0.05/h`；人间烟火按人数的额外恢复仍是
-  独立开放项。
-- 玛恩纳、维什戴尔、重岳属于同一“设施全局恢复”效果族，自动中枢选用最多保留一个有效 owner；
-  同一候选不得同时放入两个该族全局恢复来源。
-- 全局恢复与中枢满员 `-0.25/h`、笑脸扩散和干员自身心情效果叠加；同一全局恢复族内部不叠加，取当前
-  有效值最高者。
-
-### 派系/人数型中枢恢复
-
-这类技能只作用于控制中枢，不扩散到贸易、制造、发电、办公室或会客室。
-
-```text
-恢复值 = 0.05 × 有效技能持有者数量 × 中枢内对应派系成员数量
-```
-
-当前维护清单位于 `data/mood_model.json`：
-
-- `rainbow_six`：技能持有者为灰烬、战车、闪击、霜华；成员清单为同四人。
-- `altered_operators`：技能持有者为寒芒克洛丝、炎狱炎熔、濯尘芙蓉；成员清单维护全部当前异格干员。
-
-派系恢复与中枢满员减免、角色自身效果叠加；其候选选用优先级低于设施全局恢复。
-
-### 普通心情补位政策
-
-普通中枢候选不是按实际 ETA 做完整连续心情优化，而是消费 mood owner 提供的低优先级摘要：
-
-1. 当前存在维什戴尔全局恢复时，优先补位魔王，以激活 `0.1 → 0.2` 的条件恢复。
-2. 当前存在玛恩纳全局恢复时，优先补位笑脸技能 provider，使扩散值增加。
-3. 当前不存在玛恩纳、维什戴尔、重岳全局恢复时，优先考虑派系/人数恢复 provider 或笑脸 provider。
-4. 以上都不适用时，才进入普通合法角色补满 5 人。
-
-该政策只负责中枢候选的低优先级补位，不替代 mood/drain 的实际净消耗结算，也不把派系恢复伪装成跨设施全局恢复。
-轮换 fallback 只使用正式三班 assignment 之外的普通候选；琴柳不进入该 fallback 池，但仍可作为正式中枢候选或 required 成员参与结算。
-
-### 当前边界
-
-- 重岳按人间烟火数量的额外恢复尚未实现。
-- 中枢向宿舍提供的恢复族尚未接入实际宿舍恢复 owner。
-- 阿、惊蛰、艾拉等概率/倾向或复杂条件的中枢心情机制不自动进入普通候选收益。
-- ABC rotation 尚未成为完整跨周期心情最优化；rotation 只消费当班候选和既有 ETA/硬约束。
-
-## 已确认跨设施与组合规则
-
-### 日周期排班规则
-
-普通中枢以一天为周期时采用二班 `12/12`：两个完整中枢状态分别求解并填满 5 个席位。中枢不因生产设施切半而切半，不经 αβγ 三队重排；生产设施的切半只属于 ABC 轮换模型。歌蕾蒂娅的深海心情约束属于独立的 `7/5/7/5` 特殊四班模型，不适用普通二班中枢规则。
-
-效果相同的中枢来源只在同一个 12h 状态内互斥：效果账本确定为 `Winner` / `TiedWinner` 的来源才可获得该状态的候选价值，被 `Suppressed` 的来源不得作为同班补位。阿米娅与阿斯卡纶的贸易全局效果属于同一 `EffectKey`，因此应分配到两个不同的 12h 状态，而不是在同一状态同时上班。该规则是状态级排班约束，不是账号级永久互斥。
-
-怪猎木天蓼在当前排班中是一个完整组合：火龙S黑角、麒麟R夜刀和实际消费木天蓼的泰拉大陆调查团必须作为同一候选状态处理。该组合与斩业星熊+诗怀雅共享 `control_global_effect` 互斥区；虽然龙门组的制造全局注入 `+3%` 高于麒麟R夜刀的 `+2%`，有实际调查团消费方时仍优先选择完整怪猎组合，因为它还激活木天蓼链。没有可落位的调查团消费方时，怪猎组合不准入，继续选择龙门组或后续普通中枢候选。两个 12h 状态独立求解时，完整状态互斥会把可行的怪猎组合与龙门组分到不同班次；不因单个布局强行保证两组都能出现。
-
-只有用户明确确认为“同上同下”的跨设施体系，才将中枢 producer 与消费方写入 hard `shift_bind`。该关系由统一计划的轮换绑定保证，不能只检查账号持有，也不能依赖当前队伍切分结果碰巧同班；普通效率耦合不得据此升级为固定成员或班次。
-
-### 通用 producer 责任边界
-
-跨设施 producer 共用一套规则与结果协议，但不共用一种 admission：硬体系继续由 Plan 保证
-required 成员，可选 producer 由实际受影响设施的完整候选结果竞争，普通同房或全局观察量不
-因此升级为固定组合。技能公式、tier、selector、action 和 phase 只由 EffectAtom 与目标域
-solver 负责；编排规则只声明 admission 类别、需要联合的设施范围和排班关系，不复制公式。
-
-同房机制仍由单房 solver 一次选完。跨房、跨设施和全局资源机制只在互相改变分数或人员占用
-的影响闭包内联合比较，并使用调用方显式命名、可分解的 policy；producer 层不得自行匿名
-相加不同设施分量。live 求值是正确性基线，Bake/cache miss 只能变慢，不能换候选或 winner。
-
-winner 只输出最终结算中仍然有效的 producer 贡献及其最小充分 consumer 集合；同 family
-覆盖、上限截断或 shortcut 替代后无效的贡献不生成依赖。排班层只消费细粒度的同上同下、
-单向在岗和最长工时事实，再统一求闭包；不得按干员名、tag、Team、Shift 或 room id 重推。
-硬体系可显式要求绑定全部成员，可选门槛存在多个等价 witness 时使用稳定的最小集合。
-
-自动求解遇到未分类的跨设施机制或缺失的跨设施 comparator 时必须明确返回 unsupported，
-不能默认普通候选、按 0 结算或静默不绑定。游戏技能自身点名干员时，逻辑干员 id 只能作为
-规则数据参数，运行时代码仍使用通用 presence/capability 条件。
-
-Mujica 作为低优先级中枢兜底组合：只有当前 Plan 没有其他可行跨站体系，且账号拥有若叶睦、三角初华、丰川祥子、祐天寺若麦、八幡海铃五人时才考虑启用；贸易 core 只是贸易 required anchor，不算阻止 Mujica 的其他跨站体系。丰川祥子必须精二，其余成员按实际练度结算。启用后五人作为一个中枢整体绑定，不拆成普通补位；与八幡海铃实际叙拉古 consumer 形成的 exact-presence 关系并入同一连通绑定组。缺少任意成员或祥子未精二时整组关闭。歌蕾蒂娅深海组合单独按“歌蕾蒂娅提供 control_mp_aegir2[010] 且另有至少 3 名其他 cc.g.abyssal 深海猎人”准入；满足该门槛即优先于 Mujica，不再与普通 S2 制造候选比较效率。八幡海铃仍可在 Mujica 未启用时作为单独的动态贸易 producer 候选，其他四人不得单独回流普通中枢补位。
-
-### 动态贸易 producer
-
-戴菲恩、八幡海铃服从可选动态 producer 生命周期：中枢组合与全部实际贸易房候选联合求值后，才决定是否入选。凛御银灰的 producer rule 保留用于识别银灰 consumer 阈值，但属于自动中枢排除项，不进入 producer presence、普通 filler 或轮换 fallback。无实际消费者时不得生成凛御银灰动态依赖。
-
-设 `n_s(r)`、`n_g(r)`、`n_k(r)` 为贸易房 `r` 中实际上岗的叙拉古、格拉斯哥、谢拉格人数：
-
-| Producer | 生效 tier | 对每间贸易房 `r` 的订单效率注入 |
-|----------|-----------|----------------------------------|
-| 八幡海铃 | E2 | `5 × n_s(r)`；只统计当前贸易房的叙拉古总人数 |
-| 戴菲恩 | E2 | `10 × n_g(r)`；**只统计当前贸易房**，不同房间不得先求总和 |
-| 凛御银灰 | E0 起 | 仅作为保留的 consumer 阈值事实；自动中枢 admission 为 excluded |
-
-凛御银灰的「商业版图」与灵知的「精密计算」/ 孑形态完全独立，不得共享 producer bit、pool variant 或轮换特判。格拉斯哥组合可因实际 `final_efficiency` 自然胜出或落败；戴菲恩不能激活固定 `meta_vina` 优先站。
-
-winner 只为实际贡献者派生同上同下关系：八幡海铃绑定实际叙拉古贸易成员；戴菲恩绑定各房实际格拉斯哥成员；凛御银灰只绑定达到三人阈值房内的谢拉格成员。不同贸易站不因此被强制搬到同房。完整实施交接见 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
-
-用户于 2026-07-27 裁决：动态 producer 的完整候选在 resolve 后使用
-`TradeManufactureWeightedEfficiencyV1` 比较，当前贸易与制造权重为 `1:1`。权重属于未来
-可调整的具名产品 policy；布局负责宏观贸易/制造房间配比，发电不进入该加权总和。具体公式
-和实现状态由 [SCORING_MODEL.md](SCORING_MODEL.md#21-动态-producer-联合候选的具名加权-policy) 统一拥有。
-
-## 当前实现状态与已知缺口
-
-- 中枢搜索在合法候选足够时只生成 5 人组合；无技能普通角色可作为有界 fallback 补位。
-- `data/producer_rules.json` 以稳定 `source_buff_id` 登记 admission、目标设施与排班关系，并与其他 solver runtime 数据一起嵌入独立二进制；加载时会与 `skill_table` 的全部动态 workforce 注入做覆盖校验，漏登记或错登记直接报错。
-- Peak 把拥有实际 consumer tag 的 deferred producer 作为一个 presence set 做幂集枚举；每个子集从相同 seed 求精确中枢组合，候选重跑 `producer/dorm → power → trade → manufacture → resolve`。公开默认由具名 `ControlInjectRawSumV0` 比较；shadow 候选会刷新每个完整候选的贸易/制造快照后改用 `TradeManufactureWeightedEfficiencyV1`。人数不足只淘汰当前子集，真实 resolve 错误继续向上传播。
-- `must_include` producer 在组合生成前锁定，只枚举剩余中枢席位。每个 presence set 先以目标设施满席命中的正收益上界排序；只有上界严格低于当前真实 winner 才剪枝，平局不剪。若 active control buff 读取尚未完成的发电/贸易/基建 presence，上界为无穷并自动退回完整 live 前缀比较。
-- 八幡海铃、戴菲恩使用同一贸易响应规则路径；凛御银灰规则只保留 consumer 阈值和数据覆盖识别，不参与自动 producer admission；涤火杰西卡使用同一制造响应规则路径。
-- winner 的 `resolved_producer_dependencies` 记录 rule、source buff、实际 producer、实际 consumer、目标房、关系和有效贡献；hard Plan relation 也先规范化为同一结构，`shift_binds` 和 αβγ 只消费这些 resolved facts。
-- `vina_lungmen` fixed System、`meta_vina` role、按名字推断八幡/戴菲恩/灵知的 rotation 路径已删除；`gsl_vina_lungmen` 仅保留实际同房组合结算。
-- 涤火杰西卡关系为 `none`：每班按实际黑钢 workforce 重算，不与水月、香草、杰西卡或标准化组合固定 team / `shift_bind`。
-- 当前 producer presence 集合枚举对结构化候选全集是精确的。`must_include` 锁定和正收益上界属于 `safe_reduction`；测试会从同一 seed 分别启用、关闭剪枝，并核对最终 assignment、`ControlInjectRawSumV0` key 和 resolved dependency，平局不得剪枝，未完成 support 输入返回无穷上界。
-- `TradeManufactureWeightedEfficiencyV1` 已接入候选 prefix winner，但尚未晋升为公开默认；该
-  policy 自动禁用旧 raw-inject 剪枝，只保留其上界排序作为 `search_heuristic`。后续若要恢复
-  剪枝，必须证明新的同单位安全上界；exact joint 仍未实现。
-- 贸易/制造多房内部仍使用既有有序填房，明确分类为 `policy_restriction`。当前结果只能在该具名 policy 限制空间内解释，不保证 canonical 完整空间的 exact joint 或全局最优；最终 refresh 不能补回前房依赖后房时已经错失的候选。
-- 完整条件响应行和 exact joint 仍是 correctness/conformance 开放项，Bake 是与其分开的性能工作。产品要求 exact 多房保证、撤销当前 policy restriction、出现错误 winner、新机制无法表达或用户重新授权时，应恢复 A+ TODO；不能把它降级成只有复现 bug 后才处理的性能优化。
-- 纯人间烟火不使用有序 `pick_one`：计划只声明重岳/令候选组最低命中数，
-  中枢 solver 在满足约束的五人组合中按实际效率自然选择。
-- 感知启用时纯分支互斥；全图鉴烟火附带分支要求重岳、令同时实际进编。
-- 人间烟火的中枢成员在 peak 实际入选后由动态 bind 归入乌有 cohort，活跃班先 pin
-  再补满五人；未入选的候选不会在轮换层被重新强塞。
+检查 control trace、ledger records、global inject explanation、最终 assignment invariant。固定候选用 `layout eval --explain-json`；整班用 `plan --assert-invariants` 和 243/high-owned fixture。中枢技能原文与同种效果规则回知识库引用，本文只记录实现责任和状态流。

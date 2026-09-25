@@ -1,102 +1,36 @@
-# 制造站域状态
+# 制造站求解状态
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 领域键：facility.manufacture
-> 当前真源：self
-> 摘要：裁决制造站机制和实现范围
+> 当前真源：`crates/infra-core/src/manufacture/`、`search/manufacture.rs`；游戏规则见 [`知识库引用.md`](知识库引用.md)
+> 代码范围：`crates/infra-core/src/manufacture/{input,interpreter,solver}.rs`; `pool/manufacture.rs`; `search/manufacture.rs`; `layout/assign/manufacture_fill.rs`; `data/prts_manufacturing_skills.json`
+> 代码锚点：`manufacture/interpreter.rs::apply_manu_phases`; `manufacture/solver.rs::{solve_manufacture,solve_manufacture_with_shift,evaluate_manufacture_lines}`; `search/manufacture.rs::search_manufacture_triples`; `pool/manufacture.rs::build_manufacture_pool`; `layout/assign/manufacture_fill.rs::assign_manu_room_with_anchors`
+> 关联链路：[`模块/制造求解.md`](模块/制造求解.md)、[`调用链/技能到房间结算.md`](调用链/技能到房间结算.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)
+> 核验基线：`947f1a2`
 
-> **勿按贸易站 L2/L3 假设改制造站。** 制造站无 `gold_flow` / `order_mechanic` / `trade_shortcuts`；求解为 L1 直通 `solve_manufacture`。
-> **搜索刻意对候选池做 `C(n,3)` 穷举**：制造站无贸易式「金标组合」L3，穷举后按 `final_efficiency` 排序是定稿设计，不是待补缺口。排班使用 `full_pool=true` 的全部合法普通制造候选；standalone 缩池仅服务 `full_pool=false` 的 bench / 独立探索。
+## 责任边界
 
-## 域对比
+制造 solver 接收已经确定的房间、配方、实际三人组、LayoutContext 和可选班次时长，输出生产效率、单位日产量、仓库上限、心情消耗和分解。它不决定 control/trade 的候选，也没有贸易站的订单分布、gold flow 或 shortcut。
 
-| 维度 | 贸易站 | 制造站 |
-|------|--------|--------|
-| L1 | `trade/interpreter.rs` | `manufacture/interpreter.rs` |
-| L2 域引擎 | `gold_flow`、`order_mechanic` | **无**（复杂机制仍在 L1 或待建域引擎） |
-| L3 组合表 | `trade_shortcuts.json` | **无** |
-| 池 | `pool/trade.rs` | `pool/manufacture.rs` |
-| 搜索 | `search/trade.rs` | `search/manufacture.rs` |
-| 求解 | `solve_trade_with_shift` | `solve_manufacture`、`solve_manufacture_with_shift` |
-| 排班 | `layout/assign.rs` / `schedule/team_rotation.rs` | ✅ `assign_shift`（高峰/恢复班覆盖）与 αβγ ABC |
-| CLI 回归 | `verify` + CSV | **无** dedicated verify case |
+## 结算顺序
 
-## 已实现
+```text
+ManuRoomInput
+  -> ManuContext::from_room
+  -> collect_manu_atoms / apply_manu_phases
+  -> RecipeEff + RecipeLimit + state/global inject
+  -> solve_manufacture[_with_shift]
+  -> ManuResult / ManuProdBreakdown / ManuStorageBreakdown
+```
 
-| 模块 | 职责 |
-|------|------|
-| `manufacture/input.rs` | `ManuOperator`、`ManuRoomInput`、`ManuLineScenario`、`ManuSearchRecipeMode` |
-| `manufacture/interpreter.rs` | `apply_manu_phases`；`ManuContext` / `RecipeEff` / `RecipeLimit` |
-| `manufacture/solver.rs` | `solve_manufacture`、`solve_manufacture_with_shift`、`evaluate_manufacture_lines`；按 `RecipeKind` 输出直接效率与仓库 |
-| `pool/manufacture.rs` | 从 operbox 制造 roster 建池；跳过未建模 buff |
-| `search/manufacture.rs` | C(n,3) 穷举；支持单配方 / 多产线 split（2 金 + 2 经验默认） |
+`apply_manu_phases` 先收集并按 `Phase::sort_key + phase_order` 执行 atom，再处理制造专属 tagged inject、配方条件、PeerAbsorb、仓储与心情。`solve_manufacture_with_shift` 额外在班次/心情 gap 上求值；静态探索传 `None` 或调用 `solve_manufacture`。多线由 `evaluate_manufacture_lines` 汇总，不能由 CLI 手拼。
 
-### 制造 L1 与贸易 L1 的差异（摘要）
+## 搜索与排班
 
-- 上下文追踪 **配方产能**（`RecipeEff`）与 **仓库上限**（`RecipeLimit`），非订单效率%。
-- `ActiveRecipe` Condition 在制造站生效；贸易站用于订单种类。
-- 无 `PeerAbsorb` 后的 `gold_flow` 挂钩。
-- 共享同一 `skill_table.json`（制造 buff 与贸易 buff 同表不同 id）。
-- **时间爬升**（芬/克洛丝/稀音/阿罗玛等）：`Action::AddEffRamp` → 纸面取 **20h 逐时效率算术平均**（见 `eff_ramp.rs`）；发电空构仍用 `shift_hours` 单点。
-- **心情落差**（铅踝）：`OwnerMoodGap` 按制造房人数、中枢减免、同房技能和配方计算真实净心情消耗，再按技能阈值分段求班次平均效率；`OwnerMoodGapAbove` 是严格大于。显式班长必须走 live 结算，不使用静态 Bake。
-- 排班层 `assign_shift` 在体系落位后直接使用全部合法普通制造干员做 C(n,k)，由 solver 按 `final_efficiency` 自然排序；不按干员名或当前 top hit 预判谁“值得搜索”。唯一的班长 admission 例外是当前明确的 hard constraint：技能含 `OwnerMoodGap` selector，且 `AddBucketEffFromSelector.ret_per_step < 0` 的候选连续制造工作达到 `12h` 时排除；单个短班仍可参与。普通搜索、anchor 补位和 capacity fallback 共用该 atom capability 判定。排班以 `full_pool=true` 标记完整候选范围，结构上禁止使用仅由 standalone 组合烘焙的制造表。`standalone_roster.json` 与对应 baked 表只服务独立 bench/探索入口，不裁剪排班候选。这样标准化、红云/泡泡仓容耦合、莱茵同房机制以及 `atoms: []` 的同房催化角色都能参与真实组合结算。
-- `standardization_mizuki` 不是体系，不进入 `base_systems`、不产生 anchor 或特殊 fallback。水月只读取同房标准化技能；红云/泡泡只按同房仓库贡献结算；莱茵同房技能与全基建计数继续服从既有机制。搜索结果可以自然形成高效组合，但不得固定成员、房间、队伍或班次。
-- 体系专用制造干员仍留在原始制造池供编排显式认领，但普通制造池通过 `filter_general_manufacture_search_pool()` 排除冬时、温蒂、迷迭香。显式 required anchor 搜索会从原池只加回该 anchor；自动化组继续显式处理冬时/温蒂，迷迭香仍服从与黑键共同激活的硬核心。卡达等其余合法制造干员不会因零直接生产力被规则删除，只由 solver 自然淘汰。
-- 独立 bench / 探索在 `full_pool=false` 时可使用 `data/standalone_roster.json` 的结构化白名单：每个工具人可以声明 `min_tier`，并按 `recipes` / `order_types` 限定适用配方。该入口的制造搜索按当前房间 `RecipeKind` 再裁候选池，贸易搜索按 `TradeOrderKind` 再裁候选池；此规则不适用于排班 `full_pool=true`。
-- 独立 bench / 探索的 `full_pool=false` 制造白名单按配方过滤后若不足 3 人，不回退到制造全池；`search/manufacture.rs` 改用 `filter_recipe_productive_pool()` 补入当前配方下确实能贡献生产力的候选。这样源石配方限定干员（如炎熔）不会被回退池带进作战记录 / 赤金房间；排班 `full_pool=true` 不经过这条过滤。
+`build_manufacture_pool` 将 OperBox 的 facility binding、tier 和 `SkillTable` 映射为 `ManuPoolEntry`；缺失实例/buff 记录 skip，不是白板高效技能。`search_manufacture_triples` 先按 `full_pool` 过滤，再对单配方做 `C(n,3)` 组合；`ManuSearchRecipeMode::Lines` 分别求赤金和作战记录线并按线数合并。排班填房使用 `manu_options`、Plan anchor、`used` 和最新 resolve 快照。
 
-## CLI 入口
+## 失败与回退
 
-| 命令 | 说明 |
-|------|------|
-| `pool --manufacture --operbox <path>` | 制造池统计（**必须** operbox，无默认 roster） |
-| `bench --operbox <path>` | 同时 bench 贸易 + 制造搜索 |
-| `search trade` | 仅贸易单站探索；当前没有制造专用 `search` 子命令 |
-| **`layout test`** | 默认调用 `assign_base_greedy` 宏观落位→ `resolve_base` → 制造搜索（含产线拆解） |
-| **`layout team-rotation`** | 默认 ABC、ABC `12/12/12`、二班与具名特殊四班都要求每个最终状态覆盖全部制造产线，并输出直接效率与时长加权汇总 |
+配方/等级/人数非法直接返回错误；单配方无解返回无 hit/错误，由上层决定是否换配方。心情不足返回带 gap 的结果，排班 policy 决定休息或换班；制造 solver 不修改宿舍。全局资源未刷新时检查 `resolve_base` 与 cross-facility 链，不在制造结果出口补百分比。Bake 不兼容时回退 live search。
 
-输出在 `infra-cli/output.rs` 的 `emit_bench` / pool 相关段。
-
-## 数据
-
-| 文件 | 状态 |
-|------|------|
-| `data/skill_table.json` | 制造 buff 与贸易 buff **共用**；`atoms: []` 仍表示委托（制造域引擎未建时跳过或 L2 占位） |
-| `data/prts_manufacturing_skills.json` | PRTS 制造技能原文快照（核对用） |
-| `data/operator_instances.json` | 干员 tier → buff_ids（与贸易共用） |
-| `scripts/build_manufacturing_skill_table.py` | 制造技能表构建/校验 |
-
-**无** `manufacture_shortcuts.json`、**无** `REGRESSION_CASES` 制造列。
-
-## 全局资源 / 布局
-
-制造求解可读 `LayoutContext`（搜索时传入）：`ManuRecipeKinds`、`effective_power_station_count` 等来自 layout / 全局池快照。中枢编制见 `control::apply_control_to_layout`；资源注册见 `EFFECT_ATOM_DESIGN.md` §8.13。
-
-`GlobalInject` phase 在贸易 L1 为空操作；制造 / 中控侧在 `control/interpreter.rs` 处理。
-
-### 已闭环示例（怪猎 P0）
-
-| 干员 | 技能 | 布局依赖 |
-|------|------|----------|
-| **泰拉大陆调查团** | 可靠的随从们 | `layout.global.Matatabi`（木天蓼 12 → 生产力 +17% 含 flat 5%） |
-| （间接）**麒麟R夜刀** 精2 | 以身作则 | `global_inject` 全制造 +2%（`snhunt_elite2_baseline()`） |
-
-评估怪猎制造搜索时应用 `LayoutContext::snhunt_baseline()` / `LayoutContext::snhunt_elite2_baseline()`，或使用 `resolve_snhunt_baseline_layout()` / `resolve_snhunt_elite2_baseline_layout()` 生成布局快照；勿用默认 `search_baseline()`（无木天蓼）。
-
-## 已知缺口（相对贸易站）
-
-- [ ] 制造专用 L2 域引擎（若出现大量 `atoms: []` 委托）
-- [ ] 制造 L3 组合表（若出现类似巫恋核的表化最优解）
-- [ ] `verify` 制造回归 CSV + 夹具
-- [x] **制造产线排班** — 已通过 `assign_shift`（`Peak` / `Recovery`）覆盖；现行 `schedule_team_rotation` 按制造直接效率比较
-- [ ] `市井之道产能耦合` 类问题在制造侧重算最终效率时尚未完全对齐贸易站讨论（见设计文档 §九）
-- [ ] 制造 `GlobalInject` 特定 buff（目前走 `control/interpreter.rs`，未单独拆制造侧 `global_inject` 阶段）
-
-## 改制造站时推荐顺序
-
-1. 本文 + `manufacture/interpreter.rs` 局部（结构同 [INTERNAL/TRADE_INTERPRETER.md](INTERNAL/TRADE_INTERPRETER.md)）
-2. `types.rs` / `skill_table.json` / `operator_instances.json`
-3. `manufacture/solver.rs` 与 `search/manufacture.rs` 直接效率结算
-4. `cargo test -p infra-core`（制造相关 `mod tests`）
-5. **不要**改 `trade/shortcut.rs` 或 `REGRESSION_CASES.csv` 除非同时动贸易站
+核验入口：`layout eval --explain-json`、`infra-cli bench`、制造搜索报告和 `plan --assert-invariants`。机制数字来自知识库桥接；运行时 JSON 只作为输入载体。

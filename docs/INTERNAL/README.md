@@ -1,20 +1,19 @@
-# 大文件内部地图
+# 内部实现地图
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/文档生命周期.md；docs/PROJECT_MAP.md
-> 摘要：路由大模块内部实现地图和对应 current owner
+> 当前真源：对应模块源码；本文只提供导航
+> 代码范围：`crates/infra-core/src/{trade,manufacture,cross_facility,global_resource,layout}`
+> 代码锚点：见各子文档的代码锚点字段
+> 关联链路：[`../调用链/技能到房间结算.md`](../调用链/技能到房间结算.md)
+> 核验基线：`947f1a2`
 
-> 代码不拆分；用本文档族把千行级文件「切片」给 Agent / 开发者。**改前先查表，再打开对应函数段。**
+`INTERNAL/` 面向需要直接定位符号的 agent。它描述当前代码路径、输入输出、分支和诊断顺序，不裁决游戏机制；机制原文从 [`../知识库引用.md`](../知识库引用.md) 进入。
 
-| 文档 | 对应源码 | 何时读 |
-|------|----------|--------|
-| [TRADE_INTERPRETER.md](TRADE_INTERPRETER.md) | `crates/infra-core/src/trade/interpreter.rs` | 改 L1 Phase、Condition、Selector、效率/上限叠加 |
-| [SHORTCUT_MATCHING.md](SHORTCUT_MATCHING.md) | `crates/infra-core/src/trade/shortcut.rs` | 改 L3 匹配、同房互斥、shortcut 回归 |
-| [CROSS_FACILITY.md](CROSS_FACILITY.md) | `crates/infra-core/src/cross_facility/` | 改跨房 buff、scope=Global atom、resolve.rs 编排集成 |
-
-编排层当前主线见 [ORCHESTRATION_LAYER.md](../ORCHESTRATION_LAYER.md)（`layout/orchestrate/` 已落地；System → Plan → Execute）。
-
-制造站 L1 与贸易站对称，见 [MANUFACTURE_STATUS.md](../MANUFACTURE_STATUS.md)（入口 `manufacture/interpreter.rs`，结构类似 TRADE_INTERPRETER）。
-
-CLI 输出层：`infra-cli/src/output.rs` 按 `emit_pool` / `emit_trade_search` / `emit_bench` / `emit_trade_yield` / `emit_team_rotation` 等函数名定位，无需通读全文。
+| 文档 | 用途 |
+|---|---|
+| [`TRADE_INTERPRETER.md`](TRADE_INTERPRETER.md) | 贸易 L1 phase、状态字段和 selector |
+| [`SHORTCUT_MATCHING.md`](SHORTCUT_MATCHING.md) | shortcut/segment 的实际匹配与互斥 |
+| [`TRADE_COMMUNITY_UNIT_OUTPUT.md`](TRADE_COMMUNITY_UNIT_OUTPUT.md) | 单位产出锚、来源和精度边界 |
+| [`CROSS_FACILITY.md`](CROSS_FACILITY.md) | global atom 收集、编排和 resource snapshot |
+| [`MECHANICS_REGISTRY_AUDIT.md`](MECHANICS_REGISTRY_AUDIT.md) | 生成的 triage 报告，不是覆盖证明 |

@@ -1,47 +1,13 @@
-# 贸易社区单位产出锚点
+# 贸易单位产出锚
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/EFFICIENCY_MODEL.md；docs/EFFECT_ATOM_DESIGN.md
-> 摘要：说明社区单位产出与贸易解释值边界
+> 当前真源：`data/trade_shortcuts.json` 的 `unit_output` 字段及其 source/precision
+> 代码范围：`crates/infra-core/src/trade/{shortcut,solver,unit_output}.rs`; `data/trade_shortcuts.json`; `data/REGRESSION_CASES.csv`
+> 代码锚点：`shortcut.rs::CommunityUnitOutputRule`; `shortcut.rs::validate_trade_shortcuts`; `solver.rs::resolve_unit_output`; `unit_output.rs::{compute_unit_output,daily_yield}`
+> 关联链路：[`../模块/贸易求解.md`](../模块/贸易求解.md)、[`SHORTCUT_MATCHING.md`](SHORTCUT_MATCHING.md)
+> 核验基线：`947f1a2`
 
-> 真源：`工具人表26.5 (2).xlsx`（公孙长乐，2026 年 5 月）与 `排班表图片生成器.md`「三、需求模块二」。
+特殊组合的社区单位产出是 L3 产出锚，不由等效效率反推，除非条目标记 `derived_from_rounded_equivalent`。每个改变单位产出的 shortcut 必须同时声明 source 和 precision；非有限、非正数、缺来源或重复 id 在加载时失败。
 
-工具人表是截图式视觉排版，不是逐行数据表。解析时只读取明确标注的视觉卡片，不根据相邻行列自动推断组合关系。运行时规范化数据位于 `data/trade_shortcuts.json`。
-
-## 精确锚点
-
-| 规则 | 加强后单位贸易产出 | 来源 |
-|------|-------------------:|------|
-| 可露希尔特别订单 | `12000` | `Sheet1 H5:H10`：固定 2 赤金 / 1200 龙门币、每小时单位贸易收益 500 |
-| 巫恋 `tier_up` + 龙舌兰 `tier_up` + 裁缝β | `12739.73` | 需求文档三.3 的全精二示例；单位赤金 `2328.77` |
-| 巫恋 `tier_up` + 龙舌兰 `tier_up` + 裁缝α | `12288.8` | 用户校准；单位赤金 `1915.521` |
-| 巫恋 `tier_up` + 龙舌兰 `tier_up` + 白板 | `12030.46` | 用户校准；单位赤金 `1675.127` |
-| 巫恋 `tier_up` + 龙舌兰 `tier_0` + 裁缝α | `11331.04` | 用户确认的三级站 tier_0 锚点；单位赤金 `957.76` |
-| 巫恋 `tier_up` + 龙舌兰 `tier_0` + 裁缝β | `11575.34` | 用户确认的三级站 tier_0 锚点；单位赤金 `1164.384` |
-| 巫恋 `tier_up` + 龙舌兰 `tier_0` + 白板 | `11192.89` | 用户校准；单位赤金 `837.5635` |
-| 但书Ⅱ Lv.1 | `20000` | 用户确认的社区分级锚点，2026-07-11 |
-| 但书Ⅱ Lv.2 | `18591.55` | 用户确认的社区分级锚点；`Sheet1 E27` 同时标注约 `1.81` 倍率 |
-| 但书Ⅱ Lv.3 | `15929.2` | 用户确认的社区分级锚点；`Sheet1 E5` 同时标注 `1.55` 倍率 |
-
-## 由截图取整等效值派生的锚点
-
-工具人表对其余巫恋档只提供取整后的等效技能效率。按需求文档给出的等效反算关系，在三人站纸面效率 `1.93`、非技能部分 `1.03` 下转换为固定单位产出：
-
-```text
-unit_output
-  = 10265 × (1.03 + equivalent_skill_bonus) / 1.93
-```
-
-| 规则 | 截图值 | 规范化单位产出 | 来源单元格 |
-|------|-------:|-----------------:|------------|
-| 巫恋Ⅱ + 裁缝β + 白板 | `93%` | `10424.559585` | `Sheet1 B44` |
-
-上述仍保留的条目在 JSON 中标记为 `derived_from_rounded_equivalent`，表示计算过程确定，但输入本身只有整数百分比精度。用户提供精确原始单位产出后，直接替换派生值并改为 `exact`。
-
-## 运行时约束
-
-- 但书、可露希尔、黑键可露希尔和巫恋 shortcut 必须配置 `unit_output`、来源与精度。
-- 配置缺失、重复、非正数或非有限数时，solver 直接报错，不回退到旧 `trade_pct` 推算。
-- 旧 `trade_pct` / `gold_pct` 已删除；解释值统一为小数 `mechanic_equivalent_efficiency`。
-- 最终产出统一为 `10265 × final_efficiency × shift_hours / 24`。
+运行时由 `resolve_unit_output` 选择 regular/L3 unit，再由 `TradeProductionReport::daily_at_shift` 计算工作时长产出。`mechanic_equivalent_efficiency` 不参与第二次乘法。修改锚点时同步更新 JSON、来源注释、回归期望和 verify fixture。

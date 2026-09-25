@@ -1,154 +1,31 @@
-# 无人机生成、分配与产出结算
+# 发电与无人机结算
 
 > 文档角色：canonical
 > 生命周期状态：current
-> 领域键：production.drones
-> 当前真源：self
-> 摘要：裁决发电效率如何生成无人机，以及无人机如何按目标产能分配
+> 当前真源：`crates/infra-core/src/power/`、`crates/infra-core/src/layout/resolve.rs`；游戏规则见 [`知识库引用.md`](知识库引用.md)
+> 代码范围：`crates/infra-core/src/power/{input,interpreter,solver}.rs`; `layout/resolve.rs`; `layout/assignment.rs`; `schedule/*`; `export/maa.rs`
+> 代码锚点：`power/solver.rs::{aggregate_power_efficiency,solve_power,apply_power_to_layout}`; `power/interpreter.rs::apply_power_phases`; `layout/resolve.rs::build_power_rooms`; `schedule/team_rotation.rs`; `export/maa.rs`
+> 关联链路：[`模块/心情与辅助设施.md`](模块/心情与辅助设施.md)、[`调用链/跨设施状态刷新.md`](调用链/跨设施状态刷新.md)
+> 核验基线：`947f1a2`
 
-## 1. 范围
+## 两条边界
 
-本文定义无人机从发电到制造/贸易产出的领域语义。它不定义具体排班搜索的最优目标，也不把 MAA 导出字段当成产出结算。
+发电站效率产生无人机充能速度；无人机库存再由 rotation/export 的 `DroneAction` 投向制造或贸易。`drone_cap` 是布局输入中的库存上限，不是当前库存，也不是固定效率。本文不定义换班目标或 MAA 文本格式。
 
-无人机链路必须与以下两条链路分开：
+## 发电结算
 
-```text
-发电站物理效率 -> 无人机生成速度与库存
-无人机库存     -> 目标制造/贸易效率 -> 目标产物额外产出
-```
-
-`drone_cap` 是库存上限，不是固定的无人机效率，也不是当前剩余无人机数量。满清理基建的当前上限为 `235`；布局输入仍必须显式携带实际上限。
-
-## 2. 发电效率来源
-
-发电效率的基础值属于全基建共享，不按发电站数量重复计算：
+`PowerRoomInput` 经过 `apply_power_phases`，再由 `solve_power` 输出单站 `PowerResult`。`aggregate_power_efficiency` 只汇总岗位增量；`apply_power_to_layout` 把结果写进 `LayoutContext`，共享基础值在布局总量中只计一次。心情为零的进驻者仍占位，但是否提供技能/作业平台增量由 power interpreter 和数据条件决定。
 
 ```text
-power_efficiency
-  = 1.000
-  + sum(有效发电干员技能效率)
-  + sum(有效发电干员进驻效率)
-  + 其他已裁决的发电增量
+assignment power rooms
+  -> resolve_base / build_power_rooms
+  -> power interpreter + solve_power
+  -> LayoutContext power result
+  -> schedule DroneAction / export
 ```
 
-每个发电站的非零心情干员提供 `0.050` 进驻效率。干员心情为 `0` 时：
+发电站数量、平台数量和 control/global inject 通过 `LayoutContext` 传给贸易/制造 atom；不要在出口层重新按房间数加成。
 
-- 不提供自身技能效率；
-- 不提供 `0.050` 进驻效率；
-- 仍占用发电站位置；
-- 仍可满足明确声明的跨设施联动条件。
+## 诊断和核验
 
-因此，发电站数量只增加可提供有效技能和进驻效率的岗位数量；它不会复制全基建共享的 `1.000` 基础值。
-
-252/342 自动化中的“中枢森蚺 + 发电精二承曦格雷伊 + 发电 Lancet-2”属于上述例外：Lancet-2 可以 `0` 心情占位并满足联动，但不能贡献技能或进驻效率。
-
-## 3. 无人机生成
-
-基准无人机生成时间为每架 `6` 分钟。给定时间段内的有效发电效率为 `E`，则：
-
-```text
-每架无人机生成时间 = 6 / E 分钟
-无人机生成速度     = E / 6 架/分钟
-```
-
-从库存 `D0` 推进 `T` 分钟后的理论库存为：
-
-```text
-D_theoretical = D0 + E × T / 6
-D_after_cap   = min(drone_cap, D_theoretical)
-```
-
-实际状态推进必须遵守：
-
-- 库存不能超过 `drone_cap`；
-- 无人机只能从当前库存中消耗；
-- 消耗发生后才释放库存空间；
-- 从空仓开始的首个周期不自动视为稳态满仓。
-
-例如 `E = 1.2`、`drone_cap = 235` 且从空仓开始：
-
-```text
-单架生成时间 = 6 / 1.2 = 5 分钟
-填满时间     = 235 × 5 = 1175 分钟 = 19 小时 35 分钟
-```
-
-## 4. 无人机使用与效率转化
-
-无人机投入制造站或贸易站时，固定转化比例为：
-
-```text
-drone_target_efficiency = allocated_power_efficiency / 2
-```
-
-这项效率是制造、贸易房间技能和进驻效率之外的来源，不得再次计入房间原有效率。目标额外产出为：
-
-```text
-extra_output = drone_target_efficiency × target_unit_output_per_day
-```
-
-其中 `target_unit_output_per_day` 必须使用目标产线或目标特殊组合自己的单位产出。
-
-例：每日平均可分配发电效率为 `1.2 / 2 = 0.6`。
-
-投入一条普通赤金制造线：
-
-```text
-extra_pure_gold = 0.6 × 10000 = 6000 / 日
-```
-
-投入可露希尔组合：
-
-```text
-extra_trade = 0.6 × 12000 = 7200 / 日
-extra_gold  = 0.6 × 2000  = 1200 / 日
-```
-
-龙舌兰、但书、可露希尔及其他特殊组合同样使用其自身贸易单位产出和赤金单位产出；不能用普通贸易站单位产出替代。
-
-## 5. 分配守恒
-
-同一时间窗口内，无人机可分配效率必须守恒：
-
-```text
-sum(各目标 allocated_power_efficiency)
-  <= 可用发电效率对应的无人机资源
-```
-
-将同一份无人机资源分配到制造和贸易时，必须先拆分再计算：
-
-```text
-allocated_manufacture + allocated_trade = allocated_total
-```
-
-不得把同一份无人机效率同时计入两类产出。分配可以随时间变化，但每个时间点的库存和分配都必须可追溯。
-
-长期稳态可以使用日均近似；完整 `12/6/6` 或其他轮换必须按班次边界推进库存，不能把首日空仓直接当作日均稳态。
-
-## 6. 输出口径
-
-最终产出应分解为：
-
-```text
-total_output = physical_line_output + drone_extra_output
-```
-
-建议结构化结果至少区分：
-
-- `physical_*`：实体制造站/贸易站按房间效率产生的产出；
-- `drone_*`：无人机消耗、分配效率和额外产出；
-- `daily.production`：两者合计后的按时间加权产出；
-- `drone_inventory`：周期起止库存、生成量、消耗量和上限。
-
-`drone_cap`、承曦格雷伊的无人机技能效率和无人机产出转化不是同一概念。承曦格雷伊的 `drone_cap × 0.1%` 技能只属于发电效率来源；不得用它替代无人机库存推进，也不得用贸易固定系数替代无人机目标分配。
-
-## 7. 目标选择边界
-
-目标选择属于 schedule/Plan policy；export 只忠实序列化已选择的目标和执行顺序。没有用户资源 policy 时，当前安全默认可以选择实际产品为赤金的制造房；不得由 export 临时改选目标。
-
-完整的贸易/赤金/经验目标动态优化、资源倾向和跨班次分配，必须消费本 canonical 的库存与守恒事实，不能只按房间编号或当前 top hit 特判。
-
-## 8. 当前实现状态
-
-本 canonical 是当前领域目标和实现验收口径，不表示所有代码已经完成迁移。现有实现中的 `DRONE_TRADE_FACTOR = 0.685` 不能作为本规则的替代：它没有表达库存、消耗、目标分配或 `power_efficiency / 2` 转化。
-
-在无人机结算实现完成前，任何产出报告必须明确区分“不含无人机的实体产出”和“含无人机的总产出”，不得把实体产出字段误报为账号最终总产出。
+无人机异常先对比 assignment、power breakdown、有效心情、`LayoutContext` 的 power counts，再看 rotation 的 DroneAction 和 export。固定 assignment 用 `layout eval --explain-json`；完整班次用 `plan --assert-invariants` 和代表性 243/high-owned fixture。当前实现不等于已覆盖所有游戏内无人机策略，未建模机制应在知识库桥接中标注。
