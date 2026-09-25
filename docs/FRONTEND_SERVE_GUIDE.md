@@ -1,66 +1,37 @@
-# Frontend Serve Guide
+# `infra-cli serve` 运行与接入
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/FRONTEND_CLI.md；docs/INFRA_CLI.md
-> 摘要：说明前端 serve worker 的当前使用方式
+> 当前真源：docs/接口/CLI与Worker.md；docs/FRONTEND_CLI.md
+> 摘要：说明常驻 Worker 的启动、JSONL 边界、探活和进程故障定位
+> 代码范围：`crates/infra-cli/src/commands/serve.rs`
+> 代码锚点：`serve_cmd`、`read_ndjson_frame`、`write_response`、`handle_request`
+> 关联链路：[CLI 与 Worker](接口/CLI与Worker.md)、[前端对接](FRONTEND_CLI.md)、[错误与诊断](接口/错误与诊断.md)
+> 核验基线：`serve --help`、`ping`、一条最小 `plan.compute`
 
-前端改造清单见：[前端真实求解器接入说明](前端真实求解器接入说明.md)。
+## 启动
 
-使用一个长驻 `infra-cli serve`，通过 stdin/stdout 传输一行一个 JSON 对象。stdout 只允许协议帧，stderr 只用于日志。
-
-## 当前落地状态
-
-- `plan.compute` v1 的后端与 Next BFF 实现及本地证据已经完成。
-- 目标分支集成、发布部署和真实浏览器验收尚未完成；当前发布包或已安装 Worker 是否支持 v1，必须以 `ping` 返回的版本字段和契约 hash 判断。
-- 后续工作见 [Worker 内联 JSON 集成与部署验收](TODO/Worker内联JSON集成与部署验收.md)。该任务和部署 inventory 完成前，legacy 路径继续保留。
-
-## 主请求
-
-下面只展示通过结构 schema 的最小形状，不承诺该单房布局可求解；真实调用必须内联提交完整 layout 和 operbox。
-
-```json
-{"id":1,"method":"plan.compute","params":{"schema_version":1,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"char_009_12fce","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"labels":{"layout":"schema-example","operbox":"schema-example"},"options":{"rotation":"abc_12_6_6","top":20,"system_preferences":{},"maa_title":"My schedule"}}}
+```bash
+infra-cli serve
 ```
 
-`layout` 和 `operbox` 是内联对象，不接受 caller 文件路径。`options` 可省略；rotation 默认为 ABC，top 默认为 20。layout 为 1 至 64 个房间，operbox 为 1 至 1000 项，top 为 1 至 100，两个 label 均为非空且不超过 200 UTF-8 bytes；request/response 单个 NDJSON frame 均不超过 8 MiB。
+Worker 启动时加载实例表、技能表、练卡知识和 v1–v4 schema；随后尝试预热本地 bake（当前实现可安全不启用）。stderr 只写 ready、加载/预热提示和性能日志。
 
-机器参数契约位于 [`contracts/plan-compute-v1.schema.json`](../contracts/plan-compute-v1.schema.json) 与 [`contracts/plan-compute-v2.schema.json`](../contracts/plan-compute-v2.schema.json)，人类可读版本见对应 Markdown。Worker 在反序列化前按请求版本执行 schema，所有 wire 对象拒绝未知字段；重复 ID、kind/product 跨字段一致性等继续由 Rust 领域校验。v1 保持原语义，v2 增加 `abc_12_12_12`。
+## 协议边界
 
-成功响应：
+- stdin：一行一个 UTF-8 JSON request；EOF 正常结束；空白行忽略。
+- stdout：一行一个 JSON response，写完立即 flush；不得输出日志。
+- 单帧最大 8 MiB；超限返回 `FRAME_TOO_LARGE` 并消费完整坏帧后继续。
+- 非 UTF-8 返回 `INVALID_UTF8`；JSON 解析失败返回外层错误。
+- 支持方法：`ping`、`plan`、`plan.compute`。
 
-```json
-{"id":1,"ok":true,"elapsed_ms":123,"result":{"schema_version":1,"profile":{},"rotation":{"profile":"abc_12_6_6","daily":{},"shifts":[]},"maa":{},"training_advice":{"schema_version":2,"context":{"has_originium_shard_factory":false,"meeting_room_max_level":3,"dormitory_level_sum":20,"engineering_robot_count":64},"newbie_section_status":"complete","incomplete_newbie":[],"combinations":[],"recommendations":[]}}}
-```
+不要把 `serve` 当 HTTP 服务；HTTP、鉴权和进程守护属于上游部署层。
 
-- `profile`：现有账号画像 schema v4。
-- `rotation`：当前 profile、daily 和班次效率摘要；`rotation.warnings` 是报告级缺员提示（办公室/会客室候选不足时逐班列出，无缺员时省略），与 MAA `hire`/`meeting` 的 `autofill` 对应。
-- `maa`：可直接下载或用于现有 UI 的 MAA 排班 JSON。
-- `training_advice`：同一 operbox/layout 的结构化练卡结果（schema v2）；包含新手章节状态、全量未完成基础名单、常见组合完成度和按优先级去重后的最多 10 人建议。它直接消费蓝图可确定的源石线、会客室、宿舍和工程机器人条件；排班结果按每班每站 `skill-efficiency ÷ operator_count` 的简单平均注入 T9。字段、枚举、门闩和前端消费规则唯一以 [FRONTEND_CLI.md](FRONTEND_CLI.md#45-training_advice排班附带的练卡建议) §4.5 为准；无源石线时搓玉和泡泡/火神不进入行动推荐，同站条件只作为说明。
+## 部署检查
 
-错误响应：
+1. 发送 `ping` 并记录协议版本、schema hash、solver executable hash、commit 和 build time。
+2. 发送最小 `plan.compute`，确认 response 是单行 JSON、`ok` 与 result 形状正确。
+3. 对真实请求记录 id、schema version、layout/operbox label 和错误原文。
+4. 进程退出或 stdout 非 JSON 时，先检查 stderr 和运行时 data 根，再检查调用方是否误把日志写进 stdout。
 
-```json
-{"id":1,"ok":false,"elapsed_ms":3,"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}}
-```
-
-非 assert 的求解失败会在保留旧顶层错误的同时，尽可能保留 core 已真实构造的结果：
-
-```json
-{"id":1,"ok":false,"elapsed_ms":3,"result":{"schema_version":4,"rotation":null,"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}},"error":{"code":"PLAN_FAILED","stage":"plan.compute","message":"..."}}
-```
-
-`result.error` 存在时，前端不得将响应导入 MAA。若 `result.rotation` 非空，它只会来自本次 core 已真实构造的 rotation 报告；若为空，表示错误发生在报告产生前，不得伪造或复用旧排班。`options.assert_invariants=true` 仍使用上面的顶层 `ok:false` 形状且不返回 `result`；请求 schema 和输入准入错误也只在非 assert 请求中附带 `result` 错误对象。
-
-## 生命周期
-
-1. Next 进程按需启动一个 `infra-cli serve`。
-2. 同一客户端只允许一个 in-flight 请求；第二个请求立即返回 `WORKER_BUSY`。
-3. execution timeout 会终止 Worker 并失败当前请求，不自动重发。
-4. Worker busy 时 health 使用本地 running/busy 状态，不发送 ping。
-5. `ping` result 包含 `protocol_version=1`、`plan_schema_version=1`、`plan_contract_sha256`、`solver_executable_sha256`、`solver_git_commit` 和 `solver_built_at`。前两个字段承担兼容性判定；其余字段都是诊断信息。每个响应顶层的 `solver` 是本次 Worker 的构建快照，前端反馈必须使用对应 `plan.compute` 响应的快照，不使用最近一次 ping。
-6. 运行记录由 Next 在收到响应后 best-effort 保存，保存失败不改变求解结果。
-
-## Legacy
-
-旧 `method: "plan"` 在兼容期继续接收 operbox/layout/profile_out/maa_out/output_dir 等路径，并保持旧响应。新前端不回退该方法；达到部署版本门禁后按 [Worker 旧路径协议清理](TODO/Worker旧路径协议清理.md) 删除 legacy adapter。
+Worker 具体字段与错误外形见 [FRONTEND_CLI.md](FRONTEND_CLI.md)；完整调用链见 [调用链/plan请求](调用链/plan请求.md)。
