@@ -182,8 +182,8 @@
         {
           "facility": "control",
           "operators": [
-            { "name": "火龙S黑角", "elite": 2 },
-            { "name": "麒麟R夜刀", "elite": 2 }
+            { "name": "火龙S黑角", "elite": 0 },
+            { "name": "麒麟R夜刀", "elite": 0 }
           ]
         },
         {
@@ -204,13 +204,15 @@
         {
           "facility": "control",
           "operators": [
-            { "name": "火龙S黑角", "elite": 2 },
-            { "name": "麒麟R夜刀", "elite": 2 }
+            { "name": "火龙S黑角", "elite": 0 },
+            { "name": "麒麟R夜刀", "elite": 0 }
           ]
         },
         {
           "facility": "factory",
-          "operators": [{ "name": "泰拉大陆调查团", "elite": 0 }]
+          "operators": [
+            { "name": "泰拉大陆调查团", "elite": 0, "min_level": 30 }
+          ]
         }
       ]
     },

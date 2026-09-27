@@ -3274,12 +3274,6 @@
       "tier": "tier_0",
       "tags": [],
       "facilities": {
-        "manufacture": {
-          "buff_ids": [
-            "manu_prod_spd&limit&bd[000]"
-          ],
-          "stepwise": false
-        },
         "trade": {
           "buff_ids": [
             "trade_ord_spd&limit&bd[000]"

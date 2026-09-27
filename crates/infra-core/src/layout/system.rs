@@ -207,6 +207,9 @@ pub struct SystemOperatorFixed {
     /// 德克萨斯 E0/E2 企鹅物流分叉：精英上限（含）。
     #[serde(default)]
     pub max_elite: Option<u8>,
+    /// 最低等级要求；用于 1–2 星按等级（30 级）解锁、精英字段无法表达的技能准入。
+    #[serde(default)]
+    pub min_level: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -414,6 +417,20 @@ fn explain_slot_operators(
                             fixed.name,
                             progress.elite,
                             fixed.max_elite.unwrap_or_default()
+                        ),
+                    ));
+                }
+                if fixed.min_level.is_some_and(|min| progress.level < min) {
+                    if slot.fill == SlotFillMode::Search {
+                        continue;
+                    }
+                    return Err(SystemExplainReason::new(
+                        "level_requirement",
+                        format!(
+                            "{} level {} < required {}",
+                            fixed.name,
+                            progress.level,
+                            fixed.min_level.unwrap_or_default()
                         ),
                     ));
                 }
