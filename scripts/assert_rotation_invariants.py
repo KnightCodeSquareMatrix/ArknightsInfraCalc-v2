@@ -21,10 +21,15 @@ def main() -> int:
     parser.add_argument("--group", choices=["representative", "high-owned", "all"], default="all")
     parser.add_argument("--rotation", default="3")
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--binary", default="target/debug/infra-cli")
+    parser.add_argument("--skip-build", action="store_true")
     args = parser.parse_args()
     groups = GROUPS.items() if args.group == "all" else [(args.group, GROUPS[args.group])]
-    binary = ROOT / "target/debug/infra-cli"
-    subprocess.run(["cargo", "build", "-p", "infra-cli"], cwd=ROOT, check=True)
+    binary = Path(args.binary)
+    if not binary.is_absolute():
+        binary = ROOT / binary
+    if not args.skip_build:
+        subprocess.run(["cargo", "build", "-p", "infra-cli"], cwd=ROOT, check=True)
 
     failures: dict[str, list[tuple[str, str, str]]] = {
         "invariant": [],
