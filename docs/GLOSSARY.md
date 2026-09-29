@@ -130,16 +130,16 @@
 | 术语 | 短定义 | Owner / 详见 |
 |---|---|---|
 | `Efficiency` | 生产域唯一效率类型，内部为 `i32` 千分位；`1.000` 表示基础 100%。 | [效率模型](EFFICIENCY_MODEL.md) |
-| base / occupancy / skill / control efficiency | 房间基础、进驻人数、房内技能和中枢注入分量。 | [效率模型](EFFICIENCY_MODEL.md) |
-| paper efficiency | 贸易基础、占用、技能和中枢分量之和。 | [效率模型](EFFICIENCY_MODEL.md#31-贸易) |
+| base / operator / global efficiency | 基础效率包含设施基准与非红脸（心情大于 0）进驻增量；干员技能效率与全局加成分别列出。 | [效率模型](EFFICIENCY_MODEL.md) |
+| paper efficiency | 贸易基础效率、干员技能效率和全局加成之和。 | [效率模型](EFFICIENCY_MODEL.md#31-贸易) |
 | unit output / multiplier | 社区确认的单位日产出，以及相对基准日产出的倍率。 | [效率模型](EFFICIENCY_MODEL.md#31-贸易) |
-| total efficiency | 基础效率 + 中枢/全局效率 + 技能效率；新接口的统一总效率，不含特殊单位产出倍率。 | [效率模型](EFFICIENCY_MODEL.md) |
+| total efficiency | 基础效率 + 干员技能效率 + 全局加成；不含特殊单位产出倍率或等效解释值。 | [效率模型](EFFICIENCY_MODEL.md) |
 | final efficiency | 已从公开效率协议移除；内部实现仅作为排序变量名暂存。 | [效率模型](EFFICIENCY_MODEL.md)、[评分模型](SCORING_MODEL.md) |
 | mechanic equivalent efficiency | 特殊机制的解释值；不参与第二次乘法，也不是排序真源。 | [效率模型](EFFICIENCY_MODEL.md#31-贸易) |
 | weighted efficiency | 按班次分钟数对直接效率做的整数时长折算。 | [效率模型](EFFICIENCY_MODEL.md) |
 | `DailyTotals` | 贸易、制造、发电分别保存的 24 小时加权汇总；不存在匿名跨域总计。 | [评分模型](SCORING_MODEL.md#2-排班汇总) |
 | `DailyProduction` | 跨班次、跨房间按总周期归一到 24h 的五类最终产物平均值。 | [效率模型](EFFICIENCY_MODEL.md) |
-| 会客室基础效率 | 会客室每名干员的 `技能 + 精英化 + 稀有度 + 非0心情` 加成；0 心情只使非0心情 `+5%` 失效。 | [效果原子设计](EFFECT_ATOM_DESIGN.md) |
+| 会客室基础效率 | 会客室每名干员的 `干员技能效率 + 精英化基础加成 + 稀有度基础加成 + 非红脸进驻加成`；0 心情只使非红脸 `+5%` 失效。 | [效果原子设计](EFFECT_ATOM_DESIGN.md) |
 | scoring policy | 对非生产或局部混合分量排序的具名规则，必须有稳定 ID 和 breakdown。 | [评分模型](SCORING_MODEL.md) |
 | `ControlInjectRawSumV0` | 当前中枢普通候选的局部注入 policy；不是生产效率。 | [评分模型](SCORING_MODEL.md#3-非生产-heuristic) |
 | `TradeManufactureWeightedEfficiencyV1` | 动态 producer 完整联合候选的具名贸易/制造加权 policy；当前默认 `1:1`，权重可显式调整，不改变分域效率字段。 | [评分模型](SCORING_MODEL.md#21-动态-producer-联合候选的具名加权-policy) |

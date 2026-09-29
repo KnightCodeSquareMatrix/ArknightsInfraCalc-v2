@@ -19,13 +19,13 @@ use crate::trade::solve_trade_with_shift;
 pub struct RoomEfficiencyLine {
     pub room_id: String,
     pub operator_count: usize,
-    /// White: efficiency supplied directly by operators or their skills.
+    /// 干员技能提供的直接效率；发电站包含技能驱动的爬升增量。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub operator_efficiency: Efficiency,
     /// 基础效率：100% + 非 0 心情入驻人数 × 1%。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub base_efficiency: Efficiency,
-    /// Green: occupancy and facility/global environment efficiency.
+    /// 兼容字段：进驻增量与全局加成的合计，不参与总效率再次求和。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub station_efficiency: Efficiency,
     /// 中枢/全局效率；贸易与制造统一使用该分量。
@@ -41,7 +41,7 @@ pub struct RoomEfficiencyLine {
     /// Trade order multiplier; 1.000 for non-trade facilities.
     #[serde(default)]
     pub order_multiplier: Efficiency,
-    /// Blue: order-equivalent efficiency after removing base and station terms.
+    /// 等效效率：从总效率扣除设施基准与兼容分量，仅供解释。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub equivalent_efficiency: Efficiency,
     /// 贸易/赤金分别计算的单位时间产出。

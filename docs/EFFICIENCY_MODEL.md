@@ -14,6 +14,8 @@
 
 `Efficiency` 是无量纲直接效率。内部为千分整数：`1000 == 1.000`，`1550 == 1.550`。技能百分数只在解释器边界转换为小数；CLI、JSON、CSV 和搜索排序不再公开匿名百分比字段。
 
+贸易和制造逐房展示统一为：总效率 = 基础效率（设施基准 `1.000` + 每名非红脸、心情大于 0 的干员进驻增量 `0.010`）+ 干员技能效率 + 全局加成。`base_efficiency`、`operator_efficiency`、`global_efficiency` 分别承载这三项；`station_efficiency` 是兼容字段，混合进驻增量与全局加成，不参与再次求和。`equivalent_efficiency` 是已结算结果的等效解释值，不额外计入总效率或产出。
+
 - `Add`、`Sum` 使用 checked `i32` 千分整数。
 - `multiply` 在千分整数乘积处四舍五入；`scale_ratio` 在比例计算处四舍五入。
 - 序列化输出小数（例如 `2.837`），Bake 行保存 `*_efficiency_millis`，加载后恢复 `Efficiency`。
@@ -21,9 +23,9 @@
 
 ## 各域边界
 
-贸易：`TradeEfficiency` 同时保存纸面效率、订单机制等效项、单位产出和 `final_efficiency`。搜索主键是 `TradeSearchHit::final_efficiency`，实际日产出再乘 `unit_trade_per_day × shift_hours / 24`；shortcut 的单位产出不能再把 `mechanic_equivalent_efficiency` 乘一次。
+贸易：`TradeEfficiency` 同时保存纸面效率（基础效率 + 干员技能效率 + 全局加成）、订单机制等效项、单位产出和 `final_efficiency`。搜索主键是 `TradeSearchHit::final_efficiency`，实际日产出再乘 `unit_trade_per_day × shift_hours / 24`；shortcut 的单位产出不能再把 `mechanic_equivalent_efficiency` 乘一次。
 
-制造：单站 `final_efficiency = base + occupancy + skill + global`；多线由 `ManuEfficiencyBreakdown::aggregate_lines` 按线数加权。仓库上限和产出分解与效率分开保存。
+制造：单站总效率 = 基础效率 + 干员技能效率 + 全局加成；基础效率已包含非红脸干员的进驻增量。多线由 `ManuEfficiencyBreakdown::aggregate_lines` 按线数加权。仓库上限和产出分解与效率分开保存。
 
 发电：`aggregate_power_efficiency` 汇总岗位增量；布局总发电基础值只注入一次。排班汇总保留贸易、制造、发电三个域，不能跨域相加成一个匿名分数。
 

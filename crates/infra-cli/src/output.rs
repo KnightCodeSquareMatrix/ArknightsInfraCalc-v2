@@ -941,21 +941,24 @@ fn format_shift_station_line(
         .map(|r| {
             if !r.trade_efficiency.is_zero() {
                 format!(
-                    " [总效率{} / 最终{} / 白{} / 绿{} / 蓝{}]",
+                    " [总效率{} / 基础效率{} / 干员技能效率{} / 全局加成{} / 等效效率{}]",
                     r.total_efficiency,
-                    r.final_efficiency,
+                    r.base_efficiency,
                     r.operator_efficiency,
-                    r.station_efficiency,
+                    r.global_efficiency,
                     r.equivalent_efficiency
                 )
             } else if !r.manufacture_efficiency.is_zero() {
                 format!(
-                    " [总效率{} / 白{} / 绿{}]",
-                    r.final_efficiency, r.operator_efficiency, r.station_efficiency
+                    " [总效率{} / 基础效率{} / 干员技能效率{} / 全局加成{}]",
+                    r.total_efficiency,
+                    r.base_efficiency,
+                    r.operator_efficiency,
+                    r.global_efficiency
                 )
             } else if !r.power_efficiency.is_zero() {
                 format!(
-                    " [发电效率{} / 白{}]",
+                    " [发电效率{} / 干员技能效率{}]",
                     r.final_efficiency, r.operator_efficiency
                 )
             } else {

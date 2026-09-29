@@ -115,7 +115,7 @@ shortcut 的责任到此为止：它不能因为某个组合很强，就在编�
 1.550 = 基础效率的 155%
 ```
 
-贸易和制造统一先结算 `total_efficiency = base + global + skill`，再以对应配方的单位日产出和工作时间计算实际产出。特殊贸易的贸易/赤金单位产出与等效效率分别返回；`mechanic_equivalent_efficiency` 只解释机制，不参与二次乘法。
+贸易和制造统一先结算 `total_efficiency = base_efficiency + operator_efficiency + global_efficiency`；基础效率包含设施基准与非红脸（心情大于 0）进驻增量，干员技能效率和全局加成分别列出。再以对应配方的单位日产出和工作时间计算实际产出。特殊贸易的贸易/赤金单位产出与等效效率分别返回；`mechanic_equivalent_efficiency` 只解释机制，不参与二次乘法。
 
 排班始终分开保存：
 
