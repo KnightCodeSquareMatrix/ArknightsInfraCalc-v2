@@ -826,25 +826,64 @@ pub(super) fn pick_trade_hit(
     }
     let mut opts = search_opts;
     opts.top_k = top_k;
-    let report = match search_trade_triples_filtered(&sub, table, &opts, filter.clone()) {
-        Ok(r) => r,
+    let ordinary = match search_trade_triples_filtered(&sub, table, &opts, filter.clone()) {
+        Ok(report) => Ok(report),
         Err(_) if !filter.has_must_include() => {
             let mut fallback_filter = filter.clone();
             fallback_filter.hit_filter = None;
-            match search_trade_triples_filtered(&full_pool, table, &opts, fallback_filter) {
-                Ok(r) => r,
-                Err(error) => return Err(error),
+            search_trade_triples_filtered(&full_pool, table, &opts, fallback_filter)
+        }
+        Err(error) => Err(error),
+    }
+    .and_then(|report| {
+        pick_disjoint_from_report(
+            report.best,
+            report.top,
+            trade_hit_names,
+            &used_for_filter,
+            "no disjoint trade triple",
+        )
+    });
+
+    // The standalone pool omits this two-line gold-flow pair. Compare its best
+    // legal third teammate against the ordinary winner without claiming the core Plan.
+    if opts.order_mode == TradeSearchOrderMode::Single(TradeOrderKind::Gold)
+        && opts.gold_production_lines == 2
+        && !filter.has_must_include()
+        && filter.hit_filter.is_none()
+        && full_pool.entry("鸿雪").is_some()
+        && full_pool.entry("图耶").is_some()
+        && opts.operator_capacity >= 2
+    {
+        let mut pair_filter = filter;
+        pair_filter.must_include_names = vec!["鸿雪".to_string(), "图耶".to_string()];
+        let mut pair_opts = opts;
+        pair_opts.full_pool = true;
+        if let Ok(report) =
+            search_trade_triples_filtered(&full_pool, table, &pair_opts, pair_filter)
+        {
+            if let Ok(pair) = pick_disjoint_from_report(
+                report.best,
+                report.top,
+                trade_hit_names,
+                &used_for_filter,
+                "no disjoint trade triple",
+            ) {
+                let score = |hit: &TradeSearchHit| {
+                    hit.breakdown
+                        .as_ref()
+                        .map_or(hit.final_efficiency, |value| value.total_efficiency)
+                };
+                if ordinary
+                    .as_ref()
+                    .map_or(true, |winner| score(&pair) > score(winner))
+                {
+                    return Ok(pair);
+                }
             }
         }
-        Err(e) => return Err(e),
-    };
-    pick_disjoint_from_report(
-        report.best,
-        report.top,
-        trade_hit_names,
-        &used_for_filter,
-        "no disjoint trade triple",
-    )
+    }
+    ordinary
 }
 
 pub(super) fn trade_room_options(

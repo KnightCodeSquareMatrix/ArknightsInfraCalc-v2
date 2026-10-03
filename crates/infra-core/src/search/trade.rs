@@ -479,7 +479,24 @@ fn trade_search_pool_for_order(
     )
     .unwrap_or_else(|| pool.clone());
     if sub.entries.len() >= 3 {
-        sub
+        let gold_lines = if options.layout.gold_manu_line_count > 0 {
+            options.layout.gold_manu_line_count
+        } else {
+            options.gold_production_lines
+        };
+        if order_kind == TradeOrderKind::Gold && gold_lines == 2 {
+            let mut expanded = sub;
+            if let (Some(pozyomka), Some(tuye)) = (pool.entry("鸿雪"), pool.entry("图耶")) {
+                for entry in [pozyomka, tuye] {
+                    if expanded.entry(&entry.name).is_none() {
+                        expanded.entries.push(entry.clone());
+                    }
+                }
+            }
+            expanded
+        } else {
+            sub
+        }
     } else {
         pool.clone()
     }

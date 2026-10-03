@@ -20,6 +20,8 @@ OperBox + runtime data -> facility pool -> Plan/exclusion/used/capacity
 
 pool/admission、容量、required anchor、互斥和输入匹配是 hard constraint。已证明等价的枚举才可称 safe reduction；top-k、排序、control policy、producer prefix 和 shadow branch 都是 policy/heuristic。完整池模式不能被 standalone 或 Bake 子集替代。
 
+鸿雪杜林组成套核心的四条真实赤金制造线要求是 Plan `hard_constraint`；两线金单域搜索在散件缩池补入鸿雪、图耶，普通金贸两线填房还会独立枚举两人的同房候选。填房时对该组做带双人 required 的全贸易池搜索并按相同效率比较，不将这一条可选候选提升为 core、必选或全局最优保证。
+
 ## 域入口
 
 `search_trade_triples`、`search_manufacture_triples`、`search_control_combos`、`search_power_assignment` 各自负责域内比较；`joint_trade` 只处理具名跨域 candidate policy。遇到“候选没被考虑”，按 pool skip → Plan claim/exclusion → used → capacity → domain filter → comparator 排查。
