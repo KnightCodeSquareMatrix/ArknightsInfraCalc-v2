@@ -45,7 +45,11 @@ run_user_rotation_probe_with_profile_and_preferences(
 
 该 probe 进入 `schedule_timed_rotation`，由 rotation profile 分派单班编排和多班轮换。Peak/shift assignment、Plan、resolve、房间搜索、跨设施状态和最终 rotation 都属于 `infra-core`；CLI 只接收 `LayoutProbe`。
 
+`pozyomka_durin` 是贸易 Plan 的优先成套路径：至少四条真实赤金制造线、绮良/鸿雪/图耶精二、四名实际进驻的杜林成员；成套路径才消费其 required role。四线门槛只管 Plan 核心准入；两条真实赤金制造线时，普通金贸搜索仍可枚举鸿雪+图耶的同房候选，并按实际结算效率竞争，不保证最终选中。角色准入与房间归属由 Plan 编译，不由填房评分或排班绑定补选。
+
 若 probe 失败，`PlanComputeFailure` 可能带 partial rotation；`plan.compute` 在未启用断言时会序列化 partial `rotation` 与 `error`，CLI `plan` 则返回失败。
+
+`assert_invariants=true` 的最终状态检查会从每个 shift 的 `assignment_plans` 读取已选 Plan，并拒绝已选 `pozyomka_durin` 却少于四条真实赤金制造线的状态。
 
 ## 阶段三：可选断言、profile 与 MAA
 

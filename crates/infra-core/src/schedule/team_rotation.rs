@@ -4287,6 +4287,24 @@ pub fn assert_final_rotation_invariants(
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = MoodModel::load_default()?;
     for shift in &report.shifts {
+        let plan = report
+            .assignment_plans
+            .get(shift.plan_index)
+            .ok_or_else(|| {
+                Error::msg("assert-invariants gold_flow_core_real_lines failed: missing Plan")
+            })?;
+        if plan
+            .selected_rules
+            .iter()
+            .any(|rule| rule.rule_id == "pozyomka_durin")
+            && blueprint.gold_manu_line_count() < 4
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants gold_flow_core_real_lines failed in shift {}: core selected with {} real gold lines (need 4)",
+                shift.index + 1,
+                blueprint.gold_manu_line_count(),
+            )));
+        }
         validate_office_assignment_disjoint(blueprint, shift)
             .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
         validate_office_shift_eta(blueprint, instances, shift)

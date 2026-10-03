@@ -46,9 +46,67 @@
       ]
     },
     {
+      "id": "pozyomka_durin",
+      "priority": 1001,
+      "tier": "cross_station",
+      "exclusive_group": "trade_core_selection",
+      "alternatives": [
+        {
+          "id": "three_trade_gold_flow",
+          "gates": [
+            { "kind": "manufacture_recipe_count", "recipe": "gold", "min": 4 },
+            { "kind": "trade_order_count", "order": "gold", "min": 3 }
+          ],
+          "roles": [
+            { "id": "witch", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "巫恋", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "tequila", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "龙舌兰", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "kirara", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "绮良", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "docus", "facility": "trade_post", "trade_order": "gold", "room_level_preference": "lowest_level", "candidates": [{ "name": "但书" }], "room_group": "pozy_docus" },
+            { "id": "tuye", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "图耶", "elite": 2 }], "room_group": "pozy_docus" },
+            { "id": "closure", "facility": "trade_post", "trade_order": "gold", "room_level_preference": "highest_level", "candidates": [{ "name": "可露希尔", "elite": 2 }], "room_group": "pozy_closure" },
+            { "id": "pozyomka", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "鸿雪", "elite": 2 }], "room_group": "pozy_closure" },
+            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "特克诺" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }], "min_count": 4, "max_count": 4 }
+          ],
+          "bind_role_groups": [["witch", "tequila", "kirara"], ["docus", "tuye"], ["closure", "pozyomka"]],
+          "continuous_role_ids": ["docus"]
+        },
+        {
+          "id": "two_trade_gold_flow",
+          "gates": [
+            { "kind": "manufacture_recipe_count", "recipe": "gold", "min": 4 },
+            { "kind": "trade_order_count", "order": "gold", "min": 2 }
+          ],
+          "roles": [
+            { "id": "witch", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "巫恋", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "tequila", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "龙舌兰", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "kirara", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "绮良", "elite": 2 }], "room_group": "pozy_witch" },
+            { "id": "pozyomka", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "鸿雪", "elite": 2 }], "room_group": "pozy_flow" },
+            { "id": "tuye", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "图耶", "elite": 2 }], "room_group": "pozy_flow" },
+            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "特克诺" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }], "min_count": 4, "max_count": 4 }
+          ],
+          "bind_role_groups": [["witch", "tequila", "kirara"], ["pozyomka", "tuye"]]
+        },
+        {
+          "id": "single_trade_gold_flow",
+          "gates": [
+            { "kind": "manufacture_recipe_count", "recipe": "gold", "min": 4 },
+            { "kind": "trade_order_count", "order": "gold", "min": 1 }
+          ],
+          "roles": [
+            { "id": "kirara", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "绮良", "elite": 2 }], "room_group": "pozy_trio" },
+            { "id": "pozyomka", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "鸿雪", "elite": 2 }], "room_group": "pozy_trio" },
+            { "id": "tuye", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "图耶", "elite": 2 }], "room_group": "pozy_trio" },
+            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "特克诺" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }], "min_count": 4, "max_count": 4 }
+          ],
+          "bind_role_groups": [["kirara", "pozyomka", "tuye"]]
+        }
+      ]
+    },
+    {
       "id": "trade_core",
       "priority": 1000,
       "tier": "cross_station",
+      "exclusive_group": "trade_core_selection",
       "alternatives": [
         {
           "id": "single_trade_closure",
