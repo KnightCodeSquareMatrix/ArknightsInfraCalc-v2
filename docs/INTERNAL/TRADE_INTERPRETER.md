@@ -8,7 +8,7 @@
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/SHORTCUT_MATCHING.md`
 > 核验基线：`947f1a2`
 
-`apply_trade_phases` 从每名 runtime operator 的 buff id 收集 atom，按 `Phase::sort_key` 和 `phase_order` 排序，依次处理 condition、state、eff、limit、order tag、peer absorb 和 mood。跨过 Limit 阶段会重算 order limit；赤金订单的 `gold_flow::apply_gold_flow_chain` 在 PeerAbsorb 后或循环末执行一次；循环结束再做最终 limit recompute。
+`apply_trade_phases` 从每名 runtime operator 的 buff id 收集 atom，按 `Phase::sort_key` 和 `phase_order` 排序，依次处理 condition、state、eff、limit、order tag、peer absorb 和 mood。跨过 Limit 阶段会重算 order limit；赤金订单的 `gold_flow::apply_gold_flow_chain` 在进入 PeerAbsorb 前或循环末执行一次；循环结束再做最终 limit recompute。
 
 | Phase | 主要 owner | 写入 |
 |---|---|---|

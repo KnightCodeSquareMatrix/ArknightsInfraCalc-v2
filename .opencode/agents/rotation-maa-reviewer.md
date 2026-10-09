@@ -1,7 +1,8 @@
 ---
 description: Read-only high-risk reviewer for ArknightsInfraCalc Team/Shift rotation, work/rest, mood, binds, capacity, producer shutdown, and MAA export fidelity. Use after a bounded rotation diff and real-entry evidence are frozen.
 mode: subagent
-model: codesonline/gpt-5.6-sol
+model: codesonline/gpt-6.1-sol
+
 variant: high
 steps: 85
 permission:

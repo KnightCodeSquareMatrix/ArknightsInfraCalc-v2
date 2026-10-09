@@ -110,7 +110,7 @@
 | `auto_rotation` | 游戏内置按组合耗尽触发的自动轮换；当前仍待独立设计。 | [排班模式](排班模式.md) |
 | `timed_rotation` | MAA 或人工按固定时间/间隔执行完整班次表；当前默认模式。 | [排班模式](排班模式.md)、[定时换班](定时换班.md) |
 | `mower_dynamic` | Mower 按实时心情动态决定换班、宿舍和替补；当前暂停。 | [排班模式](排班模式.md) |
-| rotation profile | timed rotation 的闭集策略；当前实现含 ABC、二班、菲亚四班和深海四班。 | [排班轮换](SCHEDULE_ROTATION.md#1-当前模型) |
+| rotation profile | timed rotation 的闭集策略；当前实现含 ABC、主备 12/12、主备 24/24、菲亚二班/四班和深海四班。 | [排班轮换](SCHEDULE_ROTATION.md#1-当前模型) |
 | Team / 队伍 | 共享出勤节奏的一组成员或房间，如 α/β/γ；不是某个时刻的完整编制。 | [定时换班](定时换班.md)、[排班轮换](SCHEDULE_ROTATION.md) |
 | Shift / 班次 | 一个持续时间明确、实际在岗 assignment 完整的状态。 | [定时换班](定时换班.md)、[排班轮换](SCHEDULE_ROTATION.md) |
 | Peak / Recovery | `AssignShiftMode` 的单班主力/恢复候选模式；不是 timed rotation profile 名。 | [单班编制](BASE_ASSIGNMENT.md)、`layout/shift.rs` |

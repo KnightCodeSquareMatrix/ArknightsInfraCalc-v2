@@ -1,7 +1,8 @@
 ---
 description: Read-only high-risk reviewer for ArknightsInfraCalc skills, efficiency, drones, power, mood, orders, unit output, and source-to-runtime mechanic contracts. Use after the primary agent freezes a bounded diff and evidence bundle.
 mode: subagent
-model: codesonline/gpt-5.6-sol
+model: codesonline/gpt-6.1-sol
+
 variant: high
 steps: 80
 permission:

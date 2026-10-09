@@ -1,7 +1,8 @@
 ---
 description: 只读调查代码库、文档和运行证据；适合大范围扫描、定位责任层、调用链和文件级事实。
 mode: subagent
-model: codesonline/gpt-5.6-terra
+model: codesonline/gpt-6.1-sol
+
 reasoningEffort: low
 steps: 99
 permission:

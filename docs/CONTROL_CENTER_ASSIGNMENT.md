@@ -16,6 +16,10 @@
 
 `search/control.rs` 的 `ControlFillPolicy` 是顺序 policy，不是全基建匿名总分。排序依次消费 Plan anchor、贸易/制造全局区域、训练/办公室/会客室、心情去重和普通补位；不回溯替换前序结果。
 
+定时轮换在进入班次循环前冻结 `ControlRotationClosure`：候选身份、所属 cohort、shared/required、候选组来源和适用班次由 Plan、实际 peak assignment、bind 和真实占用共同确定。每班的 `ControlShiftAdmission` 只把当前活跃队伍和当班特殊分支交给 fill；普通候选不会从全账号池重新归队。`ControlCandidateRequirement` 通过有序 registry claim/slot 保留来源，`min_count` 在满员快捷路径、替换和最终 assignment 上统一复核。
+
+心情补位消费 `solve_control` 的当前前缀结算和既有 MoodModel 作用范围；不同设施的统一减免不转换成个人耗损分数。最终心情/办公室条件使用中枢结算前快照，办公室后置求值不能覆盖中枢条件输入。未建模技能保留为 pool skip，不擦除 buff 后作为 filler。
+
 ## 体系准入档位
 
 体系准入按技能实际解锁档位执行，不以完整形态档代替。怪猎组合（火龙S黑角＋麒麟R夜刀进驻控制中枢、泰拉大陆调查团消费木天蓼；登记项 `snhunt_monhun_control` / `snhunt_monhun_control_factory`）的「团队合作」「耐力回复」与「可爱的艾露猫」为精0/初始解锁，贸易变体按精0准入；「可靠的随从们」为 30 级解锁，制造变体按 `min_level: 30` 准入，运行档位同口径（`tier_0` 不含制造 buff）。两条变体均由 `bind_all` 保持三人同班。精2「秘传交涉术」（全贸易+7%）与「以身作则」（全制造+2%）随档位自然结算，不构成准入条件。知识库《怪猎中枢》的"双精2"按含光环的完整形态理解，产品准入与光环结算在该组合上分离。

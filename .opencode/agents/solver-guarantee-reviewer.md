@@ -1,7 +1,8 @@
 ---
 description: Read-only high-risk reviewer for ArknightsInfraCalc candidate search, constraints, pruning, objectives, top-K, Bake, cache, and solver guarantee claims. Use after a bounded solver diff and evidence bundle are frozen.
 mode: subagent
-model: codesonline/gpt-5.6-sol
+model: codesonline/gpt-6.1-sol
+
 variant: high
 steps: 90
 permission:

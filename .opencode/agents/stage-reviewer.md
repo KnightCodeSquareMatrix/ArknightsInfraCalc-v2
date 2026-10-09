@@ -1,7 +1,8 @@
 ---
 description: 只读快速审查阶段性分析、修改计划、当前代码或 diff 和证据完整性；适合边界明确的中间复核，发现高风险裁决时升级，不代替 Sol 终审。
 mode: subagent
-model: codesonline/gpt-5.6-terra
+model: codesonline/gpt-6.1-sol
+
 variant: low
 steps: 40
 permission:

@@ -8,7 +8,7 @@
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：TimedRotationProfile、schedule_timed_rotation、TeamRotationReport
 > 关联链路：docs/调用链/定时轮换.md、docs/模块/排班与轮换.md、docs/定时换班.md
-> 核验基线：六个 profile、TeamShiftResult、assert_final_rotation_invariants
+> 核验基线：七个 profile、TeamShiftResult、assert_final_rotation_invariants
 
 本文是短入口。完整调用链、状态快照、错误传播见定时轮换调用链；模块责任见排班与轮换模块。
 
@@ -17,6 +17,7 @@
 | abc_12_6_6 | 3、abc | 12/6/6 | αβγ，γ/α/β 分别休 S1/S2/S3 |
 | abc_12_12_12 | abc-121212 | 12/12/12 | 同队伍关系，总周期 36h |
 | main_backup_12_12 | 2 | 12/12 | 主/替完整状态互斥 |
+| main_backup_24_24 | 24/24、main-backup-2424 | 24/24 | 48h 周期，主/替完整状态互斥 |
 | fiammetta_witch_12_12 | fiammetta-witch-1212 | 12/12 | 共享巫恋/龙舌兰 |
 | fiammetta_8_8_4_4 | fiammetta-8844 | 8/8/4/4 | 菲亚事件 transition |
 | abyssal_7_5_7_5 | abyssal-7575 | 7/5/7/5 | 深海 producer、五小时 dorm_rest |

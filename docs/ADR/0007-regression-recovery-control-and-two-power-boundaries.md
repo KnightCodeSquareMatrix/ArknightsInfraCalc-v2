@@ -6,7 +6,7 @@
 > 摘要：恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界
 
 > 日期：2026-08-18
-> 状态：accepted with D1 implementation gate；实现与验证尚未完成
+> 状态：accepted；D1 的等级字段经 2026-09-27 用户裁决改为 `level`，其余门禁分别验证
 > 实现参考：`crates/infra-core/src/search/control.rs`、`crates/infra-core/src/pool/control.rs`、`crates/infra-core/src/layout/blueprint.rs`、`crates/infra-core/src/layout/assign/control_fill.rs`、`crates/infra-core/src/schedule/team_rotation.rs`、`crates/infra-core/src/global_resource/inject.rs`、前端 layout wire contract
 > 历史背景：7/30 回退到 7/19 的部署事实待从服务器 release 元数据补证；旧主站 binary 仅作为行为基线，不作为 Git 真源
 
@@ -24,11 +24,11 @@
 
 ## 决策
 
-### D1. 宿舍有效等级由前端事实提供
+### D1. 宿舍有效等级由 `level` 提供（2026-09-27 修订）
 
-目标 contract 是由前端作为宿舍有效等级的事实 producer，并为每间宿舍提供 `dorm_ambience_level`；`RoomBlueprint` parser 是该字段的 wire validator，核心只消费已验证字段计算 `dorm_level_sum`。该 contract 尚未在前端 schema 和 parser 中落地，因此 D1 目前是实施门，不是当前已实现事实。
+用户裁决每间宿舍仅用 `level` 表示 1–5 级的技能有效等级；前端传入的宿舍 `level` 是等级事实，`RoomBlueprint` 校验范围后，`dorm_level_sum` 和宿舍 producer 都只消费它。此前拟要求额外提供 `dorm_ambience_level` 的目标已被该裁决取代。旧 schema 仍接受此字段以兼容已发布输入，但解析后不参与结算，输出也不再生成它。
 
-目标语义是：`dorm_beds` 只表示床位容量，不再作为“每间宿舍每级”技能的语义回退。完成前端 schema、wire producer 和 parser validator 后，252/342 缺少任一宿舍 `dorm_ambience_level` 必须被拒绝；当前仍存在的 beds/level fallback 记录为已知违规。其他 legacy layout 的兼容语义另立决策，不在本 ADR 中扩张。
+`dorm_beds` 只表示床位容量，不能作为“每间宿舍每级”技能的等级回退。旧双等级布局在新语义下按 `level` 结算；若过去将真实等级只写入旧字段，调用方需要将真实等级写回 `level`。二发电的每间宿舍按输入的 `level` 分别计数，不把四间床位数相加当作等级。
 
 本 ADR 不裁决 252/342 各自具体的宿舍等级；具体值由前端事实和对应 canonical 输入提供。
 
@@ -64,7 +64,7 @@
 
 | 不变量 | owner | 禁止的冲突路径 |
 |---|---|---|
-| 宿舍有效等级 | **目标**：前端事实 producer + wire schema + `RoomBlueprint` parser + `blueprint.rs` 消费；当前 owner gate 未完成 | `dorm_beds` 作为技能等级回退、空弦/锡人姓名特判 |
+| 宿舍有效等级 | 前端 `level` 事实 + `RoomBlueprint` 范围校验 + `blueprint.rs` 统一消费；旧字段只作兼容解析 | `dorm_beds` 或旧 `dorm_ambience_level` 作为技能等级、空弦/锡人姓名特判 |
 | 凛御银灰动态激活 | Plan/response dependency | rotation 按 tag/姓名重推、无 consumer 时伪造动态收益 |
 | family max 与 suppressed source | `GlobalInjectManifest` settlement + candidate utility | 每人固定加分、房间顺序、当前 top hit 特判 |
 | filler 机会成本 | control admission/fill policy | 全量无技能候选尾部抢占有效候选 |
@@ -72,7 +72,7 @@
 
 ## 验证要求
 
-- **data contract hard constraint（D1 gate）**：完成前端 schema/wire/parser 后，252/342 每间宿舍都携带精确 `dorm_ambience_level`；缺失字段被 parser 拒绝；`dorm_level_sum` 等于该四项之和而非 beds 总和。当前 contract 尚未满足此断言，不得报告为已通过。
+- **data contract hard constraint（D1 gate）**：252/342 的每间宿舍携带 1–5 的真实 `level`；`dorm_level_sum` 等于四间 `level` 之和，不能由 `dorm_beds` 或旧 `dorm_ambience_level` 覆盖。前端建议布局应以其实际宿舍等级覆盖预设值；本仓静态样例不能代替账号事实。
 - **mechanism hard constraint**：空弦和锡人分别在前端给定的实际等级输入与合成 `20` 输入下验证公式值不同；只前者可作为 252/342 排班输入。
 - **settlement hard constraint**：维什戴尔+玛恩纳按目标设施取最高全局回复，smiley 扩散独立断言；同 family source 验证 manifest winner/suppressed。
 - **candidate policy/heuristic**：中枢 utility 只计算边际有效收益；分别覆盖少于五人、恰好五人、有效候选竞争和 filler fallback；`ControlInjectRawSumV0` 与 `TradeManufactureWeightedEfficiencyV1` 分开报告。
@@ -83,8 +83,8 @@
 
 ## 未决与非目标
 
-- 本 ADR 不裁决 252/342 具体 ambience 数值。
+- 本 ADR 不裁决 252/342 每间宿舍的具体 `level` 数值；由当前输入事实决定。
 - 不恢复通用跨站 producer 求解器，不新增干员名补偿特判。
 - 不把旧 binary 的行为自动当作领域真理；差异必须回溯到 canonical、代码 owner 或数据事实。
 - 旧 Box 的非法 rarity/elite 兼容策略另立修复单元，不与中枢/二发电修复混写。
-- `worker-json` 的单账号 Skland session 协议升级是独立认证/产品迁移；只要其布局 suggestion 在二发电时传递 `dorm_ambience_level`，该协议差异不作为 D1 宿舍数值修复的验收条件。
+- `worker-json` 的单账号 Skland session 协议升级是独立认证/产品迁移；布局 suggestion 在二发电时传递实际 `level` 即可，认证协议差异不作为 D1 宿舍数值修复的验收条件。

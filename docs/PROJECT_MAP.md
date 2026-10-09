@@ -44,7 +44,7 @@ layout / operbox / runtime data
 
 - Layout 的概念主路径是 `build_plan -> execute_plan -> fill -> resolve`；`layout/assign/pipeline.rs` 是阶段顺序与 resolve 时机的实现 owner。
 - L1 interpreter 只认 `buff_id`；L2 处理领域机制；L3 shortcut 只结算实际组合，不负责体系选型或进编。
-- `schedule_timed_rotation` 当前接受六个闭集 profile：ABC `12/6/6`、ABC `12/12/12`、主备 `12/12`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班与轮换](模块/排班与轮换.md)，当前实现见 [定时轮换](调用链/定时轮换.md)。
+- `schedule_timed_rotation` 当前接受七个闭集 profile：ABC `12/6/6`、ABC `12/12/12`、主备 `12/12`、主备 `24/24`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班与轮换](模块/排班与轮换.md)，当前实现见 [定时轮换](调用链/定时轮换.md)。
 - CLI 和 export 只消费 core 结果；`plan`、`plan.compute` 与 legacy Worker `plan` 共享 `commands/plan_compute.rs` 的一次 rotation 结果。
 
 ## `infra-core` 模块索引

@@ -193,7 +193,6 @@
         <div><label>岁设施数 sui_facility_count</label><input type="number" id="suiCount" value="2" min="0" /></div>
         <div><label>宿舍人数 dorm_occupant_count</label><input type="number" id="dormOccupants" value="20" min="0" /></div>
         <div><label>base_workforce（逗号分隔，仅显式覆盖；有进驻编制时由房间名单派生）</label><input type="text" id="baseWorkforce" value="" placeholder="留空" /></div>
-        <div><label>魔物料理 monster_cuisine</label><input type="number" id="monsterCuisine" value="3" step="0.1" /></div>
       </div>
     </div>
 
@@ -206,16 +205,13 @@
     <div class="panel" id="roomEditor" hidden>
       <h2 id="roomEditorTitle">房间设置</h2>
       <div class="field-grid">
-        <div><label>等级 level（贸易/制造岗位数：一级1人、二级2人、三级3人）</label><input type="number" id="roomLevel" min="1" max="3" value="3" /></div>
+        <div><label>等级 level（宿舍 1–5 级；贸易/制造 1–3 级）</label><input type="number" id="roomLevel" min="1" max="3" value="3" /></div>
         <div id="productField" hidden>
           <label id="productLabel">产物</label>
           <select id="roomProduct"></select>
         </div>
         <div id="dormBedsField" hidden>
           <label>床位数 dorm_beds</label><input type="number" id="dormBeds" min="1" max="8" value="5" />
-        </div>
-        <div id="dormAmbienceField" hidden>
-          <label>有效等级 dorm_ambience_level</label><input type="number" id="dormAmbience" min="1" max="5" value="5" />
         </div>
       </div>
     </div>
@@ -277,7 +273,7 @@
       return `${kind}:${index}`;
     }
 
-    function defaultDormAmbience(index) {
+    function defaultDormLevel(index) {
       return state.counts.power === 2 ? (index === 0 ? 2 : 1) : 5;
     }
 
@@ -307,8 +303,8 @@
           } else if (kind === "manufacture") {
             room.factoryRecipe = defaultFactoryProduct(i, count);
           } else if (kind === "dormitory") {
+            room.level = defaultDormLevel(i);
             room.dormBeds = 5;
-            room.dormAmbienceLevel = defaultDormAmbience(i);
           }
           next[key] = room;
         }
@@ -422,11 +418,12 @@
       }`;
       document.getElementById("roomEditorTitle").textContent =
         `${ROOM_LABELS[room.kind]} #${room.index + 1} 设置`;
-      document.getElementById("roomLevel").value = room.level;
+      const levelInput = document.getElementById("roomLevel");
+      levelInput.max = room.kind === "dormitory" ? 5 : 3;
+      levelInput.value = room.level;
 
       const productField = document.getElementById("productField");
       const dormField = document.getElementById("dormBedsField");
-      const dormAmbienceField = document.getElementById("dormAmbienceField");
       const productSelect = document.getElementById("roomProduct");
 
       if (room.kind === "trading" || room.kind === "manufacture") {
@@ -443,10 +440,8 @@
       }
 
       dormField.hidden = room.kind !== "dormitory";
-      dormAmbienceField.hidden = room.kind !== "dormitory";
       if (room.kind === "dormitory") {
         document.getElementById("dormBeds").value = room.dormBeds ?? 5;
-        document.getElementById("dormAmbience").value = room.dormAmbienceLevel ?? room.dormBeds ?? 5;
       }
     }
 
@@ -509,7 +504,6 @@
             entry.product = { factory: { recipe: room.factoryRecipe || "gold" } };
           } else if (kind === "dormitory") {
             entry.dorm_beds = Number(room.dormBeds) || 5;
-            entry.dorm_ambience_level = Number(room.dormAmbienceLevel) || entry.dorm_beds;
           }
           rooms.push(entry);
         }
@@ -529,9 +523,6 @@
           sui_facility_count: Number(document.getElementById("suiCount").value) || 0,
           dorm_occupant_count: Number(document.getElementById("dormOccupants").value) || 0,
           base_workforce: workforce,
-          initial_global: {
-            monster_cuisine: Number(document.getElementById("monsterCuisine").value) || 0,
-          },
         },
         rooms,
       };
@@ -601,7 +592,6 @@
         }
         if (kind === "dormitory") {
           room.dormBeds = r.dorm_beds || 5;
-          room.dormAmbienceLevel = r.dorm_ambience_level || r.dorm_beds || 5;
         }
         rooms[key] = room;
       }
@@ -620,8 +610,6 @@
       document.getElementById("suiCount").value = sc.sui_facility_count ?? 2;
       document.getElementById("dormOccupants").value = sc.dorm_occupant_count ?? 20;
       document.getElementById("baseWorkforce").value = (sc.base_workforce || []).join(",");
-      document.getElementById("monsterCuisine").value =
-        sc.initial_global?.monster_cuisine ?? 3;
       render();
     }
 
@@ -648,14 +636,7 @@
       renderPreview();
     });
 
-    document.getElementById("dormAmbience").addEventListener("input", (e) => {
-      if (!state.selected) return;
-      const key = roomKey(state.selected.kind, state.selected.index);
-      state.rooms[key].dormAmbienceLevel = Number(e.target.value);
-      renderPreview();
-    });
-
-    ["template", "droneCap", "eliteCount", "suiCount", "dormOccupants", "baseWorkforce", "monsterCuisine"].forEach(
+    ["template", "droneCap", "eliteCount", "suiCount", "dormOccupants", "baseWorkforce"].forEach(
       (id) => {
         document.getElementById(id).addEventListener("input", renderPreview);
       }

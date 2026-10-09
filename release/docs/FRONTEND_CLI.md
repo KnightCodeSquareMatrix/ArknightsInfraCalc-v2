@@ -56,8 +56,8 @@ Windows 可在资源管理器双击，或运行 `start release/layout-gen/index.
 | 功能 | 说明 |
 |------|------|
 | 基建预设 | 243 / 153 / 333 / 252 / 342（贸/制/电数量） |
-| 房间编辑 | 等级、贸易订单（LMD/合成玉）、制造配方、宿舍床位、宿舍有效等级 |
-| 场景假设 | `drone_cap`、`sui_facility_count`、`dorm_occupant_count`、`monster_cuisine` 等 |
+| 房间编辑 | `level`（宿舍 1–5 级）、贸易订单（LMD/合成玉）、制造配方、宿舍床位 |
+| 场景假设 | `drone_cap`、`sui_facility_count`、`dorm_occupant_count` 等 |
 | 导出 | 下载 `BaseBlueprint` JSON → 作为 CLI `--layout` |
 | 导入 | 加载已有 layout JSON 继续编辑 |
 
@@ -284,7 +284,7 @@ MAA 排班 JSON 已写入: out/243_maa.json
   "scenario": {
     "sui_facility_count": 2,
     "dorm_occupant_count": 20,
-    "initial_global": { "monster_cuisine": 3.0 }
+    "initial_global": { "monster_cuisine": 0.0 }
   },
   "rooms": [
     { "id": "control", "kind": "control_center", "level": 3 },
@@ -300,7 +300,7 @@ MAA 排班 JSON 已写入: out/243_maa.json
       "level": 3,
       "product": { "factory": { "recipe": "gold" } }
     },
-    { "id": "dorm_1", "kind": "dormitory", "level": 3, "dorm_beds": 5, "dorm_ambience_level": 5 }
+    { "id": "dorm_1", "kind": "dormitory", "level": 5, "dorm_beds": 5 }
   ]
 }
 ```
@@ -312,8 +312,9 @@ MAA 排班 JSON 已写入: out/243_maa.json
 
 宿舍字段：
 
-- `dorm_beds`：宿舍容量，用于 MAA 宿舍补人。
-- `dorm_ambience_level`：技能原文“每间宿舍每级”的有效等级，满宿舍一般为 5；旧布局未提供时 CLI 会兼容使用 `dorm_beds`，再退回 `level`。
+- `level`：宿舍技能有效等级，取值 1–5；不从床位数推算。
+- `dorm_beds`：独立的宿舍床位容量，用于 MAA 宿舍补人。
+- 旧输入中的 `dorm_ambience_level` 仍能解析，但不参与结算或输出；旧 `scenario.initial_global.monster_cuisine` 也会被忽略。历史双等级布局应以实际宿舍等级更新 `level`。
 
 参考样例：`release/fixtures/layout.json` 或 `data/fixtures/243/layout.json`。**推荐用 layout-gen 导出，字段与此一致。**
 
