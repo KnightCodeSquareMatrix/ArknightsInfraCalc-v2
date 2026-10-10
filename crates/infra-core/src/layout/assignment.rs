@@ -325,6 +325,56 @@ impl BaseAssignment {
         self.rooms.iter().any(|r| !r.operators.is_empty())
     }
 
+    /// 结构合法性的唯一检查：只看位置结构，不看技能、心情、体系或 Plan。
+    /// 依次检查：房间存在于蓝图、同一房间不重复出现、成员数不超过房间容量
+    /// （宿舍按床位）、同一干员只占一个位置（含独立的训练副手）。
+    /// 返回全部违规，便于诊断；写入入口与终态 gate 共用本函数。
+    pub fn structural_violations(&self, blueprint: &BaseBlueprint) -> Vec<String> {
+        let mut violations = Vec::new();
+        let mut seen_rooms = HashSet::new();
+        let mut holders: HashMap<&str, &str> = HashMap::new();
+        for room in &self.rooms {
+            let room_id = room.room_id.0.as_str();
+            if !seen_rooms.insert(room_id) {
+                violations.push(format!("room_duplicated: {room_id}"));
+            }
+            let Some(spec) = blueprint.room(&room.room_id) else {
+                if !room.operators.is_empty() {
+                    violations.push(format!("room_unknown: {room_id}"));
+                }
+                continue;
+            };
+            let capacity = if spec.kind == FacilityKind::Dormitory {
+                spec.dorm_bed_count() as usize
+            } else {
+                spec.operator_capacity()
+            };
+            if room.operators.len() > capacity {
+                violations.push(format!(
+                    "room_capacity: {room_id} has {} > {capacity}",
+                    room.operators.len()
+                ));
+            }
+            for operator in &room.operators {
+                if let Some(first) = holders.insert(operator.name.as_str(), room_id) {
+                    violations.push(format!(
+                        "operator_unique: {} in {first} and {room_id}",
+                        operator.name
+                    ));
+                }
+            }
+        }
+        if let Some(assistant) = &self.training_assist {
+            if let Some(room) = holders.get(assistant.name.as_str()) {
+                violations.push(format!(
+                    "operator_unique: {} in {room} and training_assist",
+                    assistant.name
+                ));
+            }
+        }
+        violations
+    }
+
     pub fn operator_names(&self) -> HashSet<String> {
         let mut names = HashSet::new();
         for room in &self.rooms {

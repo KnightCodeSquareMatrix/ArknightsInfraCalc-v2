@@ -4635,6 +4635,10 @@ fn assert_final_rotation_invariants_with_mood(
                 }
             }
         }
+        // 诊断模式：结构检查的统一入口，先只记录不失败，全部 box-bundles 清零后再升级为断言。
+        for violation in shift.assignment.structural_violations(blueprint) {
+            eprintln!("[structural] shift {} {violation}", shift.index + 1);
+        }
         let durin_count = assert_gold_flow_final_state(blueprint, shift, instances, table)?;
         if let Some(room_count) = gold_flow_split {
             let gold_room_of = |name: &str| {
