@@ -8,8 +8,7 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd[006]",
-            "power_rec_spd_ext&faction[000]"
+            "power_rec_spd[006]"
           ],
           "stepwise": true
         }
@@ -34,12 +33,6 @@
       "tier": "tier_0",
       "tags": [],
       "facilities": {
-        "manufacture": {
-          "buff_ids": [
-            "manu_formula_spd[010]"
-          ],
-          "stepwise": false
-        },
         "power": {
           "buff_ids": [
             "power_rec_spd[000]"
@@ -74,8 +67,7 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd[000]",
-            "power_rec_spd_P[000]"
+            "power_rec_spd[000]"
           ],
           "stepwise": true
         }
@@ -102,8 +94,7 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd[0010]",
-            "power_rec_spd_ext&tag[000]"
+            "power_rec_spd[0010]"
           ],
           "stepwise": true
         }
@@ -128,12 +119,6 @@
       "tier": "tier_0",
       "tags": [],
       "facilities": {
-        "dorm": {
-          "buff_ids": [
-            "dorm_rec_single[000]"
-          ],
-          "stepwise": false
-        },
         "power": {
           "buff_ids": [
             "power_rec_spd[000]"
@@ -222,8 +207,7 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd[004]",
-            "power_rec_spd_P[001]"
+            "power_rec_spd[004]"
           ],
           "stepwise": true
         }
@@ -250,7 +234,6 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd&cost[000]",
             "power_rec_spd[000]"
           ],
           "stepwise": true
@@ -2830,8 +2813,7 @@
       "facilities": {
         "dorm": {
           "buff_ids": [
-            "dorm_rec_all&oneself[000]",
-            "dorm_rec_all&oneself[001]"
+            "dorm_rec_all&oneself[000]"
           ],
           "stepwise": true
         }
@@ -3136,8 +3118,7 @@
       "facilities": {
         "power": {
           "buff_ids": [
-            "power_rec_spd[000]",
-            "power_prod_spd_P[000]"
+            "power_rec_spd[000]"
           ],
           "stepwise": true
         }
