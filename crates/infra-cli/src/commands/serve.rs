@@ -28,7 +28,7 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 4;
+const PLAN_SCHEMA_VERSION: u32 = 5;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
@@ -39,6 +39,8 @@ const PLAN_COMPUTE_SCHEMA_V3_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v3.schema.json");
 const PLAN_COMPUTE_SCHEMA_V4_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v4.schema.json");
+const PLAN_COMPUTE_SCHEMA_V5_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v5.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
@@ -64,10 +66,12 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_schema_v2: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V2_JSON)?,
         plan_schema_v3: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON)?,
         plan_schema_v4: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V4_JSON)?,
+        plan_schema_v5: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V5_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
         plan_contract_sha256_v4: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V4_JSON),
+        plan_contract_sha256_v5: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V5_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -114,6 +118,8 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
 }
 
 fn print_serve_usage() {
+    eprintln!("  plan.compute v5: options.support_combinations_enable boolean, default false");
+    eprintln!("  plan: support_combinations_enable boolean, default false");
     eprintln!("Usage:");
     eprintln!("  infra-cli serve");
     eprintln!("Protocol:");
@@ -210,10 +216,12 @@ struct ServeState {
     plan_schema_v2: JSONSchema,
     plan_schema_v3: JSONSchema,
     plan_schema_v4: JSONSchema,
+    plan_schema_v5: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
     plan_contract_sha256_v3: String,
     plan_contract_sha256_v4: String,
+    plan_contract_sha256_v5: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -332,6 +340,8 @@ struct PlanParams {
     output_dir: Option<PathBuf>,
     #[serde(default)]
     maa_title: Option<String>,
+    #[serde(default)]
+    support_combinations_enable: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -475,13 +485,14 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2, 3, 4],
+                "supported_plan_schema_versions": [1, 2, 3, 4, 5],
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,
                     "2": state.plan_contract_sha256_v2,
                     "3": state.plan_contract_sha256_v3,
                     "4": state.plan_contract_sha256_v4,
+                    "5": state.plan_contract_sha256_v5,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -654,9 +665,10 @@ fn handle_plan_compute(
         2 => &state.plan_schema_v2,
         3 => &state.plan_schema_v3,
         4 => &state.plan_schema_v4,
+        5 => &state.plan_schema_v5,
         other => {
             return Err(Error::msg(format!(
-                "unsupported plan schema version {other}; expected 1, 2, 3 or {PLAN_SCHEMA_VERSION}"
+                "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
             )))
         }
     };
@@ -697,6 +709,7 @@ fn handle_plan_compute(
             maa_title: params.options.maa_title.as_deref(),
             fiammetta_candidates_out: None,
             fiammetta_enable: params.options.fiammetta_enable,
+            support_combinations_enable: params.options.support_combinations_enable,
             assert_invariants: params.options.assert_invariants,
         },
         RequestedOutputs {
@@ -849,6 +862,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
             maa_title: params.maa_title.as_deref(),
             fiammetta_candidates_out: None,
             fiammetta_enable: true,
+            support_combinations_enable: params.support_combinations_enable,
             assert_invariants: false,
         },
         RequestedOutputs {

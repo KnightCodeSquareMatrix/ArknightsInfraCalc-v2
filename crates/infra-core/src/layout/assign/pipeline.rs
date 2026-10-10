@@ -16,8 +16,8 @@ use crate::layout::shift::AssignShiftMode;
 use crate::operbox::OperBox;
 use crate::pool::{
     add_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
-    build_power_pool, build_trade_pool, jie_e0_trade_operator, karlan_precision_active,
-    ControlPool, PowerPool, TradePool,
+    build_power_pool_with_fillers, build_trade_pool, karlan_precision_active, ControlPool,
+    PowerPool, TradePool,
 };
 use crate::scoring::{evaluate_trade_manufacture_weighted_efficiency, ScoringPolicyId};
 use crate::search::{
@@ -34,14 +34,14 @@ use super::manufacture_fill::{
     assign_manufacture_lines, manu_options, manufacture_candidate_pool_for_demand, pick_manu_hit,
     refresh_manufacture_efficiency_snapshots,
 };
-use super::power_fill::assign_power_stations;
+use super::power_fill::assign_power_stations_with_instances as assign_power_stations;
 use super::producer_fill::{
     assign_dorm_producers, cleanup_unused_sphinx_urrbian_dorm_anchor, place_system_producers,
 };
 use super::run::{AssignmentRun, StageTimer};
 use super::trade_fill::{
-    assign_trade_jie_remainder, assign_trade_remainder, pick_trade_meta_then_plain,
-    refresh_trade_efficiency_snapshots, take_next_trade_room, trade_order_from_room,
+    assign_trade_remainder, pick_trade_meta_then_plain, refresh_trade_efficiency_snapshots,
+    take_next_trade_room, trade_order_from_room,
 };
 use super::{inject_search_anchor_pool_entries, tag_pool_from_plan, AssignBaseOptions};
 
@@ -103,7 +103,7 @@ fn run_shift_pipeline_with_producer_pruning(
     let mut trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
     let mut manu_pool =
         build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
-    let mut power_pool = build_power_pool(&operbox.power_roster(instances), instances, table)?;
+    let mut power_pool = build_power_pool_with_fillers(operbox, instances, table)?;
     let control_exclusions: HashSet<_> = plan.control_exclusions.iter().cloned().collect();
     tag_pool_from_plan(plan, &mut control_pool);
     tag_pool_from_plan(plan, &mut trade_pool);
@@ -207,107 +207,15 @@ fn run_shift_pipeline_with_producer_pruning(
             }
             if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
                 &run,
-                plan,
                 &winner_trade_pool,
                 &manu_pool,
                 gold_lines,
                 &forbid_same_room,
-                AssignShiftMode::Peak,
             )? {
                 run.assignment = assignment;
                 run.used = used;
             }
             timer.mark("peak_prefixes");
-        }
-        AssignShiftMode::Recovery => {
-            if !operator_is_in_normal_base(blueprint, &run.assignment, ULPIANUS_NAME) {
-                // Deepcolor's trade bonus requires Ulpianus to remain in the normal base.
-                // Recovery does not own an Ulpianus placement, so exclude Deepcolor
-                // before either the shadow or ordinary trade branch searches.
-                run.used.insert(SPHINX_NAME.to_string());
-            }
-            let layout = run.resolve_snapshot(true)?;
-            timer.mark("recovery_prepare");
-            if karlan_precision_active(&layout.global_inject) {
-                add_jie_market_to_trade_pool(&mut trade_pool, instances, table);
-            }
-            let shadow_allowed = karlan_precision_active(&layout.global_inject)
-                || jie_e0_trade_operator(instances, table).is_none();
-            if shadow_allowed {
-                if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
-                    &run,
-                    plan,
-                    &trade_pool,
-                    &manu_pool,
-                    gold_lines,
-                    &forbid_same_room,
-                    AssignShiftMode::Recovery,
-                )? {
-                    run.assignment = assignment;
-                    run.used = used;
-                } else {
-                    assign_trade_jie_remainder(
-                        blueprint,
-                        &trade_pool,
-                        table,
-                        instances,
-                        gold_lines,
-                        options,
-                        Some(run.durin_plan),
-                        &mut run.assignment,
-                        &mut run.used,
-                    )?;
-                    let layout = run.resolve_snapshot(true)?;
-                    assign_manufacture_lines(
-                        blueprint,
-                        operbox,
-                        instances,
-                        &manu_pool,
-                        table,
-                        &layout,
-                        options,
-                        &forbid_same_room,
-                        &mut run.assignment,
-                        &mut run.used,
-                    )?;
-                }
-            } else {
-                assign_trade_jie_remainder(
-                    blueprint,
-                    &trade_pool,
-                    table,
-                    instances,
-                    gold_lines,
-                    options,
-                    Some(run.durin_plan),
-                    &mut run.assignment,
-                    &mut run.used,
-                )?;
-                let layout = run.resolve_snapshot(true)?;
-                assign_manufacture_lines(
-                    blueprint,
-                    operbox,
-                    instances,
-                    &manu_pool,
-                    table,
-                    &layout,
-                    options,
-                    &forbid_same_room,
-                    &mut run.assignment,
-                    &mut run.used,
-                )?;
-            }
-            timer.mark("recovery_production_fill");
-            assign_power_stations(
-                blueprint,
-                &power_pool,
-                table,
-                &layout,
-                options,
-                &mut run.assignment,
-                &mut run.used,
-            )?;
-            timer.mark("recovery_power");
         }
     }
 
@@ -319,6 +227,7 @@ fn run_shift_pipeline_with_producer_pruning(
         options,
         Some(run.durin_plan),
     )?;
+    run.assignment.sort_room_operators_stably();
     refresh_trade_efficiency_snapshots(
         blueprint,
         &mut run.assignment,
@@ -360,38 +269,27 @@ fn producer_pruning_enabled(requested: bool, policy: ScoringPolicyId) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn apply_shadow_trade_manufacture_pair(
     run: &AssignmentRun<'_>,
-    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
-    mode: AssignShiftMode,
 ) -> Result<Option<(BaseAssignment, HashSet<String>)>> {
     let mut assignment = run.assignment.clone();
     let mut used = run.used.clone();
     clear_production_rooms(run.blueprint, &mut assignment, &mut used);
 
-    let Some((trade_room, manu_room, trade_hit, manu_hit)) = probe_shadow_pair(
-        run,
-        plan,
-        trade_pool,
-        manu_pool,
-        gold_lines,
-        &assignment,
-        &used,
-    )?
+    let Some((trade_room, manu_room, trade_hit, manu_hit)) =
+        probe_shadow_pair(run, trade_pool, manu_pool, gold_lines, &assignment, &used)?
     else {
         return Ok(None);
     };
 
     let trade_first = shadow_trade_first_branch(
         run,
-        plan,
         trade_pool,
         manu_pool,
         gold_lines,
         forbid_same_room,
-        mode,
         &assignment,
         &used,
         &trade_room,
@@ -399,12 +297,10 @@ fn apply_shadow_trade_manufacture_pair(
     );
     let manu_first = shadow_manufacture_first_branch(
         run,
-        plan,
         trade_pool,
         manu_pool,
         gold_lines,
         forbid_same_room,
-        mode,
         &assignment,
         &used,
         &manu_room,
@@ -434,7 +330,6 @@ fn apply_shadow_trade_manufacture_pair(
 #[allow(clippy::too_many_arguments)]
 fn probe_shadow_pair(
     run: &AssignmentRun<'_>,
-    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
     gold_lines: u32,
@@ -464,7 +359,6 @@ fn probe_shadow_pair(
         trade_order_from_room(trade_room)?,
         trade_room.level,
         &mut probe_used,
-        &forbid_trade_station_pairs(plan),
         &[],
     )?;
     let manu_hit = pick_shadow_manufacture(
@@ -529,12 +423,10 @@ fn clear_production_rooms(
 #[allow(clippy::too_many_arguments)]
 fn shadow_trade_first_branch(
     run: &AssignmentRun<'_>,
-    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
-    mode: AssignShiftMode,
     base_assignment: &BaseAssignment,
     base_used: &HashSet<String>,
     trade_room: &crate::layout::blueprint::RoomBlueprint,
@@ -549,15 +441,7 @@ fn shadow_trade_first_branch(
         trade_pool,
         &mut used,
     )?;
-    fill_trade_remainder(
-        run,
-        trade_pool,
-        gold_lines,
-        plan,
-        mode,
-        &mut assignment,
-        &mut used,
-    )?;
+    fill_trade_remainder(run, trade_pool, gold_lines, &mut assignment, &mut used)?;
     cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
     fill_manufacture_remainder(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
     settle_shadow_branch(run, assignment, used)
@@ -567,12 +451,10 @@ fn shadow_trade_first_branch(
 #[allow(clippy::too_many_arguments)]
 fn shadow_manufacture_first_branch(
     run: &AssignmentRun<'_>,
-    plan: &AssignmentPlan,
     trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
-    mode: AssignShiftMode,
     base_assignment: &BaseAssignment,
     base_used: &HashSet<String>,
     manu_room: &crate::layout::blueprint::RoomBlueprint,
@@ -587,15 +469,7 @@ fn shadow_manufacture_first_branch(
         manu_pool,
         &mut used,
     )?;
-    fill_trade_remainder(
-        run,
-        trade_pool,
-        gold_lines,
-        plan,
-        mode,
-        &mut assignment,
-        &mut used,
-    )?;
+    fill_trade_remainder(run, trade_pool, gold_lines, &mut assignment, &mut used)?;
     cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut assignment, &mut used);
     fill_manufacture_remainder(run, manu_pool, forbid_same_room, &mut assignment, &mut used)?;
     settle_shadow_branch(run, assignment, used)
@@ -605,37 +479,20 @@ fn fill_trade_remainder(
     run: &AssignmentRun<'_>,
     trade_pool: &TradePool,
     gold_lines: u32,
-    plan: &AssignmentPlan,
-    mode: AssignShiftMode,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    if mode == AssignShiftMode::Recovery {
-        assign_trade_jie_remainder(
-            run.blueprint,
-            trade_pool,
-            run.table,
-            run.instances,
-            gold_lines,
-            run.options,
-            Some(run.durin_plan),
-            assignment,
-            used,
-        )
-    } else {
-        assign_trade_remainder(
-            run.blueprint,
-            trade_pool,
-            run.table,
-            run.instances,
-            gold_lines,
-            run.options,
-            Some(run.durin_plan),
-            &forbid_trade_station_pairs(plan),
-            assignment,
-            used,
-        )
-    }
+    assign_trade_remainder(
+        run.blueprint,
+        trade_pool,
+        run.table,
+        run.instances,
+        gold_lines,
+        run.options,
+        Some(run.durin_plan),
+        assignment,
+        used,
+    )
 }
 
 fn fill_manufacture_remainder(
@@ -822,17 +679,159 @@ fn assign_meeting_rooms(
     {
         let mut operators = assignment.operators_in(&room.id).to_vec();
         while operators.len() < room.operator_capacity() {
+            let winter_available = operators
+                .iter()
+                .any(|operator| operator.name == "忍冬" && operator.elite >= 2)
+                || roster.names().any(|name| {
+                    !used.contains(name.as_str())
+                        && name == "忍冬"
+                        && roster
+                            .progress(name)
+                            .is_some_and(|progress| progress.elite >= 2)
+                });
+            let candidate_names = roster
+                .names()
+                .filter(|name| {
+                    name.as_str() != "铃兰"
+                        || operators
+                            .iter()
+                            .any(|op| op.name == "忍冬" && op.elite >= 2)
+                })
+                .filter(|name| !used.contains(name.as_str()))
+                .filter_map(|name| roster.progress(name).map(|progress| (name, progress)))
+                .collect::<Vec<_>>();
+
+            // 空房先比较完整的双人组合，避免第一席用哨兵评分时丢掉
+            // 忍冬精二与铃兰同室的 +30% 条件收益。
+            if operators.is_empty() && room.operator_capacity() >= 2 {
+                let mut pair_candidates = candidate_names
+                    .iter()
+                    .filter(|(name, progress)| {
+                        registry.entries.iter().any(|entry| {
+                            entry.facility == crate::support_facility::SupportFacility::Meeting
+                                && entry.operator == **name
+                                && (progress.elite > entry.min_elite
+                                    || (progress.elite == entry.min_elite
+                                        && (progress.level == 0
+                                            || progress.level >= entry.min_level)))
+                        })
+                    })
+                    .map(|(name, progress)| (name.to_string(), *progress))
+                    .collect::<Vec<_>>();
+                let mut fillers = candidate_names
+                    .iter()
+                    .filter(|(name, _)| {
+                        !pair_candidates
+                            .iter()
+                            .any(|(skill_name, _)| skill_name == *name)
+                    })
+                    .collect::<Vec<_>>();
+                fillers.sort_by(|(name_a, progress_a), (name_b, progress_b)| {
+                    progress_b
+                        .elite
+                        .cmp(&progress_a.elite)
+                        .then_with(|| progress_b.rarity.cmp(&progress_a.rarity))
+                        .then_with(|| name_a.cmp(name_b))
+                });
+                pair_candidates.extend(
+                    fillers
+                        .into_iter()
+                        .take(2)
+                        .map(|(name, progress)| (name.to_string(), *progress)),
+                );
+                if winter_available && !used.contains("铃兰") {
+                    if let Some(progress) = roster.progress("铃兰") {
+                        pair_candidates.push(("铃兰".to_string(), progress));
+                    }
+                }
+                let mut best_pair: Option<(
+                    f64,
+                    String,
+                    String,
+                    crate::roster::OperatorProgress,
+                    crate::roster::OperatorProgress,
+                )> = None;
+                for (left_index, (left_name, left_progress)) in pair_candidates.iter().enumerate() {
+                    for (right_name, right_progress) in pair_candidates.iter().skip(left_index + 1)
+                    {
+                        if (left_name.as_str() == "铃兰" && right_name.as_str() != "忍冬")
+                            || (right_name.as_str() == "铃兰" && left_name.as_str() != "忍冬")
+                        {
+                            continue;
+                        }
+                        let support_ops = vec![
+                            crate::support_facility::SupportOperator {
+                                name: left_name.to_string(),
+                                elite: left_progress.elite,
+                                rarity: left_progress.rarity,
+                                level: left_progress.level,
+                                mood: options.mood.max(0.0),
+                            },
+                            crate::support_facility::SupportOperator {
+                                name: right_name.to_string(),
+                                elite: right_progress.elite,
+                                rarity: right_progress.rarity,
+                                level: right_progress.level,
+                                mood: options.mood.max(0.0),
+                            },
+                        ];
+                        let score = crate::meeting::evaluate_meeting(
+                            &crate::support_facility::SupportRoomInput {
+                                facility: crate::support_facility::SupportFacility::Meeting,
+                                operators: support_ops,
+                                capacity: room.operator_capacity(),
+                                extra_recruit_slots,
+                                elapsed_hours,
+                                external_speed_bonus_pct: 0.0,
+                                layout: layout.clone(),
+                            },
+                            &registry,
+                        )?
+                        .skill_speed_bonus_pct;
+                        let ordered = if left_name <= right_name {
+                            (left_name, right_name, left_progress, right_progress)
+                        } else {
+                            (right_name, left_name, right_progress, left_progress)
+                        };
+                        if best_pair.as_ref().is_none_or(|best| {
+                            score > best.0
+                                || (score == best.0
+                                    && (ordered.0.as_str(), ordered.1.as_str())
+                                        < (best.1.as_str(), best.2.as_str()))
+                        }) {
+                            best_pair = Some((
+                                score,
+                                ordered.0.to_string(),
+                                ordered.1.to_string(),
+                                *ordered.2,
+                                *ordered.3,
+                            ));
+                        }
+                    }
+                }
+                if let Some((_, left_name, right_name, left_progress, right_progress)) = best_pair {
+                    used.insert(left_name.clone());
+                    used.insert(right_name.clone());
+                    operators.push(crate::layout::AssignedOperator::from_progress(
+                        &left_name,
+                        left_progress,
+                    ));
+                    operators.push(crate::layout::AssignedOperator::from_progress(
+                        &right_name,
+                        right_progress,
+                    ));
+                    continue;
+                }
+            }
+
             let mut best: Option<(f64, String, crate::roster::OperatorProgress)> = None;
-            for name in roster.names() {
+            for (name, progress) in candidate_names {
                 if used.contains(name.as_str()) {
                     continue;
                 }
                 if operators.iter().any(|op| op.name == *name) {
                     continue;
                 }
-                let Some(progress) = roster.progress(name) else {
-                    continue;
-                };
                 // 会客室总是两人同房：候选评分用哨兵补足第二席，使
                 // `SpeedIfSolo` 失效（solo 加成在双人房不生效），
                 // `SpeedIfPartner` 搭档加成按哨兵不匹配记 0。
@@ -1079,6 +1078,43 @@ fn prepare_peak_control_candidate<'a>(
                     && requirement.candidates.iter().any(|name| name == "琴柳")
             });
     let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
+    let control_seed = run.assignment.clone();
+    let blueprint = run.blueprint;
+    let instances = run.instances;
+    let work_hours = run.options.control_work_hours;
+    let mood_model = work_hours
+        .map(|_| crate::mood::default_mood_model())
+        .transpose()?;
+    let initial_mood = run.options.mood;
+    let fits_control_work_budget = |names: &[String]| {
+        let (Some(hours), Some(model)) = (work_hours, mood_model.as_ref()) else {
+            return true;
+        };
+        let mut trial = control_seed.clone();
+        let Some(operators) = names
+            .iter()
+            .map(|name| {
+                control_pool.entry(name).map(|entry| {
+                    crate::layout::AssignedOperator::from_progress(name, entry.progress)
+                })
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            return false;
+        };
+        trial.set_room("control", operators);
+        let available = initial_mood.min(model.mood_cap);
+        crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances)
+            .per_op
+            .iter()
+            .filter(|operator| names.contains(&operator.name))
+            .all(|operator| {
+                crate::mood::fits_work_budget(model, available, operator.drain_per_hour, hours)
+            })
+    };
+    let control_eligibility = work_hours
+        .is_some()
+        .then_some(&fits_control_work_budget as &(dyn Fn(&[String]) -> bool + Sync));
     if run.assignment.control_operators().len() < 5 {
         if let Some((required, excluded)) = dynamic_set {
             if !assign_control_matching_dynamic_set_with_saileach(
@@ -1093,6 +1129,7 @@ fn prepare_peak_control_candidate<'a>(
                 control_exclusions,
                 saileach_best_office_pct,
                 saileach_required,
+                control_eligibility,
                 &mut run.used,
             )? {
                 return Ok(None);
@@ -1108,9 +1145,19 @@ fn prepare_peak_control_candidate<'a>(
                 control_exclusions,
                 saileach_best_office_pct,
                 saileach_required,
+                control_eligibility,
                 &mut run.used,
             )?;
         }
+    }
+    let selected_names: Vec<_> = run
+        .assignment
+        .control_operators()
+        .into_iter()
+        .map(|operator| operator.name)
+        .collect();
+    if !fits_control_work_budget(&selected_names) {
+        return Ok(None);
     }
     if let Some((required, excluded)) = dynamic_set {
         let control_names: HashSet<String> = run
@@ -1180,6 +1227,7 @@ fn finish_peak_prefix_candidate<'a>(
         run.options,
         &mut run.assignment,
         &mut run.used,
+        run.instances,
     )?;
     let remaining_trade_slots: usize = run
         .blueprint
@@ -1207,7 +1255,6 @@ fn finish_peak_prefix_candidate<'a>(
         gold_lines,
         run.options,
         Some(run.durin_plan),
-        &forbid_trade_station_pairs(plan),
         &mut run.assignment,
         &mut run.used,
     )?;
@@ -1358,23 +1405,11 @@ fn dynamic_producer_candidates(
 }
 
 /// 从统一 plan 的 constraints 提取 forbid-same-room 名对，供制造 anchor 房搜索排除。
-fn forbid_same_room_pairs(plan: &AssignmentPlan) -> Vec<(String, String)> {
+pub(super) fn forbid_same_room_pairs(plan: &AssignmentPlan) -> Vec<(String, String)> {
     plan.constraints
         .iter()
         .filter_map(|c| match c {
             crate::layout::orchestrate::SystemConstraint::ForbidSameRoom { a, b } => {
-                Some((a.clone(), b.clone()))
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn forbid_trade_station_pairs(plan: &AssignmentPlan) -> Vec<(String, String)> {
-    plan.constraints
-        .iter()
-        .filter_map(|constraint| match constraint {
-            crate::layout::orchestrate::SystemConstraint::ForbidSameStation { a, b } => {
                 Some((a.clone(), b.clone()))
             }
             _ => None,
@@ -1623,7 +1658,7 @@ mod tests {
     }
 
     fn plan_requiring_control_fillers(names: &[&str]) -> AssignmentPlan {
-        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut plan = AssignmentPlan::empty();
         plan.control_candidate_requirements
             .push(crate::layout::ControlCandidateRequirement {
                 candidates: names.iter().map(|name| (*name).to_string()).collect(),
@@ -1726,7 +1761,7 @@ mod tests {
             },
             AssignShiftMode::Peak,
             &BaseAssignment::default(),
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         )
         .unwrap();
 
@@ -1755,7 +1790,7 @@ mod tests {
             },
             AssignShiftMode::Peak,
             &BaseAssignment::default(),
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         )
         .unwrap();
 
@@ -1803,7 +1838,7 @@ mod tests {
             },
             AssignShiftMode::Peak,
             &seed,
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         )
         .unwrap();
         let control: HashSet<_> = assignment
@@ -1866,7 +1901,7 @@ mod tests {
                 ..Default::default()
             },
             &seed,
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         );
 
         let control: HashSet<_> = assignment
@@ -1934,7 +1969,7 @@ mod tests {
             &table,
             &AssignBaseOptions::default(),
             &seed,
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         );
         assert!(!assignment
             .control_operators()
@@ -1947,76 +1982,6 @@ mod tests {
             .collect();
         assert_eq!(trade, HashSet::from(["银灰", "崖心", "讯使"]));
         assert!(dependencies.is_empty());
-    }
-
-    fn shadow_fixture_inputs(
-        names: &[&str],
-    ) -> (BaseBlueprint, OperBox, OperatorInstances, SkillTable) {
-        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let fixture = root.join("../../data/fixtures/shadow_operator_extreme");
-        let blueprint = BaseBlueprint::load(&fixture.join("layout.json")).unwrap();
-        let operbox = OperBox::from_entries(names.iter().map(|name| e2(name)).collect()).unwrap();
-        let instances =
-            OperatorInstances::load(&root.join("../../data/operator_instances.json")).unwrap();
-        let table = SkillTable::load(&root.join("../../data/skill_table.json")).unwrap();
-        (blueprint, operbox, instances, table)
-    }
-
-    fn shadow_fixture_assignment(mode: AssignShiftMode, names: &[&str]) -> BaseAssignment {
-        let (blueprint, operbox, instances, table) = shadow_fixture_inputs(names);
-        run_shift_pipeline(
-            &blueprint,
-            &operbox,
-            &instances,
-            &table,
-            &AssignBaseOptions::default(),
-            mode,
-            &BaseAssignment::default(),
-            &AssignmentPlan::recovery(mode),
-        )
-        .unwrap()
-    }
-
-    fn assert_shadow_assignment_is_unique(assignment: &BaseAssignment) {
-        let names: Vec<_> = assignment
-            .rooms
-            .iter()
-            .flat_map(|room| room.operators.iter().map(|operator| operator.name.as_str()))
-            .collect();
-        assert_eq!(
-            names.len(),
-            assignment.operator_names().len(),
-            "duplicate={names:?}"
-        );
-    }
-
-    #[test]
-    fn recovery_shadow_pair_keeps_trade_winner_and_rehomes_manufacture() {
-        let assignment =
-            shadow_fixture_assignment(AssignShiftMode::Recovery, &["夜烟", "卡夫卡", "赫默"]);
-        assert_eq!(
-            assignment.operators_in(&RoomId::from("trade_1"))[0].name,
-            "夜烟"
-        );
-        assert_eq!(
-            assignment.operators_in(&RoomId::from("manu_1"))[0].name,
-            "赫默"
-        );
-        assert_shadow_assignment_is_unique(&assignment);
-    }
-
-    #[test]
-    fn recovery_without_shared_operator_keeps_existing_fill_order() {
-        let assignment = shadow_fixture_assignment(AssignShiftMode::Recovery, &["卡夫卡", "赫默"]);
-        assert_eq!(
-            assignment.operators_in(&RoomId::from("trade_1"))[0].name,
-            "卡夫卡"
-        );
-        assert_eq!(
-            assignment.operators_in(&RoomId::from("manu_1"))[0].name,
-            "赫默"
-        );
-        assert_shadow_assignment_is_unique(&assignment);
     }
 
     #[test]
@@ -2086,7 +2051,7 @@ mod tests {
             &table,
             &AssignBaseOptions::default(),
             &seed,
-            &AssignmentPlan::recovery(AssignShiftMode::Peak),
+            &AssignmentPlan::empty(),
         );
         assert!(assignment
             .control_operators()
@@ -2271,7 +2236,7 @@ mod tests {
             .unwrap()
             .product = None;
         let options = AssignBaseOptions::default();
-        let plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let plan = AssignmentPlan::empty();
         let control_pool = build_control_pool_with_fillers(&operbox, &instances, &table).unwrap();
         let trade_pool =
             build_trade_pool(&operbox.trade_roster(&instances), &instances, &table).unwrap();

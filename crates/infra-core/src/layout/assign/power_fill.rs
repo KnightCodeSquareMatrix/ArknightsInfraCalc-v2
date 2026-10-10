@@ -44,6 +44,55 @@ pub fn assign_power_rooms(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    assign_power_rooms_with_instances(
+        blueprint, pool, table, layout, options, rooms, assignment, used, None, None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn assign_power_stations_with_instances(
+    blueprint: &BaseBlueprint,
+    pool: &PowerPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+    instances: &crate::instances::OperatorInstances,
+) -> Result<()> {
+    let rooms: Vec<_> = blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::PowerPlant)
+        .map(|room| room.id.clone())
+        .collect();
+    assign_power_rooms_with_instances(
+        blueprint,
+        pool,
+        table,
+        layout,
+        options,
+        &rooms,
+        assignment,
+        used,
+        Some(instances),
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn assign_power_rooms_with_instances(
+    blueprint: &BaseBlueprint,
+    pool: &PowerPool,
+    table: &SkillTable,
+    layout: &LayoutContext,
+    options: &AssignBaseOptions,
+    rooms: &[RoomId],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+    instances: Option<&crate::instances::OperatorInstances>,
+    coexist_assignment: Option<&BaseAssignment>,
+) -> Result<()> {
     let total_stations = blueprint
         .rooms
         .iter()
@@ -74,28 +123,17 @@ pub fn assign_power_rooms(
         return Ok(());
     }
 
-    let full_pool = filter_power_pool(pool, used);
+    let mut full_pool = filter_power_pool(pool, used);
+    full_pool.entries.retain(|entry| !entry.buff_ids.is_empty());
     let sub = try_filter_standalone(&full_pool, FacilityKind::PowerPlant, empty_rooms.len());
     let sub = if sub.entries.len() < empty_rooms.len() {
         full_pool
     } else {
         sub
     };
-    if sub.entries.is_empty() {
-        return Err(Error::msg("power: no available operators"));
-    }
-
     let mut opts = power_opts;
     opts.station_count = empty_rooms.len().min(255) as u8;
     let report = search_power_assignment(&sub, table, &opts)?;
-    if report.assignments.len() != empty_rooms.len() {
-        return Err(Error::msg(format!(
-            "power: expected {} assignments, got {}",
-            empty_rooms.len(),
-            report.assignments.len()
-        )));
-    }
-
     for (room_id, station) in empty_rooms.iter().zip(report.assignments.iter()) {
         let op = pool
             .entry(&station.hit.name)
@@ -112,6 +150,64 @@ pub fn assign_power_rooms(
             vec![op],
             Some(power_efficiency_snapshot(&station.hit)),
         );
+    }
+    if report.assignments.len() < empty_rooms.len() {
+        let mood = crate::mood::default_mood_model()?;
+        let mut fillers: Vec<_> = pool
+            .entries
+            .iter()
+            .filter(|entry| entry.buff_ids.is_empty())
+            .collect();
+        // Preserve scarce trade/manufacture skills while filling an unskilled power seat.
+        fillers.sort_by_key(|entry| {
+            let productive = instances.is_some_and(|instances| {
+                let tier = crate::tier::PromotionTier::from_progress(entry.progress);
+                !instances
+                    .resolve_trade_buff_ids(&entry.name, tier)
+                    .is_empty()
+                    || !instances
+                        .resolve_manufacture_buff_ids(&entry.name, tier)
+                        .is_empty()
+            });
+            (productive, entry.name.as_str())
+        });
+        for room_id in empty_rooms.iter().skip(report.assignments.len()) {
+            let mut placed = false;
+            for entry in &fillers {
+                if used.contains(&entry.name) {
+                    continue;
+                }
+                let op = AssignedOperator::from_progress(&entry.name, entry.progress);
+                let mut trial = coexist_assignment.cloned().unwrap_or_default();
+                for room in &assignment.rooms {
+                    trial.set_room(room.room_id.clone(), room.operators.clone());
+                }
+                trial.set_room(room_id.clone(), vec![op.clone()]);
+                let eta = crate::mood::shift_eta_in_context(&mood, blueprint, &trial, instances);
+                let Some(candidate_eta) = eta.operator_in_room(&entry.name, &room_id.0) else {
+                    continue;
+                };
+                if !crate::mood::fits_work_budget(
+                    &mood,
+                    options.mood,
+                    candidate_eta.drain_per_hour,
+                    options.shift_hours,
+                ) {
+                    continue;
+                }
+                // Settlement reads the final assignment, including empty power buff IDs.
+                assignment.set_room(room_id.clone(), vec![op]);
+                used.insert(entry.name.clone());
+                placed = true;
+                break;
+            }
+            if !placed {
+                return Err(Error::msg(format!(
+                    "power: no eligible spare operator for {} after skill search",
+                    room_id.0,
+                )));
+            }
+        }
     }
     Ok(())
 }

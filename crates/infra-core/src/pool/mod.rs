@@ -14,7 +14,7 @@ pub use manufacture::{
     build_manufacture_pool, filter_general_manufacture_search_pool, filter_manufacture_pool,
     ManuPool, ManuPoolEntry,
 };
-pub use power::{build_power_pool, PowerPool, PowerPoolEntry};
+pub use power::{build_power_pool, build_power_pool_with_fillers, PowerPool, PowerPoolEntry};
 pub use standalone::{
     filter_standalone_exact, filter_standalone_exact_with, standalone_names_for,
     try_filter_standalone, try_filter_standalone_with, StandaloneFilter,

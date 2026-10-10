@@ -3,13 +3,14 @@ mod assignment;
 mod blueprint;
 mod context;
 mod orchestrate;
+pub(crate) use orchestrate::assert_support_combination_policy;
 mod resolve;
 mod shift;
 mod system;
 pub mod tier;
 mod workforce;
 
-pub(crate) use assign::assign_control;
+pub(crate) use assign::assign_control_with_saileach;
 pub(crate) use assign::assign_manu_room_with_anchors;
 pub(crate) use assign::assign_shift_with_preclaimed_plan;
 pub(crate) use assign::refill_manu_room_with_core;
@@ -36,6 +37,7 @@ pub use orchestrate::{
     ReserveReusePolicy, ResolvedRoleReserve, SelectedRuleAlternative, ShiftBind, SlotFill,
     SystemAnchor, SystemConstraint,
 };
+pub(crate) use resolve::resolve_control_input_layout;
 pub use resolve::{
     resolve_automation_group_1_layout, resolve_base, resolve_base_with_trace,
     resolve_search_baseline_layout, resolve_snhunt_baseline_layout,

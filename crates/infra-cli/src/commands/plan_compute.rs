@@ -50,6 +50,8 @@ pub(super) struct PlanComputeOptions {
     #[serde(default = "default_fiammetta_enable")]
     pub fiammetta_enable: bool,
     #[serde(default)]
+    pub support_combinations_enable: bool,
+    #[serde(default)]
     pub assert_invariants: bool,
 }
 
@@ -131,6 +133,7 @@ pub(super) struct PlanComputeInput<'a> {
     pub maa_title: Option<&'a str>,
     pub fiammetta_candidates_out: Option<PathBuf>,
     pub fiammetta_enable: bool,
+    pub support_combinations_enable: bool,
     pub assert_invariants: bool,
 }
 
@@ -222,6 +225,7 @@ fn compute_plan_inner(
         input.rotation_profile,
         input.system_preferences,
         input.fiammetta_enable,
+        input.support_combinations_enable,
         input.fiammetta_candidates_out.clone(),
     );
     let stage_after = infra_core::profile::solver_perf_snapshot();
@@ -315,6 +319,7 @@ fn compute_plan_inner(
                     rotation_profile: input.rotation_profile,
                     system_preferences: input.system_preferences.clone(),
                     fiammetta_enable: input.fiammetta_enable,
+                    support_combinations_enable: input.support_combinations_enable,
                     ..BoxProfileOptions::default()
                 },
             )

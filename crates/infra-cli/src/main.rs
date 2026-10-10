@@ -79,11 +79,12 @@ fn run() -> Result<(), Error> {
 
 fn print_usage() {
     eprintln!("Usage:");
-    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|12/12/12|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
+    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
     eprintln!(
         "      [--profile-out <file.json>] [--rotation-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--assert-invariants] [--json]"
     );
     eprintln!("      (default layout: data/fixtures/243/layout.json)");
+    eprintln!("      --enable-support-combinations: enable proactive attachment combinations (default off)");
     eprintln!("  infra-cli advice --operbox <path.json> [--player [--layout <layout.json>] [--player-context <context.json>] [--pretty] | --rules <path> | --answer | --explain [--pretty]]");
     eprintln!("  infra-cli verify --case <case_id>");
     eprintln!("  infra-cli verify --all");
@@ -101,7 +102,7 @@ fn print_usage() {
     eprintln!(
         "  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
     );
-    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
+    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]");
     eprintln!("  infra-cli profile analyze-compare [--layout <path>] [--operbox <path>] [--schedule <path>] [--runs <n>]");
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");
@@ -119,7 +120,7 @@ fn roster_path_from_args(args: &[String]) -> Result<PathBuf, Error> {
     {
         return Ok(PathBuf::from(path));
     }
-    Ok(data_path("roster.csv")?)
+    data_path("roster.csv")
 }
 
 fn operbox_path_optional(args: &[String]) -> Option<PathBuf> {

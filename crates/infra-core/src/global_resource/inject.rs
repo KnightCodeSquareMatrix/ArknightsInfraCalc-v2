@@ -156,7 +156,7 @@ impl GlobalInjectManifest {
                 };
                 counts.get(&rule.target_tag).copied().unwrap_or(0)
             })
-            .map(|count| f64::from(count))
+            .map(f64::from)
             .zip(
                 self.trade_tagged
                     .iter()

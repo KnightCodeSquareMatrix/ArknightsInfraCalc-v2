@@ -122,14 +122,11 @@ fn resolve_selector_value(
         Selector::MeetingMaxLevel => f64::from(layout.meeting_max_level),
         Selector::SuiFacilityCount => f64::from(layout.sui_facility_count),
         Selector::EliteFacilityCount => f64::from(layout.elite_facility_count),
-        Selector::TaggedCountInRoom { tag } => {
+        Selector::TaggedCountInRoom { tag }
             // scope=Global 时，取该干员自身的 tag 匹配
-            if entry.owner_tags.iter().any(|t| t == tag) {
+            if entry.owner_tags.iter().any(|t| t == tag) => {
                 1.0
-            } else {
-                0.0
             }
-        }
         // 以下 Selector 在跨设施上下文中不可用或恒为 0
         _ => 0.0,
     }

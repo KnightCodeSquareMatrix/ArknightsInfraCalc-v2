@@ -825,10 +825,10 @@ fn team_label(
     }
 }
 
-fn team_by_label<'a>(
-    teams: &'a [infra_core::schedule::TeamAssignment],
+fn team_by_label(
+    teams: &[infra_core::schedule::TeamAssignment],
     label: TeamLabel,
-) -> &'a infra_core::schedule::TeamAssignment {
+) -> &infra_core::schedule::TeamAssignment {
     teams
         .iter()
         .find(|t| t.label == label)

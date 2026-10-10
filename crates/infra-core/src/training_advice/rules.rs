@@ -60,16 +60,15 @@ fn validate_rule(rule: &TrainingRule) -> Result<()> {
     }
 
     let hard = matches!(rule.kind, RuleKind::System | RuleKind::Combo);
-    if matches!(rule.kind, RuleKind::Standalone | RuleKind::SoftCombo) {
-        if !rule.admission.required_core.is_empty()
+    if matches!(rule.kind, RuleKind::Standalone | RuleKind::SoftCombo)
+        && (!rule.admission.required_core.is_empty()
             || !rule.admission.pick_one_core.is_empty()
-            || !rule.admission.required_core_groups.is_empty()
-        {
-            return Err(Error::msg(format!(
-                "rule {} kind {:?} must not declare hard core admission",
-                rule.id, rule.kind
-            )));
-        }
+            || !rule.admission.required_core_groups.is_empty())
+    {
+        return Err(Error::msg(format!(
+            "rule {} kind {:?} must not declare hard core admission",
+            rule.id, rule.kind
+        )));
     }
 
     if hard

@@ -2,8 +2,8 @@
   "schema_version": 4,
   "rotation_profile": "abc_12_6_6",
   "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/08-212-operbox.json",
-  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
+  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/08-212-operbox.json",
+  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 212,
     "tier_up_owned": 45,
@@ -62,11 +62,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "杏仁",
-          "苍苔",
-          "阿罗玛"
+          "蛇屠箱",
+          "娜仁图亚",
+          "红云"
         ],
-        "final_efficiency": 7.51
+        "final_efficiency": 7.66
       },
       "baseline": {
         "operators": [
@@ -74,21 +74,21 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.102
+        "final_efficiency": 8.392
       },
-      "gap_ratio": -0.07306837817822766,
-      "severity": "ok"
+      "gap_ratio": -0.08722592945662529,
+      "severity": "warn"
     },
     {
       "id": "manufacture_gold",
       "label": "制造·赤金产线",
       "current": {
         "operators": [
-          "杏仁",
-          "苍苔",
-          "阿罗玛"
+          "蛇屠箱",
+          "娜仁图亚",
+          "红云"
         ],
-        "final_efficiency": 1.9
+        "final_efficiency": 1.93
       },
       "baseline": {
         "operators": [
@@ -96,9 +96,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.093
+        "final_efficiency": 2.238
       },
-      "gap_ratio": -0.09221213569039659,
+      "gap_ratio": -0.13762287756925828,
       "severity": "warn"
     },
     {
@@ -107,10 +107,10 @@
       "current": {
         "operators": [
           "铅踝",
-          "白面鸮",
+          "香草",
           "Castle-3"
         ],
-        "final_efficiency": 1.855
+        "final_efficiency": 1.9
       },
       "baseline": {
         "operators": [
@@ -120,7 +120,7 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": -0.05260469867211439,
+      "gap_ratio": -0.029622063329928526,
       "severity": "ok"
     },
     {
@@ -142,24 +142,24 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 7.718
+        "final_efficiency": 7.86
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 8.938
+        "final_efficiency": 9.084
       },
-      "gap_ratio": -0.1364958603714478,
+      "gap_ratio": -0.13474240422721262,
       "severity": "warn"
     }
   ],
   "rotation": {
     "daily_trade_efficiency": 3.663,
-    "daily_manufacture_efficiency": 7.718,
+    "daily_manufacture_efficiency": 7.86,
     "daily_power_efficiency": 1.54
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
-    "daily_manufacture_efficiency": 8.938,
+    "daily_manufacture_efficiency": 9.084,
     "daily_power_efficiency": 1.627
   },
   "actions": [
@@ -188,8 +188,8 @@
       "priority": "P1",
       "kind": "promote_tier_up",
       "operator": "夜烟",
-      "domain_id": "manufacture_gold",
-      "message": "将「夜烟」升至 tier_up（需精1）——制造·赤金产线参考组合成员，现4★精0 1级",
+      "domain_id": "manufacture_total",
+      "message": "将「夜烟」升至 tier_up（需精1）——制造·综合参考组合成员，现4★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精1"
     },
@@ -197,8 +197,8 @@
       "priority": "P1",
       "kind": "promote_tier_up",
       "operator": "苍苔",
-      "domain_id": "manufacture_gold",
-      "message": "将「苍苔」升至 tier_up（需精2）——制造·赤金产线参考组合成员，现5★精0 1级",
+      "domain_id": "manufacture_total",
+      "message": "将「苍苔」升至 tier_up（需精2）——制造·综合参考组合成员，现5★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精2"
     },
@@ -232,25 +232,17 @@
     {
       "priority": "P2",
       "kind": "promote_tier_up",
-      "operator": "杏仁",
-      "domain_id": "manufacture_gold",
-      "message": "将「杏仁」升至 tier_up（需精2）——制造·赤金产线当前在用组合，现5★精0 1级",
+      "operator": "蛇屠箱",
+      "domain_id": "manufacture_total",
+      "message": "将「蛇屠箱」升至 tier_up（需精1）——制造·综合当前在用组合，现4★精0 45级",
       "current_elite": 0,
-      "tier_up_requirement": "精2"
-    },
-    {
-      "priority": "P2",
-      "kind": "promote_tier_up",
-      "operator": "阿罗玛",
-      "domain_id": "manufacture_gold",
-      "message": "将「阿罗玛」升至 tier_up（需精2）——制造·赤金产线当前在用组合，现5★精0 1级",
-      "current_elite": 0,
-      "tier_up_requirement": "精2"
+      "tier_up_requirement": "精1"
     }
   ],
   "flags": [
     "trade_gold_warn",
     "trade_originium_critical",
+    "manufacture_total_warn",
     "manufacture_gold_warn",
     "rotation_manufacture_warn"
   ],

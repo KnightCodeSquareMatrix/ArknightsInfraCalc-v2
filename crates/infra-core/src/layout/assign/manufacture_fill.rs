@@ -158,6 +158,12 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
             mood: options.mood,
             layout: Arc::new(room.layout),
         };
+        if !crate::search::manufacture_peers_compatible(&input.operators, table) {
+            return Err(Error::msg(format!(
+                "manufacture {} has incompatible peer-efficiency operators",
+                room.id.0
+            )));
+        }
         let solved =
             crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
@@ -178,7 +184,10 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
 }
 
 /// anchor 房按 forbid-same-room 约束收集禁止同房的队友名（双向匹配）。
-fn forbidden_teammates(anchor: &str, forbid_same_room: &[(String, String)]) -> HashSet<String> {
+pub(super) fn forbidden_teammates(
+    anchor: &str,
+    forbid_same_room: &[(String, String)],
+) -> HashSet<String> {
     let mut out = HashSet::new();
     for (a, b) in forbid_same_room {
         if a == anchor {

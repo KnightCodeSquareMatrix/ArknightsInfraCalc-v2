@@ -122,21 +122,7 @@ pub struct SystemExplainReport {
 
 #[derive(Debug, Clone, Deserialize)]
 struct BaseSystemsFile {
-    #[serde(default)]
-    control_manu_injectors: Vec<ControlManuInjectorDef>,
     systems: Vec<BaseSystemDef>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ControlManuInjectorDef {
-    pub id: String,
-    #[serde(default)]
-    pub label: String,
-    #[serde(default)]
-    pub manu_all_pct: f64,
-    pub operators: Vec<SystemOperatorSpec>,
-    #[serde(default)]
-    pub requires_monhun_peer: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -149,8 +135,6 @@ pub struct BaseSystemDef {
     /// 跨站 / 同站 / 工具人三层分类。
     #[serde(default)]
     pub tier: Option<OperatorTier>,
-    #[serde(default)]
-    pub segment_id: Option<String>,
     #[serde(default)]
     pub exclusive_group: Option<String>,
     #[serde(default)]
@@ -322,7 +306,6 @@ fn mode_allowed(system: &BaseSystemDef, mode: AssignShiftMode) -> bool {
     }
     let want = match mode {
         AssignShiftMode::Peak => "peak",
-        AssignShiftMode::Recovery => "recovery",
     };
     system.shift_modes.iter().any(|m| m == want)
 }
@@ -353,9 +336,9 @@ fn resolve_pick_one(
             continue;
         };
         if progress.elite >= candidate.elite_requirement(pick.elite)
-            && !candidate
+            && candidate
                 .max_elite()
-                .is_some_and(|max| progress.elite > max)
+                .is_none_or(|max| progress.elite <= max)
         {
             return Some(ResolvedOperator {
                 name: name.to_string(),
@@ -553,8 +536,8 @@ fn explain_slot_room<'a>(
     ))
 }
 
-fn prioritize_registry_slot_rooms<'a>(
-    rooms: &mut Vec<&'a crate::layout::blueprint::RoomBlueprint>,
+fn prioritize_registry_slot_rooms(
+    rooms: &mut Vec<&crate::layout::blueprint::RoomBlueprint>,
     slot: &SystemSlotDef,
 ) {
     let Some(role) = slot.trade_role.as_deref() else {

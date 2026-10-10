@@ -1,9 +1,9 @@
 {
   "schema_version": 4,
-  "rotation_profile": "fiammetta_8_8_4_4",
-  "layout_label": "data/fixtures/243/layout.json",
-  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/10-238-operbox.json",
-  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
+  "rotation_profile": "abc_12_6_6",
+  "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
+  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/10-238-operbox.json",
+  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 238,
     "tier_up_owned": 72,
@@ -16,11 +16,11 @@
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "但书",
-          "德克萨斯",
-          "拉普兰德"
+          "夜刀",
+          "维娜·维多利亚",
+          "缠丸"
         ],
-        "final_efficiency": 2.233
+        "final_efficiency": 2.0
       },
       "baseline": {
         "operators": [
@@ -30,7 +30,7 @@
         ],
         "final_efficiency": 2.794
       },
-      "gap_ratio": -0.20078740157480313,
+      "gap_ratio": -0.28418038654259126,
       "severity": "critical"
     },
     {
@@ -38,11 +38,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "夜烟",
-          "杏仁",
-          "砾"
+          "裁度",
+          "克洛丝",
+          "芬"
         ],
-        "final_efficiency": 7.52
+        "final_efficiency": 7.198
       },
       "baseline": {
         "operators": [
@@ -50,21 +50,21 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.102
+        "final_efficiency": 8.392
       },
-      "gap_ratio": -0.0718341150333252,
-      "severity": "ok"
+      "gap_ratio": -0.1422783603431839,
+      "severity": "warn"
     },
     {
       "id": "manufacture_gold",
       "label": "制造·赤金产线",
       "current": {
         "operators": [
-          "夜烟",
-          "杏仁",
-          "砾"
+          "裁度",
+          "克洛丝",
+          "芬"
         ],
-        "final_efficiency": 1.855
+        "final_efficiency": 1.744
       },
       "baseline": {
         "operators": [
@@ -72,21 +72,21 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.093
+        "final_efficiency": 2.238
       },
-      "gap_ratio": -0.11371237458193979,
-      "severity": "warn"
+      "gap_ratio": -0.22073279714030383,
+      "severity": "critical"
     },
     {
       "id": "manufacture_battle_record",
       "label": "制造·经验产线",
       "current": {
         "operators": [
-          "机械师",
-          "白雪",
-          "红豆"
+          "铅踝",
+          "泡普卡",
+          "香草"
         ],
-        "final_efficiency": 1.905
+        "final_efficiency": 1.855
       },
       "baseline": {
         "operators": [
@@ -96,7 +96,7 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": -0.027068437180796698,
+      "gap_ratio": -0.05260469867211439,
       "severity": "ok"
     },
     {
@@ -104,13 +104,13 @@
       "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 3.734
+        "final_efficiency": 3.813
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 3.84
       },
-      "gap_ratio": -0.027604166666666635,
+      "gap_ratio": -0.0070312499999999195,
       "severity": "ok"
     },
     {
@@ -118,24 +118,24 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 7.43
+        "final_efficiency": 7.422
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 8.938
+        "final_efficiency": 9.084
       },
-      "gap_ratio": -0.1687178339673306,
+      "gap_ratio": -0.18295904887714662,
       "severity": "warn"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 3.734,
-    "daily_manufacture_efficiency": 7.43,
-    "daily_power_efficiency": 1.492
+    "daily_trade_efficiency": 3.813,
+    "daily_manufacture_efficiency": 7.422,
+    "daily_power_efficiency": 1.552
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
-    "daily_manufacture_efficiency": 8.938,
+    "daily_manufacture_efficiency": 9.084,
     "daily_power_efficiency": 1.627
   },
   "actions": [
@@ -159,13 +159,6 @@
     },
     {
       "priority": "P0",
-      "kind": "acquire",
-      "operator": "黑键",
-      "domain_id": "trade_originium",
-      "message": "获取「黑键」——贸易·订单/源石线参考最优组合需要（现未拥有）"
-    },
-    {
-      "priority": "P1",
       "kind": "promote_tier_up",
       "operator": "夜烟",
       "domain_id": "manufacture_gold",
@@ -174,7 +167,7 @@
       "tier_up_requirement": "精1"
     },
     {
-      "priority": "P1",
+      "priority": "P0",
       "kind": "promote_tier_up",
       "operator": "引星棘刺",
       "domain_id": "manufacture_gold",
@@ -183,34 +176,42 @@
       "tier_up_requirement": "精2"
     },
     {
-      "priority": "P1",
+      "priority": "P0",
       "kind": "acquire",
       "operator": "苍苔",
       "domain_id": "manufacture_gold",
       "message": "获取「苍苔」——制造·赤金产线参考最优组合需要（现未拥有）"
     },
     {
+      "priority": "P0",
+      "kind": "acquire",
+      "operator": "黑键",
+      "domain_id": "trade_originium",
+      "message": "获取「黑键」——贸易·订单/源石线参考最优组合需要（现未拥有）"
+    },
+    {
       "priority": "P2",
       "kind": "promote_tier_up",
-      "operator": "德克萨斯",
+      "operator": "维娜·维多利亚",
       "domain_id": "trade_originium",
-      "message": "将「德克萨斯」升至 tier_up（需精2）——贸易·订单/源石线当前在用组合，现5★精1 68级",
-      "current_elite": 1,
+      "message": "将「维娜·维多利亚」升至 tier_up（需精2）——贸易·订单/源石线当前在用组合，现6★精0 50级",
+      "current_elite": 0,
       "tier_up_requirement": "精2"
     },
     {
       "priority": "P2",
       "kind": "promote_tier_up",
-      "operator": "杏仁",
-      "domain_id": "manufacture_gold",
-      "message": "将「杏仁」升至 tier_up（需精2）——制造·赤金产线当前在用组合，现5★精0 1级",
+      "operator": "裁度",
+      "domain_id": "manufacture_total",
+      "message": "将「裁度」升至 tier_up（需精2）——制造·综合当前在用组合，现5★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精2"
     }
   ],
   "flags": [
     "trade_originium_critical",
-    "manufacture_gold_warn",
+    "manufacture_total_warn",
+    "manufacture_gold_critical",
     "rotation_manufacture_warn"
   ],
   "narration_hints": [

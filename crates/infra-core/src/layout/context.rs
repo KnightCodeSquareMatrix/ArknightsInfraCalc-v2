@@ -48,6 +48,9 @@ pub struct LayoutContext {
     pub durin_in_base: u8,
     /// 制造站赤金真实生产线数（由布局蓝图派生）。
     pub gold_manu_line_count: u32,
+    /// 当前实际进驻任意贸易站的产线提供者及其贡献；金单房有序链扣回自身贡献再重放。
+    /// (owner, virtual lines, whether this source scales with actual Durin presence).
+    pub trade_gold_line_sources: Vec<(String, u32, bool)>,
     /// 全基建设施等级合计（不含会客室；至简·绘图设计）。
     pub facility_level_sum_excl_meeting: u16,
     /// 训练室协助位干员（PhonoR-0·咒文共鸣）。
@@ -107,6 +110,7 @@ impl Default for LayoutContext {
             rhine_life_in_base: 0,
             durin_in_base: 0,
             gold_manu_line_count: 0,
+            trade_gold_line_sources: Vec::new(),
             facility_level_sum_excl_meeting: 0,
             training_assist: Vec::new(),
             other_power_has_platform: false,

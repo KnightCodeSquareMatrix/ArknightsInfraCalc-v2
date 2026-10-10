@@ -150,8 +150,12 @@ pub struct SearchTripleFilter {
     pub must_operator_override: Option<TradeOperator>,
     /// Keep only hits passing this predicate (e.g. witch / closure shortcut).
     pub hit_filter: Option<fn(&TradeSearchHit) -> bool>,
-    /// 由 `AssignmentPlan` 编译出的同站禁配，不绑定具体体系函数。
+    /// 同站禁配，包含 Plan 约束及贸易搜索的全布局产品政策。
     pub forbidden_pairs: Vec<(String, String)>,
+}
+
+pub(crate) fn is_global_trade_forbidden_pair(a: &str, b: &str) -> bool {
+    matches!((a, b), ("黑键", "巫恋") | ("巫恋", "黑键"))
 }
 
 impl SearchTripleFilter {
@@ -255,10 +259,19 @@ fn search_trade_single_order(
     table: &SkillTable,
     options: &TradeSearchOptions,
     order_kind: TradeOrderKind,
-    filter: SearchTripleFilter,
+    mut filter: SearchTripleFilter,
 ) -> Result<TradeSearchReport> {
     let leaf_started = Instant::now();
     let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Trade);
+    if !filter
+        .forbidden_pairs
+        .iter()
+        .any(|(a, b)| is_global_trade_forbidden_pair(a, b))
+    {
+        filter
+            .forbidden_pairs
+            .push(("黑键".to_string(), "巫恋".to_string()));
+    }
     let sub = trade_search_pool_for_order(pool, order_kind, options, &filter);
     let n = sub.entries.len();
     let operator_capacity = options.operator_capacity.clamp(1, 3);
@@ -467,7 +480,10 @@ fn trade_search_pool_for_order(
     }
     if filter.has_must_include()
         || filter.hit_filter.is_some()
-        || !filter.forbidden_pairs.is_empty()
+        || filter
+            .forbidden_pairs
+            .iter()
+            .any(|(a, b)| !is_global_trade_forbidden_pair(a, b))
     {
         return pool.clone();
     }
@@ -604,9 +620,51 @@ fn project_trade_combo_layout(base: &LayoutContext, operators: &[TradeOperator])
     for operator in operators {
         if base_names.insert(operator.name.clone()) {
             layout.base_workforce.push(operator.name.clone());
+            if operator
+                .tags
+                .iter()
+                .any(|tag| tag == crate::layout::TAG_DURIN)
+            {
+                layout.durin_in_base = layout.durin_in_base.saturating_add(1).min(4);
+            }
         }
+    }
+    let durin_delta = layout
+        .durin_virtual_lines()
+        .saturating_sub(base.durin_virtual_lines());
+    if durin_delta > 0 {
+        for (_, amount, durin_scaled) in &mut layout.trade_gold_line_sources {
+            if *durin_scaled {
+                *amount += durin_delta;
+                layout.global.add(
+                    crate::global_resource::GlobalResourceKey::VirtualGoldLines,
+                    durin_delta as f64,
+                );
+            }
+        }
+    }
+    for operator in operators {
         if !trade_names.insert(operator.name.clone()) {
             continue;
+        }
+        let amount = crate::trade::gold_flow::virtual_line_yield(
+            &operator.buff_ids,
+            layout.gold_manu_line_count,
+            layout.durin_virtual_lines(),
+        );
+        if amount > 0 {
+            layout.trade_gold_line_sources.push((
+                operator.name.clone(),
+                amount,
+                operator
+                    .buff_ids
+                    .iter()
+                    .any(|id| id == "trade_ord_line_durin[010]"),
+            ));
+            layout.global.add(
+                crate::global_resource::GlobalResourceKey::VirtualGoldLines,
+                amount as f64,
+            );
         }
         layout.trade_workforce.push(operator.name.clone());
         let mut seen_tags = HashSet::new();

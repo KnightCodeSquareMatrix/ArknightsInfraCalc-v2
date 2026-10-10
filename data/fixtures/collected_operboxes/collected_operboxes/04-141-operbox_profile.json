@@ -1,9 +1,9 @@
 {
   "schema_version": 4,
-  "rotation_profile": "abc_12_12_12",
+  "rotation_profile": "abc_12_6_6",
   "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/04-141-operbox.json",
-  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
+  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/04-141-operbox.json",
+  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 141,
     "tier_up_owned": 23,
@@ -39,10 +39,10 @@
       "current": {
         "operators": [
           "裁度",
-          "雪猎",
-          "克洛丝"
+          "克洛丝",
+          "芬"
         ],
-        "final_efficiency": 7.06
+        "final_efficiency": 7.158
       },
       "baseline": {
         "operators": [
@@ -50,9 +50,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.102
+        "final_efficiency": 8.392
       },
-      "gap_ratio": -0.12861021969883987,
+      "gap_ratio": -0.14704480457578636,
       "severity": "warn"
     },
     {
@@ -61,10 +61,10 @@
       "current": {
         "operators": [
           "裁度",
-          "雪猎",
-          "克洛丝"
+          "克洛丝",
+          "芬"
         ],
-        "final_efficiency": 1.728
+        "final_efficiency": 1.749
       },
       "baseline": {
         "operators": [
@@ -72,21 +72,21 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.093
+        "final_efficiency": 2.238
       },
-      "gap_ratio": -0.17439082656473961,
-      "severity": "warn"
+      "gap_ratio": -0.21849865951742622,
+      "severity": "critical"
     },
     {
       "id": "manufacture_battle_record",
       "label": "制造·经验产线",
       "current": {
         "operators": [
+          "铅踝",
           "泡普卡",
-          "Castle-3",
-          "芬"
+          "Castle-3"
         ],
-        "final_efficiency": 1.802
+        "final_efficiency": 1.83
       },
       "baseline": {
         "operators": [
@@ -96,47 +96,47 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": -0.0796731358529111,
+      "gap_ratio": -0.06537282941777318,
       "severity": "ok"
     },
     {
       "id": "rotation_trade",
-      "label": "轮休·36h周期归一化日均贸易加权",
+      "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 3.867
+        "final_efficiency": 3.913
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 3.84
       },
-      "gap_ratio": 0.007031250000000036,
+      "gap_ratio": 0.019010416666666655,
       "severity": "ok"
     },
     {
       "id": "rotation_manufacture",
-      "label": "轮休·36h周期归一化日均制造加权",
+      "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 7.412
+        "final_efficiency": 7.492
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 8.938
+        "final_efficiency": 9.084
       },
-      "gap_ratio": -0.17073170731707324,
+      "gap_ratio": -0.1752531924262439,
       "severity": "warn"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 3.867,
-    "daily_manufacture_efficiency": 7.412,
-    "daily_power_efficiency": 3.366
+    "daily_trade_efficiency": 3.913,
+    "daily_manufacture_efficiency": 7.492,
+    "daily_power_efficiency": 1.375
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
-    "daily_manufacture_efficiency": 8.938,
-    "daily_power_efficiency": 3.627
+    "daily_manufacture_efficiency": 9.084,
+    "daily_power_efficiency": 1.627
   },
   "actions": [
     {
@@ -156,23 +156,23 @@
     {
       "priority": "P0",
       "kind": "acquire",
+      "operator": "引星棘刺",
+      "domain_id": "manufacture_gold",
+      "message": "获取「引星棘刺」——制造·赤金产线参考最优组合需要（现未拥有）"
+    },
+    {
+      "priority": "P0",
+      "kind": "acquire",
+      "operator": "苍苔",
+      "domain_id": "manufacture_gold",
+      "message": "获取「苍苔」——制造·赤金产线参考最优组合需要（现未拥有）"
+    },
+    {
+      "priority": "P0",
+      "kind": "acquire",
       "operator": "黑键",
       "domain_id": "trade_originium",
       "message": "获取「黑键」——贸易·订单/源石线参考最优组合需要（现未拥有）"
-    },
-    {
-      "priority": "P1",
-      "kind": "acquire",
-      "operator": "引星棘刺",
-      "domain_id": "manufacture_total",
-      "message": "获取「引星棘刺」——制造·综合参考最优组合需要（现未拥有）"
-    },
-    {
-      "priority": "P1",
-      "kind": "acquire",
-      "operator": "苍苔",
-      "domain_id": "manufacture_total",
-      "message": "获取「苍苔」——制造·综合参考最优组合需要（现未拥有）"
     },
     {
       "priority": "P2",
@@ -182,6 +182,15 @@
       "message": "将「能天使」升至 tier_up（需精2）——贸易·订单/源石线当前在用组合，现6★精1 1级",
       "current_elite": 1,
       "tier_up_requirement": "精2"
+    },
+    {
+      "priority": "P2",
+      "kind": "promote_tier_up",
+      "operator": "芬",
+      "domain_id": "manufacture_total",
+      "message": "将「芬」升至 tier_up（需精1）——制造·综合当前在用组合，现3★精0 1级",
+      "current_elite": 0,
+      "tier_up_requirement": "精1"
     },
     {
       "priority": "P2",
@@ -200,24 +209,15 @@
       "message": "将「裁度」升至 tier_up（需精2）——制造·综合当前在用组合，现5★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精2"
-    },
-    {
-      "priority": "P2",
-      "kind": "promote_tier_up",
-      "operator": "雪猎",
-      "domain_id": "manufacture_total",
-      "message": "将「雪猎」升至 tier_up（需精2）——制造·综合当前在用组合，现5★精0 1级",
-      "current_elite": 0,
-      "tier_up_requirement": "精2"
     }
   ],
   "flags": [
     "trade_originium_critical",
     "manufacture_total_warn",
-    "manufacture_gold_warn",
+    "manufacture_gold_critical",
     "rotation_manufacture_warn"
   ],
   "narration_hints": [
-    "贸易可建模池偏小（16 vs 参考 74），部分干员未拥有或未录入"
+    "贸易可建模池偏小（16 vs 参考 75），部分干员未拥有或未录入"
   ]
 }

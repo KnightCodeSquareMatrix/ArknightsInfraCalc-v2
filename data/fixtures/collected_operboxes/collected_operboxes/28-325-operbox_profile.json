@@ -2,8 +2,8 @@
   "schema_version": 4,
   "rotation_profile": "abc_12_6_6",
   "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/28-325-operbox.json",
-  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
+  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/28-325-operbox.json",
+  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 325,
     "tier_up_owned": 107,
@@ -42,7 +42,7 @@
           "幽灵鲨",
           "苍苔"
         ],
-        "final_efficiency": 7.32
+        "final_efficiency": 7.4
       },
       "baseline": {
         "operators": [
@@ -50,9 +50,9 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 8.102
+        "final_efficiency": 8.392
       },
-      "gap_ratio": -0.09651937793137497,
+      "gap_ratio": -0.11820781696854137,
       "severity": "warn"
     },
     {
@@ -64,7 +64,7 @@
           "幽灵鲨",
           "苍苔"
         ],
-        "final_efficiency": 1.93
+        "final_efficiency": 1.95
       },
       "baseline": {
         "operators": [
@@ -72,10 +72,10 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 2.093
+        "final_efficiency": 2.238
       },
-      "gap_ratio": -0.07787864309603441,
-      "severity": "ok"
+      "gap_ratio": -0.128686327077748,
+      "severity": "warn"
     },
     {
       "id": "manufacture_battle_record",
@@ -86,7 +86,7 @@
           "白面鸮",
           "香草"
         ],
-        "final_efficiency": 1.73
+        "final_efficiency": 1.75
       },
       "baseline": {
         "operators": [
@@ -96,7 +96,7 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": -0.11644535240040857,
+      "gap_ratio": -0.10623084780388149,
       "severity": "warn"
     },
     {
@@ -118,24 +118,24 @@
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 7.716
+        "final_efficiency": 7.736
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 8.938
+        "final_efficiency": 9.084
       },
-      "gap_ratio": -0.13671962407697474,
+      "gap_ratio": -0.14839277851166885,
       "severity": "warn"
     }
   ],
   "rotation": {
     "daily_trade_efficiency": 3.85,
-    "daily_manufacture_efficiency": 7.716,
-    "daily_power_efficiency": 1.563
+    "daily_manufacture_efficiency": 7.736,
+    "daily_power_efficiency": 1.615
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
-    "daily_manufacture_efficiency": 8.938,
+    "daily_manufacture_efficiency": 9.084,
     "daily_power_efficiency": 1.627
   },
   "actions": [
@@ -267,6 +267,7 @@
   "flags": [
     "trade_originium_critical",
     "manufacture_total_warn",
+    "manufacture_gold_warn",
     "manufacture_battle_record_warn",
     "rotation_manufacture_warn"
   ],

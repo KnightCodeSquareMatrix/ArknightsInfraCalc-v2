@@ -1122,6 +1122,19 @@
         }
       }
     },
+    "史都华德@tier_0": {
+      "name": "史都华德",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "史都华德@tier_up": {
       "name": "史都华德",
       "tier": "tier_up",
@@ -2942,6 +2955,21 @@
         "power": {
           "buff_ids": [
             "power_rec_spd[020]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "桃金娘@tier_0": {
+      "name": "桃金娘",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.durin"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_limit&cost[000]"
           ],
           "stepwise": false
         }
@@ -6887,11 +6915,28 @@
       "facilities": {
         "trade": {
           "buff_ids": [
-            "trade_ord_line_durin[010]"
+            "trade_ord_line_durin[010]",
+            "trade_ord_spd&gold[100]"
           ],
           "stepwise": false
         }
       }
+    },
+    "特克诺@tier_0": {
+      "name": "特克诺",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.durin"
+      ],
+      "facilities": {}
+    },
+    "特克诺@tier_up": {
+      "name": "特克诺",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.durin"
+      ],
+      "facilities": {}
     },
     "麒麟R夜刀@tier_0": {
       "name": "麒麟R夜刀",

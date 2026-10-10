@@ -44,7 +44,7 @@ pub fn build_plan(
     )
 }
 
-/// 使用调用方已经加载的机制数据构建计划；资源 gate（例如感知 >= 50）读取候选计划
+/// 使用调用方已经加载的机制数据构建计划；资源 gate（例如感知 >= 60）读取候选计划
 /// 的真实 resolve 结果。
 #[allow(clippy::too_many_arguments)]
 pub fn build_plan_with_runtime(
@@ -66,6 +66,8 @@ pub fn build_plan_with_runtime(
         table,
         mood,
         preferences,
+        &std::collections::HashSet::new(),
+        false,
         mode,
         seed,
         skip_system_ids,
@@ -83,19 +85,53 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     table: &SkillTable,
     mood: f64,
     preferences: &std::collections::HashMap<String, String>,
+    skipped_optional_control_roles: &std::collections::HashSet<(String, String, String)>,
+    support_combinations_enable: bool,
     mode: AssignShiftMode,
     seed: &BaseAssignment,
     skip_system_ids: &std::collections::HashSet<String>,
     disabled_conditional_packs: &mut std::collections::HashSet<String>,
 ) -> Result<AssignmentPlan> {
-    if mode != AssignShiftMode::Peak {
-        return Ok(AssignmentPlan::recovery(mode));
+    if crate::layout::blackkey_witch_same_trade_room(seed, blueprint) {
+        return Err(Error::msg("trade seed cannot colocate 黑键 and 巫恋"));
     }
 
-    let catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
+    let mut catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
     validate_rule_preferences(&catalog, preferences)?;
+    if !support_combinations_enable {
+        for rule in &mut catalog.rules {
+            for alternative in &mut rule.alternatives {
+                alternative.roles.retain(|role| !role.proactive_support);
+                for pack in &mut alternative.conditional_packs {
+                    pack.roles.retain(|role| !role.proactive_support);
+                }
+            }
+        }
+    }
+    for rule in &mut catalog.rules {
+        for alternative in &mut rule.alternatives {
+            for role in alternative.roles.iter_mut().chain(
+                alternative
+                    .conditional_packs
+                    .iter_mut()
+                    .flat_map(|pack| &mut pack.roles),
+            ) {
+                if role.min_count == 0
+                    && role.facility == crate::layout::FacilityKind::ControlCenter
+                {
+                    role.candidates.retain(|candidate| {
+                        !skipped_optional_control_roles.contains(&(
+                            rule.id.clone(),
+                            role.id.clone(),
+                            candidate.name.clone(),
+                        ))
+                    });
+                }
+            }
+        }
+    }
     loop {
-        let (plan, scratch) = compile_plan_once(
+        let (mut plan, scratch) = compile_plan_once(
             &catalog,
             blueprint,
             operbox,
@@ -108,6 +144,10 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             skip_system_ids,
             disabled_conditional_packs,
         )?;
+        plan.support_combinations_enable = support_combinations_enable;
+        if crate::layout::blackkey_witch_same_trade_room(&scratch, blueprint) {
+            return Err(Error::msg("trade plan cannot colocate 黑键 and 巫恋"));
+        }
         let Some(pack_key) = guarded_pack_violation(blueprint, &scratch, &plan)? else {
             return Ok(plan);
         };
@@ -350,7 +390,8 @@ fn compile_plan_once(
         })
         .collect();
 
-    let mut control_exclusions: std::collections::HashSet<_> =
+    // 有序集合：该列表会原样写入 rotation 输出，HashSet 的迭代顺序每次运行都不同。
+    let mut control_exclusions: std::collections::BTreeSet<_> =
         compiled.inactive_control_exclusions.into_iter().collect();
     control_exclusions
         .extend(crate::layout::system::control_exclusions_for_unclaimed_systems(&registry_claims));
@@ -368,6 +409,7 @@ fn compile_plan_once(
     }
     control_exclusions.extend(compiled.excluded_operators.iter().cloned());
     let plan = AssignmentPlan {
+        support_combinations_enable: false,
         mode,
         activated,
         registry_claims,
@@ -385,6 +427,7 @@ fn compile_plan_once(
         rotation_reserves: compiled.rotation_reserves,
         control_candidate_requirements,
     };
+    plan.control_requirement_sources()?;
     Ok((plan, final_scratch))
 }
 
@@ -512,7 +555,7 @@ mod tests {
             })
             .collect();
 
-        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut plan = AssignmentPlan::empty();
         plan.selected_rules.push(SelectedRuleAlternative {
             rule_id: "guarded_rule".to_string(),
             alternative_id: "base".to_string(),

@@ -15,7 +15,7 @@
 
 use crate::layout::FacilityKind;
 
-use super::{control_global_recovery_value, MoodModel};
+use super::MoodModel;
 
 /// 计算净消耗所需的房间上下文。所有名字用干员本名（与 assignment 一致）。
 #[derive(Clone, Copy)]
@@ -34,13 +34,13 @@ pub struct DrainInputs<'a> {
 }
 
 /// 该房间是否有「消除自身心情消耗影响」的干员在场（槐琥·团队精神，制造站）。
-fn room_clears_self(model: &MoodModel, inputs: &DrainInputs<'_>) -> bool {
+fn room_clears_self(model: &MoodModel, inputs: &DrainInputs<'_>, sui_member: bool) -> bool {
     let Some(key) = super::facility_key(inputs.facility) else {
         return false;
     };
     model.mood_clear_self.iter().any(|c| {
         c.facility == key
-            && c.scope == "room"
+            && (c.scope == "room" || (c.scope == "sui_only" && sui_member))
             && inputs
                 .room_ops
                 .iter()
@@ -48,34 +48,8 @@ fn room_clears_self(model: &MoodModel, inputs: &DrainInputs<'_>) -> bool {
     })
 }
 
-/// 中枢全局回复命中本设施的最大值（取最高不叠加）。
-fn control_global_recovery_hit(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
-    let Some(key) = super::facility_key(inputs.facility) else {
-        return 0.0;
-    };
-    model
-        .control_global_recovery
-        .iter()
-        .filter(|g| g.covers.iter().any(|c| c == key))
-        .filter(|g| {
-            inputs
-                .control_ops
-                .iter()
-                .any(|(n, e)| n == &g.name && *e >= g.elite)
-        })
-        .map(|g| control_global_recovery_value(g, inputs.control_ops))
-        .fold(0.0, f64::max)
-}
-
-/// 中枢笑脸类回复总量。
-///
-/// 在中枢内始终生效；精二玛恩纳在岗时扩散到其他生产/功能设施。
-fn control_smiley_recovery_hit(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
-    model.control_smiley_recovery_for_facility(inputs.facility, inputs.control_ops)
-}
-
 /// 自身技能对本人产生的消耗修正（受同房「消除自身消耗」抵消；recipe 门限校验）。
-fn self_skill_delta(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
+fn self_skill_delta(model: &MoodModel, inputs: &DrainInputs<'_>, sui_member: bool) -> f64 {
     let Some(skill) = model.operator_self_skill(inputs.name, inputs.facility, inputs.elite, None)
     else {
         return 0.0;
@@ -87,7 +61,7 @@ fn self_skill_delta(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
         }
     }
     // 槐琥等在场：抵消同房所有干员自身技能的 mood 影响（正负都消）。
-    if room_clears_self(model, inputs) {
+    if room_clears_self(model, inputs, sui_member) {
         return 0.0;
     }
     skill.drain_delta
@@ -111,17 +85,21 @@ fn room_skill_delta(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
 
 /// 干员净每小时心情消耗 `x`（下限 0）。
 pub fn operator_net_drain(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
+    operator_net_drain_with_sui(model, inputs, false)
+}
+
+pub(crate) fn operator_net_drain_with_sui(
+    model: &MoodModel,
+    inputs: &DrainInputs<'_>,
+    sui_member: bool,
+) -> f64 {
     let mut x = model.base_drain_per_hour;
     if inputs.full_control {
         x -= model.full_control_reduction;
     }
     x -= model.occupancy_reduction(inputs.facility, inputs.room_ops.len());
-    x -= control_global_recovery_hit(model, inputs);
-    if inputs.facility == FacilityKind::ControlCenter {
-        x -= model.control_faction_recovery_value(inputs.control_ops);
-    }
-    x -= control_smiley_recovery_hit(model, inputs);
-    x += self_skill_delta(model, inputs);
+    x -= model.control_uniform_recovery_for_facility(inputs.facility, inputs.control_ops);
+    x += self_skill_delta(model, inputs, sui_member);
     x += room_skill_delta(model, inputs);
     x.max(0.0)
 }

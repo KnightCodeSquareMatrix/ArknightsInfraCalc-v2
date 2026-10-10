@@ -69,6 +69,36 @@ pub fn build_power_pool(
     build_roster_pool(roster, instances, table, |e| e.flat_charge_hint, try_entry)
 }
 
+pub fn build_power_pool_with_fillers(
+    operbox: &crate::operbox::OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<PowerPool> {
+    let mut pool = build_power_pool(&operbox.power_roster(instances), instances, table)?;
+    let mut names: Vec<_> = operbox.owned.keys().cloned().collect();
+    names.sort();
+    for name in names {
+        let progress = operbox.owned[&name];
+        let tier = PromotionTier::from_progress(progress);
+        // Unmodeled power skills must not silently become skillless fillers.
+        if !instances.resolve_power_buff_ids(&name, tier).is_empty() {
+            continue;
+        }
+        let tags = instances.tags_for(&name, tier).to_vec();
+        pool.entries.push(PowerPoolEntry {
+            name,
+            elite: progress.elite,
+            progress,
+            buff_ids: Vec::new(),
+            tags,
+            flat_charge_hint: 0.0,
+            has_l2_delegate: false,
+            tier: OperatorTier::Standalone,
+        });
+    }
+    Ok(pool)
+}
+
 fn try_entry(
     name: &str,
     progress: crate::roster::OperatorProgress,

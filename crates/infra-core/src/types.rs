@@ -399,15 +399,11 @@ pub enum Action {
 ///   由 [`crate::cross_facility`] 编排层统一执行，per-room 求解时跳过。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum AtomScope {
+    #[default]
     Room,
     Global,
-}
-
-impl Default for AtomScope {
-    fn default() -> Self {
-        Self::Room
-    }
 }
 
 /// `#[serde(skip_serializing_if)]` helper for `AtomScope` defaults.

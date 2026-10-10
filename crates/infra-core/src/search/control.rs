@@ -352,15 +352,13 @@ pub fn control_entry_dynamic_trade_tags(
             {
                 continue;
             }
-            match atom.selector.as_ref() {
-                Some(
-                    Selector::TaggedCountInTradeSum { tag }
-                    | Selector::TaggedCountInCurrentTradeRoom { tag }
-                    | Selector::TradeStationsWithTaggedGte { tag, .. },
-                ) => {
-                    tags.insert(tag.clone());
-                }
-                _ => {}
+            if let Some(
+                Selector::TaggedCountInTradeSum { tag }
+                | Selector::TaggedCountInCurrentTradeRoom { tag }
+                | Selector::TradeStationsWithTaggedGte { tag, .. },
+            ) = atom.selector.as_ref()
+            {
+                tags.insert(tag.clone());
             }
         }
     }
@@ -391,15 +389,13 @@ pub fn control_entry_deferred_trade_tags(
             continue;
         };
         for atom in &skill.atoms {
-            match atom.selector.as_ref() {
-                Some(
-                    Selector::TaggedCountInTradeSum { tag }
-                    | Selector::TaggedCountInCurrentTradeRoom { tag }
-                    | Selector::TradeStationsWithTaggedGte { tag, .. },
-                ) => {
-                    tags.insert(tag.clone());
-                }
-                _ => {}
+            if let Some(
+                Selector::TaggedCountInTradeSum { tag }
+                | Selector::TaggedCountInCurrentTradeRoom { tag }
+                | Selector::TradeStationsWithTaggedGte { tag, .. },
+            ) = atom.selector.as_ref()
+            {
+                tags.insert(tag.clone());
             }
         }
     }
@@ -448,6 +444,7 @@ pub fn control_entry_layered_fill(entry: &crate::pool::ControlPoolEntry) -> bool
     entry.buff_ids.iter().any(|b| control_layered_fill_buff(b))
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, Default)]
 struct ControlFillTierScores {
     loose_piece: f64,
@@ -455,6 +452,7 @@ struct ControlFillTierScores {
     clue: f64,
 }
 
+#[cfg(test)]
 impl ControlFillTierScores {
     fn layered_sort_bonus(self) -> f64 {
         // 散件与 +7/+2 同层按数值比较；心情和线索只在高层同分时补空。
@@ -463,6 +461,7 @@ impl ControlFillTierScores {
 }
 
 /// 体系外中枢补位分层：散件（单走八幡海铃）→ 心情（EW / 玛恩纳）→ 线索。
+#[cfg(test)]
 fn control_layered_fill_scores(
     operators: &[ControlOperator],
     table: &SkillTable,
@@ -580,51 +579,17 @@ fn control_global_recovery_redundancy(
 /// 返回完整的 policy 分解；`.policy_sort_key` 只用于中枢候选排序。
 fn evaluate_control_policy(
     result: &crate::control::ControlCenterResult,
-    operators: &[ControlOperator],
-    table: &SkillTable,
-    mood_model: &crate::mood::MoodModel,
+    _operators: &[ControlOperator],
+    _table: &SkillTable,
+    _mood_model: &crate::mood::MoodModel,
     options: &ControlSearchOptions,
-    global_recovery: crate::mood::ControlGlobalRecoverySummary,
+    _global_recovery: crate::mood::ControlGlobalRecoverySummary,
 ) -> ControlPolicyBreakdown {
     let mood_penalty: f64 = result
         .operator_mood_drains
         .values()
         .filter(|v| **v > 0.0)
         .sum();
-
-    if options.fill_policy == ControlFillPolicy::LayeredFill {
-        let fill_scores =
-            control_layered_fill_scores(operators, table, mood_model, global_recovery);
-        let trade_inject = result
-            .inject
-            .trade_eff_pct_with_tag_counts(&options.layout.trade_tagged_count_sum);
-        let manu_gold = result.inject.manu_eff_for(RecipeKind::Gold);
-        let manu_br = result.inject.manu_eff_for(RecipeKind::BattleRecord);
-        let component_score = evaluate_control_inject_policy(TradeManuEfficiencyComponents {
-            trade_eff_pct: trade_inject,
-            gold_manu_eff_pct: manu_gold,
-            battle_record_manu_eff_pct: manu_br,
-            trade_station_count: options.layout.trade_station_count,
-            gold_line_count: options.layout.gold_manu_line_count.min(u32::from(u8::MAX)) as u8,
-            battle_record_line_count: options
-                .layout
-                .manufacture_station_count
-                .saturating_sub(options.layout.gold_manu_line_count.min(u32::from(u8::MAX)) as u8),
-        });
-        return ControlPolicyBreakdown {
-            policy: component_score.policy,
-            trade_inject_pct: trade_inject,
-            manu_gold_inject_pct: manu_gold,
-            manu_br_inject_pct: manu_br,
-            inject_subtotal: component_score.sort_key_pct,
-            loose_piece_sort_component: fill_scores.loose_piece,
-            mood_fill_sort_component: fill_scores.mood,
-            clue_fill_sort_component: fill_scores.clue,
-            mood_penalty,
-            policy_sort_key: component_score.sort_key_pct + fill_scores.layered_sort_bonus(),
-            ..ControlPolicyBreakdown::default()
-        };
-    }
 
     let trade_inject = result
         .inject
@@ -918,16 +883,359 @@ pub(crate) fn control_inject_policy_sort_key_upper_bound(
     .sort_key_pct
 }
 
-/// 中枢满编组合搜索；可用人数不足上限时使用全部可用角色。
+/// Deterministic sequential policy: required groups, then trade, manufacture,
+/// office, meeting, mood and ordinary fill. Each decision reads only the
+/// selected prefix plus one candidate. Failure means this policy found no
+/// completion, not that the full canonical assignment space is infeasible.
+fn search_control_in_order(
+    pool: &ControlPool,
+    table: &SkillTable,
+    options: &ControlSearchOptions,
+    eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
+) -> Result<Vec<ControlSearchHit>> {
+    let model = crate::mood::default_mood_model()?;
+    let mut entries: Vec<_> =
+        pool.entries
+            .iter()
+            .filter_map(|entry| {
+                match crate::response_dependency::control_buff_is_automatically_excluded(
+                    table,
+                    entry.buff_ids.iter().map(String::as_str),
+                ) {
+                    Ok(excluded) => (!excluded || options.must_include.contains(&entry.name))
+                        .then_some(Ok(entry)),
+                    Err(error) => Some(Err(error)),
+                }
+            })
+            .collect::<Result<_>>()?;
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    entries.dedup_by(|a, b| a.name == b.name);
+    let capacity = usize::from(options.max_operators.min(5));
+    let mut selected: Vec<ControlOperator> = entries
+        .iter()
+        .filter(|entry| options.must_include.contains(&entry.name))
+        .map(|entry| entry.to_control_operator())
+        .collect();
+    if selected.len() != options.must_include.len() || selected.len() > capacity {
+        return Ok(Vec::new());
+    }
+    let evaluate = |ops: &[ControlOperator]| {
+        solve_control(
+            &ControlRoomInput {
+                operators: ops.to_vec(),
+                mood: options.mood,
+                layout: options.layout.clone(),
+            },
+            table,
+        )
+    };
+    let legal = |ops: &[ControlOperator]| {
+        let control: Vec<_> = ops.iter().map(|op| (op.name.clone(), op.elite)).collect();
+        !model.control_global_recovery_has_conflict(&control)
+            && !evaluate(ops).effect_ledger.has_conflicting_effect_sources()
+            && (!ops.iter().any(|op| op.name == "琴柳")
+                || options.saileach_required
+                || options.saileach_best_office_pct.is_none_or(|best| {
+                    let other: Vec<_> =
+                        ops.iter().filter(|op| op.name != "琴柳").cloned().collect();
+                    5.0 + best + evaluate(&other).office_hire_spd_pct < 30.0
+                }))
+    };
+    if !legal(&selected) {
+        return Ok(Vec::new());
+    }
+    let group_count = |ops: &[ControlOperator], candidates: &HashSet<String>| {
+        ops.iter()
+            .filter(|op| candidates.contains(&op.name))
+            .count()
+    };
+    // Necessary residual group checks, not a combination witness or extra bind.
+    let groups_can_fit = |ops: &[ControlOperator]| {
+        options
+            .candidate_requirements
+            .iter()
+            .all(|(candidates, min)| {
+                let deficit = usize::from(*min).saturating_sub(group_count(ops, candidates));
+                deficit <= capacity.saturating_sub(ops.len())
+                    && deficit
+                        <= entries
+                            .iter()
+                            .filter(|entry| {
+                                candidates.contains(&entry.name)
+                                    && !ops.iter().any(|op| op.name == entry.name)
+                            })
+                            .count()
+            })
+    };
+    let value = |result: &crate::control::ControlCenterResult, region: usize| match region {
+        // Only static global ledger regions participate here. Dynamic producer
+        // and count-scaled projections are resolved after the room context and
+        // cannot decide an earlier control seat.
+        0 => result
+            .effect_ledger
+            .value(ControlEffectKey::TRADE_GLOBAL_EFFICIENCY),
+        1 => result
+            .effect_ledger
+            .value(ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY),
+        // Runtime has no "mastery in progress" input. Training stays explicitly
+        // Unsupported rather than gaining a guessed +5 candidate value.
+        2 => 0.0,
+        3 if options.layout.office_room_count > 0 => result.office_hire_spd_pct,
+        4 if options.layout.meeting_room_count > 0 => result.meeting_speed_pct,
+        _ => 0.0,
+    };
+    let accepts_complete = |ops: &[ControlOperator]| {
+        if ops.len() != capacity {
+            return true;
+        }
+        let names: Vec<_> = ops.iter().map(|op| op.name.clone()).collect();
+        eligibility.is_none_or(|accept| accept(&names))
+    };
+    for (candidates, min_count) in &options.candidate_requirements {
+        while group_count(&selected, candidates) < usize::from(*min_count) {
+            let mut ranked = Vec::new();
+            for entry in &entries {
+                if !candidates.contains(&entry.name)
+                    || selected.iter().any(|op| op.name == entry.name)
+                {
+                    continue;
+                }
+                let mut trial = selected.clone();
+                trial.push(entry.to_control_operator());
+                if trial.len() > capacity
+                    || !legal(&trial)
+                    || !groups_can_fit(&trial)
+                    || !accepts_complete(&trial)
+                {
+                    continue;
+                }
+                let result = evaluate(&trial);
+                ranked.push((
+                    *entry,
+                    [
+                        value(&result, 0),
+                        value(&result, 1),
+                        value(&result, 2),
+                        value(&result, 3),
+                        value(&result, 4),
+                    ],
+                ));
+            }
+            ranked.sort_by(|(a, av), (b, bv)| {
+                bv.iter()
+                    .zip(av)
+                    .map(|(b, a)| b.total_cmp(a))
+                    .find(|order| !order.is_eq())
+                    .unwrap_or_else(|| a.name.cmp(&b.name))
+            });
+            let Some((entry, _)) = ranked.first() else {
+                return Ok(Vec::new());
+            };
+            selected.push(entry.to_control_operator());
+        }
+    }
+    // Regional effective maxima. A later region never changes an earlier seat.
+    for region in 0..5 {
+        if selected.len() >= capacity {
+            break;
+        }
+        let before = evaluate(&selected);
+        let mut best: Option<(&crate::pool::ControlPoolEntry, f64)> = None;
+        for entry in &entries {
+            if selected.iter().any(|op| op.name == entry.name) {
+                continue;
+            }
+            let mut trial = selected.clone();
+            trial.push(entry.to_control_operator());
+            if !legal(&trial) || !groups_can_fit(&trial) {
+                continue;
+            }
+            let result = evaluate(&trial);
+            let score = value(&result, region);
+            if score <= value(&before, region) {
+                continue;
+            }
+            if !accepts_complete(&trial) {
+                continue;
+            }
+            if best.is_none_or(|(previous, previous_value)| {
+                score > previous_value || (score == previous_value && entry.name < previous.name)
+            }) {
+                best = Some((entry, score));
+            }
+        }
+        if let Some((entry, _)) = best {
+            selected.push(entry.to_control_operator());
+        }
+    }
+    // The recovery family has a single owner. Its common five-facility
+    // projection includes spread smileys but never individual drain or ETA.
+    if selected.len() < capacity {
+        let mut best = None;
+        for entry in &entries {
+            if selected.iter().any(|op| op.name == entry.name)
+                || !model
+                    .control_global_recovery
+                    .iter()
+                    .any(|source| source.name == entry.name && entry.elite >= source.elite)
+            {
+                continue;
+            }
+            let mut trial = selected.clone();
+            trial.push(entry.to_control_operator());
+            if !legal(&trial) || !groups_can_fit(&trial) || !accepts_complete(&trial) {
+                continue;
+            }
+            let control: Vec<_> = trial.iter().map(|op| (op.name.clone(), op.elite)).collect();
+            let values = [
+                crate::layout::FacilityKind::Factory,
+                crate::layout::FacilityKind::TradePost,
+                crate::layout::FacilityKind::PowerPlant,
+                crate::layout::FacilityKind::Office,
+                crate::layout::FacilityKind::MeetingRoom,
+            ]
+            .map(|facility| model.control_uniform_recovery_for_facility(facility, &control));
+            // Only a facility-by-facility dominance relation is meaningful:
+            // trade/factory recovery cannot be traded against office recovery.
+            // Non-dominating effects retain stable identity order.
+            if best.as_ref().is_none_or(
+                |(_, previous_values): &(&crate::pool::ControlPoolEntry, [f64; 5])| {
+                    values
+                        .iter()
+                        .zip(previous_values)
+                        .all(|(value, previous)| value >= previous)
+                        && values
+                            .iter()
+                            .zip(previous_values)
+                            .any(|(value, previous)| value > previous)
+                },
+            ) {
+                best = Some((*entry, values));
+            }
+        }
+        if let Some((entry, _)) = best {
+            selected.push(entry.to_control_operator());
+        }
+    }
+    while selected.len() < capacity && selected.len() < entries.len() {
+        let control: Vec<_> = selected
+            .iter()
+            .map(|op| (op.name.clone(), op.elite))
+            .collect();
+        let owner = model.control_global_recovery.iter().find(|source| {
+            control
+                .iter()
+                .any(|(name, elite)| name == &source.name && *elite >= source.elite)
+        });
+        let mut ranked = Vec::new();
+        for entry in &entries {
+            if selected.iter().any(|op| op.name == entry.name) {
+                continue;
+            }
+            let mut trial = selected.clone();
+            trial.push(entry.to_control_operator());
+            if !legal(&trial) || !groups_can_fit(&trial) {
+                continue;
+            }
+            let after: Vec<_> = trial.iter().map(|op| (op.name.clone(), op.elite)).collect();
+            let internal = model.control_uniform_recovery_for_facility(
+                crate::layout::FacilityKind::ControlCenter,
+                &after,
+            ) - model.control_uniform_recovery_for_facility(
+                crate::layout::FacilityKind::ControlCenter,
+                &control,
+            );
+            // Named canonical preference consumes data, not a hard-coded score
+            // or an individual net-drain objective.
+            let preferred = owner.is_some_and(|source| {
+                source.bonus_when_control_contains.as_deref() == Some(entry.name.as_str())
+                    || (source.spread_smiley
+                        && model
+                            .control_smiley_recovery
+                            .as_ref()
+                            .is_some_and(|smiley| {
+                                smiley.providers.iter().any(|provider| {
+                                    provider.name == entry.name && entry.elite >= provider.elite
+                                })
+                            }))
+            });
+            let effect = if owner.is_some_and(|source| {
+                source.bonus_when_control_contains.as_deref() == Some(entry.name.as_str())
+            }) {
+                owner.expect("owner").bonus_value
+            } else {
+                internal
+            };
+            if !accepts_complete(&trial) {
+                continue;
+            }
+            ranked.push((*entry, preferred, effect.max(0.0)));
+        }
+        ranked.sort_by(|(a, ap, av), (b, bp, bv)| {
+            bp.cmp(ap)
+                .then_with(|| bv.total_cmp(av))
+                .then_with(|| a.name.cmp(&b.name))
+        });
+        let Some((entry, ..)) = ranked.first() else {
+            return Ok(Vec::new());
+        };
+        selected.push(entry.to_control_operator());
+    }
+    if !options
+        .candidate_requirements
+        .iter()
+        .all(|(candidates, min)| group_count(&selected, candidates) >= usize::from(*min))
+    {
+        return Ok(Vec::new());
+    }
+    let mut names: Vec<_> = selected.iter().map(|op| op.name.clone()).collect();
+    names.sort();
+    if eligibility.is_some_and(|accept| !accept(&names)) {
+        return Ok(Vec::new());
+    }
+    let result = evaluate(&selected);
+    let summary = model.control_global_recovery_summary(
+        &selected
+            .iter()
+            .map(|op| (op.name.clone(), op.elite))
+            .collect::<Vec<_>>(),
+    );
+    let mut legacy_options = options.clone();
+    legacy_options.fill_policy = ControlFillPolicy::InjectOnly;
+    let breakdown =
+        evaluate_control_policy(&result, &selected, table, model, &legacy_options, summary);
+    Ok(vec![ControlSearchHit {
+        names,
+        trade_inject_pct: breakdown.trade_inject_pct,
+        manu_gold_inject_pct: breakdown.manu_gold_inject_pct,
+        breakdown,
+    }])
+}
+
+/// 中枢满编搜索；LayeredFill 使用顺序 policy，InjectOnly 保留兼容组合入口。
 pub fn search_control_combos(
     pool: &ControlPool,
     table: &SkillTable,
     options: &ControlSearchOptions,
 ) -> Result<Vec<ControlSearchHit>> {
+    search_control_combos_with_eligibility(pool, table, options, None)
+}
+
+/// Apply a caller-owned feasibility constraint before ranking/top-K. The public
+/// search keeps its existing policy when no timed work budget is supplied.
+pub(crate) fn search_control_combos_with_eligibility(
+    pool: &ControlPool,
+    table: &SkillTable,
+    options: &ControlSearchOptions,
+    eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
+) -> Result<Vec<ControlSearchHit>> {
+    if options.fill_policy == ControlFillPolicy::LayeredFill {
+        return search_control_in_order(pool, table, options, eligibility);
+    }
     let leaf_started = Instant::now();
     let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Control);
-    // Skill-less operators are equivalent for control output. Keep only enough
-    // stable-name fallbacks to fill the room, avoiding C(account_size, 5).
+    // InjectOnly retains its legacy bounded tail. LayeredFill above consumes
+    // every admitted identity and does not assume empty buffs imply equivalence.
     let automatically_excluded: HashSet<_> = pool
         .entries
         .iter()
@@ -1011,7 +1319,7 @@ pub fn search_control_combos(
 
     let layout = options.layout.clone();
     let mood = options.mood;
-    let mood_model = crate::mood::MoodModel::load_default()?;
+    let mood_model = crate::mood::default_mood_model()?;
     let prepare_elapsed = leaf_started.elapsed();
 
     let evaluate_started = Instant::now();
@@ -1025,6 +1333,9 @@ pub fn search_control_combos(
                 .collect();
             let mut names: Vec<String> = operators.iter().map(|o| o.name.clone()).collect();
             names.sort();
+            if eligibility.is_some_and(|accept| !accept(&names)) {
+                return None;
+            }
             let input = ControlRoomInput {
                 operators: operators.clone(),
                 mood,
@@ -1099,20 +1410,24 @@ pub fn search_control_combos(
                 manufacture_global_pct: result
                     .effect_ledger
                     .value(ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY),
-                office_global_pct: (layout.office_room_count > 0)
-                    .then(|| {
+                office_global_pct: if layout.office_room_count > 0 {
+                    {
                         result
                             .effect_ledger
                             .value(ControlEffectKey::OFFICE_HIRE_SPEED)
-                    })
-                    .unwrap_or(0.0),
-                meeting_global_pct: (layout.meeting_room_count > 0)
-                    .then(|| {
+                    }
+                } else {
+                    0.0
+                },
+                meeting_global_pct: if layout.meeting_room_count > 0 {
+                    {
                         result
                             .effect_ledger
                             .value(ControlEffectKey::MEETING_CLUE_SPEED)
-                    })
-                    .unwrap_or(0.0),
+                    }
+                } else {
+                    0.0
+                },
                 replacement_preference,
                 suppressed_replacement_sources,
                 redundant_effect_sources: result.effect_ledger.redundant_effect_source_count(),

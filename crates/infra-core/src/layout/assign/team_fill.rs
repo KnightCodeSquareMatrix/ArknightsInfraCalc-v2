@@ -4,15 +4,17 @@ use crate::error::{Error, Result};
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::{BaseBlueprint, RoomId, RoomProduct};
 use crate::layout::context::LayoutContext;
+use crate::layout::orchestrate::AssignmentPlan;
 use crate::pool::{ManuPool, PowerPool, TradePool};
 use crate::skill_table::SkillTable;
 
 use super::commit::{commit_manu_room, commit_trade_room};
 use super::manufacture_fill::{
-    assign_manu_room_with_anchors, manu_options, manufacture_candidate_pool_for_demand,
-    pick_capacity_manu_hit, pick_manu_hit,
+    assign_manu_room_with_anchors, forbidden_teammates, manu_options,
+    manufacture_candidate_pool_for_demand, pick_capacity_manu_hit, pick_manu_hit,
 };
-use super::power_fill::assign_power_rooms;
+use super::pipeline::forbid_same_room_pairs;
+use super::power_fill::assign_power_rooms_with_instances as assign_power_rooms;
 use super::trade_fill::{pick_trade_meta_then_plain, trade_order_from_room};
 use super::AssignBaseOptions;
 
@@ -43,7 +45,6 @@ pub fn assign_team_producer_rooms(
         table,
         options,
         trade_rooms,
-        &[],
         assignment,
         used,
     )?;
@@ -58,6 +59,7 @@ pub fn assign_team_producer_rooms(
         options,
         manu_rooms,
         &HashMap::new(),
+        &[],
         assignment,
         used,
     )?;
@@ -66,6 +68,10 @@ pub fn assign_team_producer_rooms(
 }
 
 /// γ 替补半区：贸易沿用 meta 核心优先级，制造/发电仍站绑定搜索。
+///
+/// `plan` 是当前排班尝试已编译的统一 Plan（peak 班同一份）。γ 不重新选型，
+/// 也不重新执行 anchor；只消费其中的 `ForbidSameStation` / `ForbidSameRoom`
+/// 约束，与主流水线共用同一提取函数。
 #[allow(clippy::too_many_arguments)]
 pub fn assign_team_gamma_half(
     blueprint: &BaseBlueprint,
@@ -82,10 +88,11 @@ pub fn assign_team_gamma_half(
     manu_rooms: &[RoomId],
     power_rooms: &[RoomId],
     required_manu_by_room: &HashMap<RoomId, Vec<String>>,
-    forbidden_pairs: &[(String, String)],
+    plan: &AssignmentPlan,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    let forbid_same_room = forbid_same_room_pairs(plan);
     assign_team_trade_meta_rooms(
         blueprint,
         instances,
@@ -95,7 +102,6 @@ pub fn assign_team_gamma_half(
         table,
         options,
         trade_rooms,
-        forbidden_pairs,
         assignment,
         used,
     )?;
@@ -110,6 +116,7 @@ pub fn assign_team_gamma_half(
         options,
         manu_rooms,
         required_manu_by_room,
+        &forbid_same_room,
         assignment,
         used,
     )?;
@@ -122,6 +129,8 @@ pub fn assign_team_gamma_half(
         power_rooms,
         assignment,
         used,
+        Some(instances),
+        Some(coexist_assignment),
     )?;
     clear_team_trade_snapshots(assignment, trade_rooms);
     Ok(())
@@ -137,7 +146,6 @@ fn assign_team_trade_meta_rooms(
     table: &SkillTable,
     options: &AssignBaseOptions,
     trade_rooms: &[RoomId],
-    forbidden_pairs: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -150,7 +158,7 @@ fn assign_team_trade_meta_rooms(
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    println!(
+    eprintln!(
         "[rotation-debug] gamma trade input rooms={:?} used={:?} coexist={:?}",
         rooms
             .iter()
@@ -163,7 +171,7 @@ fn assign_team_trade_meta_rooms(
         super::trade_fill::take_next_trade_room(&mut rooms, trade_pool, assignment, used)
     {
         if !assignment.operators_in(&room.id).is_empty() {
-            println!(
+            eprintln!(
                 "[rotation-debug] gamma trade skip room={} already_assigned={:?}",
                 room.id.0,
                 assignment
@@ -174,7 +182,7 @@ fn assign_team_trade_meta_rooms(
             );
             continue;
         }
-        println!(
+        eprintln!(
             "[rotation-debug] gamma trade select room={} remaining_rooms={:?} used_before={:?} partial={:?}",
             room.id.0,
             rooms.iter().map(|candidate| candidate.id.0.as_str()).collect::<Vec<_>>(),
@@ -204,11 +212,10 @@ fn assign_team_trade_meta_rooms(
             order,
             room.level,
             used,
-            forbidden_pairs,
             &[],
         )
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;
-        println!(
+        eprintln!(
             "[rotation-debug] gamma trade hit room={} names={:?} rule={:?} efficiency={} used_after_search={:?}",
             room.id.0,
             &hit.names,
@@ -251,6 +258,7 @@ fn assign_team_manu_rooms(
     options: &AssignBaseOptions,
     manu_rooms: &[RoomId],
     required_manu_by_room: &HashMap<RoomId, Vec<String>>,
+    forbid_same_room: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -302,6 +310,15 @@ fn assign_team_manu_rooms(
             for name in required {
                 room_used.remove(name);
             }
+            // Plan forbid-same-room：anchor 的禁同房队友当作已占用，filler 搜索不会选中。
+            let mut injected_forbidden = Vec::new();
+            for name in required {
+                for teammate in forbidden_teammates(name, forbid_same_room) {
+                    if !required.contains(&teammate) && room_used.insert(teammate.clone()) {
+                        injected_forbidden.push(teammate);
+                    }
+                }
+            }
             assign_manu_room_with_anchors(
                 assignment,
                 room_id,
@@ -315,6 +332,9 @@ fn assign_team_manu_rooms(
                 &mut room_used,
                 &[],
             )?;
+            for teammate in &injected_forbidden {
+                room_used.remove(teammate);
+            }
             *used = room_used;
         } else {
             let hit = pick_manu_hit(&candidate_pool, table, opts.clone(), used, options.top_k)
@@ -531,6 +551,7 @@ mod tests {
                 &AssignBaseOptions::default(),
                 std::slice::from_ref(&manu_id),
                 &HashMap::new(),
+                &[],
                 &mut assignment,
                 &mut used,
             )
@@ -687,6 +708,7 @@ mod tests {
                 &AssignBaseOptions::default(),
                 &[first.clone(), second.clone()],
                 &HashMap::new(),
+                &[],
                 &mut assignment,
                 &mut used,
             )

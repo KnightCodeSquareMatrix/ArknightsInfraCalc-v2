@@ -2,6 +2,7 @@ use serde::Serialize;
 
 use crate::error::Result;
 use crate::skill_table::SkillTable;
+use crate::tier::PromotionTier;
 use crate::trade::efficiency::{
     PaperTradeEfficiency, TradeEfficiency, GOLD_TRADE_REFERENCE_OUTPUT_PER_DAY,
 };
@@ -85,7 +86,9 @@ fn resolve_unit_output(
             .operators
             .iter()
             .find(|operator| operator.name == "但书")
-            .is_some_and(|operator| operator.elite >= 2);
+            .is_some_and(|operator| {
+                PromotionTier::from_elite(operator.elite) == PromotionTier::TierUp
+            });
         let shortcut_id = if docus_e2 {
             "gsl_docus_solo"
         } else {

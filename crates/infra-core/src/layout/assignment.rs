@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 
-use crate::layout::blueprint::RoomId;
+use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
 use crate::notes::Note;
 use crate::roster::OperatorProgress;
 use crate::tier::PromotionTier;
@@ -203,6 +203,11 @@ pub struct BaseAssignment {
     pub base_workforce: Vec<String>,
     #[serde(skip)]
     pub(crate) note_facts: crate::notes::NoteFacts,
+    /// Frozen scheduling inputs for the final-state control gate; not a second
+    /// selected-members list and never part of the public assignment protocol.
+    #[serde(skip)]
+    pub(crate) control_rotation_admission:
+        Option<crate::schedule::control_rotation::ControlShiftAdmission>,
 }
 
 impl BaseAssignment {
@@ -284,6 +289,12 @@ impl BaseAssignment {
                     .then_with(|| right.rarity.cmp(&left.rarity))
                     .then_with(|| left.work_mood.cmp(&right.work_mood))
             });
+            if crate::trade::gold_flow::has_ordered_gold_flow(
+                room.operators.iter().map(|op| op.name.as_str()),
+            ) {
+                room.operators
+                    .sort_by_key(|op| crate::trade::gold_flow::ordered_trio_priority(&op.name));
+            }
         }
     }
 
@@ -322,6 +333,44 @@ impl BaseAssignment {
             }
         }
         names
+    }
+
+    /// 占用口径：任意房间（含宿舍）成员加独立的训练副手。
+    pub fn occupied_operator_names(&self) -> HashSet<String> {
+        let mut names = self.operator_names();
+        if let Some(assistant) = &self.training_assist {
+            names.insert(assistant.name.clone());
+        }
+        names
+    }
+
+    /// 工作岗位口径的唯一 owner：除宿舍外所有房间（中枢、贸易、制造、发电、会客室、
+    /// 办公室、加工站、训练室）的成员，加独立的 `training_assist` 训练副手。
+    /// 不读取队伍标签、shift_bind、required 或豁免；未知房间不计入。
+    pub fn work_position_operators<'a>(
+        &'a self,
+        blueprint: &'a BaseBlueprint,
+    ) -> impl Iterator<Item = &'a AssignedOperator> + 'a {
+        self.rooms
+            .iter()
+            .filter(|room| {
+                blueprint
+                    .room(&room.room_id)
+                    .is_some_and(|spec| spec.kind != FacilityKind::Dormitory)
+            })
+            .flat_map(|room| room.operators.iter())
+            .chain(self.training_assist.iter())
+    }
+
+    pub fn work_position_operator_names(&self, blueprint: &BaseBlueprint) -> HashSet<String> {
+        self.work_position_operators(blueprint)
+            .map(|operator| operator.name.clone())
+            .collect()
+    }
+
+    pub fn is_work_position_operator(&self, blueprint: &BaseBlueprint, name: &str) -> bool {
+        self.work_position_operators(blueprint)
+            .any(|operator| operator.name == name)
     }
 }
 

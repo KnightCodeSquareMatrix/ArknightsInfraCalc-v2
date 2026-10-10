@@ -186,7 +186,7 @@ fn solve_control_inner(
         }
         let outcome = apply_atom(
             &mut ctx,
-            &atom,
+            atom,
             &atom_id,
             &owner,
             &source_buff_id,

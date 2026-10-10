@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
-use crate::mood::MoodModel;
+use crate::mood::default_mood_model;
 use crate::operbox::OperBox;
 
 const SENXI_DORM_CUISINE_BUFF: &str = "dorm_rec_bd_dungeon[000]";
@@ -23,7 +23,7 @@ pub(super) fn place_system_producers(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    let mood_model = MoodModel::load_default()?;
+    let mood_model = default_mood_model()?;
     for producer in producers {
         let name = producer.operator.as_str();
         if used.contains(name) {
@@ -98,33 +98,6 @@ pub(super) fn assign_dorm_producers(
         );
     }
     Ok(())
-}
-
-pub(crate) fn assign_sphinx_urrbian_dorm_anchor(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) {
-    if !operbox.owns(SPHINX_NAME) || used.contains(URRBIAN_NAME) {
-        return;
-    }
-    let Some(progress) = operbox.progress_of(URRBIAN_NAME) else {
-        return;
-    };
-    let Some(room) = blueprint
-        .rooms_of(FacilityKind::Dormitory)
-        .into_iter()
-        .find(|room| assignment.operators_in(&room.id).is_empty())
-    else {
-        return;
-    };
-
-    used.insert(URRBIAN_NAME.into());
-    assignment.set_room(
-        room.id.clone(),
-        vec![AssignedOperator::from_progress(URRBIAN_NAME, progress)],
-    );
 }
 
 pub(crate) fn cleanup_unused_sphinx_urrbian_dorm_anchor(

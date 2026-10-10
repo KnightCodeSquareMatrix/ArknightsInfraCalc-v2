@@ -50,29 +50,21 @@ pub enum MemberRole {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum AcquisitionMode {
     OwnedOnly,
     SuggestAcquire,
+    #[default]
     Policy,
-}
-
-impl Default for AcquisitionMode {
-    fn default() -> Self {
-        Self::Policy
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ReviewStatus {
+    #[default]
     Confirmed,
     NeedsReview,
-}
-
-impl Default for ReviewStatus {
-    fn default() -> Self {
-        Self::Confirmed
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

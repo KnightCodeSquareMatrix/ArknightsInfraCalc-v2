@@ -63,6 +63,9 @@ pub(super) struct AlternativeSpec {
     pub gates: Vec<GateSpec>,
     #[serde(default)]
     pub roles: Vec<RoleSpec>,
+    /// All factory rooms claimed by this alternative must have their full complement.
+    #[serde(default)]
+    pub require_factory_capacity: bool,
     /// 满足自身 gate 时优先事务性替换部分基础 roles；整包不可行则回退原 alternative。
     #[serde(default)]
     pub conditional_packs: Vec<ConditionalPackSpec>,
@@ -81,12 +84,17 @@ pub(super) struct AlternativeSpec {
     /// 只绑定这些 role 的实际入选成员；用于区分体系 producer 与非 producer 路径收益位。
     #[serde(default)]
     pub bind_roles: Vec<String>,
+    /// Independent room cohorts; binding the entire cross-station alternative would prevent splitting.
+    #[serde(default)]
+    pub bind_role_groups: Vec<Vec<String>>,
     #[serde(default = "two")]
     pub on_shifts: u8,
     #[serde(default = "one")]
     pub off_shifts: u8,
     #[serde(default)]
     pub continuous: bool,
+    #[serde(default)]
+    pub continuous_role_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -177,6 +185,8 @@ pub(super) struct CandidateSpec {
     pub name: String,
     #[serde(default)]
     pub elite: u8,
+    #[serde(default)]
+    pub fallback_if_no_other_candidates: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, Deserialize)]
@@ -202,6 +212,8 @@ pub(super) enum RoomLevelPreference {
 #[derive(Debug, Clone, Deserialize)]
 pub(super) struct RoleSpec {
     pub id: String,
+    #[serde(default)]
+    pub proactive_support: bool,
     pub facility: FacilityKind,
     #[serde(default)]
     pub facilities: Vec<FacilityKind>,
@@ -209,6 +221,8 @@ pub(super) struct RoleSpec {
     pub recipe: Option<RecipeKind>,
     #[serde(default)]
     pub trade_order: Option<TradeOrderKind>,
+    #[serde(default)]
+    pub min_room_level: u8,
     #[serde(default)]
     pub room_level_preference: RoomLevelPreference,
     pub candidates: Vec<CandidateSpec>,
@@ -296,6 +310,35 @@ pub(super) fn load_rule_catalog(path: &Path) -> Result<RuleCatalog> {
 
 pub(super) fn default_rule_catalog_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("orchestration_rules.json")
+}
+
+pub(crate) fn assert_support_combination_policy(
+    plans: &[super::plan::AssignmentPlan],
+    shifts: &[crate::schedule::TeamShiftResult],
+) -> Result<()> {
+    for shift in shifts {
+        let plan = plans.get(shift.plan_index).ok_or_else(|| {
+            Error::msg("assert-invariants support_combination_policy failed: missing Plan")
+        })?;
+        if plan.support_combinations_enable {
+            continue;
+        }
+        // Candidate lists overlap with ordinary domain winners; preserve role provenance.
+        if let Some(anchor) = plan.anchors.iter().find(|anchor| anchor.proactive_support) {
+            let present = anchor.room_id.as_ref().is_some_and(|room| {
+                shift
+                    .assignment
+                    .operators_in(room)
+                    .iter()
+                    .any(|op| op.name == anchor.operator)
+            });
+            return Err(Error::msg(format!(
+                "assert-invariants support_combination_policy failed in shift {}: proactive claim {} (present={present}) while disabled",
+                shift.index + 1, anchor.operator,
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn validate_rule_preferences(
@@ -447,6 +490,20 @@ pub(super) fn compile_rules(
                 ) {
                     continue;
                 }
+                if alternative.require_factory_capacity
+                    && candidate_anchors
+                        .iter()
+                        .filter(|anchor| anchor.facility == FacilityKind::Factory)
+                        .filter_map(|anchor| anchor.room_id.as_ref())
+                        .any(|room_id| {
+                            ctx.blueprint.room(room_id).is_none_or(|room| {
+                                candidate_assignment.operators_in(room_id).len()
+                                    != room.operator_capacity()
+                            })
+                        })
+                {
+                    continue;
+                }
                 let mut candidate_reserves = Vec::new();
                 if let Some((_, gates)) = conditional_pack {
                     let Some(reserves) =
@@ -524,6 +581,17 @@ pub(super) fn compile_rules(
                     off_shifts: alternative.off_shifts,
                 });
             }
+            for group in &alternative.bind_role_groups {
+                let operators =
+                    selected_operators_for_roles(group, &candidate_roles, &candidate_anchors);
+                if operators.len() > 1 {
+                    out.shift_binds.push(ShiftBind {
+                        operators,
+                        on_shifts: alternative.on_shifts,
+                        off_shifts: alternative.off_shifts,
+                    });
+                }
+            }
             for dependency in compile_active_dependencies(
                 &alternative.active_dependencies,
                 &candidate_roles,
@@ -531,9 +599,19 @@ pub(super) fn compile_rules(
             ) {
                 out.active_dependencies.push(dependency);
             }
-            if alternative.continuous {
+            if alternative.continuous || !alternative.continuous_role_ids.is_empty() {
+                let continuous_names: HashSet<_> = selected_operators_for_roles(
+                    &alternative.continuous_role_ids,
+                    &candidate_roles,
+                    &candidate_anchors,
+                )
+                .into_iter()
+                .collect();
                 out.continuous_roles
                     .extend(candidate_anchors.iter().filter_map(|anchor| {
+                        if !alternative.continuous && !continuous_names.contains(&anchor.operator) {
+                            return None;
+                        }
                         Some(ContinuousRole {
                             operator: anchor.operator.clone(),
                             facility: anchor.facility,
@@ -698,10 +776,9 @@ fn static_gates_match(gates: &[GateSpec], ctx: &RuleCompileContext<'_>) -> bool 
             .operbox
             .progress_of(name)
             .is_some_and(|progress| progress.elite >= *elite),
-        GateSpec::OperatorUnavailable { name, elite } => !ctx
+        GateSpec::OperatorUnavailable { name, elite } => ctx
             .operbox
-            .progress_of(name)
-            .is_some_and(|progress| progress.elite >= *elite),
+            .progress_of(name).is_none_or(|progress| progress.elite < *elite),
     })
 }
 
@@ -946,6 +1023,10 @@ fn place_role_recursive(
             next.anchors.push(SystemAnchor {
                 system_id: rule_id.to_string(),
                 operator: candidate.name.clone(),
+                proactive_support: role.proactive_support,
+                optional_control_role: (role.min_count == 0
+                    && role.facility == FacilityKind::ControlCenter)
+                    .then(|| role.id.clone()),
                 elite: progress.elite,
                 facility: ctx
                     .blueprint
@@ -1009,6 +1090,12 @@ fn enumerate_role_placements<'a>(
             available,
         );
     }
+    if available
+        .iter()
+        .any(|(candidate, _)| !candidate.fallback_if_no_other_candidates)
+    {
+        available.retain(|(candidate, _)| !candidate.fallback_if_no_other_candidates);
+    }
     match role.selection {
         RoleSelection::Ordered => available.truncate(role.max_count as usize),
         RoleSelection::ManufactureObjective => available.truncate(role.max_count as usize),
@@ -1027,8 +1114,7 @@ fn enumerate_role_placements<'a>(
         return rooms
             .into_iter()
             .filter_map(|room| {
-                let available_slots = room
-                    .operator_capacity()
+                let available_slots = role_room_capacity(room)
                     .saturating_sub(state.assignment.operators_in(&room.id).len());
                 let selected_count = available
                     .len()
@@ -1085,7 +1171,7 @@ fn enumerate_role_placements<'a>(
     let mut trial = state.assignment.clone();
     for (candidate, progress) in available {
         let Some(room) = rooms.iter().copied().find(|room| {
-            trial.operators_in(&room.id).len() < room.operator_capacity()
+            trial.operators_in(&room.id).len() < role_room_capacity(room)
                 && (!role.one_per_room || trial.operators_in(&room.id).is_empty())
                 && room_allows_operator(
                     &candidate.name,
@@ -1213,19 +1299,23 @@ fn matching_rooms<'a>(
                 && role_matches_room(role, room)
         })
         .collect();
-    rooms.sort_by(|left, right| match role.room_level_preference {
-        RoomLevelPreference::BlueprintOrder => left.id.0.cmp(&right.id.0),
-        RoomLevelPreference::Level2First => (right.level == 2)
-            .cmp(&(left.level == 2))
-            .then_with(|| left.id.0.cmp(&right.id.0)),
-        RoomLevelPreference::LowestLevel => left
-            .level
-            .cmp(&right.level)
-            .then_with(|| left.id.0.cmp(&right.id.0)),
-        RoomLevelPreference::HighestLevel => right
-            .level
-            .cmp(&left.level)
-            .then_with(|| left.id.0.cmp(&right.id.0)),
+    rooms.sort_by(|left, right| {
+        (left.kind != role.facility)
+            .cmp(&(right.kind != role.facility))
+            .then_with(|| match role.room_level_preference {
+                RoomLevelPreference::BlueprintOrder => left.id.0.cmp(&right.id.0),
+                RoomLevelPreference::Level2First => (right.level == 2)
+                    .cmp(&(left.level == 2))
+                    .then_with(|| left.id.0.cmp(&right.id.0)),
+                RoomLevelPreference::LowestLevel => left
+                    .level
+                    .cmp(&right.level)
+                    .then_with(|| left.id.0.cmp(&right.id.0)),
+                RoomLevelPreference::HighestLevel => right
+                    .level
+                    .cmp(&left.level)
+                    .then_with(|| left.id.0.cmp(&right.id.0)),
+            })
     });
     rooms
 }
@@ -1253,7 +1343,7 @@ fn enumerate_distributed_placements<'a>(
             .iter()
             .filter(|(room_id, _, _)| room_id == &room.id)
             .count();
-        if assignment.operators_in(&room.id).len() + pending >= room.operator_capacity()
+        if assignment.operators_in(&room.id).len() + pending >= role_room_capacity(room)
             || (role.one_per_room && (!assignment.operators_in(&room.id).is_empty() || pending > 0))
         {
             continue;
@@ -1297,7 +1387,7 @@ fn placement_is_valid(
         let Some(room) = ctx.blueprint.room(room_id) else {
             return false;
         };
-        if trial.operators_in(room_id).len() >= room.operator_capacity()
+        if trial.operators_in(room_id).len() >= role_room_capacity(room)
             || (role.one_per_room && !trial.operators_in(room_id).is_empty())
             || !room_allows_operator(
                 &candidate.name,
@@ -1492,6 +1582,8 @@ fn complete_manufacture_role(
             anchors.push(SystemAnchor {
                 system_id: rule_id.to_string(),
                 operator: name.clone(),
+                proactive_support: role.proactive_support,
+                optional_control_role: None,
                 elite: operator.elite,
                 facility: FacilityKind::Factory,
                 room_id: Some(room.id.clone()),
@@ -1724,11 +1816,13 @@ fn score_completed_power(
             .ok()
         })
         .collect::<Option<Vec<_>>>()?;
-    Some(crate::power::aggregate_power_efficiency(scores.into_iter()))
+    Some(crate::power::aggregate_power_efficiency(scores))
 }
 
 fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
-    if room.kind != role.facility && !role.facilities.contains(&room.kind) {
+    if room.level < role.min_room_level
+        || (room.kind != role.facility && !role.facilities.contains(&room.kind))
+    {
         return false;
     }
     if role.recipe.is_some_and(|required| {
@@ -1742,6 +1836,14 @@ fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
         return false;
     }
     true
+}
+
+fn role_room_capacity(room: &RoomBlueprint) -> usize {
+    if room.kind == FacilityKind::Dormitory {
+        room.dorm_bed_count() as usize
+    } else {
+        room.operator_capacity()
+    }
 }
 
 fn room_allows_operator(

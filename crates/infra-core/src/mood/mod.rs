@@ -10,7 +10,10 @@ mod eta;
 mod recovery;
 
 pub use drain::{operator_net_drain, workable_hours, DrainInputs};
-pub use eta::{shift_eta, shift_eta_with_instances, OperatorEta, ShiftEta};
+pub use eta::{
+    fits_shift_budget, fits_work_budget, shift_eta, shift_eta_in_context, shift_eta_with_instances,
+    OperatorEta, ShiftEta,
+};
 pub use recovery::{dorm_recovery_rates, DormOccupant};
 
 use std::collections::HashMap;
@@ -61,7 +64,7 @@ pub struct MoodClearEntry {
     pub facility: String,
     #[serde(default)]
     pub elite: u8,
-    /// `room` = 清同设施全员自身技能；`sui_only` = 仅岁干员（需派系数据，暂不建模）；`self` = 仅自身。
+    /// `room` = 清同设施全员自身技能；`sui_only` = 仅岁干员（按实例标签）；`self` = 仅自身。
     pub scope: String,
 }
 
@@ -189,6 +192,34 @@ pub struct MoodModel {
 }
 
 impl MoodModel {
+    /// Actual uniform recovery in one facility, without occupancy or individual
+    /// drain. Search consumes the same projection as settlement.
+    pub(crate) fn control_uniform_recovery_for_facility(
+        &self,
+        facility: FacilityKind,
+        control_operators: &[(String, u8)],
+    ) -> f64 {
+        let global = facility_key(facility).map_or(0.0, |key| {
+            self.control_global_recovery
+                .iter()
+                .filter(|entry| entry.covers.iter().any(|cover| cover == key))
+                .filter(|entry| {
+                    control_operators
+                        .iter()
+                        .any(|(name, elite)| name == &entry.name && *elite >= entry.elite)
+                })
+                .map(|entry| control_global_recovery_value(entry, control_operators))
+                .fold(0.0_f64, f64::max)
+        });
+        global
+            + self.control_smiley_recovery_for_facility(facility, control_operators)
+            + if facility == FacilityKind::ControlCenter {
+                self.control_faction_recovery_value(control_operators)
+            } else {
+                0.0
+            }
+    }
+
     pub fn load(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| Error::msg(format!("mood_model read {}: {e}", path.display())))?;
@@ -314,6 +345,16 @@ impl MoodModel {
         let total = smiley.per_provider * provider_count as f64;
         if facility == FacilityKind::ControlCenter {
             return total;
+        }
+        if !matches!(
+            facility,
+            FacilityKind::PowerPlant
+                | FacilityKind::Factory
+                | FacilityKind::TradePost
+                | FacilityKind::Office
+                | FacilityKind::MeetingRoom
+        ) {
+            return 0.0;
         }
         let spread = self.control_global_recovery.iter().any(|entry| {
             entry.spread_smiley

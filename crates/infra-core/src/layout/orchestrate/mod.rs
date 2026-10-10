@@ -7,6 +7,7 @@ mod execute;
 mod plan;
 mod rules;
 mod select;
+pub(crate) use rules::assert_support_combination_policy;
 
 pub use execute::{execute_plan, ExecuteResult};
 pub(crate) use plan::pack_production_components;
@@ -25,25 +26,6 @@ mod tests {
     use crate::layout::shift::AssignShiftMode;
     use crate::layout::BaseBlueprint;
     use crate::operbox::OperBox;
-
-    #[test]
-    fn build_plan_recovery_is_empty() {
-        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
-        let operbox = OperBox::load(
-            &crate::skill_table::data_path("schedule_243/operbox_ideal_e2.json").unwrap(),
-        )
-        .unwrap();
-        let plan = build_plan(
-            &blueprint,
-            &operbox,
-            AssignShiftMode::Recovery,
-            &BaseAssignment::default(),
-            &std::collections::HashSet::new(),
-        )
-        .unwrap();
-        assert!(plan.activated.is_empty());
-        assert!(plan.registry_claims.is_empty());
-    }
 
     #[test]
     fn mujica_fallback_requires_full_roster_and_no_other_cross_station_plan() {

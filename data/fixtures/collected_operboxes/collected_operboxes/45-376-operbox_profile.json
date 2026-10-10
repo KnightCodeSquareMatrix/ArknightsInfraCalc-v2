@@ -1,14 +1,14 @@
 {
   "schema_version": 4,
   "rotation_profile": "abc_12_6_6",
-  "layout_label": "data/layout/243.json",
-  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/45-376-operbox.json",
-  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
+  "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
+  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/45-376-operbox.json",
+  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 376,
     "tier_up_owned": 155,
     "trade_pool_ready": 50,
-    "manufacture_pool_ready": 69
+    "manufacture_pool_ready": 70
   },
   "domains": [
     {
@@ -28,9 +28,9 @@
           "乌有",
           "黑键"
         ],
-        "final_efficiency": 2.79
+        "final_efficiency": 2.794
       },
-      "gap_ratio": -0.24587813620071683,
+      "gap_ratio": -0.246957766642806,
       "severity": "critical"
     },
     {
@@ -38,55 +38,11 @@
       "label": "制造·综合",
       "current": {
         "operators": [
-          "乌尔比安",
-          "安哲拉",
-          "夜烟"
-        ],
-        "final_efficiency": 8.2
-      },
-      "baseline": {
-        "operators": [
-          "红云",
-          "稀音",
-          "帕拉斯"
-        ],
-        "final_efficiency": 5.882
-      },
-      "gap_ratio": 0.3940836450187011,
-      "severity": "ok"
-    },
-    {
-      "id": "manufacture_gold",
-      "label": "制造·赤金产线",
-      "current": {
-        "operators": [
-          "乌尔比安",
-          "安哲拉",
-          "夜烟"
-        ],
-        "final_efficiency": 2.05
-      },
-      "baseline": {
-        "operators": [
-          "红云",
-          "稀音",
-          "帕拉斯"
-        ],
-        "final_efficiency": 1.308
-      },
-      "gap_ratio": 0.5672782874617736,
-      "severity": "ok"
-    },
-    {
-      "id": "manufacture_battle_record",
-      "label": "制造·经验产线",
-      "current": {
-        "operators": [
           "幽灵鲨",
           "斯卡蒂",
-          "食铁兽"
+          "夜烟"
         ],
-        "final_efficiency": 2.05
+        "final_efficiency": 8.24
       },
       "baseline": {
         "operators": [
@@ -94,9 +50,53 @@
           "引星棘刺",
           "夜烟"
         ],
-        "final_efficiency": 1.633
+        "final_efficiency": 8.392
       },
-      "gap_ratio": 0.25535823637477023,
+      "gap_ratio": -0.01811248808388933,
+      "severity": "ok"
+    },
+    {
+      "id": "manufacture_gold",
+      "label": "制造·赤金产线",
+      "current": {
+        "operators": [
+          "幽灵鲨",
+          "斯卡蒂",
+          "夜烟"
+        ],
+        "final_efficiency": 2.06
+      },
+      "baseline": {
+        "operators": [
+          "苍苔",
+          "引星棘刺",
+          "夜烟"
+        ],
+        "final_efficiency": 2.238
+      },
+      "gap_ratio": -0.07953529937444144,
+      "severity": "ok"
+    },
+    {
+      "id": "manufacture_battle_record",
+      "label": "制造·经验产线",
+      "current": {
+        "operators": [
+          "乌尔比安",
+          "安哲拉",
+          "食铁兽"
+        ],
+        "final_efficiency": 2.06
+      },
+      "baseline": {
+        "operators": [
+          "红云",
+          "稀音",
+          "帕拉斯"
+        ],
+        "final_efficiency": 1.958
+      },
+      "gap_ratio": 0.0520939734422881,
       "severity": "ok"
     },
     {
@@ -104,39 +104,39 @@
       "label": "轮休·24h贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 4.467
+        "final_efficiency": 4.018
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 5.332
+        "final_efficiency": 3.84
       },
-      "gap_ratio": -0.1622280570142536,
-      "severity": "warn"
+      "gap_ratio": 0.046354166666666655,
+      "severity": "ok"
     },
     {
       "id": "rotation_manufacture",
       "label": "轮休·24h制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 8.123
+        "final_efficiency": 8.1
       },
       "baseline": {
         "operators": [],
-        "final_efficiency": 6.658
+        "final_efficiency": 9.084
       },
-      "gap_ratio": 0.22003604686091902,
-      "severity": "ok"
+      "gap_ratio": -0.1083223249669749,
+      "severity": "warn"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 4.467,
-    "daily_manufacture_efficiency": 8.123,
-    "daily_power_efficiency": 3.563
+    "daily_trade_efficiency": 4.018,
+    "daily_manufacture_efficiency": 8.1,
+    "daily_power_efficiency": 1.615
   },
   "baseline_rotation": {
-    "daily_trade_efficiency": 5.332,
-    "daily_manufacture_efficiency": 6.658,
-    "daily_power_efficiency": 3.552
+    "daily_trade_efficiency": 3.84,
+    "daily_manufacture_efficiency": 9.084,
+    "daily_power_efficiency": 1.627
   },
   "actions": [
     {
@@ -169,7 +169,7 @@
   ],
   "flags": [
     "trade_originium_critical",
-    "rotation_trade_warn"
+    "rotation_manufacture_warn"
   ],
   "narration_hints": []
 }

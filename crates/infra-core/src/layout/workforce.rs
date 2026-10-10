@@ -41,8 +41,6 @@ pub const TAG_BLACKSTEEL: &str = "cc.g.blacksteel";
 pub const TAG_KNIGHT: &str = "cc.g.knight";
 pub const TAG_PINUS: &str = "cc.g.pinus";
 pub const TAG_ABYSSAL: &str = "cc.g.abyssal";
-pub const TAG_LGD: &str = "cc.g.lgd";
-pub const TAG_RAINBOW: &str = "cc.g.rainbow";
 
 const CROSS_FACILITY_TAGS: &[&str] = &[
     TAG_KARLAN,
@@ -180,13 +178,16 @@ impl WorkforceIndex {
         let rhine_life_in_base =
             count_tagged_in_base_excluding(instances, &effective_base_presence, &[], TAG_RHINE, 6);
 
-        let durin_in_base = count_tagged_in_base_excluding(
-            instances,
-            &all_base_names,
-            &training_assist,
-            TAG_DURIN,
-            4,
-        );
+        let assigned_presence: Vec<_> = blueprint
+            .rooms
+            .iter()
+            .filter(|room| room.kind != FacilityKind::MeetingRoom)
+            .flat_map(|room| assignment.operators_in(&room.id))
+            .filter(|operator| !training_assist.contains(&operator.name))
+            .map(|operator| operator.name.clone())
+            .collect();
+        let durin_in_base =
+            count_tagged_in_base_excluding(instances, &assigned_presence, &[], TAG_DURIN, 4);
 
         Self {
             by_room,
@@ -374,10 +375,6 @@ fn operator_has_tag(
         .tags_for(&op.name, op.tier())
         .iter()
         .any(|t| t == tag)
-}
-
-fn count_tagged_in_base(instances: Option<&OperatorInstances>, names: &[String], tag: &str) -> u8 {
-    count_tagged_in_base_excluding(instances, names, &[], tag, 255)
 }
 
 fn count_tagged_in_base_excluding(

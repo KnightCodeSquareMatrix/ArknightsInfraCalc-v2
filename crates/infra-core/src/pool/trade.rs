@@ -171,18 +171,25 @@ pub(crate) fn trade_atom_requires_candidate_projection(atom: &EffectAtom) -> boo
 pub(crate) fn trade_operators_require_candidate_projection(operators: &[TradeOperator]) -> bool {
     operators.iter().any(|operator| {
         operator
-            .compiled_atoms
+            .tags
             .iter()
-            .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
+            .any(|tag| tag == crate::layout::TAG_DURIN)
+            || operator.buff_ids.iter().any(|id| is_gold_flow_skill(id))
+            || operator
+                .compiled_atoms
+                .iter()
+                .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
     })
 }
 
 pub(crate) fn trade_pool_requires_candidate_projection(pool: &TradePool) -> bool {
     pool.entries.iter().any(|entry| {
-        entry
-            .compiled_atoms
-            .iter()
-            .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
+        entry.tags.iter().any(|tag| tag == crate::layout::TAG_DURIN)
+            || entry.buff_ids.iter().any(|id| is_gold_flow_skill(id))
+            || entry
+                .compiled_atoms
+                .iter()
+                .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
     })
 }
 
@@ -196,7 +203,7 @@ pub fn build_trade_combo_operators_vec(
     must_name: Option<&str>,
     override_op: Option<&TradeOperator>,
 ) -> Vec<TradeOperator> {
-    combo
+    let mut operators: Vec<_> = combo
         .iter()
         .map(|idx| {
             let entry = &pool.entries[*idx];
@@ -208,7 +215,13 @@ pub fn build_trade_combo_operators_vec(
                 entry.to_trade_operator()
             }
         })
-        .collect()
+        .collect();
+    if crate::trade::gold_flow::has_ordered_gold_flow(
+        operators.iter().map(|op: &TradeOperator| op.name.as_str()),
+    ) {
+        operators.sort_by_key(|op| crate::trade::gold_flow::ordered_trio_priority(&op.name));
+    }
+    operators
 }
 
 /// 从池索引组装三人组（保留进驻顺序）；孑 E0 override 由调用方注入。

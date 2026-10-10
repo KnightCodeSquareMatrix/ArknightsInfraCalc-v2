@@ -60,6 +60,11 @@ pub enum AnchorFillPolicy {
 pub struct SystemAnchor {
     pub system_id: String,
     pub operator: String,
+    #[serde(skip)]
+    pub(crate) proactive_support: bool,
+    /// Present only for a rule role with min_count=0 in the control center.
+    #[serde(skip)]
+    pub optional_control_role: Option<String>,
     pub elite: u8,
     pub facility: FacilityKind,
     /// `None` = 该设施类型首个空房，不绑定具体 `room_id`。
@@ -289,6 +294,8 @@ pub struct ControlCandidateRequirement {
 /// 单班进驻前的编排计划；`execute_plan` 将其落成 `BaseAssignment`。
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct AssignmentPlan {
+    #[serde(skip)]
+    pub(crate) support_combinations_enable: bool,
     pub mode: AssignShiftMode,
     /// 计划阶段已确定的规则 alternatives 与兼容 registry claims 的统一视图。
     pub activated: Vec<ActivatedSystem>,
@@ -328,6 +335,70 @@ pub struct AssignmentPlan {
 }
 
 impl AssignmentPlan {
+    /// 空 Peak 计划：无体系、无 anchor、无约束。
+    pub(crate) fn empty() -> Self {
+        Self {
+            support_combinations_enable: false,
+            mode: AssignShiftMode::Peak,
+            activated: Vec::new(),
+            registry_claims: Vec::new(),
+            selected_rules: Vec::new(),
+            anchors: Vec::new(),
+            producers: Vec::new(),
+            constraints: Vec::new(),
+            excluded_operators: Vec::new(),
+            control_exclusions: Vec::new(),
+            degradations: Vec::new(),
+            shift_binds: Vec::new(),
+            active_dependencies: Vec::new(),
+            resolved_producer_dependencies: Vec::new(),
+            continuous_roles: Vec::new(),
+            rotation_reserves: Vec::new(),
+            control_candidate_requirements: Vec::new(),
+        }
+    }
+
+    /// Recover exact provenance from the retained, ordered registry claims.
+    /// A Search group is never matched by the members chosen in a final shift.
+    pub(crate) fn control_requirement_sources(&self) -> crate::error::Result<Vec<(usize, usize)>> {
+        let sources: Vec<_> = self
+            .registry_claims
+            .iter()
+            .enumerate()
+            .flat_map(|(claim_index, claim)| {
+                claim
+                    .slots
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(slot_index, slot)| {
+                        (slot.facility == FacilityKind::ControlCenter
+                            && slot.fill == crate::layout::system::SlotFillMode::Search
+                            && slot.required_count > 0)
+                            .then_some((claim_index, slot_index))
+                    })
+            })
+            .collect();
+        if sources.len() != self.control_candidate_requirements.len() {
+            return Err(crate::error::Error::msg(
+                "control_requirement_scope_unresolved: missing registry provenance",
+            ));
+        }
+        for ((claim_index, slot_index), requirement) in
+            sources.iter().zip(&self.control_candidate_requirements)
+        {
+            let slot = &self.registry_claims[*claim_index].slots[*slot_index];
+            let candidates: Vec<_> = slot.operators.iter().map(|op| op.name.clone()).collect();
+            if candidates != requirement.candidates || slot.required_count != requirement.min_count
+            {
+                return Err(crate::error::Error::msg(format!(
+                    "control_requirement_scope_unresolved: changed group in {}/slot {}",
+                    self.registry_claims[*claim_index].system_id, slot_index
+                )));
+            }
+        }
+        Ok(sources)
+    }
+
     /// 把声明式 hard 关系与 winner 的实际 producer/consumer 统一为排班事实。
     pub fn resolve_actual_producer_dependencies(
         &mut self,
@@ -508,27 +579,6 @@ impl AssignmentPlan {
         }
     }
 
-    pub fn recovery(mode: AssignShiftMode) -> Self {
-        Self {
-            mode,
-            activated: Vec::new(),
-            registry_claims: Vec::new(),
-            selected_rules: Vec::new(),
-            anchors: Vec::new(),
-            producers: Vec::new(),
-            constraints: Vec::new(),
-            excluded_operators: Vec::new(),
-            control_exclusions: Vec::new(),
-            degradations: Vec::new(),
-            shift_binds: Vec::new(),
-            active_dependencies: Vec::new(),
-            resolved_producer_dependencies: Vec::new(),
-            continuous_roles: Vec::new(),
-            rotation_reserves: Vec::new(),
-            control_candidate_requirements: Vec::new(),
-        }
-    }
-
     /// 已选 `base_systems` 体系 id（按 priority 降序）。
     pub fn registry_system_ids(&self) -> Vec<&str> {
         let mut claims: Vec<_> = self.registry_claims.iter().collect();
@@ -653,7 +703,7 @@ mod tests {
         let mut assignment = BaseAssignment::default();
         assignment.set_room("control", vec![AssignedOperator::new("八幡海铃", 2)]);
         set_trade_group(&mut assignment, &["伺夜"]);
-        let mut single = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut single = AssignmentPlan::empty();
         resolve(&mut single, &blueprint, &assignment);
         assert_eq!(single.shift_binds.len(), 1);
         assert_eq!(single.resolved_producer_dependencies.len(), 1);
@@ -663,7 +713,7 @@ mod tests {
         assert_eq!(dependency.consumers, vec!["伺夜"]);
 
         assignment.set_room("trade_2", vec![AssignedOperator::new("贝洛内", 2)]);
-        let mut cross_station = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut cross_station = AssignmentPlan::empty();
         resolve(&mut cross_station, &blueprint, &assignment);
         assert_eq!(cross_station.shift_binds.len(), 1);
         for name in ["八幡海铃", "伺夜", "贝洛内"] {
@@ -681,7 +731,7 @@ mod tests {
         set_trade_group(&mut assignment, &["银灰", "崖心", "讯使"]);
         assignment.set_room("trade_2", vec![AssignedOperator::new("角峰", 2)]);
 
-        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut plan = AssignmentPlan::empty();
         resolve(&mut plan, &blueprint, &assignment);
 
         assert!(plan.resolved_producer_dependencies.is_empty());
@@ -701,7 +751,7 @@ mod tests {
             ],
         );
 
-        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut plan = AssignmentPlan::empty();
         resolve(&mut plan, &blueprint, &assignment);
 
         assert!(plan.shift_binds.is_empty());
@@ -723,7 +773,7 @@ mod tests {
         let mut assignment = BaseAssignment::default();
         assignment.set_room("control", vec![AssignedOperator::new("规则成员A", 2)]);
         set_trade_group(&mut assignment, &["规则成员B"]);
-        let mut plan = AssignmentPlan::recovery(AssignShiftMode::Peak);
+        let mut plan = AssignmentPlan::empty();
         plan.shift_binds.push(ShiftBind {
             operators: vec!["规则成员A".to_string(), "规则成员B".to_string()],
             on_shifts: 2,

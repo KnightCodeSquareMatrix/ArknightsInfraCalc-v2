@@ -4,7 +4,7 @@
 //! `atoms` 为空是刻意委托，不在此重复建模为 EffectAtom。
 //!
 //! 真实制造赤金线数由 `TradeRoomInput::gold_production_lines` 注入；
-//! 虚拟线由绮良/鸿雪·杜林等技能在同站按顺序累加。
+//! 虚拟线由在岗贸易干员生成，供所有赤金贸易站读取；本房按进驻顺序重放自身的线。
 
 use crate::skill_table::SkillTable;
 use crate::trade::interpreter::TradeContext;
@@ -48,10 +48,58 @@ pub fn dependency_inputs() -> &'static [DomainDependencyInputDecl] {
     DEPENDENCY_INPUTS
 }
 
+pub fn virtual_line_yield(buff_ids: &[String], real: u32, durin: u32) -> u32 {
+    buff_ids
+        .iter()
+        .map(|id| match id.as_str() {
+            "trade_ord_line_gold[010]" => (real / 2) * 2,
+            "trade_ord_line_gold[000]" => (real / 4) * 2,
+            "trade_ord_line_durin[010]" => durin,
+            _ => 0,
+        })
+        .sum()
+}
+
+pub fn ordered_trio_priority(name: &str) -> u8 {
+    match name {
+        "绮良" => 0,
+        "鸿雪" => 1,
+        "图耶" => 2,
+        _ => 3,
+    }
+}
+
+pub fn has_ordered_trio<'a>(names: impl IntoIterator<Item = &'a str>) -> bool {
+    let mut seen = [false; 3];
+    for name in names {
+        let priority = ordered_trio_priority(name);
+        if priority < 3 {
+            seen[priority as usize] = true;
+        }
+    }
+    seen.into_iter().all(|present| present)
+}
+
+pub fn has_ordered_gold_flow<'a>(names: impl IntoIterator<Item = &'a str>) -> bool {
+    let mut seen = [false; 3];
+    for name in names {
+        let priority = ordered_trio_priority(name);
+        if priority < 3 {
+            seen[priority as usize] = true;
+        }
+    }
+    seen.into_iter().filter(|present| *present).count() >= 2
+}
+
 /// 在 `PeerAbsorb` 之前执行：按干员进驻顺序结算赤金链效率。
 pub fn apply_gold_flow_chain(ctx: &mut TradeContext, table: &SkillTable) {
     let real = ctx.real_gold_lines;
     let mut virtual_lines = ctx.virtual_gold_lines;
+    for (name, amount, _) in &ctx.layout.trade_gold_line_sources {
+        if ctx.operators.iter().any(|operator| operator.name == *name) {
+            virtual_lines = virtual_lines.saturating_sub(*amount);
+        }
+    }
     let names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
 
     for name in &names {

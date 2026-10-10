@@ -699,12 +699,8 @@ mod tests {
 
         let report = TeamRotationReport {
             profile: crate::schedule::TimedRotationProfile::default(),
-            peak_plan: crate::layout::AssignmentPlan::recovery(
-                crate::layout::AssignShiftMode::Peak,
-            ),
-            assignment_plans: vec![crate::layout::AssignmentPlan::recovery(
-                crate::layout::AssignShiftMode::Peak,
-            )],
+            peak_plan: crate::layout::AssignmentPlan::empty(),
+            assignment_plans: vec![crate::layout::AssignmentPlan::empty()],
             runtime_shift_binds: vec![],
             peak_mood_eta: None,
             teams: vec![TeamAssignment {

@@ -58,14 +58,23 @@ pub struct RoomBlueprint {
     /// 宿舍床位数；缺省时按等级查表。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dorm_beds: Option<u8>,
-    /// 宿舍建筑等级；“每间宿舍每级”技能直接读取该等级。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Legacy layout field; accepted on input but not used as a skill level.
+    /// Dormitory skills use `level` exclusively.
+    #[serde(default, skip_serializing)]
     pub dorm_ambience_level: Option<u8>,
 }
 
 impl RoomBlueprint {
     pub fn dorm_skill_level(&self) -> u8 {
-        self.level.min(5)
+        self.level
+    }
+
+    /// 宿舍床位数的唯一读取入口：显式 `dorm_beds` 优先，缺省为 5（与收口前各处 `unwrap_or(5)` 一致）。
+    ///
+    /// 不要改成按等级查 `default_dorm_beds`：后者给 Lv1 与 Lv4 以上返回 4，
+    /// 会改变缺省布局下的宿舍容量与断言口径。
+    pub fn dorm_bed_count(&self) -> u8 {
+        self.dorm_beds.unwrap_or(5)
     }
 
     pub fn operator_capacity(&self) -> usize {
@@ -245,13 +254,19 @@ impl BaseBlueprint {
         self.rooms
             .iter()
             .filter(|r| r.kind == FacilityKind::Dormitory)
-            .map(|r| r.dorm_beds.unwrap_or_else(|| default_dorm_beds(r.level)))
+            .map(RoomBlueprint::dorm_bed_count)
             .sum::<u8>()
     }
 
     pub fn initial_global_pool(&self) -> GlobalResourcePool {
         let mut pool = GlobalResourcePool::new();
         for (key, value) in &self.scenario.initial_global {
+            // Legacy clients prefilled MonsterCuisine before the dorm assignment was
+            // resolved. Keep accepting that wire field, but only the current
+            // assignment may produce it.
+            if *key == GlobalResourceKey::MonsterCuisine {
+                continue;
+            }
             pool.set(*key, *value);
         }
         pool
@@ -279,6 +294,12 @@ impl BaseBlueprint {
                 return Err(Error::msg(format!("room {} level must be >= 1", room.id.0)));
             }
             if matches!(room.kind, FacilityKind::Dormitory) {
+                if room.level > 5 {
+                    return Err(Error::msg(format!(
+                        "dorm room {} level must be 1..=5",
+                        room.id.0
+                    )));
+                }
                 if matches!(room.dorm_beds, Some(0)) {
                     return Err(Error::msg(format!(
                         "dorm room {} dorm_beds must be >= 1",
@@ -412,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn dorm_level_sum_uses_skill_level_not_building_level() {
+    fn dorm_level_sum_uses_room_level_not_legacy_ambience() {
         let bp = BaseBlueprint {
             template: None,
             drone_cap: 135,
@@ -437,6 +458,6 @@ mod tests {
             ],
         };
 
-        assert_eq!(bp.dorm_level_sum(), 9);
+        assert_eq!(bp.dorm_level_sum(), 6);
     }
 }

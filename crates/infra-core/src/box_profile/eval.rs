@@ -9,8 +9,8 @@ use crate::error::Result;
 use crate::export::maa::{assignment_from_maa_plan, load_maa_schedule};
 use crate::instances::OperatorInstances;
 use crate::layout::{
-    resolve_base, AssignShiftMode, AssignmentPlan, BaseAssignment, BaseBlueprint, ResolvedBase,
-    ResolvedManuRoom, ResolvedTradeRoom,
+    resolve_base, AssignmentPlan, BaseAssignment, BaseBlueprint, ResolvedBase, ResolvedManuRoom,
+    ResolvedTradeRoom,
 };
 use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::solver::{solve_manufacture, ManuProdBreakdown, ManuStorageBreakdown};
@@ -295,8 +295,8 @@ fn probe_shell(
         manu_report,
         rotation: TeamRotationReport {
             profile: crate::schedule::TimedRotationProfile::default(),
-            peak_plan: AssignmentPlan::recovery(AssignShiftMode::Peak),
-            assignment_plans: vec![AssignmentPlan::recovery(AssignShiftMode::Peak)],
+            peak_plan: AssignmentPlan::empty(),
+            assignment_plans: vec![AssignmentPlan::empty()],
             runtime_shift_binds: vec![],
             peak_mood_eta: None,
             teams: vec![],

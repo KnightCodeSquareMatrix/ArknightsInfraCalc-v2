@@ -8,10 +8,7 @@ use crate::layout::blueprint::{
     station_operator_capacity, BaseBlueprint, FacilityKind, RoomBlueprint, RoomId, RoomProduct,
 };
 use crate::layout::context::LayoutContext;
-use crate::pool::{
-    filter_trade_pool, jie_e0_trade_operator, karlan_precision_active, try_filter_standalone,
-    TradePool, JIE_TRADE_NAME,
-};
+use crate::pool::{filter_trade_pool, karlan_precision_active, try_filter_standalone, TradePool};
 use crate::search::{
     pick_trade_role_hit_requiring, search_trade_triples_filtered, SearchTripleFilter,
     TradeSearchHit, TradeSearchOptions,
@@ -72,126 +69,6 @@ pub(super) fn trade_room_has_operator(
         .any(|o| o.name == name)
 }
 
-/// 恢复班贸易：精0 孑一站（若有），其余站贪心；按蓝图贸易站数填满。
-#[allow(clippy::too_many_arguments)]
-pub(super) fn assign_trade_jie_remainder(
-    blueprint: &BaseBlueprint,
-    pool: &TradePool,
-    table: &SkillTable,
-    instances: &OperatorInstances,
-    gold_lines: u32,
-    options: &AssignBaseOptions,
-    durin_dorm_planning: Option<u8>,
-    assignment: &mut BaseAssignment,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    let trade_rooms: Vec<_> = blueprint
-        .rooms
-        .iter()
-        .filter(|r| r.kind == FacilityKind::TradePost)
-        .collect();
-    if trade_rooms.is_empty() {
-        return Ok(());
-    }
-    for room in &trade_rooms {
-        if trade_order_from_room(room)? == TradeOrderKind::Originium
-            && assignment
-                .operators_in(&room.id)
-                .iter()
-                .any(|operator| GOLD_ORDER_CORE_NAMES.contains(&operator.name.as_str()))
-        {
-            return Err(Error::msg(format!(
-                "originium trade room {} cannot contain a gold-order core operator",
-                room.id.0
-            )));
-        }
-    }
-
-    let mut current_layout = crate::layout::resolve_base(
-        blueprint,
-        assignment,
-        Some(instances),
-        Some(table),
-        options.mood,
-        durin_dorm_planning,
-    )?
-    .layout;
-    let jie_lead = !karlan_precision_active(&current_layout.global_inject)
-        && jie_e0_trade_operator(instances, table).is_some();
-
-    if jie_lead {
-        if let Some(room) = trade_rooms.iter().find(|room| {
-            assignment.operators_in(&room.id).is_empty()
-                && trade_order_from_room(room).ok() == Some(TradeOrderKind::Gold)
-        }) {
-            let sub = filter_trade_pool(pool, used);
-            let capacity = room.operator_capacity();
-            if sub.entries.len() >= capacity {
-                if let Some(jie_op) = jie_e0_trade_operator(instances, table) {
-                    let search_opts = trade_room_options(
-                        &current_layout,
-                        gold_lines,
-                        options,
-                        TradeOrderKind::Gold,
-                        room.level,
-                    );
-                    if let Ok(report) = search_trade_triples_filtered(
-                        &sub,
-                        table,
-                        &search_opts,
-                        SearchTripleFilter {
-                            must_include_name: Some(JIE_TRADE_NAME.to_string()),
-                            must_operator_override: Some(jie_op),
-                            forbidden_pairs: vec![(
-                                WITCH_TRADE_NAME.to_string(),
-                                TEQUILA_TRADE_NAME.to_string(),
-                            )],
-                            ..SearchTripleFilter::default()
-                        },
-                    ) {
-                        commit_trade_room(assignment, &room.id, &report.best, pool, used)?;
-                    }
-                }
-            }
-        }
-    }
-
-    for room in &trade_rooms {
-        if !assignment.operators_in(&room.id).is_empty() {
-            continue;
-        }
-        current_layout = crate::layout::resolve_base(
-            blueprint,
-            assignment,
-            Some(instances),
-            Some(table),
-            options.mood,
-            durin_dorm_planning,
-        )?
-        .layout;
-        let order = trade_order_from_room(room)?;
-        let mut used_for_room = used.clone();
-        if order == TradeOrderKind::Originium {
-            used_for_room.extend(GOLD_ORDER_CORE_NAMES.map(str::to_string));
-        }
-        let hit = pick_trade_meta_then_plain(
-            pool,
-            table,
-            &current_layout,
-            gold_lines,
-            options,
-            order,
-            room.level,
-            &mut used_for_room,
-            &[],
-            &[],
-        )
-        .map_err(|e| Error::msg(format!("trade recovery {}: {e}", room.id.0)))?;
-        commit_trade_room(assignment, &room.id, &hit, pool, used)?;
-    }
-    Ok(())
-}
-
 pub(super) fn assign_trade_remainder(
     blueprint: &BaseBlueprint,
     pool: &TradePool,
@@ -200,7 +77,6 @@ pub(super) fn assign_trade_remainder(
     gold_lines: u32,
     options: &AssignBaseOptions,
     durin_dorm_planning: Option<u8>,
-    forbidden_pairs: &[(String, String)],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -235,7 +111,6 @@ pub(super) fn assign_trade_remainder(
             order,
             room.level,
             used,
-            forbidden_pairs,
             &anchors,
         )
         .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
@@ -569,7 +444,6 @@ pub(super) fn pick_trade_meta_then_plain(
     order: TradeOrderKind,
     room_level: u8,
     used: &mut HashSet<String>,
-    forbidden_pairs: &[(String, String)],
     required_names: &[String],
 ) -> Result<TradeSearchHit> {
     if order == TradeOrderKind::Originium
@@ -758,13 +632,8 @@ pub(super) fn pick_trade_meta_then_plain(
             return Ok(hit);
         }
     }
-    let mut plain_forbidden_pairs = forbidden_pairs.to_vec();
-    if room_level <= 3
-        && !plain_forbidden_pairs.iter().any(|(left, right)| {
-            (left == WITCH_TRADE_NAME && right == TEQUILA_TRADE_NAME)
-                || (left == TEQUILA_TRADE_NAME && right == WITCH_TRADE_NAME)
-        })
-    {
+    let mut plain_forbidden_pairs: Vec<(String, String)> = Vec::new();
+    if room_level <= 3 {
         plain_forbidden_pairs.push((WITCH_TRADE_NAME.to_string(), TEQUILA_TRADE_NAME.to_string()));
     }
     let mut plain_used = used.clone();
@@ -1010,7 +879,6 @@ mod tests {
             3,
             &mut used,
             &[],
-            &[],
         )
         .unwrap();
         assert!(closure.names.iter().any(|name| name == CLOSURE_TRADE_NAME));
@@ -1025,7 +893,6 @@ mod tests {
             TradeOrderKind::Gold,
             2,
             &mut used,
-            &[],
             &[],
         )
         .unwrap();
@@ -1064,7 +931,6 @@ mod tests {
             TradeOrderKind::Originium,
             3,
             &mut HashSet::new(),
-            &[],
             &[],
         )
         .unwrap();
@@ -1109,7 +975,6 @@ mod tests {
             TradeOrderKind::Gold,
             2,
             &mut HashSet::from([WITCH_TRADE_NAME.to_string()]),
-            &[],
             &seeded,
         )
         .unwrap();
@@ -1181,7 +1046,6 @@ mod tests {
             0,
             &AssignBaseOptions::default(),
             None,
-            &[],
             &mut assignment,
             &mut used,
         )
@@ -1194,67 +1058,6 @@ mod tests {
         assert_eq!(
             assignment.operators_in(&RoomId::from("gold-b"))[0].name,
             CLOSURE_TRADE_NAME
-        );
-    }
-
-    #[test]
-    fn recovery_all_originium_excludes_gold_order_cores() {
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
-        let roster = Roster::from_elite_map(
-            [
-                (DOCUS_TRADE_NAME, 2),
-                (CLOSURE_TRADE_NAME, 2),
-                (WITCH_TRADE_NAME, 2),
-                (TEQUILA_TRADE_NAME, 2),
-                ("空爆", 2),
-                ("深巡", 2),
-                ("玫兰莎", 2),
-            ]
-            .into_iter()
-            .map(|(name, elite)| (name.to_string(), elite))
-            .collect(),
-        );
-        let pool = build_trade_pool(&roster, &instances, &table).unwrap();
-        let originium = RoomBlueprint {
-            product: Some(RoomProduct::Trade {
-                order: TradeOrderKind::Originium,
-            }),
-            ..gold_room("source", 3)
-        };
-        let blueprint = BaseBlueprint {
-            template: None,
-            drone_cap: 135,
-            scenario: BlueprintScenario::default(),
-            rooms: vec![originium],
-        };
-        let mut assignment = BaseAssignment::default();
-        let mut used = HashSet::new();
-
-        assign_trade_jie_remainder(
-            &blueprint,
-            &pool,
-            &table,
-            &instances,
-            0,
-            &AssignBaseOptions::default(),
-            None,
-            &mut assignment,
-            &mut used,
-        )
-        .unwrap();
-
-        let names: Vec<_> = assignment
-            .operators_in(&RoomId::from("source"))
-            .iter()
-            .map(|operator| operator.name.as_str())
-            .collect();
-        assert_eq!(names.len(), 3);
-        assert!(
-            names
-                .iter()
-                .all(|name| !GOLD_ORDER_CORE_NAMES.contains(name)),
-            "Recovery 源石站不得通过 full-pool 回退选择金单核心: {names:?}"
         );
     }
 
@@ -1317,7 +1120,6 @@ mod tests {
                 ..Default::default()
             },
             None,
-            &[],
             &mut assignment,
             &mut used,
         )

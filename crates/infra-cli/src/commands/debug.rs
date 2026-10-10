@@ -277,13 +277,14 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
         legacy_progress_normalized_entries,
         system_preferences,
         fiammetta_enable,
+        support_combinations_enable,
         labels,
     ) = if request.method == "plan.compute" {
         let params: PlanComputeParams = serde_json::from_value(request.params.clone())
             .map_err(|error| Error::msg(format!("plan.compute params parse: {error}")))?;
-        if !(1..=3).contains(&params.schema_version) {
+        if !(1..=5).contains(&params.schema_version) {
             return Err(Error::msg(format!(
-                "unsupported plan schema version {}; expected 1, 2 or 3",
+                "unsupported plan schema version {}; expected 1 through 5",
                 params.schema_version
             )));
         }
@@ -307,6 +308,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             legacy_progress_normalized_entries,
             options.system_preferences,
             options.fiammetta_enable,
+            options.support_combinations_enable,
             labels,
         )
     } else {
@@ -321,6 +323,11 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             legacy_progress_normalized_entries,
             std::collections::HashMap::new(),
             true,
+            request
+                .params
+                .get("support_combinations_enable")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
             ("legacy-layout".to_string(), "legacy-operbox".to_string()),
         )
     };
@@ -347,6 +354,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             maa_title: None,
             fiammetta_candidates_out: None,
             fiammetta_enable,
+            support_combinations_enable,
             assert_invariants: false,
         },
         RequestedOutputs {

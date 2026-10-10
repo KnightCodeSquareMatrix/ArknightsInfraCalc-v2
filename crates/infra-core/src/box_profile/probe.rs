@@ -66,6 +66,7 @@ pub fn run_user_rotation_probe_with_profile(
         profile,
         &HashMap::new(),
         true,
+        false,
         None,
     )
 }
@@ -79,6 +80,7 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
     profile: TimedRotationProfile,
     system_preferences: &HashMap<String, String>,
     fiammetta_enable: bool,
+    support_combinations_enable: bool,
     fiammetta_candidates_out: Option<std::path::PathBuf>,
 ) -> Result<LayoutProbe> {
     let rotation = schedule_timed_rotation(
@@ -90,6 +92,7 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
             top_k,
             system_preferences: system_preferences.clone(),
             fiammetta_enable,
+            support_combinations_enable,
             fiammetta_candidates_out,
             ..AssignBaseOptions::default()
         },

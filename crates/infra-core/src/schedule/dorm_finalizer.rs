@@ -15,6 +15,16 @@ pub(crate) struct DormFinalizerWarning {
     pub omitted_names: Vec<String>,
 }
 
+pub(crate) fn render_warning(warning: DormFinalizerWarning) -> String {
+    format!(
+        "shift {} 宿舍普通休息候选 {} 人超过可用空床 {}，普通休息启用 MAA autofill: {}",
+        warning.shift_index + 1,
+        warning.candidate_count,
+        warning.available_beds,
+        warning.omitted_names.join(", ")
+    )
+}
+
 /// 在所有班次的工作 assignment 完成后，统一写入宿舍成员。
 ///
 /// 普通休息成员只来自相邻班次的实际非宿舍工作差集：
@@ -65,16 +75,7 @@ fn working_operators(
     blueprint: &BaseBlueprint,
     assignment: &crate::layout::BaseAssignment,
 ) -> Vec<AssignedOperator> {
-    let room_operators = assignment
-        .rooms
-        .iter()
-        .filter(|room| {
-            blueprint
-                .room(&room.room_id)
-                .is_some_and(|spec| spec.kind != FacilityKind::Dormitory)
-        })
-        .flat_map(|room| room.operators.iter().cloned());
-    unique_operators(room_operators.chain(assignment.training_assist.iter().cloned()))
+    unique_operators(assignment.work_position_operators(blueprint).cloned())
 }
 
 fn finalize_shift_dorm(
@@ -124,7 +125,7 @@ fn finalize_shift_dorm(
 
     let capacities: Vec<usize> = dorms
         .iter()
-        .map(|room| room.dorm_beds.unwrap_or(5).max(1) as usize)
+        .map(|room| room.dorm_bed_count().max(1) as usize)
         .collect();
     let total_capacity: usize = capacities.iter().sum();
     let special_room_index = shift

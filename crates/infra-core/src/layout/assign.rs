@@ -11,7 +11,7 @@ mod run;
 mod team_fill;
 mod trade_fill;
 
-pub(crate) use control_fill::assign_control;
+pub(crate) use control_fill::assign_control_with_saileach;
 pub(crate) use manufacture_fill::assign_manu_room_with_anchors;
 pub(crate) use manufacture_fill::refill_manu_room_with_core;
 pub use power_fill::{assign_power_rooms, assign_power_stations};
@@ -22,7 +22,7 @@ pub(crate) use trade_fill::{
     beta_tailor_names, refill_trade_room_with_core, refill_witch_room_with_tailor,
 };
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind};
@@ -49,16 +49,22 @@ pub struct AssignBaseOptions {
     pub top_k: usize,
     pub mood: f64,
     pub shift_hours: f64,
+    /// Optional control-combination work budget for an explicit timed profile.
+    /// None preserves standalone and existing rotation selection policies.
+    pub control_work_hours: Option<f64>,
     /// 中枢分配时跳过 standalone_roster 白名单过滤（轮换编排中体系绑定干员可能不在白名单内）。
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
     pub system_preferences: std::collections::HashMap<String, String>,
+    /// ABC-only Plan retry: optional control candidates proven unable to cover their bound shifts.
+    pub skipped_optional_control_roles: HashSet<(String, String, String)>,
     /// 金单贸易站自然搜索的 role 首选顺序偏好（B 分支：巫恋组优先）。
     pub trade_role_preference: Option<TradeRolePreference>,
     /// 启用菲亚候选分支时，把 N/A/B 三份最终排班报告写入该目录（调试/对比用）。
     pub fiammetta_candidates_out: Option<std::path::PathBuf>,
     /// 菲亚梅塔主力回岗覆盖开关；`false` 时 ABC 排班不生成回岗动作。
     pub fiammetta_enable: bool,
+    pub support_combinations_enable: bool,
     /// Dynamic producer prefix comparator. The public baseline remains V0;
     /// shadow runs opt into V1 explicitly.
     pub dynamic_producer_policy: ScoringPolicyId,
@@ -71,11 +77,14 @@ impl Default for AssignBaseOptions {
             top_k: 20,
             mood: 24.0,
             shift_hours: 24.0,
+            control_work_hours: None,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
+            skipped_optional_control_roles: HashSet::new(),
             trade_role_preference: None,
             fiammetta_candidates_out: None,
             fiammetta_enable: true,
+            support_combinations_enable: false,
             dynamic_producer_policy: ScoringPolicyId::ControlInjectRawSumV0,
             trade_manufacture_weights: TradeManufactureEfficiencyWeights::default(),
         }
@@ -310,6 +319,33 @@ pub(crate) fn assign_shift_with_preclaimed_plan<F>(
 where
     F: FnMut(&mut AssignmentPlan) -> Result<()>,
 {
+    assign_shift_with_preclaimed_plan_inner(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        mode,
+        planning_seed,
+        execution_seed,
+        skip_system_ids,
+        &mut augment_plan,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assign_shift_with_preclaimed_plan_inner(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    mode: AssignShiftMode,
+    planning_seed: &BaseAssignment,
+    execution_seed: &BaseAssignment,
+    skip_system_ids: &HashSet<String>,
+    augment_plan: &mut dyn FnMut(&mut AssignmentPlan) -> Result<()>,
+) -> Result<AssignShiftResult> {
     blueprint.validate()?;
 
     let mut skip_system_ids = skip_system_ids.clone();
@@ -325,6 +361,8 @@ where
             table,
             options.mood,
             &options.system_preferences,
+            &options.skipped_optional_control_roles,
+            options.support_combinations_enable,
             mode,
             planning_seed,
             &skip_system_ids,
@@ -374,34 +412,31 @@ where
                 && reserve.reuse_policy
                     == crate::layout::orchestrate::ReserveReusePolicy::EveryEligibleHalf
         });
-        if !requires_final_pack_check {
-            let mut assignment = assignment;
-            annotate_assignment(blueprint, &mut assignment);
-            return Ok(AssignShiftResult { assignment, plan });
+        if requires_final_pack_check {
+            let mut validation_plan = plan.clone();
+            validation_plan.resolve_actual_producer_dependencies(
+                blueprint,
+                &assignment,
+                instances,
+                table,
+            )?;
+            if let Some(pack_key) = crate::layout::orchestrate::guarded_pack_violation(
+                blueprint,
+                &assignment,
+                &validation_plan,
+            )? {
+                if !disabled_conditional_packs.insert(pack_key.clone()) {
+                    return Err(Error::msg(format!(
+                        "conditional pack {pack_key} remained rotation-infeasible after final assignment downgrade"
+                    )));
+                }
+                continue;
+            }
         }
 
-        let mut validation_plan = plan.clone();
-        validation_plan.resolve_actual_producer_dependencies(
-            blueprint,
-            &assignment,
-            instances,
-            table,
-        )?;
-        let Some(pack_key) = crate::layout::orchestrate::guarded_pack_violation(
-            blueprint,
-            &assignment,
-            &validation_plan,
-        )?
-        else {
-            let mut assignment = assignment;
-            annotate_assignment(blueprint, &mut assignment);
-            return Ok(AssignShiftResult { assignment, plan });
-        };
-        if !disabled_conditional_packs.insert(pack_key.clone()) {
-            return Err(crate::error::Error::msg(format!(
-                "conditional pack {pack_key} remained rotation-infeasible after final assignment downgrade"
-            )));
-        }
+        let mut assignment = assignment;
+        annotate_assignment(blueprint, &mut assignment);
+        return Ok(AssignShiftResult { assignment, plan });
     }
 }
 
@@ -470,9 +505,7 @@ pub fn pinned_assignment_excluding(
 mod tests {
     use super::commit::{commit_manu_room, manu_hit_names};
     use super::manufacture_fill::{manufacture_candidate_pool_for_demand, pick_manu_hit};
-    use super::producer_fill::{
-        assign_sphinx_urrbian_dorm_anchor, cleanup_unused_sphinx_urrbian_dorm_anchor,
-    };
+    use super::producer_fill::cleanup_unused_sphinx_urrbian_dorm_anchor;
     use super::*;
     use crate::layout::resolve::resolve_base;
     use std::collections::HashSet;

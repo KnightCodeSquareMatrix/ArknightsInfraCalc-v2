@@ -285,7 +285,11 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     let bake_started = Instant::now();
-    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
+    let has_peer_reset = sub
+        .entries
+        .iter()
+        .any(|entry| manufacture_operator_resets_peers(&entry.to_manu_operator(), table));
+    let baked_report = if !has_peer_reset && options.bake_mode != crate::bake::BakeMode::Disabled {
         crate::bake::try_baked_manufacture_search(
             &sub,
             table,
@@ -401,12 +405,41 @@ pub(crate) fn manufacture_combo_allowed_for_shift(
     table: &SkillTable,
     shift_hours: Option<f64>,
 ) -> bool {
+    if !manufacture_peers_compatible(operators, table) {
+        return false;
+    }
     if !shift_hours.is_some_and(|hours| hours >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS) {
         return true;
     }
     !operators
         .iter()
         .any(|operator| manufacture_operator_has_mood_gap_decay(operator, table))
+}
+
+pub(crate) fn manufacture_peers_compatible(
+    operators: &[crate::manufacture::ManuOperator],
+    table: &SkillTable,
+) -> bool {
+    !operators
+        .iter()
+        .any(|operator| manufacture_operator_resets_peers(operator, table))
+        || operators.iter().all(|operator| {
+            operator.name == "清流" || manufacture_operator_resets_peers(operator, table)
+        })
+}
+
+fn manufacture_operator_resets_peers(
+    operator: &crate::manufacture::ManuOperator,
+    table: &SkillTable,
+) -> bool {
+    operator.buff_ids.iter().any(|buff_id| {
+        table.get(buff_id).is_some_and(|skill| {
+            skill.facility == "manufacture"
+                && skill.atoms.iter().any(|atom| {
+                    matches!(&atom.action, Action::PeerEffAbsorb { rate_per_peer } if *rate_per_peer == 0.0)
+                })
+        })
+    })
 }
 
 pub(crate) fn manufacture_operator_has_mood_gap_decay(
@@ -573,6 +606,9 @@ fn evaluate_manufacture_room_with_shift(
     recipe: RecipeKind,
     shift_hours: Option<f64>,
 ) -> Option<ManuSearchHit> {
+    if !manufacture_peers_compatible(&base.operators, table) {
+        return None;
+    }
     let names = base
         .operator_names()
         .into_iter()

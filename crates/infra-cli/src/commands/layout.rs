@@ -37,6 +37,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
         Some("eval") => layout_eval_cmd(&args[1..]),
         Some("team-rotation") => layout_team_rotation_cmd(&args[1..]),
         _ => {
+            eprintln!("       --enable-support-combinations: enable proactive attachment combinations (default off)");
             eprintln!(
                 "usage: infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [--prefer <system=alternative>] [-o <file.csv>] [--text] [--explain-systems]"
             );
@@ -47,7 +48,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
-                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-witch-1212|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Err(Error::msg(format!(
                 "unknown layout command {:?}",
@@ -173,6 +174,9 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
         top_k,
         system_preferences,
         fiammetta_enable,
+        support_combinations_enable: args
+            .iter()
+            .any(|arg| arg == "--enable-support-combinations"),
         fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
         ..AssignBaseOptions::default()
     };
@@ -278,6 +282,9 @@ fn layout_analyze_cmd(args: &[String]) -> Result<(), Error> {
         &layout_path.to_string_lossy(),
         &operbox_path.to_string_lossy(),
         &BoxProfileOptions {
+            support_combinations_enable: args
+                .iter()
+                .any(|arg| arg == "--enable-support-combinations"),
             top_k,
             baseline_operbox: Some(baseline_path),
             ..BoxProfileOptions::default()
@@ -335,6 +342,9 @@ fn layout_test_cmd(args: &[String]) -> Result<(), Error> {
     let options = AssignBaseOptions {
         top_k,
         system_preferences: system_preferences_from_args(args)?,
+        support_combinations_enable: args
+            .iter()
+            .any(|arg| arg == "--enable-support-combinations"),
         ..AssignBaseOptions::default()
     };
     let assignment = if let Some(path) = assignment_path_from_args(args) {

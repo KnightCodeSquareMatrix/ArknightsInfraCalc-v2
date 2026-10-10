@@ -1,12 +1,9 @@
 {
   "template": "243",
-  "drone_cap": 135,
+  "drone_cap": 235,
   "scenario": {
     "sui_facility_count": 2,
-    "dorm_occupant_count": 20,
-    "initial_global": {
-      "monster_cuisine": 3
-    }
+    "dorm_occupant_count": 20
   },
   "rooms": [
     { "id": "control", "kind": "control_center", "level": 3 },

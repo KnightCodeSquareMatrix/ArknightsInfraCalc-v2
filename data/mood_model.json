@@ -111,7 +111,6 @@
       { "name": "灰喉", "elite": 0 },
       { "name": "暴雨", "elite": 0 },
       { "name": "焰尾", "elite": 0 },
-      { "name": "三角初华", "elite": 2 },
       { "name": "玛恩纳", "elite": 0 },
       { "name": "冰酿", "elite": 0 },
       { "name": "薇薇安娜", "elite": 0 },
@@ -126,7 +125,7 @@
     {
       "id": "rainbow_six",
       "providers": ["灰烬", "战车", "闪击", "霜华"],
-      "members": ["灰烬", "战车", "闪击", "霜华"]
+      "members": ["灰烬", "战车", "闪击", "霜华", "艾拉", "医生", "双月", "导火索"]
     },
     {
       "id": "altered_operators",

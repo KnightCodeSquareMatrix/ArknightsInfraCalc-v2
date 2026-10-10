@@ -68,8 +68,8 @@ pub fn build_control_pool(
     build_roster_pool(roster, instances, table, |_| 0.0, try_entry)
 }
 
-/// Build the modeled control pool plus all legal skill-less fillers in stable name order.
-/// Search trims this tail after `used` filtering, so unavailable early names cannot starve fill.
+/// Build the modeled control pool plus genuine skill-less identities. A skipped
+/// unmodeled capability must not return with its buffs silently erased.
 pub fn build_control_pool_with_fillers(
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -80,6 +80,7 @@ pub fn build_control_pool_with_fillers(
         .entries
         .iter()
         .map(|entry| entry.name.clone())
+        .chain(pool.skipped.iter().map(|(name, _, _)| name.clone()))
         .collect();
     let roster = operbox.roster();
     let mut filler_names: Vec<_> = roster
@@ -92,19 +93,10 @@ pub fn build_control_pool_with_fillers(
         let Some(progress) = roster.progress(&name) else {
             continue;
         };
-        let tier = PromotionTier::from_progress(progress);
-        let tags = instances
-            .get(&name, tier)
-            .map(|instance| instance.tags.clone())
-            .unwrap_or_default();
-        pool.entries.push(ControlPoolEntry {
-            name,
-            elite: progress.elite,
-            progress,
-            buff_ids: Vec::new(),
-            tags,
-            tier: OperatorTier::Standalone,
-        });
+        match try_entry(&name, progress, instances, table) {
+            Ok(entry) => pool.entries.push(entry),
+            Err(reason) => pool.skipped.push((name, progress.elite, reason)),
+        }
     }
     Ok(pool)
 }
@@ -120,7 +112,6 @@ fn try_entry(
     table: &SkillTable,
 ) -> std::result::Result<ControlPoolEntry, PoolSkip> {
     let tier = PromotionTier::from_progress(progress);
-    let inst = instances.get(name, tier);
     let buff_ids = instances.resolve_control_buff_ids(name, tier);
     for bid in &buff_ids {
         let Some(skill) = table.get(bid) else {
@@ -131,7 +122,7 @@ fn try_entry(
         }
     }
 
-    let tags = inst.map(|i| i.tags.clone()).unwrap_or_default();
+    let tags = instances.tags_for(name, tier);
 
     Ok(ControlPoolEntry {
         name: name.to_string(),

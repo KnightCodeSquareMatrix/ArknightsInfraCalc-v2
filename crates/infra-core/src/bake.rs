@@ -1943,7 +1943,11 @@ pub fn try_baked_trade_search(
     if mode == BakeMode::Disabled {
         return Ok(None);
     }
-    if !filter.forbidden_pairs.is_empty() {
+    if filter
+        .forbidden_pairs
+        .iter()
+        .any(|(a, b)| !crate::search::is_global_trade_forbidden_pair(a, b))
+    {
         return baked_miss(mode, "trade forbidden-pair constraints are not represented");
     }
     if !baked_trade_compatible(pool, options, filter) {
@@ -1990,6 +1994,11 @@ pub fn try_baked_trade_search(
             .iter()
             .any(|name| !row.names.iter().any(|row_name| row_name == name))
         {
+            continue;
+        }
+        if filter.forbidden_pairs.iter().any(|(a, b)| {
+            row.names.iter().any(|name| name == a) && row.names.iter().any(|name| name == b)
+        }) {
             continue;
         }
         let hit = row_to_trade_hit(row);

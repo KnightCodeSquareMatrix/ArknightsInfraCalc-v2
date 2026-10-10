@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::layout::{BaseAssignment, BaseBlueprint, FacilityKind, RoomProduct};
 use crate::types::RecipeKind;
 
-use super::drain::{operator_net_drain, DrainInputs};
+use super::drain::{operator_net_drain_with_sui, DrainInputs};
 use super::{facility_key, MoodModel};
 
 const ABYSSAL_CONTROL_RECOVERY_BUFF: &str = "control_mp_aegir1[000]";
@@ -64,6 +64,51 @@ pub fn shift_eta_with_instances(
     instances: &crate::instances::OperatorInstances,
 ) -> ShiftEta {
     shift_eta_inner(model, blueprint, assignment, Some(instances))
+}
+
+/// ETA with optional operator-instance context. `None` skips instance-driven
+/// rules (sui / abyssal) and otherwise matches [`shift_eta_with_instances`].
+pub fn shift_eta_in_context(
+    model: &MoodModel,
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: Option<&crate::instances::OperatorInstances>,
+) -> ShiftEta {
+    shift_eta_inner(model, blueprint, assignment, instances)
+}
+
+impl ShiftEta {
+    /// Per-operator detail for `name` in `room_id`, if that operator works there.
+    pub fn operator_in_room(&self, name: &str, room_id: &str) -> Option<&OperatorEta> {
+        self.per_op
+            .iter()
+            .find(|op| op.name == name && op.room_id == room_id)
+    }
+}
+
+/// Rotation budget: an operator with `available_mood` may work `hours` at
+/// `drain_per_hour` and still sit at the rest threshold plus `reserve_drain`
+/// (mood consumed by a following shift) afterwards. Not clamped at the threshold.
+pub fn fits_shift_budget(
+    model: &MoodModel,
+    available_mood: f64,
+    drain_per_hour: f64,
+    hours: f64,
+    reserve_drain: f64,
+) -> bool {
+    available_mood + 1e-9 >= model.rest_threshold + drain_per_hour * hours + reserve_drain
+}
+
+/// Single-shift work budget: mood above the rest threshold (clamped at 0) must
+/// cover `drain_per_hour * hours`.
+pub fn fits_work_budget(
+    model: &MoodModel,
+    available_mood: f64,
+    drain_per_hour: f64,
+    hours: f64,
+) -> bool {
+    let budget = (available_mood - model.rest_threshold).max(0.0);
+    drain_per_hour * hours <= budget + 1e-9
 }
 
 fn shift_eta_inner(
@@ -146,7 +191,13 @@ fn shift_eta_inner(
                 control_ops: &control_ops,
                 recipe,
             };
-            let mut x = operator_net_drain(model, &inputs);
+            let sui_member = instances.is_some_and(|instances| {
+                instances
+                    .tags_for(&op.name, op.tier())
+                    .iter()
+                    .any(|tag| tag == "cc.g.sui")
+            });
+            let mut x = operator_net_drain_with_sui(model, &inputs, sui_member);
             if bp.kind == FacilityKind::ControlCenter {
                 if abyssal_control_recovery {
                     x -= 0.05;

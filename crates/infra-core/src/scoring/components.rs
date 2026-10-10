@@ -4,23 +4,18 @@ use crate::efficiency::Efficiency;
 
 use super::PolicyEvaluation;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 pub enum ScoringPolicyId {
     /// Current central-control fill policy: sort by the raw sum of trade and
     /// manufacture inject percentages.
     ///
     /// This is a local sorting heuristic for central-control candidates, not a
     /// trade/manufacture balance formula.
+    #[default]
     ControlInjectRawSumV0,
     /// Dynamic producer prefix policy: compare fully settled trade and
     /// manufacture efficiencies with explicit weights.
     TradeManufactureWeightedEfficiencyV1,
-}
-
-impl Default for ScoringPolicyId {
-    fn default() -> Self {
-        Self::ControlInjectRawSumV0
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Default)]

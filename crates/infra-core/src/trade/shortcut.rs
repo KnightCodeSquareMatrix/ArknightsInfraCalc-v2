@@ -9,6 +9,7 @@ use crate::error::Result;
 use crate::global_resource::GlobalInjectManifest;
 use crate::skill_table::data_path;
 use crate::skill_table::SkillTable;
+use crate::tier::PromotionTier;
 use crate::trade::input::{TradeOperator, TradeOrderKind};
 use crate::trade::order_mechanic::{GoldDistribution, OrderMechanicResult, SpecialOrderKind};
 use crate::types::Action;
@@ -438,7 +439,9 @@ pub fn is_penguin_texangel_e2_station(ops: &[TradeOperator], table: &SkillTable)
     ops.len() >= 3
         && room_has_named_buff(ops, "德克萨斯", TEX_MOQI_BUFF)
         && ops.iter().any(|o| o.name == "能天使")
-        && !ops.iter().any(|o| o.name == "蕾缪安" && o.elite >= 2)
+        && !ops
+            .iter()
+            .any(|o| o.name == "蕾缪安" && o.tier() == PromotionTier::TierUp)
         && !penguin_bond_excluded(ops, table)
 }
 
@@ -458,7 +461,9 @@ pub fn match_penguin_texangel_e2_shortcut(
 pub fn is_penguin_exusiai_lemuen_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.len() >= 3
         && ops.iter().any(|o| o.name == "能天使")
-        && ops.iter().any(|o| o.name == "蕾缪安" && o.elite >= 2)
+        && ops
+            .iter()
+            .any(|o| o.name == "蕾缪安" && o.tier() == PromotionTier::TierUp)
         && !penguin_bond_excluded(ops, table)
 }
 
@@ -515,7 +520,7 @@ pub fn match_docus_solo_shortcut(
 pub(crate) fn docus_operator_is_e2(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.iter()
         .find(|operator| has_docus_buff(operator, table))
-        .is_some_and(|operator| operator.elite >= 2)
+        .is_some_and(|operator| operator.tier() == PromotionTier::TierUp)
 }
 
 /// 叙拉古但书链段：委托 `trade/segment` 注册表（保留 API 供测试对照）。
@@ -576,8 +581,8 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
 
     let long = find_op(ops, "龙舌兰");
     // 龙舌兰是 5 星：精 0 / 精 1 都解析为运行时 tier_0，精 2 才是 tier_up。
-    let long_tier_up = long.is_some_and(|o| o.elite >= 2);
-    let long_tier_0 = long.is_some_and(|o| o.elite < 2);
+    let long_tier_up = long.is_some_and(|o| o.tier() == PromotionTier::TierUp);
+    let long_tier_0 = long.is_some_and(|o| o.tier() == PromotionTier::Tier0);
 
     let has_beta = ops
         .iter()
@@ -627,8 +632,10 @@ fn penguin_bond_excluded(ops: &[TradeOperator], table: &SkillTable) -> bool {
 }
 
 fn room_has_blackkey_perception(ops: &[TradeOperator], _table: &SkillTable) -> bool {
-    ops.iter()
-        .any(|op| op.elite >= 2 && op.buff_ids.iter().any(|b| b == BLACKKEY_PERCEPTION_BUFF))
+    ops.iter().any(|op| {
+        op.tier() == PromotionTier::TierUp
+            && op.buff_ids.iter().any(|b| b == BLACKKEY_PERCEPTION_BUFF)
+    })
 }
 
 fn room_has_pepe_exclusive(ops: &[TradeOperator], table: &SkillTable) -> bool {
@@ -689,7 +696,7 @@ fn find_op<'a>(ops: &'a [TradeOperator], name: &str) -> Option<&'a TradeOperator
 fn has_witch_e2(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.iter().any(|o| {
         o.name == "巫恋"
-            && o.elite >= 2
+            && o.tier() == PromotionTier::TierUp
             && o.buff_ids
                 .iter()
                 .any(|bid| has_witch_peer_absorb(bid, table))
@@ -782,7 +789,7 @@ fn has_blank_third(ops: &[TradeOperator], table: &SkillTable) -> bool {
 
 fn has_closure(ops: &[TradeOperator], table: &SkillTable) -> bool {
     ops.iter().any(|op| {
-        if op.elite < 2 {
+        if op.tier() == PromotionTier::Tier0 {
             return false;
         }
         op.buff_ids.iter().any(|bid| {

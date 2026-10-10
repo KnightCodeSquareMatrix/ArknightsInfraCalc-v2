@@ -283,7 +283,7 @@ fn pick_disjoint_trade_hit(
     top.into_iter()
         .chain(std::iter::once(best))
         .filter(|hit| trade_hit_names(hit).iter().all(|n| !used.contains(n)))
-        .max_by_key(|hit| role_pick_sort_key(hit))
+        .max_by_key(role_pick_sort_key)
         .ok_or_else(|| crate::error::Error::msg("no disjoint trade triple"))
 }
 

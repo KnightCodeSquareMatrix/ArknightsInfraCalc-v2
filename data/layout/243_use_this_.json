@@ -53,9 +53,9 @@
     { "id": "office_1", "kind": "office", "level": 3 },
     { "id": "workshop", "kind": "workshop", "level": 3 },
     { "id": "training", "kind": "training_room", "level": 3 },
-    { "id": "dorm_1", "kind": "dormitory", "level": 5, "dorm_beds": 5, "dorm_ambience_level": 5 },
-    { "id": "dorm_2", "kind": "dormitory", "level": 5, "dorm_beds": 5, "dorm_ambience_level": 5 },
-    { "id": "dorm_3", "kind": "dormitory", "level": 5, "dorm_beds": 5, "dorm_ambience_level": 5 },
-    { "id": "dorm_4", "kind": "dormitory", "level": 5, "dorm_beds": 5, "dorm_ambience_level": 5 }
+    { "id": "dorm_1", "kind": "dormitory", "level": 5, "dorm_beds": 5 },
+    { "id": "dorm_2", "kind": "dormitory", "level": 5, "dorm_beds": 5 },
+    { "id": "dorm_3", "kind": "dormitory", "level": 5, "dorm_beds": 5 },
+    { "id": "dorm_4", "kind": "dormitory", "level": 5, "dorm_beds": 5 }
   ]
 }

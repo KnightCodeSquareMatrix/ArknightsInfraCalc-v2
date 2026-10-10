@@ -45,7 +45,7 @@ pub fn apply_power_phases(ctx: &mut PowerContext, table: &SkillTable) {
         if !condition_met(&atom.condition, ctx, &owner) {
             continue;
         }
-        apply_atom(ctx, &atom, &owner);
+        apply_atom(ctx, atom, &owner);
     }
 }
 
@@ -150,13 +150,10 @@ fn resolve_selector_value(ctx: &PowerContext, selector: Option<&Selector>) -> f6
 }
 
 fn apply_state_write(ctx: &mut PowerContext, atom: &EffectAtom) {
-    match &atom.action {
-        Action::StateProduce { key, amount } => {
-            if let Some(sk) = StateKey::parse(key) {
-                *ctx.state_pool.entry(sk).or_insert(0.0) += amount;
-            }
+    if let Action::StateProduce { key, amount } = &atom.action {
+        if let Some(sk) = StateKey::parse(key) {
+            *ctx.state_pool.entry(sk).or_insert(0.0) += amount;
         }
-        _ => {}
     }
 }
 

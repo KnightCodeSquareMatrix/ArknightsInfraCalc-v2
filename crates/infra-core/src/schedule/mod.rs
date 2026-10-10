@@ -1,4 +1,6 @@
 mod base_rotation;
+pub(crate) mod control_rotation;
+mod cycle_mood;
 mod dorm_finalizer;
 mod shift_bind;
 mod team_rotation;

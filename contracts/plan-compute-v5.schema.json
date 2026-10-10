@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KnightCodeSquareMatrix/ArknightsInfraCalc-v2/contracts/plan-compute-v5.schema.json",
+  "title": "Arknights InfraCalc plan.compute parameters v5",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "layout", "operbox"],
+  "properties": {
+    "schema_version": { "const": 5 },
+    "layout": { "$ref": "#/$defs/base_blueprint" },
+    "operbox": { "type": "array", "minItems": 1, "maxItems": 1000, "items": { "$ref": "#/$defs/operbox_entry" } },
+    "labels": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "layout": { "$ref": "#/$defs/label" }, "operbox": { "$ref": "#/$defs/label" } },
+      "default": {}
+    },
+    "options": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "rotation": { "enum": ["abc_12_6_6", "abc_12_12_12", "main_backup_12_12", "main_backup_24_24", "fiammetta_witch_12_12", "fiammetta_8_8_4_4", "abyssal_7_5_7_5"], "default": "abc_12_6_6" },
+        "top": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+        "system_preferences": { "type": "object", "additionalProperties": { "type": "string" }, "default": {} },
+        "maa_title": { "type": ["string", "null"] },
+        "fiammetta_enable": { "type": "boolean", "default": true },
+        "support_combinations_enable": { "type": "boolean", "default": false },
+        "assert_invariants": { "type": "boolean", "default": false }
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "label": { "type": ["string", "null"], "pattern": "\\S", "x-maxUtf8Bytes": 200 },
+    "base_blueprint": {
+      "type": "object", "additionalProperties": false, "required": ["rooms"],
+      "properties": {
+        "template": { "type": ["string", "null"] },
+        "drone_cap": { "type": "integer", "minimum": 0, "maximum": 4294967295, "default": 135 },
+        "scenario": { "$ref": "#/$defs/blueprint_scenario", "default": {} },
+        "rooms": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/room_blueprint" } }
+      }
+    },
+    "blueprint_scenario": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "elite_facility_count": { "$ref": "#/$defs/nullable_u8" },
+        "sui_facility_count": { "$ref": "#/$defs/nullable_u8" },
+        "dorm_occupant_count": { "$ref": "#/$defs/nullable_u8" },
+        "base_workforce": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "initial_global": { "type": "object", "propertyNames": { "$ref": "#/$defs/global_resource_key" }, "additionalProperties": { "type": "number" }, "default": {} }
+      }
+    },
+    "room_blueprint": {
+      "type": "object", "additionalProperties": false, "required": ["id", "kind", "level"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["control_center", "trade_post", "factory", "power_plant", "dormitory", "office", "meeting_room", "training_room", "workshop"] },
+        "level": { "$ref": "#/$defs/u8" },
+        "product": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/trade_product" }, { "$ref": "#/$defs/factory_product" }] },
+        "dorm_beds": { "$ref": "#/$defs/nullable_u8" },
+        "dorm_ambience_level": { "$ref": "#/$defs/nullable_u8" }
+      }
+    },
+    "trade_product": {
+      "type": "object", "additionalProperties": false, "required": ["trade"],
+      "properties": { "trade": { "type": "object", "additionalProperties": false, "required": ["order"], "properties": { "order": { "enum": ["gold", "originium"] } } } }
+    },
+    "factory_product": {
+      "type": "object", "additionalProperties": false, "required": ["factory"],
+      "properties": { "factory": { "type": "object", "additionalProperties": false, "required": ["recipe"], "properties": { "recipe": { "enum": ["all", "battle_record", "gold", "originium"] } } } }
+    },
+    "operbox_entry": {
+      "type": "object", "additionalProperties": false, "required": ["id", "name", "elite", "level", "own", "potential", "rarity"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }, "name": { "type": "string", "minLength": 1 },
+        "elite": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "level": { "type": "integer", "minimum": 1, "maximum": 90 },
+        "own": { "type": "boolean" },
+        "potential": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "rarity": { "type": "integer", "minimum": 1, "maximum": 6 }
+      }
+    },
+    "u8": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "nullable_u8": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/u8" }] },
+    "global_resource_key": { "enum": ["matatabi", "perception", "virtual_power", "virtual_gold_lines", "human_fireworks", "silent_echo", "monster_cuisine", "dream", "musical_section", "memory_fragment", "witchcraft_crystal", "thought_chain_ring", "intelligence_reserve", "usaut_drink", "passion", "engineering_robot"] }
+  }
+}

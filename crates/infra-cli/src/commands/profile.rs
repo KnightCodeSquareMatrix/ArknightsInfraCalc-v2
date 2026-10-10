@@ -438,6 +438,9 @@ fn profile_analyze_compare_cmd(args: &[String]) -> Result<(), Error> {
     let layout_label = layout_path.to_string_lossy().into_owned();
     let operbox_label = operbox_path.to_string_lossy().into_owned();
     let options = BoxProfileOptions {
+        support_combinations_enable: args
+            .iter()
+            .any(|arg| arg == "--enable-support-combinations"),
         top_k: 10,
         ..BoxProfileOptions::default()
     };

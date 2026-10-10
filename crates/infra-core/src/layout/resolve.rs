@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::error::Result;
+use crate::global_resource::GlobalResourceKey;
 use crate::instances::OperatorInstances;
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId, RoomProduct};
@@ -143,8 +144,9 @@ fn resolve_base_core(
     instances: Option<&OperatorInstances>,
     table: Option<&SkillTable>,
     mood: f64,
-    durin_dorm_planning: Option<u8>,
+    _durin_dorm_planning: Option<u8>,
     trace_enabled: bool,
+    stop_before_control: bool,
 ) -> Result<ResolvedBaseCore> {
     blueprint.validate()?;
     let mut trace = ResolveTrace::default();
@@ -180,9 +182,6 @@ fn resolve_base_core(
     workforce.apply_to_layout(&mut layout);
     if let Some(instances) = instances {
         workforce.apply_cross_facility_stats(&mut layout, blueprint, Some(instances));
-    }
-    if let Some(count) = durin_dorm_planning {
-        layout.apply_durin_dorm_planning(count);
     }
     layout.gold_manu_line_count = blueprint.gold_manu_line_count();
     crate::profile::record_resolve_phase(
@@ -227,6 +226,13 @@ fn resolve_base_core(
             support_started.elapsed(),
         );
         let mechanics_started = Instant::now();
+        if stop_before_control {
+            return Ok(ResolvedBaseCore {
+                workforce,
+                layout,
+                trace,
+            });
+        }
         let control_ops: Vec<ControlOperator> = assignment
             .control_operators()
             .iter()
@@ -291,6 +297,29 @@ fn resolve_base_core(
 
     layout.global.run_conversions(&active_global_buffs);
 
+    if let Some(instances) = instances {
+        for room in blueprint.rooms_of(FacilityKind::TradePost) {
+            for operator in assignment.operators_in(&room.id) {
+                let buffs = instances.resolve_trade_buff_ids(&operator.name, operator.tier());
+                let amount = crate::trade::gold_flow::virtual_line_yield(
+                    &buffs,
+                    layout.gold_manu_line_count,
+                    layout.durin_virtual_lines(),
+                );
+                if amount > 0 {
+                    layout.trade_gold_line_sources.push((
+                        operator.name.clone(),
+                        amount,
+                        buffs.iter().any(|id| id == "trade_ord_line_durin[010]"),
+                    ));
+                    layout
+                        .global
+                        .add(GlobalResourceKey::VirtualGoldLines, amount as f64);
+                }
+            }
+        }
+    }
+
     Ok(ResolvedBaseCore {
         workforce,
         layout,
@@ -316,6 +345,7 @@ fn resolve_base_inner(
         mood,
         durin_dorm_planning,
         trace_enabled,
+        false,
     )?;
     let ResolvedBaseCore {
         workforce,
@@ -376,10 +406,35 @@ pub(crate) fn resolve_layout_snapshot(
         mood,
         durin_dorm_planning,
         false,
+        false,
     )
     .map(|core| core.layout);
     crate::profile::record_resolve(started.elapsed());
     result
+}
+
+/// The exact snapshot consumed by control settlement. A complete resolve is
+/// not interchangeable with this phase: post-control office projections may
+/// overwrite fields that the control conditions read.
+pub(crate) fn resolve_control_input_layout(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    mood: f64,
+    durin_dorm_planning: Option<u8>,
+) -> Result<LayoutContext> {
+    resolve_base_core(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        mood,
+        durin_dorm_planning,
+        false,
+        true,
+    )
+    .map(|core| core.layout)
 }
 
 fn support_office_hire_speed(
@@ -1504,12 +1559,13 @@ mod tests {
     }
 
     #[test]
-    fn senxi_uses_dorm_ambience_level_for_monster_cuisine() {
+    fn senxi_uses_dorm_level_despite_legacy_ambience() {
         let (instances, table) = pair();
         let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
         for room in &mut blueprint.rooms {
             if room.kind == FacilityKind::Dormitory {
-                room.dorm_ambience_level = Some(1);
+                room.level = 1;
+                room.dorm_ambience_level = Some(5);
             }
         }
         let mut assignment = BaseAssignment::default();
@@ -1533,7 +1589,7 @@ mod tests {
         let mut blueprint = BaseBlueprint::template_243_use_this().unwrap();
         for room in &mut blueprint.rooms {
             if room.kind == FacilityKind::Dormitory {
-                room.dorm_ambience_level = Some(1);
+                room.level = 1;
             }
         }
         let mut assignment = BaseAssignment::default();

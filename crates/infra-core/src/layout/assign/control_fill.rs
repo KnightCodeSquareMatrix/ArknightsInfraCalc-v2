@@ -5,10 +5,11 @@ use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{FacilityKind, RoomId};
 use crate::layout::context::LayoutContext;
-use crate::mood::MoodModel;
+use crate::mood::default_mood_model;
 use crate::pool::{try_filter_standalone, ControlPool};
 use crate::search::{
-    search_control_combos, ControlFillPolicy, ControlSearchOptions, MATATABI_CONSUMER_NAME,
+    search_control_combos_with_eligibility, ControlFillPolicy, ControlSearchOptions,
+    MATATABI_CONSUMER_NAME,
 };
 use crate::skill_table::SkillTable;
 
@@ -22,30 +23,6 @@ fn assignment_has_matatabi_consumer(assignment: &BaseAssignment) -> bool {
     })
 }
 
-pub(crate) fn assign_control(
-    assignment: &mut BaseAssignment,
-    pool: &ControlPool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    options: &AssignBaseOptions,
-    candidate_requirements: &[crate::layout::ControlCandidateRequirement],
-    excluded_control: &HashSet<String>,
-    used: &mut HashSet<String>,
-) -> Result<()> {
-    assign_control_with_saileach(
-        assignment,
-        pool,
-        table,
-        layout,
-        options,
-        candidate_requirements,
-        excluded_control,
-        None,
-        false,
-        used,
-    )
-}
-
 pub(crate) fn assign_control_with_saileach(
     assignment: &mut BaseAssignment,
     pool: &ControlPool,
@@ -56,6 +33,7 @@ pub(crate) fn assign_control_with_saileach(
     excluded_control: &HashSet<String>,
     saileach_best_office_pct: Option<f64>,
     saileach_required: bool,
+    eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
     used: &mut HashSet<String>,
 ) -> Result<()> {
     assign_control_inner(
@@ -69,38 +47,11 @@ pub(crate) fn assign_control_with_saileach(
         Some(excluded_control),
         saileach_best_office_pct,
         saileach_required,
+        eligibility,
         used,
     )?
     .then_some(())
     .ok_or_else(|| Error::msg("control: no legal fill combo"))
-}
-
-pub(crate) fn assign_control_matching_dynamic_set(
-    assignment: &mut BaseAssignment,
-    pool: &ControlPool,
-    table: &SkillTable,
-    layout: &LayoutContext,
-    options: &AssignBaseOptions,
-    candidate_requirements: &[crate::layout::ControlCandidateRequirement],
-    required_all: &HashSet<String>,
-    dynamic_excluded: &HashSet<String>,
-    excluded_control: &HashSet<String>,
-    used: &mut HashSet<String>,
-) -> Result<bool> {
-    assign_control_matching_dynamic_set_with_saileach(
-        assignment,
-        pool,
-        table,
-        layout,
-        options,
-        candidate_requirements,
-        required_all,
-        dynamic_excluded,
-        excluded_control,
-        None,
-        false,
-        used,
-    )
 }
 
 pub(crate) fn assign_control_matching_dynamic_set_with_saileach(
@@ -115,6 +66,7 @@ pub(crate) fn assign_control_matching_dynamic_set_with_saileach(
     excluded_control: &HashSet<String>,
     saileach_best_office_pct: Option<f64>,
     saileach_required: bool,
+    eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
     used: &mut HashSet<String>,
 ) -> Result<bool> {
     let excluded: HashSet<_> = dynamic_excluded.union(excluded_control).cloned().collect();
@@ -129,6 +81,7 @@ pub(crate) fn assign_control_matching_dynamic_set_with_saileach(
         Some(&excluded),
         saileach_best_office_pct,
         saileach_required,
+        eligibility,
         used,
     )
 }
@@ -145,6 +98,7 @@ fn assign_control_inner(
     excluded: Option<&HashSet<String>>,
     saileach_best_office_pct: Option<f64>,
     saileach_required: bool,
+    eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
     used: &mut HashSet<String>,
 ) -> Result<bool> {
     const MAX_CONTROL: usize = 5;
@@ -168,7 +122,7 @@ fn assign_control_inner(
                     })
             })
             .collect::<Result<Vec<_>>>()?;
-        let mood_model = MoodModel::load_default()?;
+        let mood_model = default_mood_model()?;
         let control_operators = operators
             .iter()
             .map(|operator| (operator.name.clone(), operator.elite))
@@ -186,10 +140,24 @@ fn assign_control_inner(
                 "control: pinned operators contain conflicting EffectKey sources",
             ));
         }
-        return Ok(required_all.is_none_or(|required| required.is_subset(&pinned)));
+        let names: Vec<_> = pinned.iter().cloned().collect();
+        return Ok(pinned.len() == MAX_CONTROL
+            && required_all.is_none_or(|required| required.is_subset(&pinned))
+            && candidate_requirements.iter().all(|group| {
+                pinned
+                    .iter()
+                    .filter(|name| group.candidates.contains(name))
+                    .count()
+                    >= usize::from(group.min_count)
+            })
+            && excluded.is_none_or(|excluded| pinned.is_disjoint(excluded))
+            && eligibility.is_none_or(|accept| accept(&names)));
     }
     if pool.entries.is_empty() {
-        return Ok(required_all.is_none_or(HashSet::is_empty));
+        return Ok(required_all.is_none_or(HashSet::is_empty)
+            && candidate_requirements
+                .iter()
+                .all(|group| group.min_count == 0));
     }
     let requirements: Vec<(HashSet<String>, u8)> = candidate_requirements
         .iter()
@@ -237,13 +205,21 @@ fn assign_control_inner(
         excluded.unwrap_or(&empty_excluded),
     )?;
 
-    let combos = search_control_combos(&filtered_pool, table, &control_opts)?;
+    let combos =
+        search_control_combos_with_eligibility(&filtered_pool, table, &control_opts, eligibility)?;
     let Some(hit) = pick_control_extending_pins(combos, &must_include, used, &|h| &h.names) else {
         if required_all.is_some() {
             return Ok(false);
         }
         return Err(Error::msg(
-            "control: no combo extending pins after pool filter",
+            format!(
+                "control: NO_CANDIDATE_UNDER_POLICY LayeredFill; no combo extending pins after pool filter; pinned={:?} must_include={:?} pool={} filtered={} requirements={:?}",
+                pinned,
+                must_include,
+                pool.entries.len(),
+                filtered_pool.entries.len(),
+                candidate_requirements.iter().map(|group| (&group.candidates, group.min_count)).collect::<Vec<_>>(),
+            ),
         ));
     };
     let skillless_fallback_names: Vec<String> = hit

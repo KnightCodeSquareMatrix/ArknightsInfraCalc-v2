@@ -30,6 +30,9 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         .unwrap_or(20);
     let system_preferences = system_preferences_from_args(args)?;
     let fiammetta_enable = !args.iter().any(|arg| arg == "--no-fiammetta");
+    let support_combinations_enable = args
+        .iter()
+        .any(|arg| arg == "--enable-support-combinations");
     let assert_invariants = args.iter().any(|arg| arg == "--assert-invariants");
     let layout_label = layout_path.to_string_lossy().into_owned();
     let operbox_label = operbox_path.to_string_lossy().into_owned();
@@ -82,6 +85,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             maa_title,
             fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
             fiammetta_enable,
+            support_combinations_enable,
             assert_invariants,
         },
         RequestedOutputs {
@@ -113,6 +117,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             top_k,
             system_preferences: system_preferences.clone(),
             fiammetta_enable,
+            support_combinations_enable,
             ..AssignBaseOptions::default()
         };
         let stage_started = Instant::now();
