@@ -21,6 +21,22 @@
           },
           "phase": "limit",
           "phase_order": 40
+        },
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "德克萨斯"
+            }
+          },
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
         }
       ]
     },
@@ -237,6 +253,22 @@
           },
           "phase": "limit",
           "phase_order": 40
+        },
+        {
+          "condition": {
+            "partner_in_room": {
+              "name": "德克萨斯"
+            }
+          },
+          "action": {
+            "kind": "mood_drain_delta",
+            "params": {
+              "delta": -0.1,
+              "scope": "self"
+            }
+          },
+          "phase": "mood",
+          "phase_order": 10
         }
       ]
     },
