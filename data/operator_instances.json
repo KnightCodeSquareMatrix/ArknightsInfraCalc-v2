@@ -1448,9 +1448,9 @@
       "tier": "tier_0",
       "tags": [],
       "facilities": {
-        "manufacture": {
+        "trade": {
           "buff_ids": [
-            "manu_prod_spd[000]"
+            "trade_ord_spd[001]"
           ],
           "stepwise": false
         }
