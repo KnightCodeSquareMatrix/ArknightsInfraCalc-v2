@@ -712,6 +712,21 @@
         }
       }
     },
+    "凛冬@tier_0": {
+      "name": "凛冬",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[013]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
     "凛冬@tier_up": {
       "name": "凛冬",
       "tier": "tier_up",
@@ -1715,6 +1730,21 @@
         }
       }
     },
+    "安哲拉@tier_0": {
+      "name": "安哲拉",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
     "安哲拉@tier_up": {
       "name": "安哲拉",
       "tier": "tier_up",
@@ -1943,6 +1973,19 @@
         }
       }
     },
+    "巫恋@tier_0": {
+      "name": "巫恋",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
     "巫恋@tier_up": {
       "name": "巫恋",
       "tier": "tier_up",
@@ -2011,6 +2054,21 @@
           "buff_ids": [
             "manu_formula_spd[000]",
             "manu_prod_limit&cost[003]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
+    "幽灵鲨@tier_0": {
+      "name": "幽灵鲨",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
           ],
           "stepwise": true
         }
@@ -2390,6 +2448,21 @@
         }
       }
     },
+    "推进之王@tier_0": {
+      "name": "推进之王",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_all[013]"
+          ],
+          "stepwise": true
+        }
+      }
+    },
     "推进之王@tier_up": {
       "name": "推进之王",
       "tier": "tier_up",
@@ -2543,6 +2616,21 @@
             "manu_formula_spd[020]"
           ],
           "stepwise": false
+        }
+      }
+    },
+    "斯卡蒂@tier_0": {
+      "name": "斯卡蒂",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.abyssal"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": true
         }
       }
     },
@@ -2951,6 +3039,19 @@
             "manu_prod_spd[010]"
           ],
           "stepwise": false
+        }
+      }
+    },
+    "柏喙@tier_0": {
+      "name": "柏喙",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]"
+          ],
+          "stepwise": true
         }
       }
     },
