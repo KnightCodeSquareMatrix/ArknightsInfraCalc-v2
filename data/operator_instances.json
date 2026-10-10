@@ -1280,6 +1280,12 @@
             "dorm_rec_all[000]"
           ],
           "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[000]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -2722,6 +2728,12 @@
         "control": {
           "buff_ids": [
             "control_tra_spd[020]"
+          ],
+          "stepwise": false
+        },
+        "trade": {
+          "buff_ids": [
+            "trade_ord_wt&cost[000]"
           ],
           "stepwise": false
         }
