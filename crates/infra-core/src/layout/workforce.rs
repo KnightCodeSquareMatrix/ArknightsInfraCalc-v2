@@ -25,11 +25,8 @@ fn operators_for_facility_stat(
 /// 游戏术语「精英干员」：迷迭香、煌、逻各斯、烛煌、电弧、真言（非精英化练度）。
 pub const TAG_ELITE_OPERATOR: &str = "cc.g.elite_op";
 
-const ELITE_OPERATOR_NAMES: &[&str] = &["迷迭香", "煌", "逻各斯", "烛煌", "电弧", "真言"];
-
-/// 游戏内作业平台（机器人）干员名。
-const PLATFORM_OPERATOR_NAMES: &[&str] =
-    &["Lancet-2", "Castle-3", "PhonoR-0", "THRM-EX", "正义骑士号"];
+/// 游戏内作业平台（机器人）干员。
+pub const TAG_PLATFORM_OPERATOR: &str = "cc.g.platform";
 
 const TAG_LATERANO: &str = "cc.g.laterano";
 pub const TAG_RHINE: &str = "cc.g.rhine";
@@ -122,7 +119,7 @@ impl WorkforceIndex {
                     });
                     // 显式 0 心情的 Lancet-2 仍在发电站、可触发中枢森蚺，
                     // 但不作为“其他发电站作业平台”阻断晨曦。
-                    if is_platform_operator(&op.name) && op.work_mood != Some(0) {
+                    if is_platform_operator(instances, &op.name) && op.work_mood != Some(0) {
                         platform_rooms.push(room.id.clone());
                     }
                 }
@@ -214,12 +211,17 @@ impl WorkforceIndex {
         self.platform_rooms.iter().any(|id| id != excluding_room)
     }
 
-    pub fn other_platform_in_power(&self, viewing_room: &RoomId, viewing_name: &str) -> bool {
-        if is_platform_operator(viewing_name) {
+    pub fn other_platform_in_power(
+        &self,
+        instances: Option<&OperatorInstances>,
+        viewing_room: &RoomId,
+        viewing_name: &str,
+    ) -> bool {
+        if is_platform_operator(instances, viewing_name) {
             return false;
         }
         self.power_stations.iter().any(|entry| {
-            entry.room_id != *viewing_room && is_platform_operator(&entry.operator.name)
+            entry.room_id != *viewing_room && is_platform_operator(instances, &entry.operator.name)
         })
     }
 
@@ -333,34 +335,34 @@ impl WorkforceIndex {
         crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
         let mut layout = base.clone();
         layout.other_power_has_platform = self.other_power_has_platform(room_id);
-        layout.other_platform_in_power = self.other_platform_in_power(room_id, operator_name);
+        layout.other_platform_in_power =
+            self.other_platform_in_power(instances, room_id, operator_name);
         layout.other_laterano_in_power =
             self.other_laterano_in_power(instances, room_id, operator_name);
         layout
     }
 }
 
-pub fn is_platform_operator(name: &str) -> bool {
-    PLATFORM_OPERATOR_NAMES.contains(&name)
+pub fn is_platform_operator(instances: Option<&OperatorInstances>, name: &str) -> bool {
+    name_has_tag(instances, name, TAG_PLATFORM_OPERATOR)
 }
 
 pub fn is_elite_operator(instances: Option<&OperatorInstances>, op: &AssignedOperator) -> bool {
-    if operator_has_tag(instances, op, TAG_ELITE_OPERATOR) {
-        return true;
-    }
-    if let Some(instances) = instances {
-        for tier in [
-            crate::tier::PromotionTier::Tier0,
-            crate::tier::PromotionTier::TierUp,
-        ] {
-            if let Some(inst) = instances.get(&op.name, tier) {
-                if inst.tags.iter().any(|t| t == TAG_ELITE_OPERATOR) {
-                    return true;
-                }
-            }
-        }
-    }
-    ELITE_OPERATOR_NAMES.contains(&op.name.as_str())
+    name_has_tag(instances, &op.name, TAG_ELITE_OPERATOR)
+}
+
+/// 任一档位的实例带该 tag 即成立（身份类 tag 与练度无关）。
+fn name_has_tag(instances: Option<&OperatorInstances>, name: &str, tag: &str) -> bool {
+    let Some(instances) = instances else {
+        return false;
+    };
+    [
+        crate::tier::PromotionTier::Tier0,
+        crate::tier::PromotionTier::TierUp,
+    ]
+    .into_iter()
+    .filter_map(|tier| instances.get(name, tier))
+    .any(|inst| inst.tags.iter().any(|t| t == tag))
 }
 
 fn operator_has_tag(

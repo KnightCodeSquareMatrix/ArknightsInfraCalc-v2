@@ -31,7 +31,9 @@
     "Castle-3@tier_0": {
       "name": "Castle-3",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -44,7 +46,9 @@
     "Castle-3@tier_up": {
       "name": "Castle-3",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -117,7 +121,9 @@
     "Lancet-2@tier_0": {
       "name": "Lancet-2",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -130,7 +136,9 @@
     "Lancet-2@tier_up": {
       "name": "Lancet-2",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -203,7 +211,9 @@
     "PhonoR-0@tier_0": {
       "name": "PhonoR-0",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -216,7 +226,9 @@
     "PhonoR-0@tier_up": {
       "name": "PhonoR-0",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -230,7 +242,9 @@
     "THRM-EX@tier_0": {
       "name": "THRM-EX",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -243,7 +257,9 @@
     "THRM-EX@tier_up": {
       "name": "THRM-EX",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -873,7 +889,9 @@
     "医生@tier_up": {
       "name": "医生",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -1907,7 +1925,9 @@
     "导火索@tier_up": {
       "name": "导火索",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.rainbow"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3306,7 +3326,9 @@
     "正义骑士号@tier_0": {
       "name": "正义骑士号",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -3319,7 +3341,9 @@
     "正义骑士号@tier_up": {
       "name": "正义骑士号",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -8112,6 +8136,38 @@
           "stepwise": false
         }
       }
+    },
+    "逻各斯@tier_0": {
+      "name": "逻各斯",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.elite_op"
+      ],
+      "facilities": {}
+    },
+    "双月@tier_0": {
+      "name": "双月",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.rainbow"
+      ],
+      "facilities": {}
+    },
+    "逻各斯@tier_up": {
+      "name": "逻各斯",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.elite_op"
+      ],
+      "facilities": {}
+    },
+    "双月@tier_up": {
+      "name": "双月",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.rainbow"
+      ],
+      "facilities": {}
     }
   }
 }
