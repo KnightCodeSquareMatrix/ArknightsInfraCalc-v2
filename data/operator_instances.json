@@ -1202,6 +1202,19 @@
         }
       }
     },
+    "和弦@tier_0": {
+      "name": "和弦",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "和弦@tier_up": {
       "name": "和弦",
       "tier": "tier_up",
@@ -1718,6 +1731,19 @@
         }
       }
     },
+    "安德切尔@tier_0": {
+      "name": "安德切尔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "安德切尔@tier_up": {
       "name": "安德切尔",
       "tier": "tier_up",
@@ -1758,6 +1784,19 @@
         "trade": {
           "buff_ids": [
             "trade_ord_spd[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "安赛尔@tier_0": {
+      "name": "安赛尔",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
           ],
           "stepwise": false
         }
@@ -1915,6 +1954,19 @@
             "trade_ord_wt&cost[000]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "布丁@tier_0": {
+      "name": "布丁",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[010]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -2106,6 +2158,19 @@
             "manu_formula_spd&bd[001]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "慕斯@tier_0": {
+      "name": "慕斯",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[001]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -2835,6 +2900,19 @@
         }
       }
     },
+    "杰克@tier_0": {
+      "name": "杰克",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single&oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "杰克@tier_up": {
       "name": "杰克",
       "tier": "tier_up",
@@ -3474,6 +3552,21 @@
         }
       }
     },
+    "涤火杰西卡@tier_0": {
+      "name": "涤火杰西卡",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.blacksteel"
+      ],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "涤火杰西卡@tier_up": {
       "name": "涤火杰西卡",
       "tier": "tier_up",
@@ -3531,6 +3624,19 @@
             "trade_ord_spd_ext[001]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "深海色@tier_0": {
+      "name": "深海色",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -4325,6 +4431,19 @@
             "manu_prod_spd[014]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "玫兰莎@tier_0": {
+      "name": "玫兰莎",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[010]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -5204,6 +5323,21 @@
         }
       }
     },
+    "芙蓉@tier_0": {
+      "name": "芙蓉",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.a1"
+      ],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_single[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "芙蓉@tier_up": {
       "name": "芙蓉",
       "tier": "tier_up",
@@ -5263,6 +5397,19 @@
         "dorm": {
           "buff_ids": [
             "dorm_rec_oneself2[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "苇草@tier_0": {
+      "name": "苇草",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
           ],
           "stepwise": false
         }
@@ -5927,6 +6074,19 @@
             "dorm_rec_bd_n1_n3[000]"
           ],
           "stepwise": true
+        }
+      }
+    },
+    "远山@tier_0": {
+      "name": "远山",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&limit[010]"
+          ],
+          "stepwise": false
         }
       }
     },
@@ -6730,6 +6890,19 @@
         }
       }
     },
+    "霜叶@tier_0": {
+      "name": "霜叶",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "dorm": {
+          "buff_ids": [
+            "dorm_rec_oneself[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "霜叶@tier_up": {
       "name": "霜叶",
       "tier": "tier_up",
@@ -6772,6 +6945,19 @@
             "dorm_rec_all&oneself[021]"
           ],
           "stepwise": false
+        }
+      }
+    },
+    "风絮@tier_0": {
+      "name": "风絮",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd[000]"
+          ],
+          "stepwise": true
         }
       }
     },
