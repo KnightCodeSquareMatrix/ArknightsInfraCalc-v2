@@ -4541,34 +4541,13 @@ fn assert_final_rotation_invariants_with_mood(
                 shift.index + 1
             )));
         }
-        let mut seen = HashSet::new();
-        for room in shift.assignment.iter_rooms() {
-            let capacity = blueprint
-                .room(&room.room_id)
-                .and_then(|spec| {
-                    (spec.kind == FacilityKind::Dormitory).then_some(spec.dorm_bed_count())
-                })
-                .unwrap_or(u8::MAX) as usize;
-            if room.operators.len() > capacity {
-                return Err(Error::msg(format!(
-                    "assert-invariants dorm_capacity failed in shift {} room {}",
-                    shift.index + 1,
-                    room.room_id.0
-                )));
-            }
-            for operator in &room.operators {
-                if !seen.insert(operator.name.clone()) {
-                    return Err(Error::msg(format!(
-                        "assert-invariants operator_unique failed in shift {}: {}",
-                        shift.index + 1,
-                        operator.name
-                    )));
-                }
-            }
-        }
-        // 诊断模式：结构检查的统一入口，先只记录不失败，全部 box-bundles 清零后再升级为断言。
-        for violation in shift.assignment.structural_violations(blueprint) {
-            eprintln!("[structural] shift {} {violation}", shift.index + 1);
+        let violations = shift.assignment.structural_violations(blueprint);
+        if !violations.is_empty() {
+            return Err(Error::msg(format!(
+                "assert-invariants structural failed in shift {}: {}",
+                shift.index + 1,
+                violations.join("; ")
+            )));
         }
         let durin_count = assert_gold_flow_final_state(blueprint, shift, instances, table)?;
         if let Some(room_count) = gold_flow_split {
