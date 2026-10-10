@@ -2,6 +2,7 @@ pub mod efficiency;
 pub mod gold_flow;
 pub mod input;
 pub mod interpreter;
+pub mod legality;
 pub mod order_mechanic;
 pub mod segment;
 pub mod shortcut;

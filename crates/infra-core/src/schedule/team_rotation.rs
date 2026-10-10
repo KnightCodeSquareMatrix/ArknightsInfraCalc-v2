@@ -41,6 +41,7 @@ use crate::search::{
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput};
+use crate::trade::legality::witch_core_station_ok;
 use crate::trade::shortcut::match_witch_group_shortcut;
 
 use super::base_rotation::{
@@ -3138,7 +3139,7 @@ fn apply_single_core_fiammetta_rotation_legacy(
                 shift.assignment.iter_rooms().any(|room| {
                     blueprint.room(&room.room_id).is_some_and(|blueprint_room| {
                         blueprint_room.kind == FacilityKind::TradePost
-                            && blueprint_room.level == 3
+                            && witch_core_station_ok(blueprint_room)
                             && room
                                 .operators
                                 .iter()
@@ -5501,7 +5502,7 @@ fn fiammetta_b_eligible(
     let room_exists = blueprint
         .rooms
         .iter()
-        .any(|room| room.kind == FacilityKind::TradePost && room.level == 3);
+        .any(|room| room.kind == FacilityKind::TradePost && witch_core_station_ok(room));
     if !room_exists {
         return Ok(false);
     }

@@ -20,11 +20,13 @@ use crate::types::Action;
 use super::commit::{commit_trade_room, pick_disjoint_from_report, trade_hit_names};
 use super::{AssignBaseOptions, TradeRolePreference};
 
-const WITCH_TRADE_NAME: &str = "巫恋";
-const BLACKKEY_NAME: &str = "黑键";
+use crate::trade::legality::{
+    names_have_global_forbidden_pair, witch_core_station_ok, PLAIN_FORBIDDEN_TRADE_PAIRS,
+    TEQUILA_NAME as TEQUILA_TRADE_NAME, WITCH_NAME as WITCH_TRADE_NAME,
+};
+
 const DOCUS_TRADE_NAME: &str = "但书";
 const CLOSURE_TRADE_NAME: &str = "可露希尔";
-const TEQUILA_TRADE_NAME: &str = "龙舌兰";
 const GOLD_ORDER_CORE_NAMES: [&str; 4] = [
     DOCUS_TRADE_NAME,
     CLOSURE_TRADE_NAME,
@@ -53,8 +55,12 @@ pub fn blackkey_witch_same_trade_room(
         .iter()
         .filter(|r| r.kind == FacilityKind::TradePost)
         .any(|r| {
-            trade_room_has_operator(assignment, &r.id, BLACKKEY_NAME)
-                && trade_room_has_operator(assignment, &r.id, WITCH_TRADE_NAME)
+            names_have_global_forbidden_pair(
+                assignment
+                    .operators_in(&r.id)
+                    .iter()
+                    .map(|o| o.name.as_str()),
+            )
         })
 }
 
@@ -231,10 +237,7 @@ pub(crate) fn refill_witch_room_with_tailor(
     let room = blueprint
         .room(room_id)
         .ok_or_else(|| Error::msg(format!("Witch trade room {} disappeared", room_id.0)))?;
-    if room.kind != FacilityKind::TradePost
-        || room.level != 3
-        || trade_order_from_room(room)? != TradeOrderKind::Gold
-    {
+    if room.kind != FacilityKind::TradePost || !witch_core_station_ok(room) {
         return Err(Error::msg(
             "Fiammetta Witch group requires a level-3 gold trade room",
         ));
@@ -626,10 +629,10 @@ pub(super) fn pick_trade_meta_then_plain(
             return Ok(hit);
         }
     }
-    let mut plain_forbidden_pairs: Vec<(String, String)> = Vec::new();
-    if room_level <= 3 {
-        plain_forbidden_pairs.push((WITCH_TRADE_NAME.to_string(), TEQUILA_TRADE_NAME.to_string()));
-    }
+    let plain_forbidden_pairs: Vec<(String, String)> = PLAIN_FORBIDDEN_TRADE_PAIRS
+        .iter()
+        .map(|&(a, b)| (a.to_string(), b.to_string()))
+        .collect();
     let mut plain_used = used.clone();
     if order == TradeOrderKind::Originium {
         plain_used.extend(GOLD_ORDER_CORE_NAMES.map(str::to_string));

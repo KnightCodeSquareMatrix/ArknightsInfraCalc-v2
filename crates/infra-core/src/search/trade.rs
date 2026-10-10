@@ -154,9 +154,7 @@ pub struct SearchTripleFilter {
     pub forbidden_pairs: Vec<(String, String)>,
 }
 
-pub(crate) fn is_global_trade_forbidden_pair(a: &str, b: &str) -> bool {
-    matches!((a, b), ("黑键", "巫恋") | ("巫恋", "黑键"))
-}
+pub(crate) use crate::trade::legality::is_global_trade_forbidden_pair;
 
 impl SearchTripleFilter {
     pub fn must_include_names(&self) -> Vec<String> {
@@ -268,9 +266,11 @@ fn search_trade_single_order(
         .iter()
         .any(|(a, b)| is_global_trade_forbidden_pair(a, b))
     {
-        filter
-            .forbidden_pairs
-            .push(("黑键".to_string(), "巫恋".to_string()));
+        filter.forbidden_pairs.extend(
+            crate::trade::legality::GLOBAL_FORBIDDEN_TRADE_PAIRS
+                .iter()
+                .map(|&(a, b)| (a.to_string(), b.to_string())),
+        );
     }
     let sub = trade_search_pool_for_order(pool, order_kind, options, &filter);
     let n = sub.entries.len();
