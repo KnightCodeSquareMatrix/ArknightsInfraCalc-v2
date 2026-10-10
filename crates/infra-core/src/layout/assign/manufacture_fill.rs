@@ -268,11 +268,7 @@ pub(crate) fn refill_manu_room_with_core(
     else {
         return Err(Error::msg("Fiammetta manufacture target is not a factory"));
     };
-    for assigned_room in &mut assignment.rooms {
-        assigned_room
-            .operators
-            .retain(|operator| operator.name != core);
-    }
+    assignment.remove_operators_where(|_, operator| operator.name == core);
     assignment.set_room(room_id.clone(), Vec::new());
     let used = assignment.operator_names();
     let layout = crate::layout::resolve_base(

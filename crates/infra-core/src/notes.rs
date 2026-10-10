@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::layout::{BaseAssignment, BaseBlueprint};
+use crate::layout::{BaseAssignment, BaseBlueprint, RoomId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Note {
@@ -19,26 +19,26 @@ pub(crate) fn annotate_assignment(_blueprint: &BaseBlueprint, assignment: &mut B
         .note_facts
         .control_skillless_fallback_names
         .clone();
-    for room in &mut assignment.rooms {
-        room.notes.clear();
-    }
+    assignment.clear_room_notes();
 
-    if let Some(control) = assignment
-        .rooms
-        .iter_mut()
-        .find(|room| room.room_id.0 == "control")
-    {
-        if control.operators.len() == 5
-            && !fallback_names.is_empty()
-            && fallback_names
-                .iter()
-                .all(|name| control.operators.iter().any(|op| &op.name == name))
-        {
-            control.notes.push(Note {
+    let control_id = RoomId("control".to_string());
+    let needs_fallback_note = assignment
+        .room_assignment(&control_id)
+        .is_some_and(|control| {
+            control.operators.len() == 5
+                && !fallback_names.is_empty()
+                && fallback_names
+                    .iter()
+                    .all(|name| control.operators.iter().any(|op| &op.name == name))
+        });
+    if needs_fallback_note {
+        assignment.push_room_note(
+            &control_id,
+            Note {
                 code: "control_skillless_fallback".to_string(),
                 text: "中枢使用了没有中枢技能的普通干员补位，以保持岗位满编。".to_string(),
-            });
-        }
+            },
+        );
     }
 }
 

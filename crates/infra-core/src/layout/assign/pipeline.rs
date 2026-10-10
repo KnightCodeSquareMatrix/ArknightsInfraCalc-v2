@@ -409,13 +409,11 @@ fn clear_production_rooms(
     if filled.is_empty() {
         return;
     }
-    for room in &mut assignment.rooms {
-        if blueprint.room(&room.room_id).is_some_and(|spec| {
+    assignment.remove_operators_where(|room_id, _| {
+        blueprint.room(room_id).is_some_and(|spec| {
             matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
-        }) {
-            room.operators.clear();
-        }
-    }
+        })
+    });
     used.retain(|name| !filled.contains(name));
 }
 

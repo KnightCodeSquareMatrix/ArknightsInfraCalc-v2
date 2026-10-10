@@ -278,6 +278,67 @@ impl BaseAssignment {
         self.set_room(room_id, vec![op]);
     }
 
+    /// 整房移除：房间条目连同成员、效率、备注一起消失。
+    pub fn remove_room(&mut self, room_id: &str) {
+        self.rooms.retain(|room| room.room_id.0 != room_id);
+    }
+
+    /// 清掉某房间缓存的效率快照，成员不变。
+    pub fn clear_room_efficiency(&mut self, room_id: &RoomId) {
+        if let Some(room) = self.rooms.iter_mut().find(|room| &room.room_id == room_id) {
+            room.efficiency = None;
+        }
+    }
+
+    /// 清空全部房间的备注；备注只用于展示，不参与任何排班判断。
+    pub fn clear_room_notes(&mut self) {
+        for room in &mut self.rooms {
+            room.notes.clear();
+        }
+    }
+
+    /// 给指定房间追加一条备注；房间不存在时不创建。
+    pub fn push_room_note(&mut self, room_id: &RoomId, note: Note) {
+        if let Some(room) = self.rooms.iter_mut().find(|room| &room.room_id == room_id) {
+            room.notes.push(note);
+        }
+    }
+
+    /// 把满足条件的干员从所有房间移出，返回被移出的人数。
+    /// 房间条目即使变空也保留，与此前各调用点 `retain` 的行为一致。
+    pub fn remove_operators_where(
+        &mut self,
+        mut remove: impl FnMut(&RoomId, &AssignedOperator) -> bool,
+    ) -> usize {
+        let mut removed = 0;
+        for room in &mut self.rooms {
+            let before = room.operators.len();
+            let room_id = &room.room_id;
+            room.operators.retain(|operator| !remove(room_id, operator));
+            removed += before - room.operators.len();
+        }
+        removed
+    }
+
+    /// 交换两个房间的成员与效率快照，房间条目顺序不变；任一房间不存在返回 false。
+    pub fn swap_room_contents(&mut self, a: &RoomId, b: &RoomId) -> bool {
+        let Some(ai) = self.rooms.iter().position(|room| &room.room_id == a) else {
+            return false;
+        };
+        let Some(bi) = self.rooms.iter().position(|room| &room.room_id == b) else {
+            return false;
+        };
+        if ai == bi {
+            return true;
+        }
+        let (low, high) = if ai < bi { (ai, bi) } else { (bi, ai) };
+        let (head, tail) = self.rooms.split_at_mut(high);
+        let (left, right) = (&mut head[low], &mut tail[0]);
+        std::mem::swap(&mut left.operators, &mut right.operators);
+        std::mem::swap(&mut left.efficiency, &mut right.efficiency);
+        true
+    }
+
     /// Normalize presentation and export order without changing room membership.
     pub fn sort_room_operators_stably(&mut self) {
         for room in &mut self.rooms {

@@ -142,11 +142,7 @@ pub(crate) fn refill_trade_room_with_core(
         )));
     }
 
-    for assigned_room in &mut assignment.rooms {
-        assigned_room
-            .operators
-            .retain(|operator| operator.name != core);
-    }
+    assignment.remove_operators_where(|_, operator| operator.name == core);
     assignment.set_room(room_id.clone(), Vec::new());
     let mut used = assignment.operator_names();
     used.extend(forbidden_names.iter().cloned());
@@ -243,14 +239,12 @@ pub(crate) fn refill_witch_room_with_tailor(
             "Fiammetta Witch group requires a level-3 gold trade room",
         ));
     }
-    for assigned_room in &mut assignment.rooms {
-        assigned_room.operators.retain(|operator| {
-            !matches!(
-                operator.name.as_str(),
-                WITCH_TRADE_NAME | TEQUILA_TRADE_NAME
-            ) && operator.name != tailor
-        });
-    }
+    assignment.remove_operators_where(|_, operator| {
+        matches!(
+            operator.name.as_str(),
+            WITCH_TRADE_NAME | TEQUILA_TRADE_NAME
+        ) || operator.name == tailor
+    });
     assignment.set_room(room_id.clone(), Vec::new());
     let used = assignment.operator_names();
     let layout = crate::layout::resolve_base(

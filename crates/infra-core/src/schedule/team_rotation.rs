@@ -3090,17 +3090,11 @@ fn merge_rooms(target: &mut BaseAssignment, source: &BaseAssignment) {
 }
 
 fn clear_room(assignment: &mut BaseAssignment, room_id: &str) {
-    assignment.rooms.retain(|room| room.room_id.0 != room_id);
+    assignment.remove_room(room_id);
 }
 
 fn clear_room_efficiency(assignment: &mut BaseAssignment, room_id: &RoomId) {
-    if let Some(room) = assignment
-        .rooms
-        .iter_mut()
-        .find(|room| room.room_id == *room_id)
-    {
-        room.efficiency = None;
-    }
+    assignment.clear_room_efficiency(room_id);
 }
 
 fn clear_production_efficiencies(blueprint: &BaseBlueprint, assignment: &mut BaseAssignment) {
@@ -3769,22 +3763,7 @@ fn trade_room_containing_group(
 }
 
 fn swap_room_assignments(assignment: &mut BaseAssignment, a: &RoomId, b: &RoomId) -> bool {
-    let Some(ai) = assignment.rooms.iter().position(|room| &room.room_id == a) else {
-        return false;
-    };
-    let Some(bi) = assignment.rooms.iter().position(|room| &room.room_id == b) else {
-        return false;
-    };
-    if ai == bi {
-        return true;
-    }
-    let ops_a = assignment.rooms[ai].operators.clone();
-    let eff_a = assignment.rooms[ai].efficiency.clone();
-    assignment.rooms[ai].operators = assignment.rooms[bi].operators.clone();
-    assignment.rooms[ai].efficiency = assignment.rooms[bi].efficiency.clone();
-    assignment.rooms[bi].operators = ops_a;
-    assignment.rooms[bi].efficiency = eff_a;
-    true
+    assignment.swap_room_contents(a, b)
 }
 
 fn room_containing_operator(
@@ -7658,15 +7637,14 @@ fn repair_owner_meeting_seats(
             )));
         }
     }
-    for room in &mut owner.assignment.rooms {
-        if blueprint
-            .room(&room.room_id)
-            .is_some_and(|spec| spec.kind == FacilityKind::MeetingRoom)
-        {
-            room.operators
-                .retain(|operator| !infeasible.contains(&operator.name));
-        }
-    }
+    owner
+        .assignment
+        .remove_operators_where(|room_id, operator| {
+            blueprint
+                .room(room_id)
+                .is_some_and(|spec| spec.kind == FacilityKind::MeetingRoom)
+                && infeasible.contains(&operator.name)
+        });
     let layout = resolve_base(
         blueprint,
         &owner.assignment,
