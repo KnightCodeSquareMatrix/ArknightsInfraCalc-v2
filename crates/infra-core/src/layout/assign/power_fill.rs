@@ -179,7 +179,7 @@ pub(super) fn assign_power_rooms_with_instances(
                 }
                 let op = AssignedOperator::from_progress(&entry.name, entry.progress);
                 let mut trial = coexist_assignment.cloned().unwrap_or_default();
-                for room in &assignment.rooms {
+                for room in assignment.iter_rooms() {
                     trial.set_room(room.room_id.clone(), room.operators.clone());
                 }
                 trial.set_room(room_id.clone(), vec![op.clone()]);
@@ -302,7 +302,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(assignment.rooms.len(), 3);
+        assert_eq!(assignment.iter_rooms().count(), 3);
         assert_eq!(used.len(), 3);
         assert!(used.contains("Friston-3"));
     }

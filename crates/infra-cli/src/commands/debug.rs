@@ -661,8 +661,7 @@ fn projection_from_report(report: &TeamRotationReport) -> Result<BehaviorProject
                 .to_string();
             let mut rooms = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .map(|room| RoomProjection {
                     room_id: room.room_id.0.clone(),
                     operators: room
@@ -924,8 +923,7 @@ fn focused_projection(
             .map(|shift| {
                 let room = shift
                     .assignment
-                    .rooms
-                    .iter()
+                    .iter_rooms()
                     .find(|room| room.room_id.0 == room_id);
                 let anchors = report
                     .assignment_plans
@@ -968,11 +966,7 @@ fn focused_projection(
             .iter()
             .filter(|shift| shift_filter.is_none_or(|index| shift.index == index))
             .map(|shift| {
-                let room = shift
-                    .assignment
-                    .rooms
-                    .iter()
-                    .find(|room| room.operators.iter().any(|operator| operator.name == name));
+                let room = shift.assignment.room_of_operator(&name);
                 json!({
                     "shift": shift.index + 1,
                     "plan_index": shift.plan_index,

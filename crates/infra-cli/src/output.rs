@@ -837,8 +837,7 @@ fn team_by_label(
 
 fn assignment_room_ops<'a>(assignment: &'a BaseAssignment, room_id: &str) -> Option<Vec<&'a str>> {
     assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .find(|r| r.room_id.0 == room_id)
         .filter(|r| !r.operators.is_empty())
         .map(|r| r.operators.iter().map(|o| o.name.as_str()).collect())
@@ -889,7 +888,7 @@ fn shift_station_order(report: &TeamRotationReport) -> Vec<String> {
     let mut room_ids: std::collections::BTreeSet<String> = report
         .shifts
         .iter()
-        .flat_map(|shift| shift.assignment.rooms.iter())
+        .flat_map(|shift| shift.assignment.iter_rooms())
         .map(|room| room.room_id.0.clone())
         .collect();
     room_ids.extend(

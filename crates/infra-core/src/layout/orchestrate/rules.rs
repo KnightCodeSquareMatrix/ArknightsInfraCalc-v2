@@ -2470,8 +2470,7 @@ mod tests {
         );
         let docus_room = compiled
             .scratch
-            .rooms
-            .iter()
+            .iter_rooms()
             .find(|room| {
                 room.operators
                     .iter()
@@ -2480,8 +2479,7 @@ mod tests {
             .unwrap();
         let blackkey_room = compiled
             .scratch
-            .rooms
-            .iter()
+            .iter_rooms()
             .find(|room| {
                 room.operators
                     .iter()

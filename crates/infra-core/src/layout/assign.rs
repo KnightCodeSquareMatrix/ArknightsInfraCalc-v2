@@ -453,7 +453,7 @@ pub fn rotating_workers(assignment: &BaseAssignment, blueprint: &BaseBlueprint) 
         FacilityKind::PowerPlant,
     ];
     let mut names = HashSet::new();
-    for room in &assignment.rooms {
+    for room in assignment.iter_rooms() {
         let Some(bp) = blueprint.rooms.iter().find(|r| r.id == room.room_id) else {
             continue;
         };
@@ -484,7 +484,7 @@ pub fn pinned_assignment_excluding(
     excluded: &HashSet<String>,
 ) -> BaseAssignment {
     let mut pinned = BaseAssignment::default();
-    for room in &assignment.rooms {
+    for room in assignment.iter_rooms() {
         let Some(bp) = blueprint.rooms.iter().find(|r| r.id == room.room_id) else {
             continue;
         };
@@ -596,8 +596,7 @@ mod tests {
         assert!(used.contains("乌尔比安"));
         assert!(
             assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .any(|room| room.room_id.0.starts_with("dorm_")
                     && room.operators.iter().any(|op| op.name == "乌尔比安")),
             "深巡存在时应把乌尔比安作为宿舍进驻锚点"
@@ -630,7 +629,7 @@ mod tests {
 
         assert!(!used.contains("乌尔比安"));
         assert!(
-            !assignment.rooms.iter().any(|room| {
+            !assignment.iter_rooms().any(|room| {
                 room.room_id.0.starts_with("dorm_")
                     && room.operators.iter().any(|op| op.name == "乌尔比安")
             }),
@@ -655,7 +654,7 @@ mod tests {
 
         assert!(used.contains("乌尔比安"));
         assert!(
-            assignment.rooms.iter().any(|room| {
+            assignment.iter_rooms().any(|room| {
                 room.room_id.0.starts_with("dorm_")
                     && room.operators.iter().any(|op| op.name == "乌尔比安")
             }),
@@ -875,7 +874,7 @@ mod tests {
                 .iter()
                 .any(|name| name == "迷迭香" || name == "黑键")
         }));
-        assert!(result.assignment.rooms.iter().all(|room| {
+        assert!(result.assignment.iter_rooms().all(|room| {
             room.operators
                 .iter()
                 .all(|operator| operator.name != "迷迭香")
@@ -1089,8 +1088,7 @@ mod tests {
             .all(|name| !trade_core_anchors.contains(&name)));
         let assignment = result.assignment;
         let docus_room = assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .find(|r| r.operators.iter().any(|o| o.name == "但书"));
         assert!(docus_room.is_some(), "精二但书应作为贸易搜索第一核心");
     }
@@ -1125,8 +1123,7 @@ mod tests {
         .unwrap();
 
         let docus_room = assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .find(|r| r.operators.iter().any(|o| o.name == "但书"))
             .expect("但书应被排入贸易站");
         let docus_blueprint = blueprint.room(&docus_room.room_id).unwrap();
@@ -1208,7 +1205,7 @@ mod tests {
         .unwrap()
         .assignment;
         let mut seen = HashSet::new();
-        for room in &assignment.rooms {
+        for room in assignment.iter_rooms() {
             for op in &room.operators {
                 assert!(seen.insert(op.name.clone()), "duplicate {}", op.name);
             }
@@ -1378,7 +1375,7 @@ mod tests {
         blueprint: &BaseBlueprint,
         names: &[&str],
     ) -> bool {
-        assignment.rooms.iter().any(|room| {
+        assignment.iter_rooms().any(|room| {
             blueprint
                 .rooms
                 .iter()
@@ -1428,7 +1425,7 @@ mod tests {
         .unwrap();
 
         let gold_trio: HashSet<_> = GONGSUN_GOLD_MANU_TEAM.iter().map(|s| *s).collect();
-        let gold_room = peak.rooms.iter().find(|r| {
+        let gold_room = peak.iter_rooms().find(|r| {
             blueprint.rooms.iter().any(|b| {
                 b.id == r.room_id
                     && b.kind == FacilityKind::Factory
@@ -1445,8 +1442,7 @@ mod tests {
         assert!(
             gold_room.is_some(),
             "金线应有清流+温蒂+森蚺，实际制造编制: {:?}",
-            peak.rooms
-                .iter()
+            peak.iter_rooms()
                 .filter(|r| {
                     blueprint
                         .rooms
@@ -1520,7 +1516,7 @@ mod tests {
         )
         .unwrap();
 
-        let gold_room = peak.rooms.iter().find(|r| {
+        let gold_room = peak.iter_rooms().find(|r| {
             blueprint.rooms.iter().any(|b| {
                 b.id == r.room_id
                     && b.kind == FacilityKind::Factory
@@ -1537,8 +1533,7 @@ mod tests {
         assert!(
             gold_room.is_some(),
             "无森蚺时金线应补冬时，实际制造编制: {:?}",
-            peak.rooms
-                .iter()
+            peak.iter_rooms()
                 .filter(|r| {
                     blueprint
                         .rooms

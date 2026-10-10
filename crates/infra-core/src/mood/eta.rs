@@ -119,8 +119,7 @@ fn shift_eta_inner(
 ) -> ShiftEta {
     // 中枢是否满 5 人 → 全局 −0.25。
     let full_control = assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .find(|r| {
             blueprint
                 .room(&r.room_id)
@@ -136,8 +135,7 @@ fn shift_eta_inner(
 
     let abyssal_outside_dorm = instances.map_or(0, |instances| {
         assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| {
                 blueprint
                     .room(&room.room_id)
@@ -163,7 +161,7 @@ fn shift_eta_inner(
 
     let mut per_op: Vec<OperatorEta> = Vec::new();
 
-    for room in &assignment.rooms {
+    for room in assignment.iter_rooms() {
         let Some(bp) = blueprint.room(&room.room_id) else {
             continue;
         };

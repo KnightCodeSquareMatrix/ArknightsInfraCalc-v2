@@ -370,8 +370,7 @@ impl ControlShiftAdmission {
             ));
         }
         let occupied: HashSet<_> = assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| room.room_id != self.closure.room_id)
             .flat_map(|room| &room.operators)
             .map(|op| op.name.as_str())

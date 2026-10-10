@@ -78,14 +78,6 @@ pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
     normalized
 }
 
-fn room_for_operator(assignment: &BaseAssignment, name: &str) -> Option<RoomId> {
-    assignment
-        .rooms
-        .iter()
-        .find(|r| r.operators.iter().any(|o| o.name == name))
-        .map(|r| r.room_id.clone())
-}
-
 fn half_contains_room(half: &FacilityHalf, room: &RoomId) -> bool {
     half.trade.iter().any(|r| r == room)
         || half.manu.iter().any(|r| r == room)
@@ -106,7 +98,7 @@ pub fn align_shift_binds_in_halves(
         let rooms: Vec<RoomId> = bind
             .operators
             .iter()
-            .filter_map(|name| room_for_operator(peak, name))
+            .filter_map(|name| peak.room_of_operator(name).map(|r| r.room_id.clone()))
             .collect();
         if rooms.len() < bind.operators.len() {
             continue;
@@ -211,12 +203,7 @@ pub fn team_of_operator(report: &TeamRotationReport, name: &str) -> Option<TeamL
 }
 
 pub fn operator_in_shift(report: &TeamRotationReport, shift_idx: usize, name: &str) -> bool {
-    report.shifts[shift_idx]
-        .assignment
-        .rooms
-        .iter()
-        .flat_map(|r| r.operators.iter())
-        .any(|o| o.name == name)
+    report.shifts[shift_idx].assignment.has_operator(name)
 }
 
 /// 验证绑定组：同上同下 + 上2休1。
@@ -231,7 +218,7 @@ pub fn verify_shift_binds(
             .operators
             .iter()
             .map(String::as_str)
-            .filter(|name| room_for_operator(peak, name).is_some())
+            .filter(|name| peak.has_operator(name))
             .collect();
         if present.len() < 2 {
             continue;
@@ -289,10 +276,7 @@ pub fn verify_shift_binds(
 pub fn bound_operator_names(binds: &[RuntimeShiftBind], peak: &BaseAssignment) -> HashSet<String> {
     let mut names = HashSet::new();
     for bind in binds {
-        let all_in_peak = bind
-            .operators
-            .iter()
-            .all(|n| room_for_operator(peak, n).is_some());
+        let all_in_peak = bind.operators.iter().all(|n| peak.has_operator(n));
         if all_in_peak {
             for n in &bind.operators {
                 names.insert(n.clone());

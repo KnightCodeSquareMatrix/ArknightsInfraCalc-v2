@@ -212,8 +212,7 @@ pub(crate) fn pack_production_components<'a>(
         let mut bound_rooms = Vec::new();
         for name in operators {
             let room = assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .find(|room| room.operators.iter().any(|operator| &operator.name == name))
                 .ok_or_else(|| format!("shift bind operator {name} missing from peak"))?;
             if production_rooms.contains(&room.room_id) && !bound_rooms.contains(&room.room_id) {
@@ -415,8 +414,7 @@ impl AssignmentPlan {
         self.derive_registry_binds_from_actual_assignment(assignment);
         let room_ids_for = |names: &[String]| {
             let mut rooms: Vec<_> = assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .filter(|room| {
                     room.operators
                         .iter()

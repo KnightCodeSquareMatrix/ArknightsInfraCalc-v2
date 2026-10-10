@@ -325,9 +325,8 @@ fn efficiency_delta(
 
 fn room_changes(baseline: &BaseAssignment, candidate: &BaseAssignment) -> Vec<RoomChange> {
     let room_ids: BTreeSet<_> = baseline
-        .rooms
-        .iter()
-        .chain(&candidate.rooms)
+        .iter_rooms()
+        .chain(candidate.iter_rooms())
         .map(|room| room.room_id.0.clone())
         .collect();
     room_ids

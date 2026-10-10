@@ -401,7 +401,7 @@ fn automation_lancet_shift_proof(
             && anchor.operator == "Lancet-2"
             && anchor.facility == FacilityKind::PowerPlant
             && anchor.rest_facility == Some(FacilityKind::Workshop)
-            && shift.assignment.rooms.iter().any(|room| {
+            && shift.assignment.iter_rooms().any(|room| {
                 let Some(spec) = blueprint.room(&room.room_id) else {
                     return false;
                 };
@@ -439,7 +439,7 @@ fn automation_lancet_cycle_exempt(blueprint: &BaseBlueprint, report: &TeamRotati
                 .is_some_and(|plan| automation_lancet_shift_proof(blueprint, shift, plan))
         })
         && work_shifts.iter().any(|shift| {
-            shift.assignment.rooms.iter().any(|room| {
+            shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|spec| spec.kind == FacilityKind::PowerPlant)
@@ -458,7 +458,7 @@ fn rotation_cycle_rest_warnings(
 ) -> Vec<String> {
     let mut attendance: BTreeMap<&str, BTreeMap<usize, Vec<String>>> = BTreeMap::new();
     for (position, shift) in report.shifts.iter().enumerate() {
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             let Some(spec) = blueprint.room(&room.room_id) else {
                 continue;
             };
@@ -709,7 +709,7 @@ fn bound_office_operators(
         .iter()
         .flat_map(|bind| &bind.operators)
         .filter(|name| {
-            peak.rooms.iter().any(|room| {
+            peak.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|bp| bp.kind == FacilityKind::Office)
@@ -721,13 +721,7 @@ fn bound_office_operators(
 }
 
 fn peak_office_operators(blueprint: &BaseBlueprint, peak: &BaseAssignment) -> HashSet<String> {
-    peak.rooms
-        .iter()
-        .filter(|room| {
-            blueprint
-                .room(&room.room_id)
-                .is_some_and(|bp| bp.kind == FacilityKind::Office)
-        })
+    peak.rooms_of_kind(blueprint, FacilityKind::Office)
         .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
         .collect()
 }
@@ -743,7 +737,7 @@ fn bound_control_operators(
         .iter()
         .flat_map(|bind| &bind.operators)
         .filter(|name| {
-            peak.rooms.iter().any(|room| {
+            peak.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|room| room.kind == FacilityKind::ControlCenter)
@@ -766,7 +760,7 @@ fn bound_rotating_anchor_operators(
         .iter()
         .flat_map(|bind| &bind.operators)
         .filter(|name| {
-            peak.rooms.iter().any(|room| {
+            peak.iter_rooms().any(|room| {
                 blueprint.room(&room.room_id).is_some_and(|bp| {
                     !matches!(
                         bp.kind,
@@ -823,11 +817,7 @@ fn assign_rotating_anchors(
         if assignment.operator_names().contains(name) {
             continue;
         }
-        let Some(peak_room) = peak
-            .rooms
-            .iter()
-            .find(|room| room.operators.iter().any(|operator| operator.name == *name))
-        else {
+        let Some(peak_room) = peak.room_of_operator(name) else {
             return Err(Error::msg(format!(
                 "rotating anchor {name} missing from peak"
             )));
@@ -859,11 +849,7 @@ fn pin_active_dependency_required(
     required.sort();
     required.dedup();
     for name in required {
-        let Some(peak_room) = peak
-            .rooms
-            .iter()
-            .find(|room| room.operators.iter().any(|operator| operator.name == *name))
-        else {
+        let Some(peak_room) = peak.room_of_operator(name) else {
             return Err(Error::msg(format!(
                 "active dependency required operator {name} missing from peak"
             )));
@@ -1259,11 +1245,7 @@ fn record_meeting_usage_hours(
     worked_hours: &mut HashMap<String, f64>,
     hours: f64,
 ) {
-    for room in assignment.rooms.iter().filter(|room| {
-        blueprint
-            .room(&room.room_id)
-            .is_some_and(|bp| bp.kind == FacilityKind::MeetingRoom)
-    }) {
+    for room in assignment.rooms_of_kind(blueprint, FacilityKind::MeetingRoom) {
         for operator in &room.operators {
             *worked_hours.entry(operator.name.clone()).or_default() += hours;
         }
@@ -1880,13 +1862,7 @@ fn complete_rotating_meeting_teams(
 }
 
 fn peak_meeting_operators(blueprint: &BaseBlueprint, peak: &BaseAssignment) -> HashSet<String> {
-    peak.rooms
-        .iter()
-        .filter(|room| {
-            blueprint
-                .room(&room.room_id)
-                .is_some_and(|bp| bp.kind == FacilityKind::MeetingRoom)
-        })
+    peak.rooms_of_kind(blueprint, FacilityKind::MeetingRoom)
         .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
         .collect()
 }
@@ -2286,8 +2262,7 @@ fn production_half_from_peak(peak: &BaseAssignment, half: &FacilityHalf) -> Base
 
 fn print_trade_rotation_debug(label: &str, assignment: &BaseAssignment) {
     let mut rooms: Vec<_> = assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .filter(|room| room.room_id.0.starts_with("trade_"))
         .map(|room| {
             (
@@ -2313,7 +2288,7 @@ fn active_dependency_required_manu_by_room(
         .flat_map(|dependency| dependency.required.iter().map(String::as_str))
         .collect();
     let mut by_room = HashMap::new();
-    for room in &peak.rooms {
+    for room in peak.iter_rooms() {
         if !blueprint
             .room(&room.room_id)
             .is_some_and(|blueprint_room| blueprint_room.kind == FacilityKind::Factory)
@@ -2339,11 +2314,7 @@ fn bound_control_operators_for_half(
     binds: &[RuntimeShiftBind],
     half: &FacilityHalf,
 ) -> HashSet<String> {
-    let room_for = |name: &str| {
-        peak.rooms
-            .iter()
-            .find(|room| room.operators.iter().any(|operator| operator.name == name))
-    };
+    let room_for = |name: &str| peak.room_of_operator(name);
     binds
         .iter()
         .filter(|bind| {
@@ -2419,8 +2390,7 @@ fn validate_fiammetta_continuous_targets(
     for shift in shifts {
         let production_names: HashSet<_> = shift
             .assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| {
                 blueprint.room(&room.room_id).is_some_and(|room| {
                     matches!(
@@ -2504,7 +2474,7 @@ fn first_fiammetta_assignment_target(
         .filter(|target| fiammetta_target_is_legal(profile, target))
         .filter(|target| !used.contains(*target))
         .find_map(|target| {
-            assignment.rooms.iter().find_map(|room| {
+            assignment.iter_rooms().find_map(|room| {
                 let production = blueprint.room(&room.room_id).is_some_and(|room| {
                     matches!(
                         room.kind,
@@ -2527,7 +2497,7 @@ fn validate_office_assignment_disjoint(
 ) -> Result<()> {
     let mut production_names = HashSet::new();
     let mut office_names = HashSet::new();
-    for room in &shift.assignment.rooms {
+    for room in shift.assignment.iter_rooms() {
         let Some(spec) = blueprint.room(&room.room_id) else {
             continue;
         };
@@ -2571,11 +2541,10 @@ fn validate_office_shift_eta(
 ) -> Result<()> {
     let model = default_mood_model()?;
     let eta = shift_eta_with_instances(&model, blueprint, &shift.assignment, instances);
-    for room in shift.assignment.rooms.iter().filter(|room| {
-        blueprint
-            .room(&room.room_id)
-            .is_some_and(|spec| spec.kind == FacilityKind::Office)
-    }) {
+    for room in shift
+        .assignment
+        .rooms_of_kind(blueprint, FacilityKind::Office)
+    {
         for operator in &room.operators {
             let Some(detail) = eta
                 .per_op
@@ -2607,7 +2576,7 @@ fn validate_final_rotation_invariants(
     for shift in shifts {
         validate_office_assignment_disjoint(blueprint, shift)?;
         let mut seen = HashSet::new();
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             for operator in &room.operators {
                 if !seen.insert(operator.name.clone()) {
                     return Err(Error::msg(format!(
@@ -2703,7 +2672,7 @@ fn operator_is_in_normal_base(
     assignment: &BaseAssignment,
     name: &str,
 ) -> bool {
-    assignment.rooms.iter().any(|room| {
+    assignment.iter_rooms().any(|room| {
         blueprint.room(&room.room_id).is_some_and(|spec| {
             spec.kind != FacilityKind::MeetingRoom
                 && room.operators.iter().any(|operator| operator.name == name)
@@ -2719,7 +2688,7 @@ fn shift_works_in_trade(
     assignment: &BaseAssignment,
     name: &str,
 ) -> bool {
-    assignment.rooms.iter().any(|room| {
+    assignment.iter_rooms().any(|room| {
         blueprint.room(&room.room_id).is_some_and(|spec| {
             spec.kind == FacilityKind::TradePost
                 && room.operators.iter().any(|operator| operator.name == name)
@@ -3071,8 +3040,7 @@ struct ProductionPools {
 
 fn operators_of(assignment: &BaseAssignment) -> Vec<String> {
     let mut names: Vec<String> = assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .flat_map(|r| r.operators.iter().map(|o| o.name.clone()))
         .collect();
     names.sort();
@@ -3081,7 +3049,7 @@ fn operators_of(assignment: &BaseAssignment) -> Vec<String> {
 }
 
 fn merge_rooms(target: &mut BaseAssignment, source: &BaseAssignment) {
-    for room in &source.rooms {
+    for room in source.iter_rooms() {
         if room.operators.is_empty() {
             continue;
         }
@@ -3167,7 +3135,7 @@ fn apply_single_core_fiammetta_rotation_legacy(
     for target in fiammetta_return_priority(blueprint) {
         if target == "巫恋" {
             let witch_room_exists = shifts.iter().any(|shift| {
-                shift.assignment.rooms.iter().any(|room| {
+                shift.assignment.iter_rooms().any(|room| {
                     blueprint.room(&room.room_id).is_some_and(|blueprint_room| {
                         blueprint_room.kind == FacilityKind::TradePost
                             && blueprint_room.level == 3
@@ -3199,12 +3167,10 @@ fn apply_single_core_fiammetta_rotation_legacy(
             .map(|role| role.room_id.clone())
             .or_else(|| {
                 shifts.iter().find_map(|shift| {
-                    shift.assignment.rooms.iter().find_map(|room| {
-                        room.operators
-                            .iter()
-                            .any(|operator| operator.name == target)
-                            .then(|| room.room_id.clone())
-                    })
+                    shift
+                        .assignment
+                        .room_of_operator(target)
+                        .map(|room| room.room_id.clone())
                 })
             });
         let Some(room_id) = room_id else {
@@ -3316,14 +3282,8 @@ fn apply_single_core_fiammetta_rotation_legacy(
         for index in action_indices {
             let action_room_id = candidate_shifts[index]
                 .assignment
-                .rooms
-                .iter()
-                .find_map(|room| {
-                    room.operators
-                        .iter()
-                        .any(|operator| operator.name == target)
-                        .then(|| room.room_id.clone())
-                })
+                .room_of_operator(target)
+                .map(|room| room.room_id.clone())
                 .ok_or_else(|| {
                     Error::msg(format!(
                         "Fiammetta target {target} missing after continuous refill"
@@ -3412,12 +3372,10 @@ fn apply_profile_fiammetta_rotation(
                 .map(|role| role.room_id.clone())
                 .or_else(|| {
                     candidate_shifts.iter().find_map(|shift| {
-                        shift.assignment.rooms.iter().find_map(|room| {
-                            room.operators
-                                .iter()
-                                .any(|operator| operator.name == target)
-                                .then(|| room.room_id.clone())
-                        })
+                        shift
+                            .assignment
+                            .room_of_operator(target)
+                            .map(|room| room.room_id.clone())
                     })
                 })
             else {
@@ -3502,12 +3460,10 @@ fn apply_profile_fiammetta_rotation(
             {
                 continue;
             }
-            let action_room_id = trial[slot].assignment.rooms.iter().find_map(|room| {
-                room.operators
-                    .iter()
-                    .any(|operator| operator.name == target)
-                    .then(|| room.room_id.clone())
-            });
+            let action_room_id = trial[slot]
+                .assignment
+                .room_of_operator(target)
+                .map(|room| room.room_id.clone());
             let Some(action_room_id) = action_room_id else {
                 continue;
             };
@@ -3577,7 +3533,7 @@ fn apply_witch_group_fiammetta_rotation(
         return Ok(false);
     }
     let Some(room_id) = shifts.iter().find_map(|shift| {
-        shift.assignment.rooms.iter().find_map(|room| {
+        shift.assignment.iter_rooms().find_map(|room| {
             blueprint
                 .room(&room.room_id)
                 .is_some_and(|blueprint_room| {
@@ -3755,7 +3711,7 @@ fn trade_room_containing_group(
     blueprint: &BaseBlueprint,
     names: &[&str],
 ) -> Option<RoomId> {
-    assignment.rooms.iter().find_map(|room| {
+    assignment.iter_rooms().find_map(|room| {
         let bp_room = blueprint.room(&room.room_id)?;
         (bp_room.kind == FacilityKind::TradePost && room_has_all(room, names))
             .then(|| room.room_id.clone())
@@ -3772,7 +3728,7 @@ fn room_containing_operator(
     name: &str,
     kind: FacilityKind,
 ) -> Option<RoomId> {
-    assignment.rooms.iter().find_map(|room| {
+    assignment.iter_rooms().find_map(|room| {
         let bp_room = blueprint.room(&room.room_id)?;
         (bp_room.kind == kind && room.operators.iter().any(|op| op.name == name))
             .then(|| room.room_id.clone())
@@ -3811,8 +3767,7 @@ fn align_warmup_rooms(
     sticky_rooms: &mut HashMap<String, RoomId>,
 ) {
     let ops: Vec<(String, FacilityKind)> = assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .filter_map(|room| {
             blueprint
                 .room(&room.room_id)
@@ -4046,8 +4001,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         }
 
         let mut gamma_ops: Vec<String> = candidate
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| ctx.mutable_manu_rooms.contains(&room.room_id))
             .flat_map(|room| room.operators.iter())
             .map(|op| op.name.clone())
@@ -4398,7 +4352,7 @@ fn assert_final_rotation_invariants_with_mood(
                 Error::msg("assert-invariants power_fallback_admission failed: missing Plan")
             })?;
         let mut names = HashSet::new();
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             for operator in &room.operators {
                 if !names.insert(operator.name.clone()) {
                     return Err(Error::msg(format!(
@@ -4572,14 +4526,12 @@ fn assert_final_rotation_invariants_with_mood(
         annotate_assignment(blueprint, &mut expected_notes);
         let actual_note_rows: Vec<_> = shift
             .assignment
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| !room.notes.is_empty())
             .map(|room| (&room.room_id, &room.notes))
             .collect();
         let expected_note_rows: Vec<_> = expected_notes
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|room| !room.notes.is_empty())
             .map(|room| (&room.room_id, &room.notes))
             .collect();
@@ -4590,7 +4542,7 @@ fn assert_final_rotation_invariants_with_mood(
             )));
         }
         let mut seen = HashSet::new();
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             let capacity = blueprint
                 .room(&room.room_id)
                 .and_then(|spec| {
@@ -4920,7 +4872,7 @@ fn assert_final_rotation_invariants_with_mood(
                 actual_cuisine,
             )));
         }
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             if blueprint
                 .room(&room.room_id)
                 .is_none_or(|spec| spec.kind != FacilityKind::TradePost)
@@ -5983,7 +5935,7 @@ fn attach_fiammetta_target_actions(
         }
         let Some(slot) = (0..shifts.len()).find(|slot| {
             !consumed_shifts.contains(slot)
-                && shifts[*slot].assignment.rooms.iter().any(|room| {
+                && shifts[*slot].assignment.iter_rooms().any(|room| {
                     blueprint.room(&room.room_id).is_some_and(|spec| {
                         matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
                     }) && room
@@ -6000,7 +5952,7 @@ fn attach_fiammetta_target_actions(
         if !ready {
             continue;
         }
-        let Some(room_id) = shifts[slot].assignment.rooms.iter().find_map(|room| {
+        let Some(room_id) = shifts[slot].assignment.iter_rooms().find_map(|room| {
             blueprint
                 .room(&room.room_id)
                 .filter(|spec| matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory))
@@ -6340,7 +6292,7 @@ fn schedule_abc_rotation_once(
         .control_operators()
         .iter()
         .any(|operator| operator.name == "薇薇安娜")
-        && peak.rooms.iter().any(|room| {
+        && peak.iter_rooms().any(|room| {
             blueprint
                 .room(&room.room_id)
                 .is_some_and(|spec| spec.kind == FacilityKind::Factory)
@@ -7323,7 +7275,7 @@ fn schedule_abc_rotation_once(
     let actual_work: HashSet<_> = report
         .shifts
         .iter()
-        .flat_map(|shift| shift.assignment.rooms.iter())
+        .flat_map(|shift| shift.assignment.iter_rooms())
         .filter(|room| {
             blueprint
                 .room(&room.room_id)
@@ -7604,7 +7556,7 @@ fn repair_owner_meeting_seats(
         .per_op
         .iter()
         .filter(|operator| {
-            owner.assignment.rooms.iter().any(|room| {
+            owner.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|spec| spec.kind == FacilityKind::MeetingRoom)
@@ -7664,7 +7616,7 @@ fn repair_owner_meeting_seats(
             .flat_map(|reserve| reserve.operators.iter().cloned()),
     );
     let mut candidate_excluded = forbidden.clone();
-    if owner.assignment.rooms.iter().any(|room| {
+    if owner.assignment.iter_rooms().any(|room| {
         blueprint
             .room(&room.room_id)
             .is_some_and(|spec| spec.kind == FacilityKind::MeetingRoom)
@@ -7859,7 +7811,7 @@ fn witch_group_room_and_tailor(
     assignment: &BaseAssignment,
     beta_tailors: &HashSet<String>,
 ) -> Option<(RoomId, String)> {
-    assignment.rooms.iter().find_map(|room| {
+    assignment.iter_rooms().find_map(|room| {
         let is_level_three_gold = blueprint.room(&room.room_id).is_some_and(|blueprint_room| {
             blueprint_room.kind == FacilityKind::TradePost
                 && blueprint_room.level == 3
@@ -8572,8 +8524,7 @@ fn plan_abyssal_dorm_rest(
         .ok_or_else(|| Error::msg("abyssal dorm plan cannot resolve producer mood drain"))?;
     let required_recovery = producer_eta.drain_per_hour * 7.0;
     let active_backup: HashSet<_> = backup
-        .rooms
-        .iter()
+        .iter_rooms()
         .filter(|room| {
             blueprint
                 .room(&room.room_id)
@@ -9086,7 +9037,7 @@ fn validate_mood_gap_decay_work_spans(
 ) -> Result<()> {
     let sensitive_names: HashSet<String> = shifts
         .iter()
-        .flat_map(|shift| &shift.assignment.rooms)
+        .flat_map(|shift| shift.assignment.iter_rooms())
         .filter(|room| {
             blueprint
                 .room(&room.room_id)
@@ -9105,7 +9056,7 @@ fn validate_mood_gap_decay_work_spans(
         })
         .collect();
     let works_in_factory = |shift: &TeamShiftResult, name: &str| {
-        shift.assignment.rooms.iter().any(|room| {
+        shift.assignment.iter_rooms().any(|room| {
             blueprint
                 .room(&room.room_id)
                 .is_some_and(|room| room.kind == FacilityKind::Factory)
@@ -9154,7 +9105,7 @@ fn validate_profile_rotation(
             .get(shift.plan_index)
             .ok_or_else(|| Error::msg("rotation shift lost its plan owner"))?;
         let mut seen = HashSet::new();
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             for operator in &room.operators {
                 if !seen.insert(operator.name.clone()) {
                     return Err(Error::msg(format!(
@@ -9402,13 +9353,7 @@ fn validate_profile_rotation(
             .ok_or_else(|| Error::msg("abyssal profile lost its control producer"))?;
         let tagged_factory_count = producer_shift
             .assignment
-            .rooms
-            .iter()
-            .filter(|room| {
-                blueprint
-                    .room(&room.room_id)
-                    .is_some_and(|room| room.kind == FacilityKind::Factory)
-            })
+            .rooms_of_kind(blueprint, FacilityKind::Factory)
             .flat_map(|room| &room.operators)
             .filter(|operator| {
                 instances
@@ -9448,8 +9393,7 @@ fn validate_profile_rotation(
             }
             let active_non_dorm: HashSet<_> = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .filter(|assignment| {
                     blueprint
                         .room(&assignment.room_id)
@@ -10819,11 +10763,7 @@ mod tests {
             let active = shift.resting_team != team;
             active_shifts += usize::from(active);
             for name in &bound {
-                let room = shift
-                    .assignment
-                    .rooms
-                    .iter()
-                    .find(|room| room.operators.iter().any(|op| op.name == *name));
+                let room = shift.assignment.room_of_operator(name);
                 if !active {
                     assert!(room.is_none(), "休息班不应安排红松核心: {name}");
                     continue;
@@ -10873,7 +10813,7 @@ mod tests {
                 .iter()
                 .any(|op| op.name == "薇薇安娜")
         }) || !report.shifts.iter().any(|shift| {
-            shift.assignment.rooms.iter().any(|room| {
+            shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|spec| spec.kind == FacilityKind::Factory)
@@ -10895,7 +10835,7 @@ mod tests {
                 .control_operators()
                 .iter()
                 .any(|op| op.name == "薇薇安娜");
-            let gravel_present = shift.assignment.rooms.iter().any(|room| {
+            let gravel_present = shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|spec| spec.kind == FacilityKind::Factory)
@@ -10932,7 +10872,7 @@ mod tests {
         blueprint: &BaseBlueprint,
         names: &[&str],
     ) -> bool {
-        assignment.rooms.iter().any(|room| {
+        assignment.iter_rooms().any(|room| {
             blueprint
                 .room(&room.room_id)
                 .is_some_and(|bp| bp.kind == FacilityKind::TradePost)
@@ -11109,7 +11049,7 @@ mod tests {
 
         assert!(!candidates.is_empty());
         for candidate in candidates {
-            for room in &candidate.assignment.rooms {
+            for room in candidate.assignment.iter_rooms() {
                 let is_empty_factory = blueprint
                     .room(&room.room_id)
                     .is_some_and(|bp| bp.kind == FacilityKind::Factory)
@@ -11556,7 +11496,7 @@ mod tests {
             }
             // 每班内部无重复干员。
             let mut seen = HashSet::new();
-            for room in &shift.assignment.rooms {
+            for room in shift.assignment.iter_rooms() {
                 for op in &room.operators {
                     assert!(
                         seen.insert(op.name.clone()),
@@ -11746,7 +11686,7 @@ mod tests {
 
         let mut shifts_with_abyssal_manu = Vec::new();
         for shift in &report.shifts {
-            let has_abyssal_manu = shift.assignment.rooms.iter().any(|room| {
+            let has_abyssal_manu = shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|bp| bp.kind == FacilityKind::Factory)
@@ -11776,7 +11716,7 @@ mod tests {
                     .iter()
                     .find(|team| team.label == shift.resting_team)
                     .unwrap();
-                for room in &shift.assignment.rooms {
+                for room in shift.assignment.iter_rooms() {
                     let is_factory = blueprint
                         .room(&room.room_id)
                         .is_some_and(|bp| bp.kind == FacilityKind::Factory);
@@ -11837,7 +11777,7 @@ mod tests {
             .collect();
 
         for shift in &report.shifts {
-            for room in &shift.assignment.rooms {
+            for room in shift.assignment.iter_rooms() {
                 if blueprint.room(&room.room_id).is_some_and(|bp| {
                     matches!(bp.kind, FacilityKind::Dormitory | FacilityKind::Office)
                 }) {
@@ -11992,8 +11932,7 @@ mod tests {
         for shift in &report.shifts {
             let names: Vec<_> = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .flat_map(|room| room.operators.iter().map(|operator| &operator.name))
                 .collect();
             assert_eq!(
@@ -12227,7 +12166,7 @@ mod tests {
             &BaseAssignment::default(),
         )
         .unwrap();
-        let peak_has_blackkey = peak.rooms.iter().any(|r| {
+        let peak_has_blackkey = peak.iter_rooms().any(|r| {
             blueprint
                 .rooms
                 .iter()
@@ -12251,7 +12190,7 @@ mod tests {
         .unwrap();
 
         let blackkey_in_rotation = report.shifts.iter().any(|shift| {
-            shift.assignment.rooms.iter().any(|room| {
+            shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .rooms
                     .iter()
@@ -12307,14 +12246,12 @@ mod tests {
         )
         .unwrap();
         assert!(
-            peak.rooms
-                .iter()
+            peak.iter_rooms()
                 .any(|r| r.operators.iter().any(|o| o.name == "迷迭香")),
             "迷迭香链激活时 peak 应含迷迭香"
         );
         assert!(
-            peak.rooms
-                .iter()
+            peak.iter_rooms()
                 .any(|r| r.operators.iter().any(|o| o.name == "黑键")),
             "迷迭香链激活时 peak 应含黑键"
         );
@@ -12413,7 +12350,7 @@ mod tests {
         }
 
         let in_facility = |shift: &TeamShiftResult, facility: FacilityKind, name: &str| {
-            shift.assignment.rooms.iter().any(|room| {
+            shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|bp| bp.kind == facility)
@@ -12468,13 +12405,7 @@ mod tests {
                 assert!(!mangberry_active, "桑葚休息班不得继续占用办公室");
                 let offices: Vec<_> = shift
                     .assignment
-                    .rooms
-                    .iter()
-                    .filter(|room| {
-                        blueprint
-                            .room(&room.room_id)
-                            .is_some_and(|bp| bp.kind == FacilityKind::Office)
-                    })
+                    .rooms_of_kind(blueprint, FacilityKind::Office)
                     .collect();
                 assert!(!offices.is_empty(), "布局应包含办公室");
                 assert!(
@@ -12551,7 +12482,7 @@ mod tests {
         }
 
         let in_facility = |shift: &TeamShiftResult, facility: FacilityKind, name: &str| {
-            shift.assignment.rooms.iter().any(|room| {
+            shift.assignment.iter_rooms().any(|room| {
                 blueprint
                     .room(&room.room_id)
                     .is_some_and(|bp| bp.kind == facility)
@@ -12645,15 +12576,14 @@ mod tests {
         let manufacturers = ["灰毫", "远牙", "野鬃"];
         assert_pinus_rotation(&report, &blueprint, &manufacturers);
         for shift in &report.shifts {
-            if shift.assignment.rooms.iter().any(|room| {
+            if shift.assignment.iter_rooms().any(|room| {
                 room.operators
                     .iter()
                     .any(|op| manufacturers.contains(&op.name.as_str()))
             }) {
                 let occupied_rooms = shift
                     .assignment
-                    .rooms
-                    .iter()
+                    .iter_rooms()
                     .filter(|room| {
                         room.operators
                             .iter()
@@ -12766,8 +12696,7 @@ mod tests {
                 .map(|name| {
                     shift
                         .assignment
-                        .rooms
-                        .iter()
+                        .iter_rooms()
                         .flat_map(|room| &room.operators)
                         .any(|operator| operator.name == *name)
                 })
@@ -12860,7 +12789,7 @@ mod tests {
         .unwrap();
 
         for shift in &report.shifts {
-            for room in &shift.assignment.rooms {
+            for room in shift.assignment.iter_rooms() {
                 let Some(bp_room) = blueprint.room(&room.room_id) else {
                     continue;
                 };
@@ -12914,8 +12843,7 @@ mod tests {
         for shift in &report.shifts {
             let raw_names: Vec<_> = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .flat_map(|room| room.operators.iter().map(|operator| operator.name.as_str()))
                 .collect();
             let unique_names: HashSet<_> = raw_names.iter().copied().collect();
@@ -12929,8 +12857,7 @@ mod tests {
             let facilities_for = |name: &str| -> Vec<FacilityKind> {
                 shift
                     .assignment
-                    .rooms
-                    .iter()
+                    .iter_rooms()
                     .filter(|room| room.operators.iter().any(|operator| operator.name == name))
                     .filter_map(|room| blueprint.room(&room.room_id).map(|room| room.kind))
                     .collect()
@@ -13011,7 +12938,7 @@ mod tests {
             }
             gnosis_shifts += 1;
             assert!(
-                shift.assignment.rooms.iter().any(|room| {
+                shift.assignment.iter_rooms().any(|room| {
                     let Some(room_spec) = blueprint.room(&room.room_id) else {
                         return false;
                     };
@@ -13180,8 +13107,7 @@ mod tests {
         for shift in &report.shifts {
             let room = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .find(|room| {
                     room.operators
                         .iter()
@@ -13243,8 +13169,7 @@ mod tests {
             );
             let room = shift
                 .assignment
-                .rooms
-                .iter()
+                .iter_rooms()
                 .find(|room| {
                     room.operators
                         .iter()
@@ -13338,8 +13263,7 @@ mod tests {
         .unwrap();
 
         let peak_meta: HashSet<String> = peak
-            .rooms
-            .iter()
+            .iter_rooms()
             .filter(|r| {
                 blueprint
                     .rooms
@@ -13783,10 +13707,7 @@ mod tests {
             std::slice::from_ref(&dependency),
         )
         .is_ok());
-        shifts[0]
-            .assignment
-            .rooms
-            .retain(|room| room.room_id.0 != "meeting");
+        shifts[0].assignment.remove_room("meeting");
         assert!(validate_final_rotation_invariants(
             &BaseBlueprint::template_243_use_this().unwrap(),
             &shifts,

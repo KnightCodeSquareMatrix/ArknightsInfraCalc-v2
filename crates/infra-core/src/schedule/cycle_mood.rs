@@ -48,7 +48,7 @@ pub(crate) fn validate_cycle_mood(
             )));
         }
         let eta = shift_eta_with_instances(&model, blueprint, &shift.assignment, instances);
-        for room in &shift.assignment.rooms {
+        for room in shift.assignment.iter_rooms() {
             let spec = blueprint.room(&room.room_id).ok_or_else(|| {
                 Error::msg(format!(
                     "rotation_cycle_mood unknown room {} in shift {}",

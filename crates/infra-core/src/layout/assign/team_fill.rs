@@ -190,7 +190,7 @@ fn assign_team_trade_meta_rooms(
             sorted_names(&assignment.operator_names()),
         );
         let mut current_assignment = coexist_assignment.clone();
-        for assigned_room in &assignment.rooms {
+        for assigned_room in assignment.iter_rooms() {
             current_assignment.set_room_assignment(assigned_room.clone());
         }
         let current_layout = crate::layout::resolve_base(
@@ -281,7 +281,7 @@ fn assign_team_manu_rooms(
             }
         };
         let mut current_assignment = coexist_assignment.clone();
-        for assigned_room in &assignment.rooms {
+        for assigned_room in assignment.iter_rooms() {
             current_assignment.set_room_assignment(assigned_room.clone());
         }
         let current_layout = crate::layout::resolve_base(
@@ -753,7 +753,7 @@ mod tests {
             [(&baseline, baseline_eff), (&enhanced, enhanced_eff)]
         {
             let mut merged = coexist.clone();
-            for room in &assignment.rooms {
+            for room in assignment.iter_rooms() {
                 merged.set_room_assignment(room.clone());
             }
             let resolved = crate::layout::resolve_base(

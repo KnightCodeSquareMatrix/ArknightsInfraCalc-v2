@@ -195,7 +195,7 @@ pub struct RoomAssignment {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BaseAssignment {
     #[serde(default)]
-    pub rooms: Vec<RoomAssignment>,
+    rooms: Vec<RoomAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub training_assist: Option<AssignedOperator>,
     /// 覆盖 blueprint.scenario.base_workforce。
@@ -276,6 +276,37 @@ impl BaseAssignment {
 
     pub fn set_power_operator(&mut self, room_id: impl Into<RoomId>, op: AssignedOperator) {
         self.set_room(room_id, vec![op]);
+    }
+
+    /// 全部房间条目的只读视图，顺序即写入顺序。整班扫描（校验、结算、诊断）使用；
+    /// 带明确意图的查询优先用 `room_of_operator`、`has_operator`、`rooms_of_kind`。
+    pub fn iter_rooms(&self) -> impl Iterator<Item = &RoomAssignment> {
+        self.rooms.iter()
+    }
+
+    /// 干员所在的房间条目；训练副手不在 rooms 内，返回 None。
+    pub fn room_of_operator(&self, name: &str) -> Option<&RoomAssignment> {
+        self.rooms
+            .iter()
+            .find(|room| room.operators.iter().any(|op| op.name == name))
+    }
+
+    /// 干员是否在任一房间里（不含独立的训练副手）。
+    pub fn has_operator(&self, name: &str) -> bool {
+        self.room_of_operator(name).is_some()
+    }
+
+    /// 蓝图中属于指定设施类型的房间条目，按 rooms 顺序；蓝图里不存在的房间被跳过。
+    pub fn rooms_of_kind<'a>(
+        &'a self,
+        blueprint: &'a BaseBlueprint,
+        kind: FacilityKind,
+    ) -> impl Iterator<Item = &'a RoomAssignment> + 'a {
+        self.rooms.iter().filter(move |room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|spec| spec.kind == kind)
+        })
     }
 
     /// 整房移除：房间条目连同成员、效率、备注一起消失。

@@ -16,7 +16,7 @@ use crate::skill_table::SkillTable;
 use super::AssignBaseOptions;
 
 fn assignment_has_matatabi_consumer(assignment: &BaseAssignment) -> bool {
-    assignment.rooms.iter().any(|room| {
+    assignment.iter_rooms().any(|room| {
         room.operators
             .iter()
             .any(|op| op.name == MATATABI_CONSUMER_NAME)

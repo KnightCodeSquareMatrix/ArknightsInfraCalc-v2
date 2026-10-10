@@ -397,8 +397,7 @@ fn clear_production_rooms(
     used: &mut HashSet<String>,
 ) {
     let filled: HashSet<String> = assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .filter(|room| {
             blueprint.room(&room.room_id).is_some_and(|spec| {
                 matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
@@ -999,8 +998,7 @@ fn best_available_office_pct(
 
     let office_occupants: HashSet<_> = run
         .assignment
-        .rooms
-        .iter()
+        .iter_rooms()
         .filter(|room| {
             run.blueprint
                 .rooms
@@ -1321,7 +1319,7 @@ fn operator_is_in_normal_base(
     assignment: &BaseAssignment,
     name: &str,
 ) -> bool {
-    assignment.rooms.iter().any(|room| {
+    assignment.iter_rooms().any(|room| {
         blueprint.room(&room.room_id).is_some_and(|spec| {
             spec.kind != FacilityKind::MeetingRoom
                 && room.operators.iter().any(|operator| operator.name == name)
@@ -1335,7 +1333,7 @@ fn operator_is_in_normal_base(
 fn trade_manufacture_efficiency_totals(
     assignment: &BaseAssignment,
 ) -> (crate::Efficiency, crate::Efficiency) {
-    assignment.rooms.iter().fold(
+    assignment.iter_rooms().fold(
         (crate::Efficiency::ZERO, crate::Efficiency::ZERO),
         |(trade_total, manufacture_total), room| {
             let Some(snapshot) = &room.efficiency else {
