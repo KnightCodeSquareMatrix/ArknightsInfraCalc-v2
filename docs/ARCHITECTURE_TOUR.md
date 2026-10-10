@@ -127,7 +127,7 @@ OperBoxEntry
 6. 只让胜出的前缀进入制造站填充。
 7. 对最终制造、贸易房间刷新效率快照。
 
-Recovery 有独立顺序，不能用 Peak 的假设推断。各设施的具体补位代码位于 `layout/assign/*_fill.rs`。
+各设施的具体补位代码位于 `layout/assign/*_fill.rs`。单班编制只有 Peak 一种模式；早期的 Recovery（恢复班）模式已删除，轮换里的休息班由 timed rotation 的 ABC 编制与 dorm_finalizer 产生。
 
 搜索层负责枚举候选并按本域口径排序：
 

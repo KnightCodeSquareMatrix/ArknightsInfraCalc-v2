@@ -30,6 +30,8 @@ OperBox + instances + skill table + blueprint
 
 pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 负责 required anchor、claim、exclusion、used 和跨设施 dependency。任一 hard constraint 失败都应跳过候选并保留可诊断原因，不能让排序分数把非法候选带回结果。
 
+贸易搜索另有全布局产品禁配：黑键与巫恋不得同站。`search_trade_single_order` 在每种订单的候选过滤器中加入该对，live 搜索在排序前拒绝，role pick 复用同一入口；该全局禁配本身不强制退回全池，其他筛选条件仍按原逻辑决定候选池。Plan 对已同站的 seed / scratch 直接报错，最终 `--assert-invariants` 检查每班真实贸易房。
+
 `top_k` 只限制报告行。完整池、standalone、shadow branch、producer prefix 和 `full_pool` 的保证等级必须在对应模块页声明；未证明等价的 reduction 只能叫 policy、heuristic 或 approximation。
 
 ## 搜索与提交
@@ -41,6 +43,8 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 ## Bake 分支
 
 `bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 在 miss 或不兼容时回 live，`Disabled` 直接 live，`Required` 对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。
+
+完整贸易行集合经 catalog 校验后，在查询行时按同一黑键—巫恋禁配过滤，再取前 K 条；该全局产品禁配可在 `Required` 下命中。其他未表示的禁配仍按原有 miss 语义处理；可执行文件或输入指纹不匹配的旧表不能跳过验证。
 
 ## 失败传播与排查
 

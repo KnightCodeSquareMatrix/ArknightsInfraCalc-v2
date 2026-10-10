@@ -113,7 +113,7 @@
 | rotation profile | timed rotation 的闭集策略；当前实现含 ABC、主备 12/12、主备 24/24、菲亚二班/四班和深海四班。 | [排班轮换](SCHEDULE_ROTATION.md#1-当前模型) |
 | Team / 队伍 | 共享出勤节奏的一组成员或房间，如 α/β/γ；不是某个时刻的完整编制。 | [定时换班](定时换班.md)、[排班轮换](SCHEDULE_ROTATION.md) |
 | Shift / 班次 | 一个持续时间明确、实际在岗 assignment 完整的状态。 | [定时换班](定时换班.md)、[排班轮换](SCHEDULE_ROTATION.md) |
-| Peak / Recovery | `AssignShiftMode` 的单班主力/恢复候选模式；不是 timed rotation profile 名。 | [单班编制](BASE_ASSIGNMENT.md)、`layout/shift.rs` |
+| Peak | `AssignShiftMode` 当前唯一的取值，表示单班主力编制；不是 timed rotation profile 名。早期的 Recovery 模式已删除。 | [单班编制](BASE_ASSIGNMENT.md)、`layout/shift.rs` |
 | αβγ ABC | 默认 `abc_12_6_6` profile 的三队拓扑；不是全部 rotation profile 或全部排班模式。 | [排班轮换](SCHEDULE_ROTATION.md#11-默认-abc)、[排班模式](排班模式.md) |
 | H1 / H2 | 默认 ABC 把生产设施划分的两个稳定半区。 | [排班轮换](SCHEDULE_ROTATION.md#2-abc-轮换流程) |
 | rotation/bind cohort | 因 Team presence 或 exact bind 必须共享出勤节奏的成员/房间集合。 | [排班轮换](SCHEDULE_ROTATION.md#5-班次绑定shift_bind) |
