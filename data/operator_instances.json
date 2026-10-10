@@ -581,9 +581,10 @@
       "facilities": {
         "trade": {
           "buff_ids": [
+            "trade_ord_limit&trade&lv[000]",
             "trade_ord_pepe[000]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -3889,9 +3890,10 @@
       "facilities": {
         "trade": {
           "buff_ids": [
+            "trade_ord_wt&cost[003]",
             "trade_ord_spd&meet[010]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -4054,9 +4056,10 @@
       "facilities": {
         "trade": {
           "buff_ids": [
+            "trade_cost[000]",
             "trade_ord_spd&share[000]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -4650,9 +4653,10 @@
       "facilities": {
         "trade": {
           "buff_ids": [
+            "trade_ord_limit&trade&lv[001]",
             "trade_ord_spd[1001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -6009,9 +6013,10 @@
       "facilities": {
         "manufacture": {
           "buff_ids": [
+            "manu_prod_spd[003]",
             "manu_prod_limit&cost[001]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
@@ -7440,9 +7445,10 @@
       "facilities": {
         "trade": {
           "buff_ids": [
+            "trade_ord_spd&limit[036]",
             "trade_ord_spd_bd[100]"
           ],
-          "stepwise": false
+          "stepwise": true
         }
       }
     },
