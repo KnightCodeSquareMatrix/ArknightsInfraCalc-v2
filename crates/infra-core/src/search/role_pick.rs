@@ -15,8 +15,6 @@ use super::trade::{
     TradeSearchHit, TradeSearchOptions,
 };
 
-const KARLAN_TRADE_NAMES: &[&str] = &["银灰", "崖心", "讯使", "角峰"];
-
 pub fn hit_docus_syracusa_shortcut(hit: &TradeSearchHit) -> bool {
     hit.rule_id.as_deref() == Some("gsl_docus_syracusa")
 }
@@ -267,12 +265,9 @@ fn hit_witch_blank(hit: &TradeSearchHit) -> bool {
     )
 }
 
+/// 喀兰核心：银灰和孑必须同站。孑加崖心、讯使、角峰这类低档协同不算核心。
 fn hit_karlan_jie(hit: &TradeSearchHit) -> bool {
-    hit.names.iter().any(|n| n == "孑")
-        && hit
-            .names
-            .iter()
-            .any(|n| KARLAN_TRADE_NAMES.contains(&n.as_str()))
+    hit.names.iter().any(|n| n == "孑") && hit.names.iter().any(|n| n == "银灰")
 }
 
 fn pick_disjoint_trade_hit(
@@ -540,6 +535,30 @@ mod tests {
         assert!(hit.names.iter().any(|n| n == "银灰"), "{hit:?}");
         assert_eq!(hit.rule_id, None);
         assert!((hit.final_efficiency.as_f64() * 100.0) >= 120.0, "{hit:?}");
+    }
+
+    #[test]
+    fn karlan_hit_filter_requires_silverash_and_jie_together() {
+        let hit = |names: &[&str]| TradeSearchHit {
+            names: names.iter().map(|n| n.to_string()).collect(),
+            gold_names: vec![],
+            originium_names: vec![],
+            final_efficiency: Efficiency::ZERO,
+            mechanic_equivalent_efficiency: Efficiency::ZERO,
+            rule_id: None,
+            unit_trade_per_day: 0.0,
+            unit_gold_per_day: 0.0,
+            unit_originium_per_day: 0.0,
+            breakdown: None,
+        };
+        assert!(hit_karlan_jie(&hit(&["孑", "银灰", "琳琅诗怀雅"])));
+        assert!(hit_karlan_jie(&hit(&["孑", "银灰"])));
+        assert!(
+            !hit_karlan_jie(&hit(&["孑", "崖心", "琳琅诗怀雅"])),
+            "孑加崖心不是喀兰核心"
+        );
+        assert!(!hit_karlan_jie(&hit(&["孑", "讯使", "角峰"])));
+        assert!(!hit_karlan_jie(&hit(&["银灰", "崖心", "角峰"])));
     }
 
     #[test]
