@@ -7697,14 +7697,25 @@ fn filter_operbox_for_24_24(operbox: &OperBox) -> OperBox {
         "歌蕾蒂娅",
     ];
 
-    // 只过滤 owned HashMap，不克隆 entries（性能优化）
+    // entries 与 owned 必须同步：部分路径按 entry.own 筛候选，部分按 owned 判断拥有。
     let mut filtered_owned = operbox.owned.clone();
     for name in FORBIDDEN_NAMES_24_24 {
         filtered_owned.remove(*name);
     }
+    let entries = operbox
+        .entries
+        .iter()
+        .map(|entry| {
+            let mut entry = entry.clone();
+            if FORBIDDEN_NAMES_24_24.contains(&entry.name.as_str()) {
+                entry.own = false;
+            }
+            entry
+        })
+        .collect();
 
     OperBox {
-        entries: operbox.entries.clone(),
+        entries,
         owned: filtered_owned,
     }
 }
