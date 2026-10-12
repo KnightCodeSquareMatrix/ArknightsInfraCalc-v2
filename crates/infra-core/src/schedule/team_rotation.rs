@@ -7674,39 +7674,37 @@ fn schedule_main_backup_24_24(
     )
 }
 
-/// 为 24/24 模式过滤 operbox：移除德克萨斯、拉普兰德，以及心情增加≥0.5的干员
+/// 为 24/24 模式过滤 operbox：移除德克萨斯、拉普兰德，以及心情消耗增加≥0.5的干员
 fn filter_operbox_for_24_24(operbox: &OperBox) -> OperBox {
+    // 德拉特殊组合：两人互增 drain=1.9/h，24h 撑不住
+    // drain_delta >= 0.5 的干员（从 mood_model.json 读取）
     const FORBIDDEN_NAMES_24_24: &[&str] = &[
         "德克萨斯",
         "拉普兰德",
-        // TODO: 补充其他 drain >= 1.0 的干员名单（需要从 mood_model 读取）
-        // 暂时硬编码已知的高耗心情干员
-        "歌蕾蒂娅",
+        // operator_mood_skills 中 drain_delta >= 0.5 的干员
+        "地灵",
         "夕",
+        "怒潮凛冬",
+        "惊蛰",
+        "斥罪",
+        "水灯心",
+        "涤火杰西卡",
+        "见行者",
+        "重岳",
+        "阿",
         "麒麟R夜刀",
+        // todo 区特殊干员
+        "歌蕾蒂娅",
     ];
 
-    let mut filtered_entries = Vec::new();
-    let mut filtered_owned = std::collections::HashMap::new();
-
-    for entry in &operbox.entries {
-        if FORBIDDEN_NAMES_24_24.contains(&entry.name.as_str()) {
-            // 保留 entry 但标记为不拥有
-            let mut filtered_entry = entry.clone();
-            filtered_entry.own = false;
-            filtered_entries.push(filtered_entry);
-        } else {
-            filtered_entries.push(entry.clone());
-            if entry.own {
-                if let Some(progress) = operbox.owned.get(&entry.name) {
-                    filtered_owned.insert(entry.name.clone(), *progress);
-                }
-            }
-        }
+    // 只过滤 owned HashMap，不克隆 entries（性能优化）
+    let mut filtered_owned = operbox.owned.clone();
+    for name in FORBIDDEN_NAMES_24_24 {
+        filtered_owned.remove(*name);
     }
 
     OperBox {
-        entries: filtered_entries,
+        entries: operbox.entries.clone(),
         owned: filtered_owned,
     }
 }
