@@ -14,8 +14,8 @@ use crate::manufacture::solver::{
     solve_manufacture, solve_manufacture_with_shift, ManuProdBreakdown, ManuStorageBreakdown,
 };
 use crate::pool::{
-    combinations_indices, combinations_indices_with_anchor, filter_general_manufacture_search_pool,
-    filter_standalone_exact_with, ManuPool, StandaloneFilter,
+    filter_general_manufacture_search_pool, filter_standalone_exact_with, ManuPool,
+    StandaloneFilter,
 };
 use crate::skill_table::SkillTable;
 use crate::types::{Action, Condition, EffectAtom, RecipeKind, SkillDef};
@@ -266,12 +266,8 @@ fn search_manufacture_single_recipe(
         )));
     }
     let operator_capacity = options.operator_capacity.clamp(1, 3);
-    let combos: Vec<Vec<usize>> = if let Some(anchor) = must_idx {
-        combinations_indices_with_anchor(n, operator_capacity, anchor).collect()
-    } else {
-        combinations_indices(n, operator_capacity).collect()
-    };
-    let combinations = combos.len() as u64;
+    let flat = flat_combinations(n, operator_capacity, must_idx);
+    let combinations = (flat.len() / operator_capacity) as u64;
     let prepare_elapsed = leaf_started.elapsed();
     perf.set_progress(
         combinations,
@@ -330,9 +326,16 @@ fn search_manufacture_single_recipe(
     );
     let evaluate_started = Instant::now();
     perf.mark_live_started();
-    let mut hits: Vec<ManuSearchHit> = combos
-        .par_iter()
-        .filter_map(|combo| {
+    struct Light {
+        idx: usize,
+        eff: Efficiency,
+        storage: i32,
+    }
+    let k = operator_capacity;
+    let mut hits: Vec<Light> = flat
+        .par_chunks(k)
+        .enumerate()
+        .filter_map(|(ci, combo)| {
             let ops: Vec<_> = combo
                 .iter()
                 .map(|i| sub.entries[*i].to_manu_operator())
@@ -348,7 +351,13 @@ fn search_manufacture_single_recipe(
                 mood: options.mood,
                 layout,
             };
-            evaluate_manufacture_room_with_shift(&base, table, recipe, options.shift_hours)
+            let (eff, storage) =
+                evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
+            Some(Light {
+                idx: ci,
+                eff,
+                storage,
+            })
         })
         .collect();
     let evaluate_elapsed = evaluate_started.elapsed();
@@ -366,12 +375,47 @@ fn search_manufacture_single_recipe(
         },
     );
     let sort_started = Instant::now();
-    hits.sort_by(compare_manufacture_hits);
+    hits.sort_by(|a, b| {
+        b.eff
+            .cmp(&a.eff)
+            .then_with(|| b.storage.cmp(&a.storage))
+            .then_with(|| {
+                let ca = &flat[a.idx * k..a.idx * k + k];
+                let cb = &flat[b.idx * k..b.idx * k + k];
+                ca.iter()
+                    .map(|i| sub.entries[*i].name.as_str())
+                    .cmp(cb.iter().map(|i| sub.entries[*i].name.as_str()))
+            })
+    });
 
     let evaluated = hits.len() as u64;
-    let best = hits.first().cloned().unwrap_or(empty_hit());
     let top_k = options.top_k.min(hits.len());
-    let top = hits.into_iter().take(top_k).collect();
+    let materialize = if hits.is_empty() { 0 } else { top_k.max(1) };
+    let mut full: Vec<ManuSearchHit> = Vec::with_capacity(materialize);
+    for light in hits.iter().take(materialize) {
+        let combo = &flat[light.idx * k..light.idx * k + k];
+        let ops: Vec<_> = combo
+            .iter()
+            .map(|i| sub.entries[*i].to_manu_operator())
+            .collect();
+        let layout = manufacture_combo_layout(&options.layout, &ops);
+        let base = ManuRoomInput {
+            level: options.level,
+            operators: ops,
+            active_recipe: recipe,
+            mood: options.mood,
+            layout,
+        };
+        let hit = evaluate_manufacture_room_with_shift(&base, table, recipe, options.shift_hours)
+            .expect("lazy manufacture hit must re-evaluate");
+        assert_eq!(
+            hit.final_efficiency, light.eff,
+            "lazy re-evaluation drifted"
+        );
+        full.push(hit);
+    }
+    let best = full.first().cloned().unwrap_or(empty_hit());
+    let top: Vec<ManuSearchHit> = full.into_iter().take(top_k).collect();
     let sort_topk_elapsed = sort_started.elapsed();
 
     let report = ManuSearchReport {
@@ -671,6 +715,61 @@ fn evaluate_manufacture_room_with_shift(
         storage,
         breakdown,
     })
+}
+
+/// 与 `combinations_indices` 同序的平铺组合：一次分配，`k` 个下标一组。
+fn flat_combinations(n: usize, k: usize, anchor: Option<usize>) -> Vec<usize> {
+    let mut out = Vec::new();
+    if k == 0 || k > n {
+        return out;
+    }
+    let mut combo = [0usize; 3];
+    for (i, slot) in combo.iter_mut().enumerate().take(k) {
+        *slot = i;
+    }
+    loop {
+        if anchor.is_none_or(|a| combo[..k].contains(&a)) {
+            out.extend_from_slice(&combo[..k]);
+        }
+        let mut i = k;
+        let mut advanced = false;
+        while i > 0 {
+            i -= 1;
+            if combo[i] != i + n - k {
+                combo[i] += 1;
+                for j in i + 1..k {
+                    combo[j] = combo[j - 1] + 1;
+                }
+                advanced = true;
+                break;
+            }
+        }
+        if !advanced {
+            break;
+        }
+    }
+    out
+}
+
+/// 只产出排序所需的 (final_efficiency, storage key)，不构造 names / breakdown。
+fn evaluate_manufacture_room_light(
+    base: &ManuRoomInput,
+    table: &SkillTable,
+    recipe: RecipeKind,
+    shift_hours: Option<f64>,
+) -> Option<(Efficiency, i32)> {
+    if !manufacture_peers_compatible(&base.operators, table) {
+        return None;
+    }
+    let result = match shift_hours {
+        Some(hours) => solve_manufacture_with_shift(base, table, hours).ok()?,
+        None => solve_manufacture(base, table).ok()?,
+    };
+    let storage = match recipe {
+        RecipeKind::Gold | RecipeKind::BattleRecord => result.storage_limit.max(0),
+        _ => 0,
+    };
+    Some((result.final_efficiency, storage))
 }
 
 fn empty_hit() -> ManuSearchHit {
