@@ -1,14 +1,14 @@
 {
   "schema_version": 4,
-  "rotation_profile": "abc_12_6_6",
-  "layout_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/layout.json",
-  "operbox_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/collected_operboxes/collected_operboxes/04-141-operbox.json",
-  "baseline_label": "/tmp/arknights-infra-calc-v2/embedded-569490ca6f04ca5f/fixtures/243/schedule_export.json (full_e2)",
+  "rotation_profile": "abc_12_12_12",
+  "layout_label": "data/fixtures/243/layout.json",
+  "operbox_label": "data/fixtures/collected_operboxes/collected_operboxes/04-141-operbox.json",
+  "baseline_label": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/fixtures/243/schedule_export.json (full_e2)",
   "summary": {
     "owned": 141,
     "tier_up_owned": 23,
-    "trade_pool_ready": 16,
-    "manufacture_pool_ready": 35
+    "trade_pool_ready": 24,
+    "manufacture_pool_ready": 34
   },
   "domains": [
     {
@@ -16,11 +16,11 @@
       "label": "贸易·订单/源石线",
       "current": {
         "operators": [
-          "梓兰",
-          "能天使",
-          "衡沙"
+          "月见夜",
+          "空爆",
+          "梓兰"
         ],
-        "final_efficiency": 1.75
+        "final_efficiency": 1.95
       },
       "baseline": {
         "operators": [
@@ -30,7 +30,7 @@
         ],
         "final_efficiency": 2.794
       },
-      "gap_ratio": -0.3736578382247674,
+      "gap_ratio": -0.3020758768790265,
       "severity": "critical"
     },
     {
@@ -39,10 +39,10 @@
       "current": {
         "operators": [
           "裁度",
-          "克洛丝",
-          "芬"
+          "雪猎",
+          "克洛丝"
         ],
-        "final_efficiency": 7.158
+        "final_efficiency": 7.06
       },
       "baseline": {
         "operators": [
@@ -52,7 +52,7 @@
         ],
         "final_efficiency": 8.392
       },
-      "gap_ratio": -0.14704480457578636,
+      "gap_ratio": -0.15872259294566252,
       "severity": "warn"
     },
     {
@@ -61,10 +61,10 @@
       "current": {
         "operators": [
           "裁度",
-          "克洛丝",
-          "芬"
+          "雪猎",
+          "克洛丝"
         ],
-        "final_efficiency": 1.749
+        "final_efficiency": 1.728
       },
       "baseline": {
         "operators": [
@@ -74,7 +74,7 @@
         ],
         "final_efficiency": 2.238
       },
-      "gap_ratio": -0.21849865951742622,
+      "gap_ratio": -0.22788203753351208,
       "severity": "critical"
     },
     {
@@ -82,11 +82,11 @@
       "label": "制造·经验产线",
       "current": {
         "operators": [
-          "铅踝",
           "泡普卡",
-          "Castle-3"
+          "香草",
+          "芬"
         ],
-        "final_efficiency": 1.83
+        "final_efficiency": 1.802
       },
       "baseline": {
         "operators": [
@@ -96,42 +96,42 @@
         ],
         "final_efficiency": 1.958
       },
-      "gap_ratio": -0.06537282941777318,
+      "gap_ratio": -0.0796731358529111,
       "severity": "ok"
     },
     {
       "id": "rotation_trade",
-      "label": "轮休·24h贸易加权",
+      "label": "轮休·36h周期归一化日均贸易加权",
       "current": {
         "operators": [],
-        "final_efficiency": 3.913
+        "final_efficiency": 4.0
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 3.84
       },
-      "gap_ratio": 0.019010416666666655,
+      "gap_ratio": 0.041666666666666706,
       "severity": "ok"
     },
     {
       "id": "rotation_manufacture",
-      "label": "轮休·24h制造加权",
+      "label": "轮休·36h周期归一化日均制造加权",
       "current": {
         "operators": [],
-        "final_efficiency": 7.492
+        "final_efficiency": 7.412
       },
       "baseline": {
         "operators": [],
         "final_efficiency": 9.084
       },
-      "gap_ratio": -0.1752531924262439,
+      "gap_ratio": -0.18405988551298985,
       "severity": "warn"
     }
   ],
   "rotation": {
-    "daily_trade_efficiency": 3.913,
-    "daily_manufacture_efficiency": 7.492,
-    "daily_power_efficiency": 1.375
+    "daily_trade_efficiency": 4.0,
+    "daily_manufacture_efficiency": 7.412,
+    "daily_power_efficiency": 1.367
   },
   "baseline_rotation": {
     "daily_trade_efficiency": 3.84,
@@ -177,29 +177,20 @@
     {
       "priority": "P2",
       "kind": "promote_tier_up",
-      "operator": "能天使",
+      "operator": "月见夜",
       "domain_id": "trade_originium",
-      "message": "将「能天使」升至 tier_up（需精2）——贸易·订单/源石线当前在用组合，现6★精1 1级",
-      "current_elite": 1,
-      "tier_up_requirement": "精2"
-    },
-    {
-      "priority": "P2",
-      "kind": "promote_tier_up",
-      "operator": "芬",
-      "domain_id": "manufacture_total",
-      "message": "将「芬」升至 tier_up（需精1）——制造·综合当前在用组合，现3★精0 1级",
+      "message": "将「月见夜」升至 tier_up（需精1）——贸易·订单/源石线当前在用组合，现3★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精1"
     },
     {
       "priority": "P2",
       "kind": "promote_tier_up",
-      "operator": "衡沙",
+      "operator": "空爆",
       "domain_id": "trade_originium",
-      "message": "将「衡沙」升至 tier_up（需精2）——贸易·订单/源石线当前在用组合，现5★精0 1级",
+      "message": "将「空爆」升至 tier_up（需精1）——贸易·订单/源石线当前在用组合，现3★精0 1级",
       "current_elite": 0,
-      "tier_up_requirement": "精2"
+      "tier_up_requirement": "精1"
     },
     {
       "priority": "P2",
@@ -207,6 +198,15 @@
       "operator": "裁度",
       "domain_id": "manufacture_total",
       "message": "将「裁度」升至 tier_up（需精2）——制造·综合当前在用组合，现5★精0 1级",
+      "current_elite": 0,
+      "tier_up_requirement": "精2"
+    },
+    {
+      "priority": "P2",
+      "kind": "promote_tier_up",
+      "operator": "雪猎",
+      "domain_id": "manufacture_total",
+      "message": "将「雪猎」升至 tier_up（需精2）——制造·综合当前在用组合，现5★精0 1级",
       "current_elite": 0,
       "tier_up_requirement": "精2"
     }
@@ -218,6 +218,6 @@
     "rotation_manufacture_warn"
   ],
   "narration_hints": [
-    "贸易可建模池偏小（16 vs 参考 75），部分干员未拥有或未录入"
+    "贸易可建模池偏小（24 vs 参考 75），部分干员未拥有或未录入"
   ]
 }
