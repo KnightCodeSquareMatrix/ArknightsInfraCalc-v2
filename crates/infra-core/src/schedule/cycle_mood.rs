@@ -60,14 +60,13 @@ pub(crate) fn validate_cycle_mood(
                 continue;
             }
             for operator in &room.operators {
-                if spec.kind == FacilityKind::TrainingRoom {
-                    return Err(Error::msg(format!(
-                        "rotation_cycle_mood_unsupported_activity: shift {} room {} operator {} has no training activity budget",
-                        index + 1, room.room_id.0, operator.name
-                    )));
-                }
-                // Workshop occupancy has no hourly cost, but is not a rest boundary.
-                let drain = if spec.kind == FacilityKind::Workshop {
+                // Workshop and training-room occupancy has no hourly cost, but is not a
+                // rest boundary. The assignment carries no training task, so a training
+                // room seat is a pure support placement without a training activity.
+                let drain = if matches!(
+                    spec.kind,
+                    FacilityKind::Workshop | FacilityKind::TrainingRoom
+                ) {
                     0.0
                 } else {
                     eta.per_op

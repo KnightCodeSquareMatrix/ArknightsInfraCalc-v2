@@ -2239,8 +2239,7 @@ mod tests {
         let manu_pool =
             build_manufacture_pool(&operbox.manufacture_roster(&instances), &instances, &table)
                 .unwrap();
-        let power_pool =
-            build_power_pool(&operbox.power_roster(&instances), &instances, &table).unwrap();
+        let power_pool = build_power_pool_with_fillers(&operbox, &instances, &table).unwrap();
         let run = AssignmentRun::new(
             &blueprint,
             &operbox,

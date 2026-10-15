@@ -68,6 +68,7 @@ pub fn build_plan_with_runtime(
         preferences,
         &std::collections::HashSet::new(),
         false,
+        None,
         mode,
         seed,
         skip_system_ids,
@@ -87,6 +88,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     preferences: &std::collections::HashMap<String, String>,
     skipped_optional_control_roles: &std::collections::HashSet<(String, String, String)>,
     support_combinations_enable: bool,
+    registry_sustain_hours: Option<f64>,
     mode: AssignShiftMode,
     seed: &BaseAssignment,
     skip_system_ids: &std::collections::HashSet<String>,
@@ -143,6 +145,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             seed,
             skip_system_ids,
             disabled_conditional_packs,
+            registry_sustain_hours,
         )?;
         plan.support_combinations_enable = support_combinations_enable;
         if crate::layout::blackkey_witch_same_trade_room(&scratch, blueprint) {
@@ -172,6 +175,7 @@ fn compile_plan_once(
     seed: &BaseAssignment,
     skip_system_ids: &std::collections::HashSet<String>,
     disabled_conditional_packs: &std::collections::HashSet<String>,
+    registry_sustain_hours: Option<f64>,
 ) -> Result<(AssignmentPlan, BaseAssignment)> {
     // priority >= 19 是用户确认的硬/主要体系；先于 legacy registry 编译。
     let mut compiled = compile_rules(
@@ -210,6 +214,7 @@ fn compile_plan_once(
         &used,
         &registry_skip,
         &compiled.claimed_exclusive_groups,
+        registry_sustain_hours.filter(|_| mode == AssignShiftMode::Peak),
     );
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(

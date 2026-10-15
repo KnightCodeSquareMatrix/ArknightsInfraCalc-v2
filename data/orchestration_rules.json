@@ -219,6 +219,7 @@
             { "id": "xi", "facility": "control_center", "candidates": [{ "name": "夕", "elite": 0 }], "min_count": 0 },
             {
               "id": "dorm_perception",
+              "proactive_support": true,
               "facility": "dormitory",
               "candidates": [{ "name": "爱丽丝", "elite": 2 }, { "name": "车尔尼", "elite": 2 }],
               "min_count": 0,
@@ -227,6 +228,7 @@
             },
             {
               "id": "dorm_silent_echo",
+              "proactive_support": true,
               "facility": "dormitory",
               "candidates": [{ "name": "塑心", "elite": 0 }],
               "min_count": 0,
@@ -311,6 +313,7 @@
             { "id": "xi", "facility": "control_center", "candidates": [{ "name": "夕", "elite": 0 }], "min_count": 0 },
             {
               "id": "dorm_perception",
+              "proactive_support": true,
               "facility": "dormitory",
               "candidates": [{ "name": "爱丽丝", "elite": 2 }, { "name": "车尔尼", "elite": 2 }],
               "min_count": 0,
@@ -319,6 +322,7 @@
             },
             {
               "id": "dorm_silent_echo",
+              "proactive_support": true,
               "facility": "dormitory",
               "candidates": [{ "name": "塑心", "elite": 0 }],
               "min_count": 0,
@@ -759,7 +763,8 @@
               "consumer_roles": ["nasti", "muelsyse"],
               "required_roles": ["rhine_support"]
             }
-          ]
+          ],
+          "bind_all": true
         },
         {
           "id": "nasti_actual_support",
@@ -789,7 +794,8 @@
               "consumer_roles": ["nasti"],
               "required_roles": ["rhine_support"]
             }
-          ]
+          ],
+          "bind_all": true
         },
         {
           "id": "muelsyse_actual_support",
@@ -817,7 +823,8 @@
               "consumer_roles": ["muelsyse"],
               "required_roles": ["rhine_support"]
             }
-          ]
+          ],
+          "bind_all": true
         }
       ]
     }

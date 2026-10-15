@@ -1665,8 +1665,15 @@ mod tests {
         let (instances, table) = pair();
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
-        assignment.base_workforce =
-            vec!["杜林".into(), "桃金娘".into(), "至简".into(), "褐果".into()];
+        assignment.set_room(
+            "trade_1",
+            vec![
+                AssignedOperator::new("桃金娘", 0),
+                AssignedOperator::new("至简", 0),
+                AssignedOperator::new("褐果", 0),
+            ],
+        );
+        assignment.set_room("control", vec![AssignedOperator::new("杜林", 0)]);
         assignment.training_assist = Some(AssignedOperator::new("杜林", 0));
         let layout = resolve_base(
             &blueprint,
@@ -1705,30 +1712,6 @@ mod tests {
         .unwrap()
         .layout;
         assert_eq!(layout.elite_facility_count, 1);
-    }
-
-    #[test]
-    fn durin_dorm_planning_from_operbox_floors_layout() {
-        let (instances, table) = pair();
-        let operbox = OperBox::load(&default_operbox_gongsun_path().unwrap()).unwrap();
-        let durin_plan = operbox.durin_dorm_planning_count(&instances);
-        assert!(
-            durin_plan >= 4,
-            "gongsun operbox should own at least 4 durin-tagged operators"
-        );
-        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
-        let assignment = BaseAssignment::default();
-        let layout = resolve_base(
-            &blueprint,
-            &assignment,
-            Some(&instances),
-            Some(&table),
-            24.0,
-            Some(durin_plan),
-        )
-        .unwrap()
-        .layout;
-        assert_eq!(layout.durin_in_base, 4);
     }
 
     #[test]

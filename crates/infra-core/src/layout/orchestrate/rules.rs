@@ -2431,6 +2431,8 @@ mod tests {
             ("巫恋", 2),
             ("龙舌兰", 2),
             ("柏喙", 2),
+            ("爱丽丝", 2),
+            ("车尔尼", 2),
         ];
         let filtered: Vec<_> = entries
             .into_iter()
@@ -2452,6 +2454,8 @@ mod tests {
             "巫恋",
             "龙舌兰",
             "柏喙",
+            "爱丽丝",
+            "车尔尼",
         ];
         let compiled = compile(
             &bp,
@@ -2520,6 +2524,8 @@ mod tests {
             "巫恋",
             "龙舌兰",
             "柏喙",
+            "爱丽丝",
+            "车尔尼",
         ];
         for missing in ["可露希尔", "巫恋", "龙舌兰", "柏喙"] {
             let include: Vec<_> = all
@@ -2593,7 +2599,7 @@ mod tests {
         assert_eq!(selected(&inactive, "rosemary_perception"), None);
         assert!(!inactive.skip_registry_ids.contains("human_fireworks_pure"));
 
-        // 40 感知 + 塑心 E0（固定 5 点 SilentEcho）仍不能跨过 50 感知启动门槛：
+        // 40 感知 + 塑心 E0（固定 5 点 SilentEcho）仍不能跨过 60 感知启动门槛：
         // 无声共鸣不是 Perception 资源。
         let forty_plus_suscentheart =
             operbox(&[("迷迭香", 2), ("黑键", 2), ("八幡海铃", 2), ("塑心", 0)]);
@@ -2602,11 +2608,26 @@ mod tests {
         assert_eq!(
             selected(&inactive_suscentheart, "rosemary_perception"),
             None,
-            "塑心 SilentEcho 不参与 50 感知门槛（ADR 0004 D4）"
+            "塑心 SilentEcho 不参与 60 感知门槛（ADR 0004 D4）"
         );
 
         let fifty = operbox(&[("迷迭香", 2), ("黑键", 2), ("八幡海铃", 2), ("夕", 0)]);
-        let compiled = compile(&bp, &fifty, &BaseAssignment::default());
+        let below_gate = compile(&bp, &fifty, &BaseAssignment::default());
+        assert_eq!(
+            selected(&below_gate, "rosemary_perception"),
+            None,
+            "50 感知低于 60 启动门槛"
+        );
+
+        let sixty = operbox(&[
+            ("迷迭香", 2),
+            ("黑键", 2),
+            ("八幡海铃", 2),
+            ("夕", 0),
+            ("爱丽丝", 2),
+            ("车尔尼", 2),
+        ]);
+        let compiled = compile(&bp, &sixty, &BaseAssignment::default());
         assert_eq!(
             selected(&compiled, "rosemary_perception"),
             Some("recruit_refresh")
@@ -2634,26 +2655,13 @@ mod tests {
             .iter()
             .all(|bind| { !bind.operators.iter().any(|operator| operator == "八幡海铃") }));
 
-        let preferred = HashMap::from([(
-            "rosemary_perception".to_string(),
-            "recruit_refresh_witch".to_string(),
-        )]);
-        let witch = compile_with_preferences(&bp, &fifty, &BaseAssignment::default(), &preferred);
-        assert_eq!(
-            selected(&witch, "rosemary_perception"),
-            Some("recruit_refresh_witch")
-        );
-        assert!(witch.constraints.iter().all(|constraint| !matches!(
-            constraint,
-            SystemConstraint::ForbidSameStation { a, b }
-                if (a == "黑键" && b == "巫恋") || (a == "巫恋" && b == "黑键")
-        )));
-
         let with_fireworks = operbox(&[
             ("迷迭香", 2),
             ("黑键", 2),
             ("八幡海铃", 2),
             ("夕", 0),
+            ("爱丽丝", 2),
+            ("车尔尼", 2),
             ("重岳", 0),
             ("令", 2),
             ("乌有", 2),

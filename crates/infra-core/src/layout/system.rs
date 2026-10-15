@@ -585,6 +585,7 @@ pub fn select_registry_systems(
     used: &HashSet<String>,
     skip_system_ids: &HashSet<String>,
     inherited_exclusive_groups: &HashSet<String>,
+    sustain_hours: Option<f64>,
 ) -> Vec<RegistrySystemClaim> {
     let Some(cache) = base_systems_cache() else {
         return Vec::new();
@@ -606,6 +607,7 @@ pub fn select_registry_systems(
         &mut scratch_used,
         &mut claimed_groups,
         skip_system_ids,
+        sustain_hours,
         &mut selected,
     );
 
@@ -620,6 +622,7 @@ pub fn select_registry_systems(
         &mut scratch_used,
         &mut claimed_groups,
         skip_system_ids,
+        sustain_hours,
         &mut selected,
     );
 
@@ -690,6 +693,7 @@ fn select_tier(
     scratch_used: &mut HashSet<String>,
     claimed_groups: &mut HashSet<String>,
     skip_system_ids: &HashSet<String>,
+    sustain_hours: Option<f64>,
     out: &mut Vec<RegistrySystemClaim>,
 ) {
     for system in systems_by_tier_and_priority(cache, tier) {
@@ -709,12 +713,51 @@ fn select_tier(
         else {
             continue;
         };
+        if let Some(hours) = sustain_hours {
+            if !claim_control_pins_sustain(&plan.claim, hours) {
+                continue;
+            }
+        }
         apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
         if let Some(group) = system.exclusive_group.clone() {
             claimed_groups.insert(group);
         }
         out.push(plan.claim);
     }
+}
+
+/// Variant C: a system is sustainable for `hours` of continuous work when every
+/// operator it pins into the control room (non-search slots) can carry `hours`
+/// with only the pinned set's own mutual recovery and a full five-person
+/// control room. The remaining control slots are assumed to be filled by
+/// non-recovery operators, so no external recovery is credited.
+fn claim_control_pins_sustain(claim: &RegistrySystemClaim, hours: f64) -> bool {
+    let pinned: Vec<(String, u8)> = claim
+        .slots
+        .iter()
+        .filter(|slot| slot.facility == FacilityKind::ControlCenter)
+        .filter(|slot| slot.fill != SlotFillMode::Search)
+        .flat_map(|slot| slot.operators.iter().map(|op| (op.name.clone(), op.elite)))
+        .collect();
+    if pinned.is_empty() {
+        return true;
+    }
+    let Ok(model) = crate::mood::default_mood_model() else {
+        return true;
+    };
+    pinned.iter().all(|(name, elite)| {
+        let inputs = crate::mood::DrainInputs {
+            name,
+            elite: *elite,
+            facility: FacilityKind::ControlCenter,
+            room_ops: &pinned,
+            full_control: true,
+            control_ops: &pinned,
+            recipe: None,
+        };
+        let x = crate::mood::operator_net_drain(model, &inputs);
+        crate::mood::fits_work_budget(model, model.mood_cap, x, hours)
+    })
 }
 
 fn explain_tier(
@@ -902,6 +945,7 @@ pub fn claim_base_systems(
         used,
         skip_system_ids,
         &HashSet::new(),
+        None,
     );
     for claim in selected {
         apply_registry_system_claim(blueprint, &claim, assignment, used)?;
@@ -1238,6 +1282,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            None,
         );
         let ling = claims
             .iter()
@@ -1283,10 +1328,47 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            None,
         );
         assert!(!claims
             .iter()
             .any(|claim| claim.system_id == "ling_jie_karlan"));
+    }
+
+    /// 体系自己钉死的中枢成员必须撑得住连续工作时长：麒麟R夜刀净消耗 1.25/h，
+    /// 24h 需 30 点超过 24 的上限（12/12/12），18h 需 22.5 点可以（12/6/6）。
+    #[test]
+    fn registry_rejects_system_whose_control_pins_cannot_sustain_peak_hours() {
+        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
+        let operbox = ideal_e2_operbox();
+        assert!(
+            operbox.owns("火龙S黑角") && operbox.owns("麒麟R夜刀"),
+            "夹具必须拥有怪猎对，否则本测试什么都没验证"
+        );
+        let select = |hours: Option<f64>| {
+            select_registry_systems(
+                &blueprint,
+                &operbox,
+                AssignShiftMode::Peak,
+                &BaseAssignment::default(),
+                &HashSet::new(),
+                &HashSet::new(),
+                &HashSet::new(),
+                hours,
+            )
+        };
+        let has_snhunt = |claims: &[RegistrySystemClaim]| {
+            claims
+                .iter()
+                .any(|claim| claim.system_id.starts_with("snhunt_monhun_control"))
+        };
+        // 不检查时长：体系照常认领，作为对照。
+        assert!(has_snhunt(&select(None)), "对照：不限时长时应认领怪猎体系");
+        assert!(has_snhunt(&select(Some(18.0))), "18h 撑得住，应保留");
+        assert!(
+            !has_snhunt(&select(Some(24.0))),
+            "24h 麒麟R夜刀撑不住，体系应整体不可用"
+        );
     }
 
     #[test]
@@ -1309,6 +1391,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            None,
         );
         assert!(!claims
             .iter()

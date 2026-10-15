@@ -27,6 +27,33 @@ mod tests {
     use crate::layout::BaseBlueprint;
     use crate::operbox::OperBox;
 
+    /// 与 `build_plan` 相同，但显式开启主动挂件组合（默认关闭）。
+    fn build_plan_support_enabled(
+        blueprint: &BaseBlueprint,
+        operbox: &OperBox,
+    ) -> crate::error::Result<AssignmentPlan> {
+        let instances = crate::instances::OperatorInstances::load(
+            &crate::instances::default_instances_path()?,
+        )?;
+        let table =
+            crate::skill_table::SkillTable::load(&crate::skill_table::default_skill_table_path()?)?;
+        build_plan_with_runtime_and_disabled_packs(
+            blueprint,
+            operbox,
+            &instances,
+            &table,
+            24.0,
+            &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
+            true,
+            None,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &std::collections::HashSet::new(),
+            &mut std::collections::HashSet::new(),
+        )
+    }
+
     #[test]
     fn mujica_fallback_requires_full_roster_and_no_other_cross_station_plan() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
@@ -259,7 +286,10 @@ mod tests {
             &operbox,
             &instances,
             &table,
-            &crate::layout::AssignBaseOptions::default(),
+            &crate::layout::AssignBaseOptions {
+                support_combinations_enable: true,
+                ..Default::default()
+            },
             AssignShiftMode::Peak,
             &BaseAssignment::default(),
         )
@@ -470,14 +500,7 @@ mod tests {
         if !operbox.owns("迷迭香") || !operbox.owns("黑键") {
             return;
         }
-        let plan = build_plan(
-            &blueprint,
-            &operbox,
-            AssignShiftMode::Peak,
-            &BaseAssignment::default(),
-            &std::collections::HashSet::new(),
-        )
-        .unwrap();
+        let plan = build_plan_support_enabled(&blueprint, &operbox).unwrap();
         // 两名硬核心都必须作为 required anchor 汇入 plan。
         assert!(
             plan.anchors.iter().any(|a| a.operator == "迷迭香"
@@ -663,14 +686,7 @@ mod tests {
         for name in ["但书", "八幡海铃", "伺夜", "贝洛内"] {
             assert!(operbox.owns(name), "ideal E2 fixture must own {name}");
         }
-        let plan = build_plan(
-            &blueprint,
-            &operbox,
-            AssignShiftMode::Peak,
-            &BaseAssignment::default(),
-            &std::collections::HashSet::new(),
-        )
-        .unwrap();
+        let plan = build_plan_support_enabled(&blueprint, &operbox).unwrap();
         let executed = execute_plan(
             &blueprint,
             &operbox,

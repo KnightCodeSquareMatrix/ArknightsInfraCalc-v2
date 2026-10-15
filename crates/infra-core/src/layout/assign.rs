@@ -52,6 +52,9 @@ pub struct AssignBaseOptions {
     /// Optional control-combination work budget for an explicit timed profile.
     /// None preserves standalone and existing rotation selection policies.
     pub control_work_hours: Option<f64>,
+    /// Variant C: peak-step registry selection rejects a system whose own control pins
+    /// cannot sustain this many continuous hours. None disables the check.
+    pub registry_sustain_hours: Option<f64>,
     /// 中枢分配时跳过 standalone_roster 白名单过滤（轮换编排中体系绑定干员可能不在白名单内）。
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
@@ -78,6 +81,7 @@ impl Default for AssignBaseOptions {
             mood: 24.0,
             shift_hours: 24.0,
             control_work_hours: None,
+            registry_sustain_hours: None,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
             skipped_optional_control_roles: HashSet::new(),
@@ -363,6 +367,7 @@ fn assign_shift_with_preclaimed_plan_inner(
             &options.system_preferences,
             &options.skipped_optional_control_roles,
             options.support_combinations_enable,
+            options.registry_sustain_hours,
             mode,
             planning_seed,
             &skip_system_ids,
@@ -505,7 +510,6 @@ pub fn pinned_assignment_excluding(
 mod tests {
     use super::commit::{commit_manu_room, manu_hit_names};
     use super::manufacture_fill::{manufacture_candidate_pool_for_demand, pick_manu_hit};
-    use super::producer_fill::cleanup_unused_sphinx_urrbian_dorm_anchor;
     use super::*;
     use crate::layout::resolve::resolve_base;
     use std::collections::HashSet;
@@ -582,84 +586,6 @@ mod tests {
             buff_ids,
             crate::roster::OperatorProgress::elite_only(0),
         )
-    }
-
-    #[test]
-    fn sphinx_urrbian_anchor_places_urrbian_in_dorm_base_workforce() {
-        let (blueprint, _, instances, table) = fixtures();
-        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
-        let mut assignment = BaseAssignment::default();
-        let mut used = HashSet::new();
-
-        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
-
-        assert!(used.contains("乌尔比安"));
-        assert!(
-            assignment
-                .iter_rooms()
-                .any(|room| room.room_id.0.starts_with("dorm_")
-                    && room.operators.iter().any(|op| op.name == "乌尔比安")),
-            "深巡存在时应把乌尔比安作为宿舍进驻锚点"
-        );
-        let layout = resolve_base(
-            &blueprint,
-            &assignment,
-            Some(&instances),
-            Some(&table),
-            24.0,
-            None,
-        )
-        .unwrap()
-        .layout;
-        assert!(
-            layout.base_workforce.iter().any(|name| name == "乌尔比安"),
-            "宿舍进驻的乌尔比安应进入 OperatorInBase 判定"
-        );
-    }
-
-    #[test]
-    fn sphinx_urrbian_anchor_is_removed_when_sphinx_not_assigned() {
-        let (blueprint, _, _, _) = fixtures();
-        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
-        let mut assignment = BaseAssignment::default();
-        let mut used = HashSet::new();
-
-        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
-        cleanup_unused_sphinx_urrbian_dorm_anchor(&blueprint, &mut assignment, &mut used);
-
-        assert!(!used.contains("乌尔比安"));
-        assert!(
-            !assignment.iter_rooms().any(|room| {
-                room.room_id.0.starts_with("dorm_")
-                    && room.operators.iter().any(|op| op.name == "乌尔比安")
-            }),
-            "深巡未进贸易站时，不应保留乌尔比安宿舍锚点"
-        );
-    }
-
-    #[test]
-    fn sphinx_urrbian_anchor_stays_when_sphinx_is_assigned() {
-        let (blueprint, _, _, _) = fixtures();
-        let operbox = operbox_from_names(&[("深巡", 2, 6), ("乌尔比安", 2, 6)]);
-        let mut assignment = BaseAssignment::default();
-        let mut used = HashSet::new();
-
-        assign_sphinx_urrbian_dorm_anchor(&blueprint, &operbox, &mut assignment, &mut used);
-        assignment.set_room(
-            RoomId::from("trade_1"),
-            vec![AssignedOperator::new("深巡", 2)],
-        );
-        used.insert("深巡".to_string());
-        cleanup_unused_sphinx_urrbian_dorm_anchor(&blueprint, &mut assignment, &mut used);
-
-        assert!(used.contains("乌尔比安"));
-        assert!(
-            assignment.iter_rooms().any(|room| {
-                room.room_id.0.starts_with("dorm_")
-                    && room.operators.iter().any(|op| op.name == "乌尔比安")
-            }),
-            "深巡进贸易站时，应保留乌尔比安作为 OperatorInBase 锚点"
-        );
     }
 
     #[test]

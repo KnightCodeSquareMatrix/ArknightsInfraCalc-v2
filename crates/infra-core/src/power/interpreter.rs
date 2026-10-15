@@ -131,12 +131,20 @@ fn resolve_selector_value(ctx: &PowerContext, selector: Option<&Selector>) -> f6
         Some(Selector::DormLevelSum) => f64::from(ctx.layout.dorm_level_sum),
         Some(Selector::RhineLifeInBase) => f64::from(ctx.layout.rhine_life_in_base),
         Some(Selector::RhineLifeInBaseExcludingSelf) => {
+            // rhine_life_in_base 只在本人已经在基建内时才含本人；候选评估时布局里还没有她，
+            // 此时不能再减 1，否则会少算一名其他莱茵干员。
             let mut n = ctx.layout.rhine_life_in_base;
-            if ctx
-                .operator
-                .tags
+            let self_counted = ctx
+                .layout
+                .base_workforce
                 .iter()
-                .any(|t| t == crate::layout::TAG_RHINE)
+                .any(|name| name == &ctx.operator.name);
+            if self_counted
+                && ctx
+                    .operator
+                    .tags
+                    .iter()
+                    .any(|t| t == crate::layout::TAG_RHINE)
             {
                 n = n.saturating_sub(1);
             }

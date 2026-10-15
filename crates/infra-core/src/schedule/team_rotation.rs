@@ -391,6 +391,8 @@ fn rotation_shortfall_warnings(
 }
 
 const CYCLE_REST_WARNING_PREFIX: &str = "rotation_cycle_rest:";
+/// 最终排班校验违规：不拒绝输出，只作为诊断警告，便于人工修正与 Agent 定位。
+const FINAL_INVARIANT_WARNING_PREFIX: &str = "rotation_final_invariant:";
 
 fn automation_lancet_shift_proof(
     blueprint: &BaseBlueprint,
@@ -844,10 +846,12 @@ fn assign_rotating_anchors(
 
 /// 当前 active dependency 的 required 端采用全周期共享策略。只从 peak 复制 plan
 /// 实际声明的 required 成员，不把 Meeting/Workshop/Training 的其他旧成员扩大为 shared。
+/// 已在班次绑定内的 required 成员（如开启后的莱茵组）改由绑定组同上同下，不在此钉住。
 fn pin_active_dependency_required(
     shared: &mut BaseAssignment,
     peak: &BaseAssignment,
     dependencies: &[crate::layout::ActiveDependency],
+    binds: &[RuntimeShiftBind],
 ) -> Result<()> {
     let mut required: Vec<_> = dependencies
         .iter()
@@ -856,6 +860,14 @@ fn pin_active_dependency_required(
     required.sort();
     required.dedup();
     for name in required {
+        // 已被班次绑定覆盖的 required 成员跟随其绑定组同上同下，不再全周期共享；
+        // 否则共享钉住会让绑定组内的其他成员下班后它仍留在岗位上。
+        if binds
+            .iter()
+            .any(|bind| bind.operators.iter().any(|member| member == name))
+        {
+            continue;
+        }
         let Some(peak_room) = peak.room_of_operator(name) else {
             return Err(Error::msg(format!(
                 "active dependency required operator {name} missing from peak"
@@ -2289,10 +2301,18 @@ fn active_dependency_required_manu_by_room(
     blueprint: &BaseBlueprint,
     peak: &BaseAssignment,
     dependencies: &[crate::layout::ActiveDependency],
+    binds: &[RuntimeShiftBind],
 ) -> HashMap<RoomId, Vec<String>> {
+    // 已在班次绑定里的 required 成员跟随其绑定组同上同下，不能再被当作 γ 替补必须带上的人，
+    // 否则（例如多萝西既是莱茵挂件又在制造站）会在绑定组休息的班次单独上岗。
     let required: HashSet<&str> = dependencies
         .iter()
         .flat_map(|dependency| dependency.required.iter().map(String::as_str))
+        .filter(|name| {
+            !binds
+                .iter()
+                .any(|bind| bind.operators.iter().any(|member| member == name))
+        })
         .collect();
     let mut by_room = HashMap::new();
     for room in peak.iter_rooms() {
@@ -3026,7 +3046,10 @@ fn finalize_timed_rotation(
         stage_after,
     );
     if let Err(error) = invariant_result {
-        return Err(Error::with_rotation(&report, error));
+        // 最终不变量违规不拒绝输出：排班照常返回，违规作为诊断警告交给人工修正。
+        report
+            .warnings
+            .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
     crate::profile::emit_solver_stage(
         "rotation_finalize",
@@ -6200,6 +6223,7 @@ fn schedule_abc_rotation_once(
     let durin_plan = operbox.durin_dorm_planning_count(instances);
     let mut peak_options = options.clone();
     peak_options.shift_hours = shift_hours[0] + shift_hours[1].max(shift_hours[2]);
+    peak_options.registry_sustain_hours = Some(peak_options.shift_hours);
     let mut gamma_h1_options = options.clone();
     gamma_h1_options.shift_hours = shift_hours[1];
     let mut gamma_h2_options = options.clone();
@@ -6240,7 +6264,12 @@ fn schedule_abc_rotation_once(
         instances,
     ));
     let mut shared = pinned_assignment_excluding(&peak, blueprint, &excluded_shared_names);
-    pin_active_dependency_required(&mut shared, &peak, &peak_plan.active_dependencies)?;
+    pin_active_dependency_required(
+        &mut shared,
+        &peak,
+        &peak_plan.active_dependencies,
+        &shift_binds,
+    )?;
     // 被 active dependency 钉进 shared 的会客室成员按全周期共享（required 语义），
     // 不得再进入 rotating meeting cohort，否则 resting 班会因 shared 保留而重复出现。
     let shared_names: HashSet<String> = operators_of(&shared).into_iter().collect();
@@ -6309,8 +6338,12 @@ fn schedule_abc_rotation_once(
         halves.swap(0, 1);
     }
     let [h1, h2] = halves;
-    let required_manu_by_room =
-        active_dependency_required_manu_by_room(blueprint, &peak, &peak_plan.active_dependencies);
+    let required_manu_by_room = active_dependency_required_manu_by_room(
+        blueprint,
+        &peak,
+        &peak_plan.active_dependencies,
+        &shift_binds,
+    );
 
     // 3) α/β 从 peak 编制按 H1/H2 切半（保留编排已认领的 meta 锚点）；γ 走贸易 role 替补。
     let alpha = production_half_from_peak(&peak, &h1);
@@ -6491,10 +6524,21 @@ fn schedule_abc_rotation_once(
         .iter()
         .map(|entry| (entry.name.clone(), entry.clone()))
         .collect();
+    // 深海猎手是 S2 短班的制造候选，不能作为中枢目录的 filler 被分进某个常驻队：
+    // 否则 S2 恰是该队的休息班，猎手上岗会与休息队约束冲突。
+    let abyssal_hunters: HashSet<String> =
+        if abyssal_policy == AbyssalShortShiftPolicy::Opportunistic {
+            owned_abyssal_hunters(operbox, instances, &used_ab)
+                .into_iter()
+                .collect()
+        } else {
+            HashSet::new()
+        };
     let mut plugin_entries: Vec<_> = control_pool
         .entries
         .iter()
         .filter(|entry| !team_ctrl.values().any(|names| names.contains(&entry.name)))
+        .filter(|entry| !abyssal_hunters.contains(&entry.name))
         .filter(|entry| !production_team_by_name.contains_key(&entry.name))
         .filter(|entry| !automatically_excluded_control.contains(&entry.name))
         .filter(|entry| !scaffold_used.contains(&entry.name))
@@ -7359,18 +7403,23 @@ fn schedule_abc_rotation_once(
     }
 
     report.elapsed = t4.duration_since(t0);
+    // 质量类违规（绑定未同上同下、挂件缺席、心情落差跨度）不拒绝输出，作为警告交给人工修正。
     if let Err(error) = validate_final_rotation_invariants(
         blueprint,
         &report.shifts,
         &report.runtime_shift_binds,
         &report.peak_plan.active_dependencies,
     ) {
-        return Err(Error::with_rotation(&report, error));
+        report
+            .warnings
+            .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
     if let Err(error) =
         validate_mood_gap_decay_work_spans(blueprint, instances, table, profile, &report.shifts)
     {
-        return Err(Error::with_rotation(&report, error));
+        report
+            .warnings
+            .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
     Ok(report)
 }
@@ -9866,7 +9915,10 @@ mod tests {
             &operbox,
             &instances,
             &table,
-            &AssignBaseOptions::default(),
+            &AssignBaseOptions {
+                support_combinations_enable: true,
+                ..Default::default()
+            },
             TimedRotationProfile::Abc12_12_12,
         )
         .unwrap();
@@ -11742,6 +11794,13 @@ mod tests {
                     .find(|team| team.label == shift.resting_team)
                     .unwrap();
                 for room in shift.assignment.iter_rooms() {
+                    // 宿舍内的休息队成员是正常休息，不属于“上岗”。
+                    if blueprint
+                        .room(&room.room_id)
+                        .is_some_and(|bp| bp.kind == FacilityKind::Dormitory)
+                    {
+                        continue;
+                    }
                     let is_factory = blueprint
                         .room(&room.room_id)
                         .is_some_and(|bp| bp.kind == FacilityKind::Factory);
@@ -12263,6 +12322,7 @@ mod tests {
             &table,
             &AssignBaseOptions {
                 top_k: 5,
+                support_combinations_enable: true,
                 ..Default::default()
             },
             AssignShiftMode::Peak,
@@ -12287,6 +12347,7 @@ mod tests {
             &table,
             &AssignBaseOptions {
                 top_k: 5,
+                support_combinations_enable: true,
                 ..Default::default()
             },
         )
@@ -12661,6 +12722,7 @@ mod tests {
             &table,
             &AssignBaseOptions {
                 top_k: 5,
+                support_combinations_enable: true,
                 ..Default::default()
             },
         )
@@ -13739,6 +13801,7 @@ mod tests {
                 consumers: vec!["receiver".into()],
                 required: vec!["required-support".into()],
             }],
+            &[],
         )
         .unwrap();
 

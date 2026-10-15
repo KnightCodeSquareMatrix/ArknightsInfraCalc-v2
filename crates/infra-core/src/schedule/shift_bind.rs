@@ -239,8 +239,11 @@ pub fn verify_shift_binds(
                 ));
             }
         }
-        let team = team_of_operator(report, present[0])
-            .ok_or_else(|| format!("{}: 未找到 {} 所属队", label, present[0]))?;
+        // 宿舍常驻干员（如塑心）不属于任何轮换队，取第一个有队伍归属的在岗者代表绑定组。
+        let team = present
+            .iter()
+            .find_map(|name| team_of_operator(report, name))
+            .ok_or_else(|| format!("{}: 绑定组内无任何干员属于轮换队", label))?;
         if bind.off_shifts > 0 {
             let rest = resting_shift_index(team);
             for name in &present {

@@ -143,12 +143,16 @@ impl WorkforceIndex {
             .flat_map(|room| assignment.operators_in(&room.id))
             .map(|operator| operator.name.clone())
             .collect();
-        let mut effective_base_presence = all_base_names
-            .iter()
-            .filter(|name| !training_assist.iter().any(|assist| assist == *name))
-            .filter(|name| !meeting_names.contains(*name))
-            .cloned()
-            .collect::<Vec<_>>();
+        // 同名只算一次：base_workforce 可能来自场景默认值与调用方覆盖，不保证唯一。
+        let mut effective_base_presence: Vec<String> = Vec::new();
+        for name in &all_base_names {
+            if !training_assist.iter().any(|assist| assist == name)
+                && !meeting_names.contains(name)
+                && !effective_base_presence.contains(name)
+            {
+                effective_base_presence.push(name.clone());
+            }
+        }
         for ops in by_room.values() {
             for op in ops {
                 if !all_base_names.iter().any(|n| n == &op.name) {
@@ -170,8 +174,9 @@ impl WorkforceIndex {
             }
         }
 
-        // 莱茵技能的“基建内”排除会客室使用者和训练副手；
-        // effective_base_presence 已完成这两个排除。
+        // 莱茵技能的“基建内”：宿舍、加工站、训练室主位及所有进驻设施的在岗干员计入，
+        // 排除会客室（活动室）使用者与训练室副手（effective_base_presence 已完成这两个排除并按姓名去重）。
+        // 上限取 6：缪尔赛思读取时先减去自身再截到 5，娜斯提读取时含自身并截到 5。
         let rhine_life_in_base =
             count_tagged_in_base_excluding(instances, &effective_base_presence, &[], TAG_RHINE, 6);
 
@@ -461,6 +466,8 @@ mod tests {
 
     #[test]
     fn elite_facility_count_from_assignment() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room("control", vec![AssignedOperator::new("电弧", 2)]);
@@ -473,16 +480,18 @@ mod tests {
                 AssignedOperator::new("真言", 2),
             ],
         );
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
-        assert_eq!(idx.elite_facility_count(&bp, None), 2);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.elite_facility_count(&bp, Some(&instances)), 2);
     }
 
     #[test]
     fn trade_workforce_from_assignment() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room("trade_1", vec![AssignedOperator::new("古米", 0)]);
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert!(idx.trade_workforce.iter().any(|n| n == "古米"));
         let mut layout = LayoutContext::default();
         idx.apply_to_layout(&mut layout);
@@ -491,6 +500,8 @@ mod tests {
 
     #[test]
     fn zero_mood_platform_stays_in_power_but_does_not_block_other_power() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_power_operator(
@@ -498,24 +509,26 @@ mod tests {
             AssignedOperator::new("Lancet-2", 0).with_work_mood(Some(0)),
         );
         assignment.set_power_operator("power_2", AssignedOperator::new("承曦格雷伊", 2));
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert!(idx.power_workforce.iter().any(|name| name == "Lancet-2"));
         assert!(!idx.other_power_has_platform(&RoomId::from("power_2")));
 
         let mut normal = BaseAssignment::default();
         normal.set_power_operator("power_1", AssignedOperator::new("Lancet-2", 0));
         normal.set_power_operator("power_2", AssignedOperator::new("承曦格雷伊", 2));
-        let normal_idx = WorkforceIndex::build(&bp, &normal, None);
+        let normal_idx = WorkforceIndex::build(&bp, &normal, Some(&instances));
         assert!(normal_idx.other_power_has_platform(&RoomId::from("power_2")));
     }
 
     #[test]
     fn elite_facility_count_ignores_promoted_non_elite_operators() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room("control", vec![AssignedOperator::new("阿米娅", 2)]);
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
-        assert_eq!(idx.elite_facility_count(&bp, None), 0);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.elite_facility_count(&bp, Some(&instances)), 0);
     }
 
     #[test]
@@ -526,13 +539,21 @@ mod tests {
         .unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
-        assignment.base_workforce = vec![
-            "杜林".into(),
-            "桃金娘".into(),
-            "至简".into(),
-            "褐果".into(),
-            "杜林".into(),
-        ];
+        assignment.set_room(
+            "trade_1",
+            vec![
+                AssignedOperator::new("杜林", 0),
+                AssignedOperator::new("桃金娘", 0),
+                AssignedOperator::new("至简", 0),
+            ],
+        );
+        assignment.set_room(
+            "control",
+            vec![
+                AssignedOperator::new("杜林", 0),
+                AssignedOperator::new("褐果", 0),
+            ],
+        );
         assignment.training_assist = Some(AssignedOperator::new("褐果", 0));
         let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert_eq!(idx.durin_in_base, 4);
@@ -634,23 +655,31 @@ mod tests {
 
     #[test]
     fn elite_facility_count_ignores_meeting_room() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_room("meeting", vec![AssignedOperator::new("真言", 2)]);
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
-        assert_eq!(idx.elite_facility_count(&bp, None), 0);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
+        assert_eq!(idx.elite_facility_count(&bp, Some(&instances)), 0);
     }
 
     #[test]
     fn platform_detection_and_other_flags() {
+        let instances =
+            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
         let bp = BaseBlueprint::template_252_auto1().unwrap();
         let mut assignment = BaseAssignment::default();
         assignment.set_power_operator("power_1", AssignedOperator::new("Lancet-2", 0));
         assignment.set_power_operator("power_2", AssignedOperator::new("承曦格雷伊", 2));
-        let idx = WorkforceIndex::build(&bp, &assignment, None);
+        let idx = WorkforceIndex::build(&bp, &assignment, Some(&instances));
         assert_eq!(idx.platform_count_in_power(), 1);
         assert!(idx.other_power_has_platform(&RoomId::from("power_2")));
         assert!(!idx.other_power_has_platform(&RoomId::from("power_1")));
-        assert!(idx.other_platform_in_power(&RoomId::from("power_2"), "承曦格雷伊"));
+        assert!(idx.other_platform_in_power(
+            Some(&instances),
+            &RoomId::from("power_2"),
+            "承曦格雷伊"
+        ));
     }
 }

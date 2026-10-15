@@ -695,7 +695,9 @@ fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner
         Some(Selector::PlatformCountInPower) => f64::from(ctx.layout.platform_count_in_power),
         Some(Selector::TaggedCountInControl { .. }) | Some(Selector::ControlOperatorCount) => 0.0,
         Some(Selector::DroneCap) => ctx.layout.drone_cap as f64,
+        // 未封顶（最大 6）；目前只有制造站的娜斯提消费，已在制造解释器里截到 5。
         Some(Selector::RhineLifeInBase) => f64::from(ctx.layout.rhine_life_in_base),
+        // 贸易站没有技能使用“除自身外”的莱茵口径。
         Some(Selector::RhineLifeInBaseExcludingSelf) => 0.0,
         Some(Selector::GoldDeliveryCount) => default_gold_delivery(ctx),
         Some(Selector::MetalFormulaSkillCountInRoom) => 0.0,

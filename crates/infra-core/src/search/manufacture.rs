@@ -479,6 +479,15 @@ fn manufacture_combo_layout(
     for operator in operators {
         if base_names.insert(operator.name.clone()) {
             layout.base_workforce.push(operator.name.clone());
+            // 解释器按 base_workforce 去重补算房内莱茵候选；候选一旦进入 base_workforce，
+            // 就必须同步进入 rhine_life_in_base，否则会被去重吞掉，娜斯提少算一名。
+            if operator
+                .tags
+                .iter()
+                .any(|tag| tag == crate::layout::TAG_RHINE)
+            {
+                layout.rhine_life_in_base = layout.rhine_life_in_base.saturating_add(1).min(6);
+            }
         }
         if !manu_names.insert(operator.name.clone()) {
             continue;
@@ -726,6 +735,57 @@ mod tests {
         let projected = manufacture_combo_layout(&Arc::new(layout), &[operator]);
         assert_eq!(projected.manu_tagged_count_sum["cc.g.blacksteel"], 1);
         assert_eq!(projected.global_inject.manu_eff_for(RecipeKind::Gold), 5.0);
+    }
+
+    #[test]
+    fn manufacture_candidate_projection_counts_rhine_operators_once() {
+        let mut layout = LayoutContext::default();
+        layout.global_inject.record_manu_count_scaled(
+            "producer",
+            "source_buff",
+            "blacksteel",
+            "cc.g.blacksteel",
+            None,
+            5.0,
+            0,
+        );
+        layout.rhine_life_in_base = 3;
+        let rhine = |name: &str, tags: Vec<&str>| ManuOperator {
+            name: name.to_string(),
+            elite: 2,
+            buff_ids: Vec::new(),
+            tags: tags.into_iter().map(str::to_string).collect(),
+        };
+        let projected = manufacture_combo_layout(
+            &Arc::new(layout),
+            &[
+                rhine("娜斯提", vec![crate::layout::TAG_RHINE, "cc.g.blacksteel"]),
+                rhine("多萝西", vec![crate::layout::TAG_RHINE]),
+            ],
+        );
+        assert_eq!(projected.rhine_life_in_base, 5);
+
+        // 候选已在 base_workforce 时不重复计数。
+        let mut present = LayoutContext::default();
+        present.global_inject.record_manu_count_scaled(
+            "producer",
+            "source_buff",
+            "blacksteel",
+            "cc.g.blacksteel",
+            None,
+            5.0,
+            0,
+        );
+        present.rhine_life_in_base = 3;
+        present.base_workforce = vec!["娜斯提".to_string()];
+        let projected = manufacture_combo_layout(
+            &Arc::new(present),
+            &[rhine(
+                "娜斯提",
+                vec![crate::layout::TAG_RHINE, "cc.g.blacksteel"],
+            )],
+        );
+        assert_eq!(projected.rhine_life_in_base, 3);
     }
 
     #[test]

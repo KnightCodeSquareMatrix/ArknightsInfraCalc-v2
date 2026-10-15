@@ -201,13 +201,39 @@ mod tests {
         op.tags = vec![TAG_RHINE.into()];
         let mut layout = LayoutContext::default();
         layout.rhine_life_in_base = 6;
-        let mut input = PowerRoomInput::with_operator(op);
+        layout.base_workforce = vec!["缪尔赛思".into()];
+        let mut input = PowerRoomInput::with_operator(op.clone());
         input.layout = layout;
         let result = solve_power(&input, &table).unwrap();
         // +10% 基础 + 5×3%（总数 6，排除自身后满额 5）
         assert!(
-            result.final_efficiency == Efficiency::from_decimal(1.250),
+            result.final_efficiency == Efficiency::from_decimal(0.250),
             "got {}",
+            result.final_efficiency
+        );
+
+        // 候选评估：她尚未进入布局，layout 里的 5 名都是其他莱茵，不能再减 1。
+        let mut candidate_layout = LayoutContext::default();
+        candidate_layout.rhine_life_in_base = 5;
+        let mut candidate = PowerRoomInput::with_operator(op.clone());
+        candidate.layout = candidate_layout;
+        let result = solve_power(&candidate, &table).unwrap();
+        assert!(
+            result.final_efficiency == Efficiency::from_decimal(0.250),
+            "候选评估 got {}",
+            result.final_efficiency
+        );
+
+        // 布局里没有任何其他莱茵时只剩 +10% 基础。
+        let mut alone_layout = LayoutContext::default();
+        alone_layout.rhine_life_in_base = 1;
+        alone_layout.base_workforce = vec!["缪尔赛思".into()];
+        let mut alone = PowerRoomInput::with_operator(op);
+        alone.layout = alone_layout;
+        let result = solve_power(&alone, &table).unwrap();
+        assert!(
+            result.final_efficiency == Efficiency::from_decimal(0.100),
+            "独自在基建 got {}",
             result.final_efficiency
         );
     }

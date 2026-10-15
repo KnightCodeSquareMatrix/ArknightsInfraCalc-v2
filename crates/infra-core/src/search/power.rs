@@ -333,6 +333,30 @@ mod tests {
     }
 
     #[test]
+    fn muelsyse_candidate_counts_other_rhine_operators_without_subtracting_absent_self() {
+        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
+        let mut entry = power_entry("缪尔赛思", &["power_rec_rhine[000]"]);
+        entry.tags = vec![crate::layout::TAG_RHINE.to_string()];
+        let pool = PowerPool {
+            entries: vec![entry],
+            skipped: vec![],
+        };
+        // 候选评估时她尚未进入布局：基建里 5 名都是其他莱茵干员，应满额 10% + 5×3%。
+        let mut layout = LayoutContext::search_baseline();
+        layout.rhine_life_in_base = 5;
+        let opts = PowerSearchOptions {
+            layout,
+            ..Default::default()
+        };
+        let hits = search_power_top(&pool, &table, &opts, 1).unwrap();
+        assert_eq!(hits[0].name, "缪尔赛思");
+        assert_eq!(
+            hits[0].final_efficiency,
+            crate::Efficiency::from_decimal(0.250)
+        );
+    }
+
+    #[test]
     fn power_assignment_tie_prefers_plain_charger_over_friston_combo() {
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
         let pool = PowerPool {
