@@ -5989,6 +5989,22 @@ fn attach_fiammetta_target_actions(
     Ok(())
 }
 
+/// 周期心情预算在候选阶段仍是筛选条件（让合法候选优先于违规候选）；
+/// 但所有候选都被它拒绝时不再拒绝输出：保留的完整排班带 `rotation_final_invariant:` 警告返回，
+/// 交给人工修正。没有保留排班的错误（输入非法、无候选等）原样传播。
+fn downgrade_cycle_mood_rejection(error: Error) -> Result<TeamRotationReport> {
+    if !is_budget_rejection(&error) {
+        return Err(error);
+    }
+    let Some(mut report) = error.partial_rotation_report() else {
+        return Err(error);
+    };
+    report
+        .warnings
+        .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
+    Ok(report)
+}
+
 pub fn schedule_timed_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -6000,7 +6016,8 @@ pub fn schedule_timed_rotation(
     let started = Instant::now();
     let before = crate::profile::solver_perf_snapshot();
     let result =
-        schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile);
+        schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile)
+            .or_else(downgrade_cycle_mood_rejection);
     let after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_resolve_stage(
         "rotation_resolve",
@@ -9524,6 +9541,39 @@ mod tests {
         OperBoxEntry,
     };
     use crate::trade::TradeOrderKind;
+
+    fn empty_rotation_report() -> TeamRotationReport {
+        TeamRotationReport {
+            profile: TimedRotationProfile::Abc12_12_12,
+            peak_plan: crate::layout::AssignmentPlan::empty(),
+            assignment_plans: vec![],
+            runtime_shift_binds: vec![],
+            peak_mood_eta: None,
+            teams: vec![],
+            shifts: vec![],
+            daily: Default::default(),
+            warnings: vec![],
+            elapsed: Duration::from_millis(1),
+        }
+    }
+
+    #[test]
+    fn cycle_mood_rejection_with_report_downgrades_to_warning() {
+        let message = "rotation_cycle_mood failed: 赫默 has no rest or recovery boundary";
+        let error = Error::with_rotation(&empty_rotation_report(), message);
+        let report = downgrade_cycle_mood_rejection(error).unwrap();
+        assert_eq!(report.warnings.len(), 1);
+        assert!(report.warnings[0].starts_with(FINAL_INVARIANT_WARNING_PREFIX));
+        assert!(report.warnings[0].contains("赫默"));
+    }
+
+    #[test]
+    fn non_budget_or_report_less_errors_keep_failing() {
+        let other = Error::with_rotation(&empty_rotation_report(), "control: NO_CANDIDATE");
+        assert!(downgrade_cycle_mood_rejection(other).is_err());
+        let no_report = Error::msg("rotation_cycle_mood failed: 赫默 has no rest");
+        assert!(downgrade_cycle_mood_rejection(no_report).is_err());
+    }
 
     #[test]
     fn sui_control_mood_uses_active_operator_state() {
