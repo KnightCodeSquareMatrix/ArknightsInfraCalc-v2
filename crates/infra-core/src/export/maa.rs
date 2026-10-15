@@ -190,14 +190,22 @@ pub fn build_from_team_rotation(
                     active.join("+")
                 ),
                 description: format!(
-                    "本班 {:.0} 小时；下次在 {:.0} 小时后执行下一计划；休息 {} 队",
+                    "本班 {:.0} 小时；下次在 {:.0} 小时后执行下一计划；休息 {} 队{}",
                     shift.duration_hours,
                     shift.duration_hours,
-                    team_label_zh(report.profile, shift.resting_team)
+                    team_label_zh(report.profile, shift.resting_team),
+                    if report.profile.plan_times() == "2班" {
+                        "；宿舍已设为自动填充，请换班后手动把休息队伍倒入宿舍"
+                    } else {
+                        ""
+                    }
                 ),
-                dorm_autofill: report.warnings.iter().any(|warning| {
-                    warning.starts_with(&format!("shift {} 宿舍普通休息候选", shift.index + 1))
-                }),
+                // 二班没有逐班的宿舍恢复推演：休息队伍的住宿由 MAA 自动填充，
+                // 其他 profile 只在床位不足 warning 时才请求填充。
+                dorm_autofill: report.profile.plan_times() == "2班"
+                    || report.warnings.iter().any(|warning| {
+                        warning.starts_with(&format!("shift {} 宿舍普通休息候选", shift.index + 1))
+                    }),
                 fiammetta_target: shift
                     .fiammetta
                     .as_ref()
@@ -674,6 +682,66 @@ mod tests {
             vec!["单回宿管", "群回宿管", "歌蕾蒂娅", "原宿舍成员"]
         );
         assert!(!rooms.dormitory[0].sort);
+    }
+
+    fn dorm_autofill_report(profile: crate::schedule::TimedRotationProfile) -> TeamRotationReport {
+        let mut assignment = BaseAssignment::default();
+        assignment.set_room("dorm_1", vec![AssignedOperator::new("休息干员", 2)]);
+        TeamRotationReport {
+            profile,
+            peak_plan: crate::layout::AssignmentPlan::empty(),
+            assignment_plans: vec![crate::layout::AssignmentPlan::empty()],
+            runtime_shift_binds: vec![],
+            peak_mood_eta: None,
+            teams: vec![],
+            shifts: vec![TeamShiftResult {
+                index: 0,
+                plan_index: 0,
+                duration_hours: 12.0,
+                active_teams: vec![TeamLabel::Alpha],
+                resting_team: TeamLabel::Beta,
+                assignment,
+                fiammetta: None,
+                dorm_rest: None,
+                drone: None,
+                transition: crate::schedule::ShiftTransition::ReplaceRooms,
+                efficiencies: ShiftEfficiencies::default(),
+                weighted_trade: crate::Efficiency::ZERO,
+                weighted_manufacture: crate::Efficiency::ZERO,
+                weighted_power: crate::Efficiency::ZERO,
+            }],
+            daily: Default::default(),
+            warnings: vec![],
+            elapsed: Duration::from_millis(1),
+        }
+    }
+
+    #[test]
+    fn two_team_profile_always_requests_dorm_autofill_with_manual_note() {
+        let blueprint = sample_blueprint();
+        let opts = MaaExportOptions::for_blueprint(&blueprint);
+        let report = dorm_autofill_report(crate::schedule::TimedRotationProfile::MainBackup12_12);
+        let plan = &build_from_team_rotation(&blueprint, &report, &opts)
+            .unwrap()
+            .plans[0];
+        assert!(plan
+            .rooms
+            .dormitory
+            .iter()
+            .all(|slot| slot.autofill && !slot.skip));
+        assert!(plan.description.contains("手动把休息队伍倒入宿舍"));
+    }
+
+    #[test]
+    fn three_team_profile_keeps_dorm_autofill_off_without_overflow_warning() {
+        let blueprint = sample_blueprint();
+        let opts = MaaExportOptions::for_blueprint(&blueprint);
+        let report = dorm_autofill_report(crate::schedule::TimedRotationProfile::Abc12_6_6);
+        let plan = &build_from_team_rotation(&blueprint, &report, &opts)
+            .unwrap()
+            .plans[0];
+        assert!(plan.rooms.dormitory.iter().all(|slot| !slot.autofill));
+        assert!(!plan.description.contains("倒入宿舍"));
     }
 
     #[test]
