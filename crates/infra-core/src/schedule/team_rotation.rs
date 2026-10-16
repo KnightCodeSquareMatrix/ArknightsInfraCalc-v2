@@ -6381,6 +6381,11 @@ fn schedule_abc_rotation_once(
     // A bound office member must remain available for the office assignment;
     // do not let gamma production consume the other side of the bind first.
     used_ab.extend(bound_office_names.iter().cloned());
+    // A bound rotating anchor (dorm / workshop / training-room support such as the
+    // Rhine group) is placed per shift by `assign_rotating_anchors` and owned by one
+    // team. Gamma production must not also take it, otherwise the member belongs to
+    // two teams, works every shift and never rests.
+    used_ab.extend(rotating_anchor_names.iter().cloned());
 
     let mut gamma_h1 = BaseAssignment::default();
     let mut used_g1 = used_ab.clone();
