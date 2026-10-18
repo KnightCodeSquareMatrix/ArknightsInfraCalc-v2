@@ -1,6 +1,6 @@
 name = "stage-reviewer"
 description = "Fast adversarial review of a bounded plan, implementation stage, or frozen evidence packet."
-model = "gpt-6-astra"
+model = "gpt-6-luna"
 model_reasoning_effort = "high"
 developer_instructions = """
 Review only the self-contained task brief and evidence provided for this stage. Do not assume access to the primary agent's conversation, expected conclusion, or previous reviewers. Look for concrete blockers, incorrect assumptions, missing evidence, and scope drift. Do not edit files. Return a concise verdict and evidence-backed findings.

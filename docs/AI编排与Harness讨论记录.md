@@ -1744,3 +1744,14 @@ OpenCode 原生 `task` 在同一 assistant 消息中提交多个调用时可并�
 阶段审阅必须主动构造竞争解释、合法 witness 或最小反例，并区分事实、推断和未知。机制语义、solver 保证、Plan admission、required anchor、跨设施、Team/Shift、rotation、心情、MAA/export、最终 invariant、安全和不可逆变更仍必须由适用的领域 Sol reviewer 终审；结构化 `FINAL_REVIEW` 字段强制 HIGH 风险在修复后或当前阶段进入 Sol。canonical 冲突和用户取舍交回 Terra/用户，不由快速审阅层裁决。
 
 该 profile 已加入项目 `build.permission.task`，根 `AGENTS.md` 负责路由。它尚未加入 Phase 0B harness capability matrix 的已验证 profile，也没有形成漏检率、错误升级率和 wall-clock 的 A/B 结果；后续真实任务应记录这些指标，再决定是否扩大无人值守权限或提高 reasoning effort。
+
+
+### 15.8 Magpie / Codex 子代理模型统一（2026-10-18）
+
+用户当前裁决：除最后的独立终审外，所有子代理一律使用 DeepSeek。当前 Magpie 将 `gpt-6-luna` 映射为 DeepSeek；该别名用于调查、提取、规划、阶段审阅、实现 writer 和验证。此裁决取代 §15.5 的暂定子代理分工以及 §15.7 中与当前 Codex 模型配置不一致的部分；历史观测数据保留。本节只记录当前 Magpie / Codex 配置，不声明旧 OpenCode 配置已迁移。
+
+项目与全局 `.codex/agents/` 的 `stage-reviewer` 均改为 `gpt-6-luna`，并新增同模型的 `deepseek-writer`。全局 `agents.default_subagent_model` 已为 `gpt-6-luna`，继续保留。最后的独立终审使用现有 Sol / Astra / Terra reviewer，模型配置保持原值。模型选择以实际配置和启动参数为准，禁止静默回退到其他模型。
+
+所有子代理保持独立上下文：`fork_turns="none"` 加自包含任务简报；共享工作区继续遵守单 writer 和已有改动保护规则。仓库 `AGENTS.md` 与全局协作规则同步此次裁决。
+
+配置静态检查与子代理实际启动是两项证据。本轮显式启动 `gpt-6-luna` 时，服务返回任务封装跨后端无法解读的错误，子代理未开始执行；保存上述配置不表示已解决该运行时问题。
