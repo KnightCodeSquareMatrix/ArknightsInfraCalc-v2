@@ -129,6 +129,8 @@ pub struct MaaRooms {
     pub hire: Vec<MaaRoomSlot>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub processing: Vec<MaaRoomSlot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recycle: Vec<MaaRecycleSlot>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -139,6 +141,11 @@ pub struct MaaRoomSlot {
     pub operators: Vec<String>,
     pub sort: bool,
     pub autofill: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MaaRecycleSlot {
+    pub operators: Vec<String>,
 }
 
 struct PlanInput<'a> {
@@ -351,6 +358,17 @@ fn build_rooms(blueprint: &BaseBlueprint, assignment: &BaseAssignment) -> MaaRoo
             .map(|(index, room)| {
                 let _ = index;
                 shared_slot(assignment, &room.id.0)
+            })
+            .collect(),
+        recycle: blueprint
+            .rooms_of(FacilityKind::Recycle)
+            .into_iter()
+            .map(|room| MaaRecycleSlot {
+                operators: assignment
+                    .operators_in(&room.id)
+                    .iter()
+                    .map(|operator| operator.name.clone())
+                    .collect(),
             })
             .collect(),
     }

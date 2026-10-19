@@ -15,7 +15,7 @@ use crate::layout::orchestrate::{execute_plan, AssignmentPlan};
 use crate::layout::shift::AssignShiftMode;
 use crate::operbox::OperBox;
 use crate::pool::{
-    add_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
+    add_owned_jie_market_to_trade_pool, build_control_pool_with_fillers, build_manufacture_pool,
     build_power_pool_with_fillers, build_trade_pool, karlan_precision_active, ControlPool,
     PowerPool, TradePool,
 };
@@ -31,8 +31,8 @@ use super::control_fill::{
     assign_control_matching_dynamic_set_with_saileach, assign_control_with_saileach,
 };
 use super::manufacture_fill::{
-    assign_manufacture_lines, manu_options, manufacture_candidate_pool_for_demand, pick_manu_hit,
-    refresh_manufacture_efficiency_snapshots,
+    assign_manufacture_lines, manu_options, manufacture_candidate_pool_for_demand,
+    pick_capacity_manu_hit, pick_manu_hit, refresh_manufacture_efficiency_snapshots,
 };
 use super::power_fill::assign_power_stations_with_instances as assign_power_stations;
 use super::producer_fill::{
@@ -203,7 +203,12 @@ fn run_shift_pipeline_with_producer_pruning(
             let mut winner_trade_pool = trade_pool.clone();
             let winner_layout = run.resolve_snapshot(true)?;
             if karlan_precision_active(&winner_layout.global_inject) {
-                add_jie_market_to_trade_pool(&mut winner_trade_pool, run.instances, run.table);
+                add_owned_jie_market_to_trade_pool(
+                    &mut winner_trade_pool,
+                    run.operbox,
+                    run.instances,
+                    run.table,
+                );
             }
             if let Some((assignment, used)) = apply_shadow_trade_manufacture_pair(
                 &run,
@@ -343,6 +348,14 @@ fn probe_shadow_pair(
         ManuSearchHit,
     )>,
 > {
+    if used.contains(SHADOW_TRADE_MANUFACTURE_OPERATOR)
+        || trade_pool
+            .entry(SHADOW_TRADE_MANUFACTURE_OPERATOR)
+            .is_none()
+        || manu_pool.entry(SHADOW_TRADE_MANUFACTURE_OPERATOR).is_none()
+    {
+        return Ok(None);
+    }
     let Some((trade_room, manu_room)) =
         first_shadow_rooms(run.blueprint, assignment, trade_pool, used)
     else {
@@ -361,24 +374,24 @@ fn probe_shadow_pair(
         &mut probe_used,
         &[],
     )?;
-    let manu_hit = pick_shadow_manufacture(
-        manu_pool,
-        run.table,
-        manu_options(
-            &layout,
-            run.options,
-            room_recipe(manu_room)?,
-            manu_room.level,
-        ),
-        used,
-    )?;
     let trade_takes_night_smoke = trade_hit_names(&trade_hit)
         .iter()
         .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
+    if !trade_takes_night_smoke {
+        return Ok(None);
+    }
+    let manu_hit = pick_shadow_manufacture(
+        run,
+        manu_pool,
+        &layout,
+        room_recipe(manu_room)?,
+        manu_room.level,
+        used,
+    )?;
     let manu_takes_night_smoke = manu_hit_names(&manu_hit)
         .iter()
         .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
-    if !(trade_takes_night_smoke && manu_takes_night_smoke) {
+    if !manu_takes_night_smoke {
         return Ok(None);
     }
     Ok(Some((
@@ -585,15 +598,29 @@ fn room_recipe(room: &crate::layout::blueprint::RoomBlueprint) -> Result<crate::
 }
 
 fn pick_shadow_manufacture(
+    run: &AssignmentRun<'_>,
     pool: &crate::pool::ManuPool,
-    table: &SkillTable,
-    options: crate::search::ManuSearchOptions,
+    layout: &crate::layout::LayoutContext,
+    recipe: crate::types::RecipeKind,
+    room_level: u8,
     used: &HashSet<String>,
 ) -> Result<ManuSearchHit> {
+    let options = manu_options(layout, run.options, recipe, room_level);
     let top_k = options.top_k;
     let candidate_pool = manufacture_candidate_pool_for_demand(pool, used);
-    pick_manu_hit(&candidate_pool, table, options.clone(), used, top_k)
-        .or_else(|_| pick_manu_hit(pool, table, options, used, top_k))
+    pick_manu_hit(&candidate_pool, run.table, options.clone(), used, top_k)
+        .or_else(|_| pick_manu_hit(pool, run.table, options, used, top_k))
+        .or_else(|_| {
+            pick_capacity_manu_hit(
+                pool,
+                run.table,
+                layout,
+                run.options,
+                recipe,
+                used,
+                room_level,
+            )
+        })
 }
 
 fn settle_shadow_branch(
@@ -1213,7 +1240,7 @@ fn finish_peak_prefix_candidate<'a>(
     let layout = run.resolve_snapshot(true)?;
     let mut trade_pool = base_trade_pool.clone();
     if karlan_precision_active(&layout.global_inject) {
-        add_jie_market_to_trade_pool(&mut trade_pool, run.instances, run.table);
+        add_owned_jie_market_to_trade_pool(&mut trade_pool, run.operbox, run.instances, run.table);
     }
     assign_power_stations(
         run.blueprint,
@@ -1225,24 +1252,6 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.used,
         run.instances,
     )?;
-    let remaining_trade_slots: usize = run
-        .blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == crate::layout::FacilityKind::TradePost)
-        .map(|room| {
-            room.operator_capacity()
-                .saturating_sub(run.assignment.operators_in(&room.id).len())
-        })
-        .sum();
-    let available_trade_operators = trade_pool
-        .entries
-        .iter()
-        .filter(|entry| !run.used.contains(&entry.name))
-        .count();
-    if available_trade_operators < remaining_trade_slots {
-        return Ok(None);
-    }
     assign_trade_remainder(
         run.blueprint,
         &trade_pool,

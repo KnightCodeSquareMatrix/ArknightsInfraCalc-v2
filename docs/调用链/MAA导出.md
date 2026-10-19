@@ -13,6 +13,18 @@
 
 MAA export 是最终状态的序列化适配器，不重新选择机制、岗位、菲亚目标或无人机房间。
 
+## 当前字段状态
+
+以下是当前源码事实，不是回收站 proposal 的目标状态：
+
+| 字段/分组 | 当前实现 | 说明 |
+|---|---|---|
+| `rooms.trading`、`manufacture`、`power`、`dormitory`、`control`、`meeting`、`hire`、`processing` | 已投影 | `build_rooms` 逐类从最终 `BaseAssignment` 读取成员；export 不重新选人。 |
+| `rooms.recycle` | 已投影 | 每个蓝图回收站写一个 `MaaRecycleSlot`，字段仅为 `operators`，成员直接来自该房间的最终 `BaseAssignment`。 |
+| `operatorsA` / `operatorsB` | 不在本次输出范围 | MAA 的 A/B 是训练室字段；回收站遵循普通 `operators` 名单，不沿用旧 A/B 草案。 |
+
+官方 [MAA 基建排班协议示例](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/zh-cn/protocol/base-scheduling-schema.md#L153-L156) 中，`rooms.recycle` 是与制造、贸易同级的数组，示例项为 `{ "operators": ["芬", "克洛丝"] }`；固定版本 [schema](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/maa-infra.schema.json#L189-L195) 将其限制为最多一个普通房间项。该协议仅证明所查上游提交的字段，不代表所有 MAA 发布版 GUI 均已启用；export 只投影、不补选。回收站轮换设计及新旧协议差异见 [回收站设计稿 §7](../TODO/回收站选人放人与轮换设计.md#7-plancompute-v6-契约)。
+
 ## 写出链
 
     compute_plan_inner
@@ -34,11 +46,11 @@ plan --maa-out 和 serve plan.compute 都走这条路径。save 负责创建父�
 
 MaaSchedule 的 author/title/description/id/buildingType 来自 MaaExportOptions。planTimes 显式选项优先，否则由 profile 决定：ABC 为 3班，主替/龙巫为 2班，菲亚插班/深海为 4班。plans 与 TeamRotationReport.shifts 一一对应，顺序不重排。
 
-MaaPlan 包含 name、description、Fiammetta、drones 和 rooms。rooms 使用 MAA 固定名称：trading、manufacture、power、dormitory、control、meeting、hire、processing。每个 MaaRoomSlot 有 skip、product、operators、sort、autofill。
+MaaPlan 包含 name、description、Fiammetta、drones 和 rooms。rooms 使用 MAA 固定名称：trading、manufacture、power、dormitory、control、meeting、hire、processing、recycle。通用 `MaaRoomSlot` 承载已有房间字段；回收站用专属 `MaaRecycleSlot`，仅序列化 `operators`，没有 A/B、product 或额外补位行为。布局不含回收站时 `recycle` 省略；含回收站时按蓝图顺序写出其最终名单。
 
 ## 菲亚与无人机
 
-若 shift.fiammetta 已有目标，直接投影为 enable/target/order=pre；不重新搜索。没有已确认动作时才使用兼容 priority，不能增加 schedule 次数。
+若 shift.fiammetta 已有目标，直接投影为 enable/target/order=pre；不重新搜索。定时轮换传入空 priority，没有已确认动作时保持关闭，不会在导出层补回被 ready 排除的动作。兼容 priority 字段不参与这条定时轮换主路径。
 
 schedule 的 drone_action 只在实际产品为赤金的制造房且 transition 不是 FiammettaOnly 时返回动作；resolve_drones 只把 room_id 映射为蓝图制造房的 1-based index。找不到 id 时 index=1 是输出映射兜底，不是重新选择目标。
 

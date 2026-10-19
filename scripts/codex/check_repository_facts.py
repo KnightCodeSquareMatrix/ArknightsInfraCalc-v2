@@ -22,7 +22,7 @@ PROJECT_MAP_RETRIEVAL_FACTS = (
     "`data/producer_rules.json` 声明 admission/target/relation → `response_dependency.rs` 加载并规范化依赖",
     "| 办公室/会客室静态求值与出口 |",
     "当前 `support_facility.rs` → `layout/resolve.rs` → `commands/layout.rs::layout_eval_cmd`",
-    "未实现的 `plan.compute` 扩展点是 `schedule/team_rotation.rs::TeamShiftResult` → `commands/serve.rs::RotationShiftSummary`",
+    "未实现的 `plan.compute` 扩展点是 `schedule/rotation_types.rs::TeamShiftResult` → `commands/serve.rs::RotationShiftSummary`",
 )
 
 

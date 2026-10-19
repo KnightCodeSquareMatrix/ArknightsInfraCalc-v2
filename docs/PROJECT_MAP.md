@@ -67,6 +67,7 @@ layout / operbox / runtime data
 | `pool` | 各设施候选池和 standalone/full-pool 边界 |
 | `profile` | 供性能画像使用的轻量热路径计数器 |
 | `response_dependency` | 动态 producer 规则、响应依赖与 reverse closure |
+| `recycle` | 回收站设施容量、技能效率与房间结算参数；选人由 schedule 普通房间 admission 负责 |
 | `roster` | 维护用设施 roster CSV 输入 |
 | `schedule` | timed profiles、ABC、shift bind、班次结算和报告 |
 | `scoring` | 具名非生产 policy 与分量，不冒充生产效率 |
@@ -218,9 +219,9 @@ layout / operbox / runtime data
 | 制造 full_pool / standalone 与填房 | [MANUFACTURE_STATUS.md](MANUFACTURE_STATUS.md)、[PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md) | `layout/assign/manufacture_fill.rs::manu_options` 设置排班 `full_pool=true`；`search/manufacture.rs::search_manufacture_single_recipe` 只在 `false` 应用 standalone；体系 required 路径见 `layout/orchestrate/rules.rs`，Bake gate 见 `bake.rs` |
 | 中枢求值 / 普通补位 | [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md) | `control/`、`search/control.rs` |
 | 动态 producer admission / 依赖 / 同班 | [CONTROL_CENTER_ASSIGNMENT.md](CONTROL_CENTER_ASSIGNMENT.md)、[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md) | `data/producer_rules.json` 声明 admission/target/relation → `response_dependency.rs` 加载并规范化依赖 → `layout/assign/pipeline.rs` / `layout/orchestrate/plan.rs` 产出事实 → `schedule/shift_bind.rs` 消费 |
-| 办公室/会客室静态求值与出口 | [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)、[FRONTEND_CLI.md](FRONTEND_CLI.md) | 当前 `support_facility.rs` → `layout/resolve.rs` → `commands/layout.rs::layout_eval_cmd`；未实现的 `plan.compute` 扩展点是 `schedule/team_rotation.rs::TeamShiftResult` → `commands/serve.rs::RotationShiftSummary` |
+| 办公室/会客室静态求值与出口 | [EFFECT_ATOM_DESIGN.md](EFFECT_ATOM_DESIGN.md)、[FRONTEND_CLI.md](FRONTEND_CLI.md) | 当前 `support_facility.rs` → `layout/resolve.rs` → `commands/layout.rs::layout_eval_cmd`；未实现的 `plan.compute` 扩展点是 `schedule/rotation_types.rs::TeamShiftResult` → `commands/serve.rs::RotationShiftSummary` |
 | 单班 Plan/填房 | [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md) | `layout/orchestrate/`、`layout/assign/` |
-| timed rotation/MAA | [排班模式](排班模式.md)、[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md) | `schedule/team_rotation.rs`、`shift_bind.rs`、`export/maa.rs` |
+| timed rotation/MAA | [排班模式](排班模式.md)、[SCHEDULE_ROTATION.md](SCHEDULE_ROTATION.md)、[排班职责地图](模块/排班职责地图.md) | `schedule/team_rotation.rs` 调度；`rotation_types.rs` 公共报告；`room_admission.rs` 候选试算/ETA helper；`rotation_scoring.rs` 菲亚后的普通班次重算；`shift_bind.rs`、`cycle_mood.rs`、`dorm_finalizer.rs` 分别负责绑定、周期心情、宿舍；`export/maa.rs` 只投影 |
 | argv/Worker Plan 汇合 | [INFRA_CLI.md](INFRA_CLI.md) | `commands/{plan,plan_compute,serve}.rs` |
 | 练卡推荐 | [练卡推荐相关](练卡推荐相关/README.md) | `training_advice/`、`commands/advice.rs`；旧 `training_recommendations.json` 仅 diagnose |
 | Bake/性能 | [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md) | `bake.rs`、`pool/standalone.rs`、`commands/{bake,profile}.rs` |

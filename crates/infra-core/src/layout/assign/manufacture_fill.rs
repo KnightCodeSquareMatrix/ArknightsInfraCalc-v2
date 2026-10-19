@@ -364,13 +364,7 @@ pub(crate) fn assign_manu_room_with_anchors(
         })
         .cloned()
         .collect();
-    if fillers.len() < filler_need {
-        return Err(Error::msg(format!(
-            "manufacture {} has {} ready fillers (need {filler_need})",
-            room_id.0,
-            fillers.len()
-        )));
-    }
+    let filler_need = filler_need.min(fillers.len());
 
     let mut combos = Vec::new();
     collect_manu_filler_combos(&fillers, filler_need, 0, &mut Vec::new(), &mut combos);
@@ -524,12 +518,6 @@ pub(super) fn pick_capacity_manu_hit(
         .take(capacity)
         .cloned()
         .collect();
-    if entries.len() < capacity {
-        return Err(Error::msg(format!(
-            "manufacture capacity fallback has {} ready operators (need {capacity})",
-            entries.len(),
-        )));
-    }
     let operators = entries
         .iter()
         .map(|entry| entry.to_manu_operator())

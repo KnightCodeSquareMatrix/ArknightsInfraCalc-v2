@@ -17,7 +17,7 @@
 | 生产 bundle 与当前结果不同 | `debug rerun --bundle ...` | 当前 runtime 对同一快照的稳定 projection；不证明旧环境 bit-identical |
 | 已知某个 assignment 的效率/注入错误 | `layout eval --explain-json` | 已选编制如何结算；不解释未选候选为何落败 |
 | 某个 trade shortcut 或单位产出错误 | `verify --case <id>` / `trade yield <fixture>` | CSV 期望与正式 trade solver 的回归结果 |
-| 轮换、容量、bind、最终状态错误 | `plan`/`layout team-rotation --assert-invariants` | 当前入口和最终 rotation invariant |
+| 轮换、容量、bind、最终状态错误 | `plan --assert-invariants` | 当前 Plan 入口和最终 rotation invariant；`layout team-rotation` 不解析此开关 |
 | 搜索慢或 bake 可疑 | `profile ...`、`bake validate`、`bake verify` | 阶段耗时、catalog 结构和 live response 对账 |
 
 ## `debug rerun`

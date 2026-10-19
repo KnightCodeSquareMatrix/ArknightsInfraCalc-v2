@@ -8,6 +8,7 @@ mod resolve;
 mod shift;
 mod system;
 pub mod tier;
+mod vacancy_fill;
 mod workforce;
 
 pub(crate) use assign::assign_control_with_saileach;
@@ -53,6 +54,10 @@ pub use system::{
     SystemExplainReason, SystemExplainReport, SystemExplainStatus, SystemSlotExplain,
 };
 pub use tier::OperatorTier;
+pub(crate) use vacancy_fill::plan_admits_workplace_candidate;
+pub(crate) use vacancy_fill::{
+    fill_workplace_vacancies, ordinary_room_compatible, ordinary_workplace,
+};
 pub use workforce::{
     is_elite_operator, is_platform_operator, WorkforceIndex, TAG_DURIN, TAG_ELITE_OPERATOR,
     TAG_KNIGHT, TAG_PINUS, TAG_RHINE,

@@ -12,7 +12,7 @@
 
 ## 编制硬约束
 
-中枢容量由 blueprint 决定，当前标准布局为 5 人。可用角色足够时先满足 Plan 的 required anchor，再补齐合法席位；无中枢技能的 filler 仍可能提供 occupancy/mood 或满足跨设施条件。后续 filler 不能替换已认领的 required anchor。缺席、重复 operator、同房禁配和无法满足 required group 返回错误/无解。
+中枢容量由 blueprint 决定，当前标准布局为 5 人。可用角色足够时先满足 Plan 的 required anchor，再补齐合法席位；无中枢技能的 filler 仍可能提供 occupancy/mood 或满足跨设施条件。后续 filler 不能替换已认领的 required anchor。定时轮换内部班次可在候选构造阶段暂时少于容量，required anchor、`min_count`、身份唯一性、活跃队伍准入与练度仍需满足；完整周期后的普通 fallback 再从当前合法剩余候选补位。候选耗尽时最终 Assignment 保留缺额并由缺员 warning 报告，不把单纯容量不足升级为产品拒绝；超容量、重复 operator、同房禁配和无法满足仍不可降级的 required group 继续错误/无解。最终显式 invariant 核验中枢不超容量，并重放同一普通补位策略：仍有合法候选可加入才失败，候选耗尽后的短员保留 warning，不以满员作为通过前提。其余门禁按各自已实现范围独立执行，不据此声称所有 profile 的 required 或通用绑定均已独立重放。
 
 `search/control.rs` 的 `ControlFillPolicy` 是顺序 policy，不是全基建匿名总分。排序依次消费 Plan anchor、贸易/制造全局区域、训练/办公室/会客室、心情去重和普通补位；不回溯替换前序结果。
 

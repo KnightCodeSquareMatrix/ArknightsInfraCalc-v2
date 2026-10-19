@@ -5,7 +5,7 @@ use crate::instances::OperatorInstances;
 use crate::layout::{BaseBlueprint, FacilityKind};
 use crate::mood::{default_mood_model, shift_eta_with_instances};
 
-use super::TeamRotationReport;
+use super::rotation_types::TeamRotationReport;
 
 #[derive(Clone)]
 struct WorkCost {
@@ -27,6 +27,26 @@ pub(crate) fn validate_cycle_mood(
     instances: &OperatorInstances,
     report: &TeamRotationReport,
     initial_mood: f64,
+) -> Result<()> {
+    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, None)
+}
+
+pub(crate) fn validate_operator_cycle_mood(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    report: &TeamRotationReport,
+    initial_mood: f64,
+    name: &str,
+) -> Result<()> {
+    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, Some(name))
+}
+
+fn validate_cycle_mood_scope(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    report: &TeamRotationReport,
+    initial_mood: f64,
+    operator_scope: Option<&str>,
 ) -> Result<()> {
     let model = default_mood_model()?;
     let count = report.shifts.len();
@@ -60,6 +80,9 @@ pub(crate) fn validate_cycle_mood(
                 continue;
             }
             for operator in &room.operators {
+                if operator_scope.is_some_and(|name| name != operator.name) {
+                    continue;
+                }
                 // Workshop and training-room occupancy has no hourly cost, but is not a
                 // rest boundary. The assignment carries no training task, so a training
                 // room seat is a pure support placement without a training activity.

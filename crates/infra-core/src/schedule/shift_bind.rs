@@ -7,16 +7,7 @@ use std::collections::HashSet;
 
 use crate::layout::{AssignmentPlan, BaseAssignment, RoomId};
 
-use super::team_rotation::{FacilityHalf, TeamLabel, TeamRotationReport};
-
-/// 一组须同队、同休的轮换干员（运行期，来自统一 plan）。
-#[derive(Debug, Clone)]
-pub struct RuntimeShiftBind {
-    pub operators: Vec<String>,
-    /// αβγ 周期内上岗班次数（当前固定 12h+6h+6h → 2）。
-    pub on_shifts: u8,
-    pub off_shifts: u8,
-}
+use super::rotation_types::{FacilityHalf, RuntimeShiftBind, TeamLabel, TeamRotationReport};
 
 /// 从统一 plan 提取运行期绑定组。plan 的 shift_binds 仅在体系激活时产出，已隐含 ownership gate。
 pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
@@ -78,12 +69,6 @@ pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
     normalized
 }
 
-fn half_contains_room(half: &FacilityHalf, room: &RoomId) -> bool {
-    half.trade.iter().any(|r| r == room)
-        || half.manu.iter().any(|r| r == room)
-        || half.power.iter().any(|r| r == room)
-}
-
 /// 绑定组跨 H1/H2 时，将 wanderer 所在房间换到 anchor 所在半区。
 pub fn align_shift_binds_in_halves(
     peak: &BaseAssignment,
@@ -105,18 +90,16 @@ pub fn align_shift_binds_in_halves(
         }
         let Some(anchor) = rooms
             .iter()
-            .find(|room| half_contains_room(h1, room) || half_contains_room(h2, room))
+            .find(|room| h1.contains(room) || h2.contains(room))
         else {
             continue;
         };
-        let anchor_in_h1 = half_contains_room(h1, anchor);
+        let anchor_in_h1 = h1.contains(anchor);
         for wanderer in &rooms {
-            if wanderer == anchor
-                || (!half_contains_room(h1, wanderer) && !half_contains_room(h2, wanderer))
-            {
+            if wanderer == anchor || (!h1.contains(wanderer) && !h2.contains(wanderer)) {
                 continue;
             }
-            let wanderer_in_h1 = half_contains_room(h1, wanderer);
+            let wanderer_in_h1 = h1.contains(wanderer);
             if wanderer_in_h1 == anchor_in_h1 {
                 continue;
             }

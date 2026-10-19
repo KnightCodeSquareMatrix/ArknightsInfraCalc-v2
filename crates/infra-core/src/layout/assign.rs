@@ -267,7 +267,7 @@ pub fn assign_shift_with_plan(
     mode: AssignShiftMode,
     seed: &BaseAssignment,
 ) -> Result<AssignShiftResult> {
-    assign_shift_with_plan_skip(
+    let mut result = assign_shift_with_plan_skip(
         blueprint,
         operbox,
         instances,
@@ -276,7 +276,178 @@ pub fn assign_shift_with_plan(
         mode,
         seed,
         &HashSet::new(),
-    )
+    )?;
+    complete_standalone_assignment(blueprint, operbox, instances, table, options, &mut result)?;
+    Ok(result)
+}
+
+fn complete_standalone_assignment(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    result: &mut AssignShiftResult,
+) -> Result<()> {
+    let mut excluded: HashSet<_> = result.plan.excluded_operators.iter().cloned().collect();
+    excluded.extend(
+        result
+            .plan
+            .anchors
+            .iter()
+            .map(|anchor| anchor.operator.clone()),
+    );
+    excluded.extend(
+        result
+            .plan
+            .rotation_reserves
+            .iter()
+            .flat_map(|reserve| reserve.operators.iter().cloned()),
+    );
+    let model = crate::mood::default_mood_model()?;
+    let layout = crate::layout::resolve_base(
+        blueprint,
+        &result.assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?
+    .layout;
+    excluded.extend(result.assignment.occupied_operator_names());
+    let office_candidates =
+        crate::office::rank_candidates(operbox, &layout, options.mood, &excluded);
+    for room in blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+    {
+        if result.assignment.operators_in(&room.id).len() >= room.operator_capacity() {
+            continue;
+        }
+        for candidate in &office_candidates {
+            if result
+                .assignment
+                .occupied_operator_names()
+                .contains(&candidate.name)
+            {
+                continue;
+            }
+            let mut trial = result.assignment.clone();
+            trial.set_room(room.id.clone(), vec![candidate.clone()]);
+            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, &trial, instances);
+            if crate::layout::plan_admits_workplace_candidate(&result.plan, &trial, room, candidate)
+                && eta
+                    .operator_in_room(&candidate.name, &room.id.0)
+                    .is_some_and(|entry| {
+                        crate::mood::fits_work_budget(
+                            &model,
+                            options.mood,
+                            entry.drain_per_hour,
+                            options.shift_hours,
+                        )
+                    })
+            {
+                result.assignment = trial;
+                break;
+            }
+        }
+    }
+    let roster = operbox.roster_excluding(&excluded);
+    let mut candidates: Vec<_> = roster
+        .names()
+        .filter_map(|name| {
+            roster
+                .progress(name)
+                .map(|progress| crate::layout::AssignedOperator::from_progress(name, progress))
+        })
+        .collect();
+    candidates.sort_by(|left, right| left.name.cmp(&right.name));
+    let before_eta =
+        crate::mood::shift_eta_with_instances(&model, blueprint, &result.assignment, instances);
+    crate::layout::fill_workplace_vacancies(
+        blueprint,
+        &mut result.assignment,
+        &candidates,
+        instances,
+        table,
+        |trial, room, candidate| {
+            if !crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
+            {
+                return false;
+            }
+            if room.kind == FacilityKind::Factory {
+                let operators = trial
+                    .operators_in(&room.id)
+                    .iter()
+                    .map(|operator| crate::manufacture::ManuOperator {
+                        name: operator.name.clone(),
+                        elite: operator.elite,
+                        buff_ids: instances
+                            .resolve_manufacture_buff_ids(&operator.name, operator.tier()),
+                        tags: instances.tags_for(&operator.name, operator.tier()),
+                    })
+                    .collect::<Vec<_>>();
+                if !crate::search::manufacture_combo_allowed_for_shift(
+                    &operators,
+                    table,
+                    Some(options.shift_hours),
+                ) {
+                    return false;
+                }
+            }
+            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
+            eta.operator_in_room(&candidate.name, &room.id.0)
+                .is_some_and(|entry| {
+                    crate::mood::fits_work_budget(
+                        &model,
+                        options.mood,
+                        entry.drain_per_hour,
+                        options.shift_hours,
+                    )
+                })
+                && before_eta
+                    .per_op
+                    .iter()
+                    .filter(|entry| {
+                        crate::mood::fits_work_budget(
+                            &model,
+                            options.mood,
+                            entry.drain_per_hour,
+                            options.shift_hours,
+                        )
+                    })
+                    .all(|before| {
+                        eta.operator_in_room(&before.name, &before.room_id)
+                            .is_some_and(|entry| {
+                                crate::mood::fits_work_budget(
+                                    &model,
+                                    options.mood,
+                                    entry.drain_per_hour,
+                                    options.shift_hours,
+                                )
+                            })
+                    })
+        },
+    )?;
+    manufacture_fill::refresh_manufacture_efficiency_snapshots(
+        blueprint,
+        &mut result.assignment,
+        instances,
+        table,
+        options,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?;
+    trade_fill::refresh_trade_efficiency_snapshots(
+        blueprint,
+        &mut result.assignment,
+        instances,
+        table,
+        options,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?;
+    annotate_assignment(blueprint, &mut result.assignment);
+    Ok(())
 }
 
 /// 同 [`assign_shift_with_plan`]，额外允许跳过指定体系。

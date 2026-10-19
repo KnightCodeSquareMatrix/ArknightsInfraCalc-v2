@@ -14,8 +14,8 @@ use crate::operbox::OperBox;
 use crate::pool::{ControlPool, ControlPoolEntry};
 use crate::skill_table::SkillTable;
 
-use super::shift_bind::RuntimeShiftBind;
-use super::team_rotation::{TeamLabel, TeamRotationReport};
+use super::rotation_types::RuntimeShiftBind;
+use super::rotation_types::{TeamLabel, TeamRotationReport, TimedRotationProfile};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WorkScope {
@@ -329,7 +329,7 @@ pub(crate) struct ControlShiftAdmission {
 }
 
 impl ControlShiftAdmission {
-    fn allows(&self, name: &str) -> bool {
+    pub(crate) fn allows(&self, name: &str) -> bool {
         self.closure
             .candidates
             .get(name)
@@ -420,10 +420,10 @@ impl ControlShiftAdmission {
     pub(crate) fn validate(&self, assignment: &BaseAssignment) -> Result<()> {
         let operators = assignment.operators_in(&self.closure.room_id);
         let names: HashSet<_> = operators.iter().map(|op| op.name.clone()).collect();
-        if operators.len() != self.closure.capacity || names.len() != operators.len() {
+        if operators.len() > self.closure.capacity || names.len() != operators.len() {
             return Err(Error::msg(format!(
-                "control_rotation_admission: shift {} capacity or identity mismatch",
-                self.index + 1
+                "control_rotation_admission: shift {} capacity overflow or identity mismatch",
+                self.index + 1,
             )));
         }
         for op in operators {
@@ -482,9 +482,9 @@ pub(crate) fn assert_final_control_rotation(
         let Some(admission) = &shift.assignment.control_rotation_admission else {
             if matches!(
                 report.profile,
-                super::team_rotation::TimedRotationProfile::Abc12_6_6
-                    | super::team_rotation::TimedRotationProfile::Abc12_12_12
-                    | super::team_rotation::TimedRotationProfile::Fiammetta8_8_4_4
+                TimedRotationProfile::Abc12_6_6
+                    | TimedRotationProfile::Abc12_12_12
+                    | TimedRotationProfile::Fiammetta8_8_4_4
             ) {
                 return Err(Error::msg(
                     "assert-invariants control_rotation_admission: missing frozen runtime inputs",

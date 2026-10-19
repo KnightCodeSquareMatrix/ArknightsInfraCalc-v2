@@ -1,135 +1,19 @@
 use std::sync::Arc;
 
-use serde::Serialize;
-
 use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::instances::OperatorInstances;
-use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint};
+use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint, FacilityKind};
 use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::solve_manufacture_with_shift;
 use crate::power::aggregate_power_efficiency;
 use crate::power::{solve_power, PowerRoomInput};
+use crate::recycle::evaluate_recycle;
 use crate::skill_table::SkillTable;
 use crate::trade::input::TradeRoomInput;
 use crate::trade::solve_trade_with_shift;
 
-/// 单房间直接效率快照（用于 CLI 逐房展示）。
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct RoomEfficiencyLine {
-    pub room_id: String,
-    pub operator_count: usize,
-    /// 干员技能提供的直接效率；发电站包含技能驱动的爬升增量。
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub operator_efficiency: Efficiency,
-    /// 基础效率：100% + 非 0 心情入驻人数 × 1%。
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub base_efficiency: Efficiency,
-    /// 兼容字段：进驻增量与全局加成的合计，不参与总效率再次求和。
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub station_efficiency: Efficiency,
-    /// 中枢/全局效率；贸易与制造统一使用该分量。
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub global_efficiency: Efficiency,
-    /// Paper total before an order-specific multiplier is applied.
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub total_efficiency: Efficiency,
-    /// Legacy compatibility field; current direct efficiency is `total_efficiency`.
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    #[serde(skip_serializing)]
-    pub final_efficiency: Efficiency,
-    /// Trade order multiplier; 1.000 for non-trade facilities.
-    #[serde(default)]
-    pub order_multiplier: Efficiency,
-    /// 等效效率：从总效率扣除设施基准与兼容分量，仅供解释。
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub equivalent_efficiency: Efficiency,
-    /// 贸易/赤金分别计算的单位时间产出。
-    #[serde(default, skip_serializing_if = "is_zero_f64")]
-    pub trade_output_per_day: f64,
-    #[serde(default, skip_serializing_if = "is_zero_f64")]
-    #[serde(skip_serializing)]
-    pub gold_consumption_per_day: f64,
-    #[serde(default, skip_serializing_if = "is_zero_f64")]
-    #[serde(skip_serializing)]
-    pub originium_shards_per_day: f64,
-    #[serde(default, skip_serializing_if = "is_zero_f64")]
-    pub manufacture_unit_output_per_day: f64,
-    #[serde(default, skip_serializing_if = "is_zero_f64")]
-    pub manufacture_output_per_day: f64,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub trade_equivalent_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub gold_equivalent_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub combined_output_value: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub trade_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub trade_skill_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub manufacture_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub manufacture_skill_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub power_efficiency: Efficiency,
-    #[serde(default, skip_serializing_if = "is_zero_efficiency")]
-    pub power_skill_efficiency: Efficiency,
-}
-
-fn is_zero_efficiency(v: &Efficiency) -> bool {
-    v.is_zero()
-}
-
-fn is_zero_f64(v: &f64) -> bool {
-    *v == 0.0
-}
-
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct ShiftEfficiencies {
-    pub trade_efficiency: Efficiency,
-    pub manufacture_efficiency: Efficiency,
-    pub power_efficiency: Efficiency,
-    /// 各房间效率明细（按 SHIFT_STATION_ORDER 顺序）。
-    pub room_lines: Vec<RoomEfficiencyLine>,
-}
-
-impl ShiftEfficiencies {
-    /// 贸易效率按时长折算（不与制造/发电混合量纲）。
-    pub fn weighted_trade(&self, shift_hours: f64) -> Efficiency {
-        weighted_for_hours(self.trade_efficiency, shift_hours)
-    }
-    /// 制造效率按时长折算。
-    pub fn weighted_manufacture(&self, shift_hours: f64) -> Efficiency {
-        weighted_for_hours(self.manufacture_efficiency, shift_hours)
-    }
-    /// 发电效率按时长折算。
-    pub fn weighted_power(&self, shift_hours: f64) -> Efficiency {
-        weighted_for_hours(self.power_efficiency, shift_hours)
-    }
-
-    pub fn weighted_trade_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
-        weighted_for_cycle(self.trade_efficiency, shift_hours, cycle_hours)
-    }
-
-    pub fn weighted_manufacture_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
-        weighted_for_cycle(self.manufacture_efficiency, shift_hours, cycle_hours)
-    }
-
-    pub fn weighted_power_for_cycle(&self, shift_hours: f64, cycle_hours: f64) -> Efficiency {
-        weighted_for_cycle(self.power_efficiency, shift_hours, cycle_hours)
-    }
-}
-
-fn weighted_for_hours(efficiency: Efficiency, hours: f64) -> Efficiency {
-    weighted_for_cycle(efficiency, hours, 24.0)
-}
-
-fn weighted_for_cycle(efficiency: Efficiency, hours: f64, cycle_hours: f64) -> Efficiency {
-    let minutes = (hours * 60.0).round() as i64;
-    let cycle_minutes = (cycle_hours * 60.0).round() as i64;
-    efficiency.scale_ratio(minutes, cycle_minutes)
-}
+use super::rotation_types::{RoomEfficiencyLine, ShiftEfficiencies};
 
 /// 对编制逐房求贸易/制造/发电直接效率（满心情）；`shift_hours` 影响发电爬升与产出折算。
 pub fn evaluate_base_assignment_efficiencies(
@@ -313,6 +197,26 @@ pub fn evaluate_base_assignment_efficiencies(
         line.final_efficiency = efficiency;
         line.equivalent_efficiency = line.operator_efficiency;
         room_lines.push(line);
+    }
+
+    // 回收站：空站也出一行（基础效率照常转化）。不并入贸易/制造/发电三个域汇总，
+    // 也不进 daily；`order_multiplier` 必须显式设为 1，否则默认 0 会被序列化。
+    for room in blueprint.rooms_of(FacilityKind::Recycle) {
+        let evaluated = evaluate_recycle(
+            room.level,
+            assignment.operators_in(&room.id),
+            instances,
+            table,
+        )?;
+        room_lines.push(RoomEfficiencyLine {
+            room_id: room.id.0.clone(),
+            operator_count: evaluated.operator_count,
+            operator_efficiency: evaluated.operator_efficiency,
+            base_efficiency: evaluated.base_efficiency,
+            total_efficiency: evaluated.total_efficiency,
+            order_multiplier: Efficiency::ONE,
+            ..RoomEfficiencyLine::default()
+        });
     }
 
     let power_efficiency = aggregate_power_efficiency(power_increments);

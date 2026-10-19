@@ -172,7 +172,6 @@ pub(super) fn assign_power_rooms_with_instances(
             (productive, entry.name.as_str())
         });
         for room_id in empty_rooms.iter().skip(report.assignments.len()) {
-            let mut placed = false;
             for entry in &fillers {
                 if used.contains(&entry.name) {
                     continue;
@@ -198,14 +197,7 @@ pub(super) fn assign_power_rooms_with_instances(
                 // Settlement reads the final assignment, including empty power buff IDs.
                 assignment.set_room(room_id.clone(), vec![op]);
                 used.insert(entry.name.clone());
-                placed = true;
                 break;
-            }
-            if !placed {
-                return Err(Error::msg(format!(
-                    "power: no eligible spare operator for {} after skill search",
-                    room_id.0,
-                )));
             }
         }
     }

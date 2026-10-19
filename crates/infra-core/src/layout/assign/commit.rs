@@ -18,6 +18,11 @@ pub(super) fn commit_trade_room(
         .iter()
         .map(|op| op.name.clone())
         .collect();
+    let efficiency = if trade_hit_names(hit).is_empty() {
+        None
+    } else {
+        Some(trade_efficiency_snapshot(hit))
+    };
     commit_operators_to_room(
         assignment,
         room_id,
@@ -30,7 +35,7 @@ pub(super) fn commit_trade_room(
         used,
         &anchors,
         "trade",
-        Some(trade_efficiency_snapshot(hit)),
+        efficiency,
     )
 }
 

@@ -108,6 +108,29 @@ pub fn add_jie_market_to_trade_pool(
     });
 }
 
+pub fn add_owned_jie_market_to_trade_pool(
+    pool: &mut TradePool,
+    operbox: &crate::operbox::OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) {
+    let Some(progress) = operbox.progress_of(JIE_TRADE_NAME) else {
+        return;
+    };
+    if progress.elite == 0 {
+        return;
+    }
+    add_jie_market_to_trade_pool(pool, instances, table);
+    if let Some(entry) = pool
+        .entries
+        .iter_mut()
+        .find(|entry| entry.name == JIE_TRADE_NAME)
+    {
+        entry.elite = progress.elite;
+        entry.progress = progress;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TradePoolEntry {
     pub name: String,

@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::layout::{AssignedOperator, BaseBlueprint, FacilityKind, RoomId};
 use crate::operbox::OperBox;
 
-use super::{DormRestPlan, TeamShiftResult};
+use super::rotation_types::{DormRestPlan, TeamShiftResult};
 
 /// 普通轮换休息不足时保留给报告层的确定性信息。
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -42,6 +42,8 @@
         "候选池异常"
       ],
       "entrypoints": [
+        "crates/infra-core/src/layout/assign.rs::assign_shift_with_plan",
+        "crates/infra-core/src/layout/vacancy_fill.rs::fill_workplace_vacancies",
         "crates/infra-core/src/layout/assign.rs::assign_shift_with_plan_skip",
         "crates/infra-core/src/layout/orchestrate/select.rs::build_plan"
       ],
@@ -379,7 +381,7 @@
       ],
       "verification": [
         "infra-cli layout eval --explain-json <args>",
-        "infra-cli layout team-rotation --assert-invariants <args>"
+        "infra-cli plan --assert-invariants <args>"
       ],
       "priority": 80,
       "when": "ETA、宿舍、办公室、会客室或辅助设施状态异常时选择。"

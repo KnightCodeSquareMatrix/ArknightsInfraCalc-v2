@@ -28,6 +28,66 @@ use crate::layout::{AssignedOperator, BaseAssignment, BaseBlueprint, FacilityKin
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
+pub(crate) fn rank_candidates(
+    operbox: &crate::operbox::OperBox,
+    layout: &LayoutContext,
+    mood: f64,
+    excluded: &std::collections::HashSet<String>,
+) -> Vec<AssignedOperator> {
+    let roster = operbox.roster();
+    let mut registry = None;
+    let winter_available = roster.names().any(|name| {
+        !excluded.contains(name.as_str())
+            && name == "忍冬"
+            && roster
+                .progress(name)
+                .is_some_and(|progress| progress.elite >= 2)
+    });
+    let mut candidates: Vec<(f64, AssignedOperator)> = roster
+        .names()
+        .filter(|name| !excluded.contains(name.as_str()))
+        .filter(|name| name.as_str() != "铃兰" || winter_available)
+        .filter_map(|name| {
+            let progress = roster.progress(name)?;
+            let registry = registry.get_or_insert_with(|| {
+                SupportRegistry::load_default_shared()
+                    .expect("support registry loads in office candidate build")
+            });
+            let score = evaluate_office(
+                &SupportRoomInput {
+                    facility: SupportFacility::Office,
+                    operators: vec![crate::support_facility::SupportOperator {
+                        name: name.clone(),
+                        elite: progress.elite,
+                        rarity: progress.rarity,
+                        level: progress.level,
+                        mood: mood.max(0.0),
+                    }],
+                    capacity: 1,
+                    extra_recruit_slots: 0,
+                    elapsed_hours: 24.0,
+                    external_speed_bonus_pct: 0.0,
+                    layout: layout.clone(),
+                },
+                registry,
+            )
+            .map(|result| result.skill_speed_bonus_pct)
+            .unwrap_or(0.0);
+            Some((score, AssignedOperator::from_progress(name, progress)))
+        })
+        .collect();
+    candidates.sort_by(|(left_score, left), (right_score, right)| {
+        right_score
+            .partial_cmp(left_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    candidates
+        .into_iter()
+        .map(|(_, operator)| operator)
+        .collect()
+}
+
 pub fn apply_office_to_layout(
     layout: &mut LayoutContext,
     blueprint: &BaseBlueprint,

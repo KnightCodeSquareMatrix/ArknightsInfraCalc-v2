@@ -35,7 +35,7 @@
 
 **判别**：单班 assignment、used/capacity、体系准入或干员冲突异常时选择。
 
-**入口**：`crates/infra-core/src/layout/assign.rs::assign_shift_with_plan_skip`；`crates/infra-core/src/layout/orchestrate/select.rs::build_plan`
+**入口**：`crates/infra-core/src/layout/assign.rs::assign_shift_with_plan`；`crates/infra-core/src/layout/vacancy_fill.rs::fill_workplace_vacancies`；`crates/infra-core/src/layout/assign.rs::assign_shift_with_plan_skip`；`crates/infra-core/src/layout/orchestrate/select.rs::build_plan`
 
 **完整调用链**：[docs/调用链/跨设施状态刷新.md](../调用链/跨设施状态刷新.md)
 
@@ -245,7 +245,7 @@
 
 **知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/心情与宿舍.md`；`docs/1-基础设定/设施与进驻/办公室机制.md`；`docs/1-基础设定/设施与进驻/会客室机制.md`
 
-**验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli layout team-rotation --assert-invariants <args>`
+**验证**：`infra-cli layout eval --explain-json <args>`；`infra-cli plan --assert-invariants <args>`
 
 ## `VERIFY.REGRESSION`：回归验证与失败证据
 

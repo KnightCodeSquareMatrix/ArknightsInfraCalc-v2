@@ -108,6 +108,9 @@ pub(super) fn assign_trade_remainder(
         let order = trade_order_from_room(room)?;
         let existing = assignment.operators_in(&room.id);
         let anchors: Vec<_> = existing.iter().map(|op| op.name.clone()).collect();
+        if anchors.is_empty() && pool.entries.iter().all(|entry| used.contains(&entry.name)) {
+            continue;
+        }
         let hit = pick_trade_meta_then_plain(
             pool,
             table,
@@ -683,7 +686,21 @@ pub(super) fn pick_trade_hit(
     } else {
         reduced_sub
     };
-    if sub.entries.len() < search_opts.operator_capacity {
+    if sub.entries.is_empty() {
+        if !filter.has_must_include() {
+            return Ok(TradeSearchHit {
+                names: Vec::new(),
+                gold_names: Vec::new(),
+                originium_names: Vec::new(),
+                final_efficiency: crate::Efficiency::ZERO,
+                mechanic_equivalent_efficiency: crate::Efficiency::ZERO,
+                rule_id: None,
+                unit_trade_per_day: 0.0,
+                unit_gold_per_day: 0.0,
+                unit_originium_per_day: 0.0,
+                breakdown: None,
+            });
+        }
         return Err(Error::msg(format!(
             "trade pool has {} ready operators (need {})",
             sub.entries.len(),
@@ -691,6 +708,7 @@ pub(super) fn pick_trade_hit(
         )));
     }
     let mut opts = search_opts;
+    opts.operator_capacity = opts.operator_capacity.min(sub.entries.len());
     opts.top_k = top_k;
     let ordinary = match search_trade_triples_filtered(&sub, table, &opts, filter.clone()) {
         Ok(report) => Ok(report),
