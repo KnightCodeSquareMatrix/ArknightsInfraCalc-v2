@@ -261,7 +261,7 @@ MAA 导出消费最终各班 assignment，而不是重新解释效率。`plan` �
 - 工具人池用于贸易等明确适用的领域；普通排班制造使用全部合法普通候选；
 - 单房 `C(n,k)` 组合求值用 Rayon 并行；
 - 当前跨房依赖通过顺序 commit + `resolve`，保证后房能看到前房已提交状态；前房选型仍看不到后房最终成员，双向联合反馈属于未来 A+ 的已知改造边界；
-- Bake 保存 schema v12 单房候选索引、整数效率和首批贸易 room-local 机制签名，并校验完整贸易 row universe；
+- Bake 保存 schema v13 单房候选索引、整数效率和首批贸易 room-local 机制签名，并校验 combo table bytes/hash、逐 signature 行数和完整贸易 row universe；
 - Bake 使用前检查数据指纹、CLI 生成器、房间签名、练度和布局兼容性；
 - 动态候选投影、非基准布局或旧 schema 等不安全情况会走实时搜索。
 

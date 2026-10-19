@@ -426,7 +426,7 @@ catalog row/response 精确命中
 |----------|----------|----------|
 | exact joint | `layout/assign/pipeline.rs`、贸易/制造 fill | producer presence 已统一比较，但目标房仍按稳定顺序提交；这是显式 `policy_restriction`，前房最优性依赖后房时不保证 canonical exact winner |
 | conditional response | `search/joint_trade.rs`、目标域 solver | 只有未接主路径的最小 joint helper；尚无完整 response row、logical mask tuple、统一临时 assignment resolve 与 winner 对账 |
-| Bake | `bake.rs` schema v12 单房 baseline 表 | 仍不能表达完整联合 rule/tier/cross-room signature；不兼容时只能安全拒绝，尚无 exact joint 的 live/Bake 等价证明 |
+| Bake | `bake.rs` schema v13 单房 baseline 表 | 仍不能表达完整联合 rule/tier/cross-room signature；不兼容时只能安全拒绝，尚无 exact joint 的 live/Bake 等价证明 |
 | performance | full-E2 debug rotation | 约 8.4s 只是当前样例，不是已确认预算；在用户确认预算前不据此启动新优化框架或宣称性能达标 |
 
 ## 10. 单一责任边界

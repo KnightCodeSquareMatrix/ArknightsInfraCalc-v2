@@ -180,7 +180,7 @@ Baseline 是检测回归的工具，不是允许既有错误永久存在的豁�
 
 Bake 是加速载体，不是业务真源。预计算结果只有在候选结构和所有相关上下文与生成模型兼容时才能使用。
 
-### 6.1 当前 schema v12 已实现的门禁
+### 6.1 当前 schema v13 已实现的门禁
 
 - schema、CLI generator 和输入文件 fingerprint 一致；输入覆盖 baseline layout、instances、skill table、standalone roster、segments、shortcuts 和 systems。
 - runtime pool 中的候选名必须被 catalog 覆盖，且当前快速路径要求兼容的 E2 tier 模型。
@@ -195,11 +195,11 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
   Morgan 的 owner-inclusive Glasgow count、推进之王 presence、`snhunt` / `laterano` count；
   这些字段从实际 row 编译，不改变候选集合或 comparator。
 
-当前工作区旧 catalog 与代码 schema 的具体状态见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)。当前 loader 尚未校验 `combo_table.bin` 自身内容 hash；非白名单反序列化错误也可能作为错误返回，而不是无条件 fallback；生成物也尚未采用完整 generation-id 原子切换。因此不能把下面的未来要求写成当前能力。
+当前工作区旧 catalog 与代码 schema 的具体状态见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)。当前 loader 已校验 `combo_table.bin` 的 bytes、内容 hash 和每个物理 signature 的行数；非白名单反序列化错误仍可能作为错误返回，而不是无条件 fallback；生成物也尚未采用完整 generation-id 原子切换。因此不能把下面的未来要求写成当前能力。
 
 ### 6.2 下一代 catalog 必须补齐
 
-- catalog 自身 bytes、内容 hash、row count 和 index checksum。
+- 在已有 bytes、内容 hash 和逐 signature 行数校验之外，补齐 index checksum。
 - 损坏、反序列化失败、未知 signature 与缺行全部安全进入同语义 live 求值。
 - 临时 generation 目录、完整校验和原子切换，避免读取新旧文件混合状态。
 - cache miss 只替代候选生成 / 求值方式，不能改用更小候选集、固定 top-K 或旧 pipeline。
