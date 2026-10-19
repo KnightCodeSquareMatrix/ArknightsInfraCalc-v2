@@ -37,7 +37,7 @@
 - stderr：`layout=`、`operbox=`、阶段性能记录以及 profile/rotation/MAA 文件路径；
 - 文件：profile 默认写到 operbox 同目录，`--profile-out` 可覆盖；`--maa-out`、`--rotation-out`、`--output-dir` 显式请求才写入。
 
-`--prefer rosemary_perception=recruit_refresh_witch` 已不再是可用值；当前感知体系可选 `recruit_refresh`、`high_perception`、`recruit_refresh_zilan`，不可行时仍按规则回退。`--assert-invariants` 在共享编排完成后调用 `assert_final_rotation_invariants`，其中包含最终班次黑键与巫恋贸易禁同站检查。断言失败时命令失败；这不是输出层错误。
+`--prefer rosemary_perception=recruit_refresh_witch` 已不再是可用值；当前感知体系可选 `recruit_refresh`、`high_perception`、`recruit_refresh_zilan`，不可行时仍按规则回退。`--assert-invariants` 在共享编排完成后调用 `assert_final_rotation_invariants`，其中包含最终班次黑键与巫恋贸易禁同站及 `rotation_bind` 工作/支持统计检查。宿舍入住不算绑定工作班；真实拆组、班数或支持缺席在普通产品中保留排班及 warning，在显式验收中返回错误。断言失败时命令失败；这不是输出层错误。
 
 ## 常驻 Worker
 

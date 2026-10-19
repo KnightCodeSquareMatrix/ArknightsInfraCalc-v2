@@ -5,9 +5,11 @@
 
 use std::collections::HashSet;
 
-use crate::layout::{AssignmentPlan, BaseAssignment, RoomId};
+use crate::layout::{AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId};
 
-use super::rotation_types::{FacilityHalf, RuntimeShiftBind, TeamLabel, TeamRotationReport};
+use super::rotation_types::{
+    FacilityHalf, RuntimeShiftBind, TeamLabel, TeamRotationReport, TimedRotationProfile,
+};
 
 /// 从统一 plan 提取运行期绑定组。plan 的 shift_binds 仅在体系激活时产出，已隐含 ownership gate。
 pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
@@ -187,6 +189,350 @@ pub fn team_of_operator(report: &TeamRotationReport, name: &str) -> Option<TeamL
 
 pub fn operator_in_shift(report: &TeamRotationReport, shift_idx: usize, name: &str) -> bool {
     report.shifts[shift_idx].assignment.has_operator(name)
+}
+
+fn bind_required_support<'a>(
+    plan: &'a AssignmentPlan,
+    bind: &'a RuntimeShiftBind,
+) -> HashSet<&'a str> {
+    plan.active_dependencies
+        .iter()
+        .filter(|dependency| {
+            dependency
+                .consumers
+                .iter()
+                .all(|consumer| bind.operators.contains(consumer))
+        })
+        .flat_map(|dependency| dependency.required.iter().map(String::as_str))
+        .collect()
+}
+
+fn plan_dorm_support(plan: &AssignmentPlan) -> HashSet<&str> {
+    plan.anchors
+        .iter()
+        .filter(|anchor| anchor.facility == FacilityKind::Dormitory)
+        .map(|anchor| anchor.operator.as_str())
+        .chain(
+            plan.registry_claims
+                .iter()
+                .flat_map(|claim| &claim.slots)
+                .filter(|slot| slot.facility == FacilityKind::Dormitory)
+                .flat_map(|slot| slot.operators.iter().map(|operator| operator.name.as_str())),
+        )
+        .collect()
+}
+
+fn assignment_dorm_presence<'a>(
+    blueprint: &'a BaseBlueprint,
+    assignment: &'a BaseAssignment,
+) -> HashSet<&'a str> {
+    assignment
+        .iter_rooms()
+        .filter(|room| {
+            blueprint
+                .room(&room.room_id)
+                .is_some_and(|room| room.kind == FacilityKind::Dormitory)
+        })
+        .flat_map(|room| room.operators.iter().map(|operator| operator.name.as_str()))
+        .collect()
+}
+
+fn bind_work_operators<'a>(plan: &'a AssignmentPlan, bind: &'a RuntimeShiftBind) -> Vec<&'a str> {
+    let required = bind_required_support(plan, bind);
+    bind.operators
+        .iter()
+        .map(String::as_str)
+        .filter(|name| !required.contains(name))
+        .collect()
+}
+
+fn operator_is_bind_work(
+    blueprint: &BaseBlueprint,
+    plan: &AssignmentPlan,
+    assignment: &BaseAssignment,
+    work_names: &HashSet<String>,
+    name: &str,
+) -> bool {
+    if !work_names.contains(name) {
+        return false;
+    }
+    let Some(room) = assignment.room_of_operator(name) else {
+        return true;
+    };
+    let Some(room_kind) = blueprint
+        .room(&room.room_id)
+        .map(|blueprint_room| blueprint_room.kind)
+    else {
+        return true;
+    };
+    !plan.anchors.iter().any(|anchor| {
+        anchor.operator == name
+            && anchor
+                .rest_facility
+                .is_some_and(|rest_facility| rest_facility == room_kind)
+    })
+}
+
+fn shift_plan<'a>(
+    report: &'a TeamRotationReport,
+    shift_index: usize,
+) -> Result<&'a AssignmentPlan, String> {
+    let shift = report
+        .shifts
+        .get(shift_index)
+        .ok_or_else(|| "rotation_bind: missing shift".to_string())?;
+    report
+        .assignment_plans
+        .get(shift.plan_index)
+        .ok_or_else(|| {
+            format!(
+                "rotation_bind: shift {} lost its owning Plan",
+                shift.index + 1
+            )
+        })
+}
+
+fn operator_bind_work_states(
+    blueprint: &BaseBlueprint,
+    report: &TeamRotationReport,
+    source_plan: &AssignmentPlan,
+    required: &HashSet<&str>,
+    name: &str,
+) -> Result<Vec<bool>, String> {
+    report
+        .shifts
+        .iter()
+        .map(|shift| {
+            if required.contains(name) {
+                return Ok(false);
+            }
+            let work_names = shift.assignment.work_position_operator_names(blueprint);
+            Ok(operator_is_bind_work(
+                blueprint,
+                source_plan,
+                &shift.assignment,
+                &work_names,
+                name,
+            ))
+        })
+        .collect()
+}
+
+fn bind_core_operators(plan: &AssignmentPlan, bind: &RuntimeShiftBind) -> Vec<String> {
+    let dorm_support = plan_dorm_support(plan);
+    let mut core: Vec<_> = bind_work_operators(plan, bind)
+        .into_iter()
+        .filter(|name| !dorm_support.contains(name))
+        .map(str::to_string)
+        .collect();
+    core.sort();
+    core
+}
+
+fn bind_dorm_support<'a>(
+    plan: &'a AssignmentPlan,
+    bind: &'a RuntimeShiftBind,
+    core: &[String],
+    required: &HashSet<&'a str>,
+) -> Vec<&'a str> {
+    let dorm_support = plan_dorm_support(plan);
+    let mut support: Vec<_> = bind
+        .operators
+        .iter()
+        .map(String::as_str)
+        .filter(|name| dorm_support.contains(name))
+        .filter(|name| !required.contains(name))
+        .collect();
+    support.sort();
+    support.dedup();
+    if core.is_empty() {
+        Vec::new()
+    } else {
+        support
+    }
+}
+
+fn validate_bind_dependency_presence(
+    blueprint: &BaseBlueprint,
+    report: &TeamRotationReport,
+) -> Result<(), String> {
+    for (index, shift) in report.shifts.iter().enumerate() {
+        let plan = shift_plan(report, index)?;
+        let work_names = shift.assignment.work_position_operator_names(blueprint);
+        let present = shift.assignment.operator_names();
+        for dependency in &plan.active_dependencies {
+            let consumer_working = dependency.consumers.iter().any(|consumer| {
+                operator_is_bind_work(blueprint, plan, &shift.assignment, &work_names, consumer)
+            });
+            if !consumer_working {
+                continue;
+            }
+            let missing: Vec<_> = dependency
+                .required
+                .iter()
+                .filter(|required| !present.contains(*required))
+                .collect();
+            if !missing.is_empty() {
+                return Err(format!(
+                    "rotation_bind: shift {} active dependency {:?} missing required {:?}",
+                    shift.index + 1,
+                    dependency.consumers,
+                    missing
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Final-state bind evidence shared by normal finalization and `--assert-invariants`.
+/// Required supports from the same Plan are checked for presence while their consumer
+/// works; they stay outside the work-member topology so dorm/support duty is not split.
+pub(crate) fn validate_final_bind_cycle(
+    blueprint: &BaseBlueprint,
+    report: &TeamRotationReport,
+) -> Result<(), String> {
+    let abc = matches!(
+        report.profile,
+        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
+    );
+    let mut source_binds = Vec::new();
+    for (plan_index, plan) in report.assignment_plans.iter().enumerate() {
+        for bind in shift_binds_from_plan(plan) {
+            source_binds.push((plan_index, plan, bind));
+        }
+    }
+    for bind in report.runtime_shift_binds.iter() {
+        if !source_binds
+            .iter()
+            .any(|(_, _, existing)| existing.operators == bind.operators)
+        {
+            let peak_index = report
+                .assignment_plans
+                .iter()
+                .position(|plan| std::ptr::eq(plan, &report.peak_plan))
+                .unwrap_or(0);
+            source_binds.push((peak_index, &report.peak_plan, bind.clone()));
+        }
+    }
+    source_binds.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.2.operators.cmp(&right.2.operators))
+    });
+    for (_, source_plan, bind) in source_binds {
+        let core = bind_core_operators(source_plan, &bind);
+        let required = bind_required_support(source_plan, &bind);
+        let dorm_support = bind_dorm_support(source_plan, &bind, &core, &required);
+        let states: Vec<Vec<bool>> = core
+            .iter()
+            .map(|name| operator_bind_work_states(blueprint, report, source_plan, &required, name))
+            .collect::<Result<_, _>>()?;
+        if core.len() >= 2 {
+            for (index, shift) in report.shifts.iter().enumerate() {
+                let flags: Vec<_> = states.iter().map(|state| state[index]).collect();
+                if flags
+                    .first()
+                    .is_some_and(|first| flags.iter().any(|flag| flag != first))
+                {
+                    return Err(format!(
+                        "rotation_bind: shift {} bind {:?} does not move together",
+                        shift.index + 1,
+                        core
+                    ));
+                }
+            }
+        }
+        if abc && core.len() >= 2 {
+            let active = report
+                .shifts
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| states.iter().all(|state| state[*index]))
+                .count();
+            let inactive = report.shifts.len().saturating_sub(active);
+            if bind.on_shifts > 0 && active != usize::from(bind.on_shifts) {
+                return Err(format!(
+                    "rotation_bind: bind {:?} expected {} active shifts, got {active}",
+                    core, bind.on_shifts
+                ));
+            }
+            if bind.off_shifts > 0 && inactive != usize::from(bind.off_shifts) {
+                return Err(format!(
+                    "rotation_bind: bind {:?} expected {} resting shifts, got {inactive}",
+                    core, bind.off_shifts
+                ));
+            }
+        }
+        if !abc && core.len() >= 2 {
+            let teams: Vec<_> = report
+                .teams
+                .iter()
+                .filter(|team| {
+                    core.iter()
+                        .all(|operator| team.operators.contains(operator))
+                })
+                .collect();
+            let team = match teams.as_slice() {
+                [single] => *single,
+                [] => {
+                    return Err(format!(
+                        "rotation_bind: bind {:?} belongs to no complete team",
+                        core
+                    ));
+                }
+                _ => {
+                    return Err(format!(
+                        "rotation_bind: bind {:?} belongs to multiple complete teams",
+                        core
+                    ));
+                }
+            };
+            for (index, shift) in report.shifts.iter().enumerate() {
+                let expected = shift.active_teams.contains(&team.label);
+                for (operator, state) in core.iter().zip(&states) {
+                    let actual = state[index];
+                    let expected = if report.profile == TimedRotationProfile::FiammettaWitch12_12
+                        && matches!(operator.as_str(), "巫恋" | "龙舌兰")
+                    {
+                        true
+                    } else {
+                        expected
+                    };
+                    if actual != expected {
+                        return Err(format!(
+                            "rotation_bind: profile bind {} work {:?} does not match team {:?} topology",
+                            operator, actual, team.label
+                        ));
+                    }
+                }
+            }
+        }
+        if !dorm_support.is_empty() {
+            for shift in &report.shifts {
+                let core_working = core
+                    .iter()
+                    .any(|name| shift.assignment.is_work_position_operator(blueprint, name));
+                if !core_working {
+                    continue;
+                }
+                let dorm_presence = assignment_dorm_presence(blueprint, &shift.assignment);
+                let missing: Vec<_> = dorm_support
+                    .iter()
+                    .filter(|name| !dorm_presence.contains(**name))
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(format!(
+                        "rotation_bind: shift {} dormitory support {:?} missing while bound core is working",
+                        shift.index + 1,
+                        missing
+                    ));
+                }
+            }
+        }
+    }
+    validate_bind_dependency_presence(blueprint, report)?;
+    Ok(())
 }
 
 /// 验证绑定组：同上同下 + 上2休1。

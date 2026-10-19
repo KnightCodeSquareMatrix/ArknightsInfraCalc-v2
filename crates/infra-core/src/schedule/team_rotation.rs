@@ -59,7 +59,7 @@ use super::rotation_types::{
     RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies, ShiftTransition, TeamAssignment,
     TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
 };
-use super::shift_bind::shift_binds_from_plan;
+use super::shift_bind::{shift_binds_from_plan, validate_final_bind_cycle};
 
 const FIAMMETTA_NAME: &str = "菲亚梅塔";
 const SPHINX_NAME: &str = "深巡";
@@ -3012,21 +3012,20 @@ fn finalize_timed_rotation(
     report.warnings.extend(quality_warnings);
     let cycle_rest_warnings = rotation_cycle_rest_warnings(blueprint, &report);
     report.warnings.extend(cycle_rest_warnings);
-    let structure_result = if matches!(
-        report.profile,
-        TimedRotationProfile::Abc12_6_6
-            | TimedRotationProfile::Abc12_12_12
-            | TimedRotationProfile::Fiammetta8_8_4_4
-    ) {
-        validate_final_rotation_invariants(
-            blueprint,
-            &report.shifts,
-            &report.runtime_shift_binds,
-            &report.peak_plan.active_dependencies,
-        )
-    } else {
-        validate_profile_rotation(blueprint, instances, &report)
-    };
+    let structure_result = validate_final_bind_cycle(blueprint, &report)
+        .map_err(Error::msg)
+        .and_then(|_| {
+            if matches!(
+                report.profile,
+                TimedRotationProfile::Abc12_6_6
+                    | TimedRotationProfile::Abc12_12_12
+                    | TimedRotationProfile::Fiammetta8_8_4_4
+            ) {
+                validate_final_rotation_invariants(blueprint, &report.shifts, &[], &[])
+            } else {
+                validate_profile_rotation(blueprint, instances, &report)
+            }
+        });
     if let Err(error) = structure_result {
         report
             .warnings
@@ -4458,6 +4457,8 @@ fn assert_final_rotation_invariants_with_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
+    validate_final_bind_cycle(blueprint, report)
+        .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     validate_fiammetta_action_policy(report.profile, &report.shifts)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     let mood_model = default_mood_model()?;
@@ -9639,64 +9640,6 @@ fn validate_profile_rotation(
             return Err(Error::msg(
                 "two-team rotation violates work-position-disjoint policy",
             ));
-        }
-    }
-
-    let mut binds = Vec::new();
-    for plan in &report.assignment_plans {
-        binds.extend(shift_binds_from_plan(plan));
-    }
-    for bind in binds {
-        // 要求恰好一个 Team 完整包含该 bind 的全部成员：零个表示编制或 owner
-        // 绑定边界错误，多个表示跨 owner 绑定，均不能静默跳过。
-        let teams: Vec<_> = report
-            .teams
-            .iter()
-            .filter(|team| {
-                bind.operators
-                    .iter()
-                    .all(|operator| team.operators.contains(operator))
-            })
-            .collect();
-        let team = match teams.as_slice() {
-            [single] => single,
-            [] => {
-                return Err(Error::msg(format!(
-                    "profile bind {:?} belongs to no complete team",
-                    bind.operators
-                )));
-            }
-            _ => {
-                return Err(Error::msg(format!(
-                    "profile bind {:?} belongs to multiple complete teams",
-                    bind.operators
-                )));
-            }
-        };
-        let expected: Vec<_> = report
-            .shifts
-            .iter()
-            .map(|shift| shift.active_teams.contains(&team.label))
-            .collect();
-        for operator in &bind.operators {
-            let actual: Vec<_> = report
-                .shifts
-                .iter()
-                .map(|shift| shift.assignment.operator_names().contains(operator))
-                .collect();
-            let operator_expected = if report.profile == TimedRotationProfile::FiammettaWitch12_12
-                && matches!(operator.as_str(), "巫恋" | "龙舌兰")
-            {
-                vec![true; report.shifts.len()]
-            } else {
-                expected.clone()
-            };
-            if actual != operator_expected {
-                return Err(Error::msg(format!(
-                    "profile bind {} presence {actual:?} does not match team {:?} topology {operator_expected:?}",
-                    operator, team.label,
-                )));
-            }
         }
     }
 
