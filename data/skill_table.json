@@ -7031,6 +7031,42 @@
           "phase_order": 10
         }
       ]
+    },
+    {
+      "id": "recycle_spd&cost[000]",
+      "skill_name": "拾荒者",
+      "facility": "recycle",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "recycle_spd&cost[010]",
+      "skill_name": "捡海人",
+      "facility": "recycle",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
     }
   ]
 }

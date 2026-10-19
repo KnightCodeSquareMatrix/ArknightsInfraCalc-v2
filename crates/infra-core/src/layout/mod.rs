@@ -25,7 +25,8 @@ pub use assign::{
 pub(crate) use assign::{beta_tailor_names, refill_witch_room_with_tailor};
 pub use assignment::{AssignedOperator, BaseAssignment, RoomAssignment, RoomEfficiencySnapshot};
 pub use blueprint::{
-    BaseBlueprint, BlueprintScenario, FacilityKind, RoomBlueprint, RoomId, RoomProduct,
+    recycle_base_efficiency_millis, recycle_operator_capacity, BaseBlueprint, BlueprintScenario,
+    FacilityKind, RoomBlueprint, RoomId, RoomProduct,
 };
 pub use context::{
     trade_station_tagged_gte_key, LayoutContext, SharedLayout, DEFAULT_DORM_OCCUPANT_COUNT,

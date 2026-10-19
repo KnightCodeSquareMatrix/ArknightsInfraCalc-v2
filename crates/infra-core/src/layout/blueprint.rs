@@ -38,6 +38,8 @@ pub enum FacilityKind {
     MeetingRoom,
     TrainingRoom,
     Workshop,
+    /// 回收站：wire 名 `recycle`。全布局至多一座，等级 1..=3，不带 `product`。
+    Recycle,
 }
 
 /// 生产类房间的在产配置。
@@ -86,6 +88,9 @@ impl RoomBlueprint {
             FacilityKind::ControlCenter => 5,
             FacilityKind::Office => 1,
             FacilityKind::MeetingRoom => 2,
+            // 回收站工位：Lv.1 为 1，Lv.2 与 Lv.3 为 2。不可复用 `station_operator_capacity`，
+            // 它按 clamp(1,3) 返回人数，会给 Lv.3 三个工位。
+            FacilityKind::Recycle => recycle_operator_capacity(self.level),
             _ => usize::MAX,
         }
     }
@@ -330,12 +335,27 @@ impl BaseBlueprint {
                         )));
                     };
                 }
+                FacilityKind::Recycle => {
+                    if room.level > 3 {
+                        return Err(Error::msg(format!(
+                            "recycle room {} level must be 1..=3",
+                            room.id.0
+                        )));
+                    }
+                    if room.product.is_some() {
+                        return Err(Error::msg(format!(
+                            "recycle room {} must not carry product",
+                            room.id.0
+                        )));
+                    }
+                }
                 _ => {}
             }
         }
         for (kind, label) in [
             (FacilityKind::Office, "office"),
             (FacilityKind::MeetingRoom, "meeting room"),
+            (FacilityKind::Recycle, "recycle station"),
         ] {
             let count = self.rooms.iter().filter(|room| room.kind == kind).count();
             if count > 1 {
@@ -378,6 +398,24 @@ pub fn default_dorm_beds(level: u8) -> u8 {
 
 pub fn station_operator_capacity(level: u8) -> usize {
     level.clamp(1, 3) as usize
+}
+
+/// 回收站进驻上限（知识库《回收站机制》）：Lv.1 为 1，Lv.2 与 Lv.3 为 2。
+pub fn recycle_operator_capacity(level: u8) -> usize {
+    if level <= 1 {
+        1
+    } else {
+        2
+    }
+}
+
+/// 回收站等级基础转化效率（千分倍率）：Lv.1 与 Lv.2 为 1.000，Lv.3 为 1.200。
+pub fn recycle_base_efficiency_millis(level: u8) -> i32 {
+    if level >= 3 {
+        1200
+    } else {
+        1000
+    }
 }
 
 #[cfg(test)]

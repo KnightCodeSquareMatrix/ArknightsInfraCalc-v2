@@ -84,7 +84,11 @@ impl SkillTable {
     pub fn validate_operator_refs(&self, instances: &OperatorInstances) -> Vec<String> {
         let mut warnings = Vec::new();
         for (_key, inst) in instances.iter() {
-            for bid in inst.trade_buff_ids() {
+            for bid in inst
+                .trade_buff_ids()
+                .into_iter()
+                .chain(inst.recycle_buff_ids())
+            {
                 if !self.by_id.contains_key(bid) {
                     warnings.push(format!(
                         "{} references unknown skill_table id {}",

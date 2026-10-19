@@ -480,6 +480,7 @@ fn rotation_cycle_rest_warnings(
                 FacilityKind::MeetingRoom => "会客室",
                 FacilityKind::TrainingRoom => "训练室",
                 FacilityKind::Workshop => "加工站",
+                FacilityKind::Recycle => "回收站",
                 FacilityKind::Dormitory => continue,
             };
             for operator in &room.operators {

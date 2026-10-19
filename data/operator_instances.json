@@ -5387,6 +5387,32 @@
         }
       }
     },
+    "旅骨@tier_0": {
+      "name": "旅骨",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[000]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "旅骨@tier_up": {
+      "name": "旅骨",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[010]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
     "至简@tier_0": {
       "name": "至简",
       "tier": "tier_0",

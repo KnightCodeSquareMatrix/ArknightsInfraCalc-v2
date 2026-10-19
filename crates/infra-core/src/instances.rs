@@ -186,12 +186,32 @@ impl OperatorInstances {
             .and_then(|i| i.facilities.get("office"));
         resolve_buff_ids(tier, binding, tier0)
     }
+
+    pub fn resolve_recycle_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+        let tier_binding = self
+            .get(name, tier)
+            .and_then(|i| i.facilities.get("recycle"));
+        let Some(binding) = tier_binding else {
+            return Vec::new();
+        };
+        let tier0 = self
+            .get(name, PromotionTier::Tier0)
+            .and_then(|i| i.facilities.get("recycle"));
+        resolve_buff_ids(tier, binding, tier0)
+    }
 }
 
 impl OperatorInstance {
     pub fn trade_buff_ids(&self) -> Vec<&str> {
         self.facilities
             .get("trade")
+            .map(|f| f.buff_ids.iter().map(String::as_str).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn recycle_buff_ids(&self) -> Vec<&str> {
+        self.facilities
+            .get("recycle")
             .map(|f| f.buff_ids.iter().map(String::as_str).collect())
             .unwrap_or_default()
     }

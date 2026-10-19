@@ -34,6 +34,8 @@ pub fn facility_key(kind: FacilityKind) -> Option<&'static str> {
         FacilityKind::Office => Some("office"),
         FacilityKind::ControlCenter => Some("control"),
         FacilityKind::MeetingRoom => Some("reception"),
+        // 回收站：每名进驻者基础消耗 1 点/小时，满中枢后 0.75；站点对人数没有减免。
+        FacilityKind::Recycle => Some("recycle"),
         // 宿舍是回复侧；训练/加工暂不建模工作消耗。
         _ => None,
     }

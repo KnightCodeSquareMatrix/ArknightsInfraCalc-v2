@@ -38,6 +38,7 @@ pub mod mood;
 pub mod operbox;
 pub mod pool;
 pub mod profile;
+pub mod recycle;
 pub mod response_dependency;
 pub mod roster;
 pub mod schedule;
