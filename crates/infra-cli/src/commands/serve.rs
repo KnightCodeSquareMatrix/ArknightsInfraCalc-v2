@@ -28,7 +28,7 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 5;
+const PLAN_SCHEMA_VERSION: u32 = 6;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
@@ -41,6 +41,8 @@ const PLAN_COMPUTE_SCHEMA_V4_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v4.schema.json");
 const PLAN_COMPUTE_SCHEMA_V5_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v5.schema.json");
+const PLAN_COMPUTE_SCHEMA_V6_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v6.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
@@ -67,11 +69,13 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_schema_v3: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V3_JSON)?,
         plan_schema_v4: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V4_JSON)?,
         plan_schema_v5: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V5_JSON)?,
+        plan_schema_v6: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V6_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
         plan_contract_sha256_v4: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V4_JSON),
         plan_contract_sha256_v5: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V5_JSON),
+        plan_contract_sha256_v6: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V6_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -118,7 +122,7 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
 }
 
 fn print_serve_usage() {
-    eprintln!("  plan.compute v5: options.support_combinations_enable boolean, default false");
+    eprintln!("  plan.compute v6: options.support_combinations_enable boolean, default false");
     eprintln!("  plan: support_combinations_enable boolean, default false");
     eprintln!("Usage:");
     eprintln!("  infra-cli serve");
@@ -217,11 +221,13 @@ struct ServeState {
     plan_schema_v3: JSONSchema,
     plan_schema_v4: JSONSchema,
     plan_schema_v5: JSONSchema,
+    plan_schema_v6: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
     plan_contract_sha256_v3: String,
     plan_contract_sha256_v4: String,
     plan_contract_sha256_v5: String,
+    plan_contract_sha256_v6: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -485,7 +491,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2, 3, 4, 5],
+                "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6],
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,
@@ -493,6 +499,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                     "3": state.plan_contract_sha256_v3,
                     "4": state.plan_contract_sha256_v4,
                     "5": state.plan_contract_sha256_v5,
+                    "6": state.plan_contract_sha256_v6,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -666,12 +673,18 @@ fn handle_plan_compute(
         3 => &state.plan_schema_v3,
         4 => &state.plan_schema_v4,
         5 => &state.plan_schema_v5,
+        6 => &state.plan_schema_v6,
         other => {
             return Err(Error::msg(format!(
                 "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
             )))
         }
     };
+    reject_removed_rotation(
+        params
+            .get("options")
+            .and_then(|options| options.get("rotation")),
+    )?;
     validate_plan_compute_params(schema, &params, schema_version)?;
     let params: PlanComputeParams = serde_json::from_value(params)?;
     if params.options.top == 0 || params.options.top > MAX_TOP_K {
@@ -830,6 +843,7 @@ fn validated_label(value: Option<String>, fallback: &str, field: &str) -> Result
 }
 
 fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_json::Value, Error> {
+    reject_removed_rotation(params.get("rotation"))?;
     let params: PlanParams = serde_json::from_value(params)?;
     let top = params.top.unwrap_or(20);
     let rotation_profile = params.rotation.unwrap_or_default();
@@ -921,6 +935,15 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
         warnings: rotation.warnings.clone(),
     };
     serde_json::to_value(result).map_err(Error::from)
+}
+
+fn reject_removed_rotation(rotation: Option<&serde_json::Value>) -> Result<(), Error> {
+    if rotation.and_then(serde_json::Value::as_str) == Some("fiammetta_witch_12_12") {
+        return Err(Error::msg(
+            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+        ));
+    }
+    Ok(())
 }
 
 fn write_pretty_json(path: &Path, value: &impl Serialize) -> Result<(), Error> {

@@ -133,7 +133,7 @@ pub struct RuntimeShiftBind {
     pub off_shifts: u8,
 }
 
-/// Closed set of timed-rotation products supported by the runtime.
+/// Supported timed-rotation profiles plus a hidden legacy wire tombstone.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimedRotationProfile {
@@ -150,7 +150,8 @@ pub enum TimedRotationProfile {
     /// Two complete, disjoint 24-hour main/backup states over a 48-hour cycle.
     #[serde(rename = "main_backup_24_24")]
     MainBackup24_24,
-    /// Two 12-hour owners sharing Witch and Tequila with alternating beta tailors.
+    /// Legacy wire token retained only so older requests can be explicitly rejected.
+    #[doc(hidden)]
     #[serde(rename = "fiammetta_witch_12_12")]
     FiammettaWitch12_12,
     /// Split 16/4/4 at the Fiammetta event boundary.
@@ -168,7 +169,7 @@ impl TimedRotationProfile {
             Self::Abc12_12_12 => "abc-121212",
             Self::MainBackup12_12 => "2",
             Self::MainBackup24_24 => "main-backup-2424",
-            Self::FiammettaWitch12_12 => "fiammetta-witch-1212",
+            Self::FiammettaWitch12_12 => "fiammetta-witch-1212 (removed)",
             Self::Fiammetta8_8_4_4 => "fiammetta-8844",
             Self::Abyssal7_5_7_5 => "abyssal-7575",
         }
@@ -180,7 +181,7 @@ impl TimedRotationProfile {
             Self::Abc12_12_12 => "ABC 三班 12/12/12",
             Self::MainBackup12_12 => "二班主替 12/12",
             Self::MainBackup24_24 => "二班主替 24/24",
-            Self::FiammettaWitch12_12 => "菲亚龙巫二班 12/12",
+            Self::FiammettaWitch12_12 => "已删除的龙巫二班",
             Self::Fiammetta8_8_4_4 => "菲亚插班 8/8/4/4",
             Self::Abyssal7_5_7_5 => "深海四班 7/5/7/5",
         }
@@ -191,7 +192,7 @@ impl TimedRotationProfile {
             Self::Abc12_6_6 => "3班",
             Self::Abc12_12_12 => "3班",
             Self::MainBackup12_12 | Self::MainBackup24_24 => "2班",
-            Self::FiammettaWitch12_12 => "2班",
+            Self::FiammettaWitch12_12 => "不支持",
             Self::Fiammetta8_8_4_4 | Self::Abyssal7_5_7_5 => "4班",
         }
     }
@@ -199,10 +200,7 @@ impl TimedRotationProfile {
     pub const fn is_two_team(self) -> bool {
         matches!(
             self,
-            Self::MainBackup12_12
-                | Self::MainBackup24_24
-                | Self::FiammettaWitch12_12
-                | Self::Abyssal7_5_7_5
+            Self::MainBackup12_12 | Self::MainBackup24_24 | Self::Abyssal7_5_7_5
         )
     }
 }
@@ -218,14 +216,18 @@ impl std::str::FromStr for TimedRotationProfile {
             "main_backup_24_24" | "main-backup-2424" | "24/24" | "24-24" => {
                 Ok(Self::MainBackup24_24)
             }
-            "fiammetta-witch-1212" | "witch-1212" => Ok(Self::FiammettaWitch12_12),
+            "fiammetta-witch-1212" | "witch-1212" | "fiammetta_witch_12_12" => Err(
+                Error::msg(
+                    "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+                ),
+            ),
             "fiammetta-8844" | "8/8/4/4" => Ok(Self::Fiammetta8_8_4_4),
             "abyssal-7575" | "7/5/7/5" => Ok(Self::Abyssal7_5_7_5),
             "4" => Err(Error::msg(
                 "rotation 4 requires a named profile: fiammetta-8844 or abyssal-7575",
             )),
             other => Err(Error::msg(format!(
-                "unsupported rotation {other:?}; expected 2, 3, 12/12/12, 24/24, fiammetta-witch-1212, fiammetta-8844, or abyssal-7575"
+                "unsupported rotation {other:?}; expected 2, 3, 12/12/12, 24/24, fiammetta-8844, or abyssal-7575"
             ))),
         }
     }

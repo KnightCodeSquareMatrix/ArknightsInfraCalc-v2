@@ -24,21 +24,21 @@ infra-cli serve
 {"id":"ping-1","method":"ping","params":{}}
 ```
 
-响应包含 `protocol_version`、`supported_plan_schema_versions`、每版本 `plan_contract_sha256`、`solver_executable_sha256`、`solver_git_commit` 和 `solver_built_at`。部署方应记录这些值，用于把前端请求和 solver 制品关联起来。
+响应包含 `protocol_version`、`supported_plan_schema_versions`（当前 v1–v6）、每版本 `plan_contract_sha256`、`solver_executable_sha256`、`solver_git_commit` 和 `solver_built_at`。部署方应记录这些值，用于把前端请求和 solver 制品关联起来。
 
 ## `plan.compute` 请求
 
-当前推荐 `schema_version: 5`。完整字段限制见 [输入、输出与兼容契约](接口/输入输出与兼容.md) 和仓库内 `contracts/plan-compute-v5.schema.json`。最小结构：
+当前推荐 `schema_version: 6`。完整字段限制见 [输入、输出与兼容契约](接口/输入输出与兼容.md) 和仓库内 `contracts/plan-compute-v6.schema.json`。最小结构：
 
 ```json
-{"id":"req-1","method":"plan.compute","params":{"schema_version":5,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"x","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"options":{"rotation":"abc_12_6_6","top":20,"fiammetta_enable":true,"support_combinations_enable":false,"assert_invariants":false}}}
+{"id":"req-1","method":"plan.compute","params":{"schema_version":6,"layout":{"rooms":[{"id":"control","kind":"control_center","level":3}]},"operbox":[{"id":"x","name":"12F","elite":0,"level":30,"own":true,"potential":6,"rarity":2}],"options":{"rotation":"abc_12_6_6","top":20,"fiammetta_enable":true,"support_combinations_enable":false,"assert_invariants":false}}}
 ```
 
 `layout` 和 `operbox` 是内联值，避免 Worker 依赖调用方机器上的路径。`labels` 只用于日志和性能标识，不是文件路径。`options` 默认 rotation `abc_12_6_6`、top `20`、菲亚启用；未知字段拒绝。
 
-主备 24/24 使用 v5 的 `options.rotation: "main_backup_24_24"`，输出两班各 24h、总周期 48h；daily 仍为 24h 平均产出。较早请求版本不接受这个 profile。展示和执行间隔读取 `rotation.shifts[].duration_hours` 与 MAA 的相对间隔说明。
+主备 24/24 从 v5 开始支持，当前使用 v6 的 `options.rotation: "main_backup_24_24"`，输出两班各 24h、总周期 48h；daily 仍为 24h 平均产出。v1–v4 不接受这个 profile。展示和执行间隔读取 `rotation.shifts[].duration_hours` 与 MAA 的相对间隔说明。独立龙巫二班已删除；历史 v3–v5 wire 即使通过旧 schema 形状检查，也会被当前 Worker 明确拒绝。
 
-`options.support_combinations_enable` 为布尔值，默认 `false`。只有显式 `true` 才沿用当前主动补挂件流程；关闭时主角色仍可竞争，技能仍读取当班真实编制。v1–v4 不接受这个新字段，未传入同样默认关闭，这是用户明确接受的排班行为变化。前端使用 v5 并同步开关；结果不增加开关回显。深巡与鸿雪豁免，普通同房组合及思衡托自然读取不受影响。
+`options.support_combinations_enable` 为布尔值，默认 `false`。只有显式 `true` 才沿用当前主动补挂件流程；关闭时主角色仍可竞争，技能仍读取当班真实编制。v1–v4 不接受这个新字段，未传入同样默认关闭，这是用户明确接受的排班行为变化。前端当前使用 v6 并同步开关；结果不增加开关回显。深巡与鸿雪豁免，普通同房组合及思衡托自然读取不受影响。
 
 ## 响应与消费
 

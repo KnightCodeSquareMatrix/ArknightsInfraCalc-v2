@@ -44,7 +44,7 @@ plan --maa-out 和 serve plan.compute 都走这条路径。save 负责创建父�
 
 ## 顶层字段
 
-MaaSchedule 的 author/title/description/id/buildingType 来自 MaaExportOptions。planTimes 显式选项优先，否则由 profile 决定：ABC 为 3班，主替/龙巫为 2班，菲亚插班/深海为 4班。plans 与 TeamRotationReport.shifts 一一对应，顺序不重排。
+MaaSchedule 的 author/title/description/id/buildingType 来自 MaaExportOptions。planTimes 显式选项优先，否则由当前 profile 决定：ABC 为 3班，主备为 2班，菲亚插班/深海为 4班。独立龙巫二班已删除；旧请求在导出前失败，不会映射到主备。plans 与 TeamRotationReport.shifts 一一对应，顺序不重排。
 
 MaaPlan 包含 name、description、Fiammetta、drones 和 rooms。rooms 使用 MAA 固定名称：trading、manufacture、power、dormitory、control、meeting、hire、processing、recycle。通用 `MaaRoomSlot` 承载已有房间字段；回收站用专属 `MaaRecycleSlot`，仅序列化 `operators`，没有 A/B、product 或额外补位行为。布局不含回收站时 `recycle` 省略；含回收站时按蓝图顺序写出其最终名单。
 

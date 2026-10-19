@@ -282,9 +282,9 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
     ) = if request.method == "plan.compute" {
         let params: PlanComputeParams = serde_json::from_value(request.params.clone())
             .map_err(|error| Error::msg(format!("plan.compute params parse: {error}")))?;
-        if !(1..=5).contains(&params.schema_version) {
+        if !(1..=6).contains(&params.schema_version) {
             return Err(Error::msg(format!(
-                "unsupported plan schema version {}; expected 1 through 5",
+                "unsupported plan schema version {}; expected 1 through 6",
                 params.schema_version
             )));
         }
@@ -334,6 +334,11 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
 
     let top_k = rerun_top_k(args, &bundle)?;
     let rotation = rerun_rotation(args, &bundle)?;
+    if rotation.value == TimedRotationProfile::FiammettaWitch12_12 {
+        return Err(Error::msg(
+            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+        ));
+    }
     let current_runtime = current_runtime_fingerprint();
     let instances = OperatorInstances::load(&default_instances_path()?)?;
     let table = SkillTable::load(&default_skill_table_path()?)?;

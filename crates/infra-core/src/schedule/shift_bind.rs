@@ -492,13 +492,6 @@ pub(crate) fn validate_final_bind_cycle(
                 let expected = shift.active_teams.contains(&team.label);
                 for (operator, state) in core.iter().zip(&states) {
                     let actual = state[index];
-                    let expected = if report.profile == TimedRotationProfile::FiammettaWitch12_12
-                        && matches!(operator.as_str(), "巫恋" | "龙舌兰")
-                    {
-                        true
-                    } else {
-                        expected
-                    };
                     if actual != expected {
                         return Err(format!(
                             "rotation_bind: profile bind {} work {:?} does not match team {:?} topology",

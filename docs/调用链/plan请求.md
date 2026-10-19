@@ -26,8 +26,8 @@ serve plan.compute ───┘                 │
 ## 阶段一：适配与加载
 
 - CLI：`commands/plan.rs::plan_cmd` 解析 `--layout`、`--operbox`、`--baseline`、`--rotation`、`--top`、`--prefer`、输出路径和 `--assert-invariants`，加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable`。
-- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择嵌入 schema，执行 schema 校验、布局语义校验和 `inline_operbox`。
-- Worker `plan`：`handle_plan` 反序列化路径参数，默认加载 243/full-e2，调用同一 `compute_plan`。
+- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v6 嵌入 schema。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败；v6 schema 不包含该枚举。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
+- Worker `plan`：`handle_plan` 在反序列化路径参数前拒绝旧龙巫 wire；其他请求默认加载 243/full-e2，调用同一 `compute_plan`。
 
 布局语义校验拒绝超出 1–5 级的宿舍 `level`。旧 `dorm_ambience_level` 可读取但不参与结算；`dorm_beds` 仅负责容量；旧 `scenario.initial_global.monster_cuisine` 可读取但会从初始资源池忽略。CLI 文件加载与 Worker 内联布局使用同一 `BaseBlueprint::validate`，不会把这些遗留字段当作当前料理来源。其他真正非法输入仍在此阶段返回，不应进入 solver 根因分析。
 

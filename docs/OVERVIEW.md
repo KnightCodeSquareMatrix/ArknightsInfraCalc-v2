@@ -212,7 +212,7 @@ WorkforceIndex
 
 ## 9. Timed profiles 与默认 αβγ ABC
 
-`schedule_timed_rotation` 在默认 ABC、ABC `12/12/12`、二班 `12/12`、主备 `24/24`、菲亚龙巫二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 七个具名 profile 中分派。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
+`schedule_timed_rotation` 在默认 ABC、ABC `12/12/12`、主备 `12/12`、主备 `24/24`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 六个具名 profile 中分派。独立龙巫二班已从产品支持中删除。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
 
 ```text
 α = peak 的 H1

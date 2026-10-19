@@ -2396,7 +2396,6 @@ fn fiammetta_action_slots(profile: TimedRotationProfile, shift_count: usize) -> 
         TimedRotationProfile::Abc12_12_12 => 3,
         TimedRotationProfile::Abc12_6_6 => 2,
         TimedRotationProfile::Fiammetta8_8_4_4 => 3,
-        TimedRotationProfile::FiammettaWitch12_12 => 2,
         _ => 0,
     };
     (0..count.min(shift_count)).collect()
@@ -4446,6 +4445,11 @@ pub fn assert_final_rotation_invariants(
     table: &SkillTable,
     report: &TeamRotationReport,
 ) -> Result<()> {
+    if report.profile == TimedRotationProfile::FiammettaWitch12_12 {
+        return Err(Error::msg(
+            "assert-invariants unsupported rotation profile fiammetta_witch_12_12: this product mode was removed",
+        ));
+    }
     assert_final_rotation_invariants_with_mood(blueprint, operbox, instances, table, report, 24.0)
 }
 
@@ -6150,6 +6154,11 @@ pub fn schedule_timed_rotation(
     options: &AssignBaseOptions,
     profile: TimedRotationProfile,
 ) -> Result<TeamRotationReport> {
+    if profile == TimedRotationProfile::FiammettaWitch12_12 {
+        return Err(Error::msg(
+            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+        ));
+    }
     let started = Instant::now();
     let before = crate::profile::solver_perf_snapshot();
     let result =
@@ -6224,9 +6233,9 @@ fn schedule_timed_rotation_inner(
         TimedRotationProfile::MainBackup24_24 => {
             schedule_main_backup_24_24(blueprint, operbox, instances, table, options)
         }
-        TimedRotationProfile::FiammettaWitch12_12 => {
-            schedule_fiammetta_witch_12_12(blueprint, operbox, instances, table, options)
-        }
+        TimedRotationProfile::FiammettaWitch12_12 => Err(Error::msg(
+            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+        )),
         TimedRotationProfile::Fiammetta8_8_4_4 => {
             if !options.fiammetta_enable {
                 return Err(Error::msg(
@@ -8099,7 +8108,6 @@ fn schedule_ordinary_profile_fallback(
     reason: &str,
 ) -> Result<TeamRotationReport> {
     let state_hours: &[f64] = match profile {
-        TimedRotationProfile::FiammettaWitch12_12 => &[12.0, 12.0],
         TimedRotationProfile::Abyssal7_5_7_5 => &[7.0, 5.0, 7.0, 5.0],
         _ => {
             return Err(Error::msg(
@@ -8120,307 +8128,6 @@ fn schedule_ordinary_profile_fallback(
         "{FINAL_INVARIANT_WARNING_PREFIX} {reason}; special claims unavailable, ordinary assignments retain requested {} timing",
         profile.display_name(),
     ));
-    Ok(report)
-}
-
-fn witch_group_room_and_tailor(
-    blueprint: &BaseBlueprint,
-    assignment: &BaseAssignment,
-    beta_tailors: &HashSet<String>,
-) -> Option<(RoomId, String)> {
-    assignment.iter_rooms().find_map(|room| {
-        let is_level_three_gold = blueprint.room(&room.room_id).is_some_and(|blueprint_room| {
-            blueprint_room.kind == FacilityKind::TradePost
-                && blueprint_room.level == 3
-                && matches!(
-                    blueprint_room.product,
-                    Some(RoomProduct::Trade {
-                        order: TradeOrderKind::Gold
-                    })
-                )
-        });
-        if !is_level_three_gold
-            || !room
-                .operators
-                .iter()
-                .any(|operator| operator.name == "巫恋")
-            || !room
-                .operators
-                .iter()
-                .any(|operator| operator.name == "龙舌兰")
-        {
-            return None;
-        }
-        room.operators
-            .iter()
-            .find(|operator| beta_tailors.contains(&operator.name))
-            .map(|tailor| (room.room_id.clone(), tailor.name.clone()))
-    })
-}
-
-fn augment_witch_profile_plan(
-    plan: &mut AssignmentPlan,
-    room_id: &RoomId,
-    tailor: &str,
-    operbox: &OperBox,
-) -> Result<()> {
-    let operators = ["巫恋", "龙舌兰", tailor];
-    for operator in operators {
-        let progress = operbox.progress_of(operator).ok_or_else(|| {
-            Error::msg(format!(
-                "fiammetta-witch-1212 missing progress for {operator}"
-            ))
-        })?;
-        plan.anchors.push(SystemAnchor {
-            system_id: "timed_rotation_fiammetta_witch".to_string(),
-            operator: operator.to_string(),
-            proactive_support: false,
-            optional_control_role: None,
-            elite: progress.elite,
-            facility: FacilityKind::TradePost,
-            room_id: Some(room_id.clone()),
-            recipe: None,
-            trade_order: Some(TradeOrderKind::Gold),
-            work_mood: None,
-            rest_facility: None,
-            fill_policy: AnchorFillPolicy::TradeRole {
-                role_id: Some("witch".to_string()),
-            },
-        });
-    }
-    // The two persistent cores and alternating beta tailor are fixed by their separate owner
-    // plans. They are not one same-work/rest cohort, so they must not create a ShiftBind.
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn solve_witch_profile_owner(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    room_id: &RoomId,
-    tailor: &str,
-) -> Result<OwnedRotationAssignment> {
-    let operators = ["巫恋", "龙舌兰", tailor]
-        .into_iter()
-        .map(|operator| {
-            operbox
-                .progress_of(operator)
-                .map(|progress| AssignedOperator::from_progress(operator, progress))
-                .ok_or_else(|| Error::msg(format!("fiammetta-witch-1212 requires {operator}")))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let mut planning_seed = BaseAssignment::default();
-    planning_seed.set_room(room_id.clone(), operators);
-    let mut profile_options = options.clone();
-    profile_options.shift_hours = 12.0;
-    let room_for_plan = room_id.clone();
-    let tailor_for_plan = tailor.to_string();
-    let mut result = assign_shift_with_preclaimed_plan(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        &profile_options,
-        AssignShiftMode::Peak,
-        &planning_seed,
-        &BaseAssignment::default(),
-        &HashSet::new(),
-        |plan| augment_witch_profile_plan(plan, &room_for_plan, &tailor_for_plan, operbox),
-    )?;
-    result.plan.resolve_actual_producer_dependencies(
-        blueprint,
-        &result.assignment,
-        instances,
-        table,
-    )?;
-    Ok(OwnedRotationAssignment {
-        assignment: result.assignment,
-        plan: result.plan,
-    })
-}
-
-fn schedule_fiammetta_witch_12_12(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-) -> Result<TeamRotationReport> {
-    if !options.fiammetta_enable || !operbox.owns("菲亚梅塔") {
-        return schedule_ordinary_profile_fallback(
-            TimedRotationProfile::FiammettaWitch12_12,
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            "fiammetta-witch-1212 requires fiammetta_enable=true and an owned Fiammetta operator",
-        );
-    }
-    let started = Instant::now();
-    let trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
-    let beta_tailors: HashSet<_> = beta_tailor_names(&trade_pool, table).into_iter().collect();
-    if beta_tailors.len() < 2 || !operbox.owns("巫恋") || !operbox.owns("龙舌兰") {
-        return schedule_ordinary_profile_fallback(
-            TimedRotationProfile::FiammettaWitch12_12,
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            "fiammetta-witch-1212 requires Witch, Tequila, and two distinct beta tailors",
-        );
-    }
-
-    let Some(room_id) = blueprint
-        .rooms
-        .iter()
-        .find(|room| {
-            room.kind == FacilityKind::TradePost
-                && room.level == 3
-                && matches!(
-                    room.product,
-                    Some(RoomProduct::Trade {
-                        order: TradeOrderKind::Gold
-                    })
-                )
-        })
-        .map(|room| room.id.clone())
-    else {
-        return schedule_ordinary_profile_fallback(
-            TimedRotationProfile::FiammettaWitch12_12,
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            "fiammetta-witch-1212 requires a level-3 gold trade room",
-        );
-    };
-    let mut tailors: Vec<_> = beta_tailors.iter().cloned().collect();
-    tailors.sort();
-    let tailor_a = tailors[0].clone();
-    let mut main = solve_witch_profile_owner(
-        blueprint, operbox, instances, table, options, &room_id, &tailor_a,
-    )?;
-    fill_owner_office_seats(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        12.0,
-        &mut main,
-        &HashSet::new(),
-    )?;
-    repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, 12.0)?;
-    let mut main_forbidden = main.assignment.operator_names();
-    main_forbidden.remove("巫恋");
-    main_forbidden.remove("龙舌兰");
-    let backup_operbox = operbox.excluding(&main_forbidden);
-    let Some(tailor_b) = tailors
-        .iter()
-        .find(|tailor| backup_operbox.owns(tailor))
-        .cloned()
-    else {
-        return schedule_ordinary_profile_fallback(
-            TimedRotationProfile::FiammettaWitch12_12,
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            "fiammetta-witch-1212 could not reserve a distinct backup beta tailor",
-        );
-    };
-    let mut backup = solve_witch_profile_owner(
-        blueprint,
-        &backup_operbox,
-        instances,
-        table,
-        options,
-        &room_id,
-        &tailor_b,
-    )?;
-    fill_owner_office_seats(
-        blueprint,
-        &backup_operbox,
-        instances,
-        table,
-        options,
-        12.0,
-        &mut backup,
-        &main_forbidden,
-    )?;
-    repair_owner_meeting_seats(
-        blueprint,
-        &backup_operbox,
-        instances,
-        table,
-        &mut backup,
-        12.0,
-    )?;
-    let backup_group_missing =
-        witch_group_room_and_tailor(blueprint, &backup.assignment, &beta_tailors)
-            != Some((room_id.clone(), tailor_b.clone()));
-
-    let teams = vec![
-        TeamAssignment {
-            label: TeamLabel::Alpha,
-            operators: sorted_assignment_names(&main.assignment),
-        },
-        TeamAssignment {
-            label: TeamLabel::Beta,
-            operators: sorted_assignment_names(&backup.assignment),
-        },
-    ];
-    let states = vec![
-        RotationStateSpec {
-            owner_index: 0,
-            duration_hours: 12.0,
-            active_teams: vec![TeamLabel::Alpha],
-            resting_team: TeamLabel::Beta,
-            fiammetta: Some(FiammettaShiftAction {
-                target: "巫恋".to_string(),
-                displaced: String::new(),
-                room_id: room_id.clone(),
-            }),
-            dorm_rest: None,
-            transition: ShiftTransition::ReplaceRooms,
-        },
-        RotationStateSpec {
-            owner_index: 1,
-            duration_hours: 12.0,
-            active_teams: vec![TeamLabel::Beta],
-            resting_team: TeamLabel::Alpha,
-            fiammetta: Some(FiammettaShiftAction {
-                target: "龙舌兰".to_string(),
-                displaced: String::new(),
-                room_id,
-            }),
-            dorm_rest: None,
-            transition: ShiftTransition::ReplaceRooms,
-        },
-    ];
-    let mut report = finalize_profile_rotation(
-        TimedRotationProfile::FiammettaWitch12_12,
-        blueprint,
-        operbox,
-        instances,
-        table,
-        vec![main, backup],
-        teams,
-        states,
-        started,
-    )?;
-    if backup_group_missing {
-        report.warnings.push(format!(
-            "{FINAL_INVARIANT_WARNING_PREFIX} fiammetta-witch-1212 backup owner lost its preclaimed Witch group"
-        ));
-    }
     Ok(report)
 }
 
@@ -9342,8 +9049,7 @@ fn finalize_profile_rotation(
             efficiencies: scores,
         });
     }
-    let fiammetta_fixed_failed =
-        retry_profile_fiammetta_slots(profile, blueprint, instances, &proposals, &mut shifts)?;
+    retry_profile_fiammetta_slots(blueprint, instances, &proposals, &mut shifts)?;
     let daily = DailyTotals {
         trade: shifts.iter().map(|shift| shift.weighted_trade).sum(),
         manufacture: shifts.iter().map(|shift| shift.weighted_manufacture).sum(),
@@ -9363,7 +9069,7 @@ fn finalize_profile_rotation(
         &owners[0].assignment,
         instances,
     ));
-    let mut report = TeamRotationReport {
+    let report = TeamRotationReport {
         profile,
         peak_plan,
         assignment_plans,
@@ -9375,29 +9081,22 @@ fn finalize_profile_rotation(
         warnings,
         elapsed: started.elapsed(),
     };
-    if fiammetta_fixed_failed {
-        report.warnings.push(format!(
-            "{FINAL_INVARIANT_WARNING_PREFIX} fiammetta-witch-1212 fixed Fiammetta actions are not all ready; unavailable actions omitted"
-        ));
-    }
     Ok(report)
 }
 
 fn retry_profile_fiammetta_slots(
-    profile: TimedRotationProfile,
     blueprint: &BaseBlueprint,
     instances: &OperatorInstances,
     proposals: &[Option<FiammettaShiftAction>],
     shifts: &mut [TeamShiftResult],
-) -> Result<bool> {
+) -> Result<()> {
     let has_proposal = proposals.iter().any(Option::is_some);
     if !has_proposal {
-        return Ok(false);
+        return Ok(());
     }
     let model = default_mood_model()?;
     fiammetta_events::accept_proposals(shifts, proposals, &model, blueprint, instances);
-    Ok(profile == TimedRotationProfile::FiammettaWitch12_12
-        && shifts.iter().any(|shift| shift.fiammetta.is_none()))
+    Ok(())
 }
 
 fn validate_mood_gap_decay_work_spans(
@@ -9590,8 +9289,6 @@ fn validate_profile_rotation(
                         }
                     }
                     [_single] => {}
-                    _ if report.profile == TimedRotationProfile::FiammettaWitch12_12
-                        && matches!(operator.as_str(), "巫恋" | "龙舌兰") => {}
                     _ => {
                         return Err(Error::msg(format!(
                             "shift {} operator {operator} belongs to multiple teams",
@@ -9631,11 +9328,7 @@ fn validate_profile_rotation(
             .filter(|operator| alpha_work.contains(*operator) && beta_work.contains(*operator))
             .cloned()
             .collect();
-        let allowed_overlap = if report.profile == TimedRotationProfile::FiammettaWitch12_12 {
-            HashSet::from(["巫恋".to_string(), "龙舌兰".to_string()])
-        } else {
-            HashSet::new()
-        };
+        let allowed_overlap = HashSet::new();
         if overlap != allowed_overlap {
             return Err(Error::msg(
                 "two-team rotation violates work-position-disjoint policy",
@@ -13448,71 +13141,6 @@ mod tests {
         assert!(rooms.iter().all(|room| *room == rooms[0]));
         assert_eq!(selected_tailors[0], selected_tailors[1]);
         assert_ne!(selected_tailors[1], selected_tailors[2]);
-    }
-
-    #[test]
-    fn timed_fiammetta_witch_two_shift_profile_uses_ab_tailors() {
-        let blueprint = BaseBlueprint::template_243_use_this().unwrap();
-        let operbox = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
-        let trade_pool = build_trade_pool(&operbox.trade_roster(&instances), &instances, &table)
-            .expect("trade pool");
-        let beta_tailors: HashSet<_> = beta_tailor_names(&trade_pool, &table).into_iter().collect();
-        let report = schedule_timed_rotation(
-            &blueprint,
-            &operbox,
-            &instances,
-            &table,
-            &AssignBaseOptions {
-                top_k: 20,
-                ..Default::default()
-            },
-            TimedRotationProfile::FiammettaWitch12_12,
-        )
-        .unwrap();
-        assert_eq!(report.shifts.len(), 2);
-        let mut rooms = Vec::new();
-        let mut tailors = Vec::new();
-        let mut targets = HashSet::new();
-        for shift in &report.shifts {
-            targets.insert(
-                shift
-                    .fiammetta
-                    .as_ref()
-                    .expect("each shift serves one group core")
-                    .target
-                    .clone(),
-            );
-            let room = shift
-                .assignment
-                .iter_rooms()
-                .find(|room| {
-                    room.operators
-                        .iter()
-                        .any(|operator| operator.name == "巫恋")
-                        && room
-                            .operators
-                            .iter()
-                            .any(|operator| operator.name == "龙舌兰")
-                })
-                .expect("Witch group room");
-            rooms.push(room.room_id.clone());
-            tailors.push(
-                room.operators
-                    .iter()
-                    .find(|operator| beta_tailors.contains(&operator.name))
-                    .expect("beta tailor")
-                    .name
-                    .clone(),
-            );
-        }
-        assert_eq!(
-            targets,
-            HashSet::from(["巫恋".to_string(), "龙舌兰".to_string()])
-        );
-        assert_eq!(rooms[0], rooms[1]);
-        assert_ne!(tailors[0], tailors[1]);
     }
 
     #[test]
