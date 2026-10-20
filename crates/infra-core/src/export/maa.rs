@@ -188,6 +188,14 @@ pub fn build_from_team_rotation(
                 .iter()
                 .map(|team| team_label_zh(report.profile, *team))
                 .collect();
+            let fiammetta_action_note = shift
+                .fiammetta
+                .as_ref()
+                .filter(|_| {
+                    report.profile == crate::schedule::TimedRotationProfile::MainBackup24_24
+                })
+                .map(|action| format!("；本班菲亚贸易站目标：{}", action.target))
+                .unwrap_or_default();
             PlanInput {
                 assignment: &shift.assignment,
                 name: format!(
@@ -197,7 +205,7 @@ pub fn build_from_team_rotation(
                     active.join("+")
                 ),
                 description: format!(
-                    "本班 {:.0} 小时；下次在 {:.0} 小时后执行下一计划；休息 {} 队{}",
+                    "本班 {:.0} 小时；下次在 {:.0} 小时后执行下一计划；休息 {} 队{}{}",
                     shift.duration_hours,
                     shift.duration_hours,
                     team_label_zh(report.profile, shift.resting_team),
@@ -205,7 +213,8 @@ pub fn build_from_team_rotation(
                         "；宿舍已设为自动填充，请换班后手动把休息队伍倒入宿舍"
                     } else {
                         ""
-                    }
+                    },
+                    fiammetta_action_note
                 ),
                 // 二班没有逐班的宿舍恢复推演：休息队伍的住宿由 MAA 自动填充，
                 // 其他 profile 只在床位不足 warning 时才请求填充。

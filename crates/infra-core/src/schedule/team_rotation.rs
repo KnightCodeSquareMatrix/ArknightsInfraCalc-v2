@@ -5284,6 +5284,80 @@ fn assert_main_backup_24_24_final_state(
     }
     let model = default_mood_model()?;
     let available = (initial_mood.min(model.mood_cap) - model.rest_threshold).max(0.0);
+    let action_count = report
+        .shifts
+        .iter()
+        .filter(|shift| shift.fiammetta.is_some())
+        .count();
+    let fiammetta_targets = main_backup_24_24_fiammetta_targets_from_report(report);
+    if action_count > 2 || fiammetta_targets.len() != action_count {
+        return Err(Error::msg(
+            "assert-invariants main_backup_24_24_fiammetta_targets failed: action targets must be distinct and within the two-slot limit",
+        ));
+    }
+    if action_count > 0 {
+        for (index, shift) in report.shifts.iter().enumerate() {
+            let Some(action) = shift.fiammetta.as_ref() else {
+                continue;
+            };
+            if !blueprint
+                .room(&action.room_id)
+                .is_some_and(|room| room.kind == FacilityKind::TradePost)
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants main_backup_24_24_fiammetta_trade_room failed in shift {} for {}",
+                    index + 1,
+                    action.target
+                )));
+            }
+            if trade_post_room_for_operator(blueprint, &shift.assignment, &action.target).as_ref()
+                != Some(&action.room_id)
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants main_backup_24_24_fiammetta_target_assignment failed in shift {} for {}",
+                    index + 1,
+                    action.target
+                )));
+            }
+            let plan = report
+                .assignment_plans
+                .get(shift.plan_index)
+                .ok_or_else(|| {
+                    Error::msg(format!(
+                        "assert-invariants main_backup_24_24_plan_index failed in shift {}",
+                        index + 1
+                    ))
+                })?;
+            if has_multi_member_shift_bind(&action.target, &shift_binds_from_plan(plan)) {
+                return Err(Error::msg(format!(
+                    "assert-invariants main_backup_24_24_fiammetta_bind failed for {}: target is part of a multi-member bind",
+                    action.target
+                )));
+            }
+        }
+        let mut repeated_shifts = Vec::with_capacity(report.shifts.len() * 2);
+        for cycle in 0..2 {
+            for shift in &report.shifts {
+                let mut repeated = shift.clone();
+                repeated.index += cycle * report.shifts.len();
+                repeated_shifts.push(repeated);
+            }
+        }
+        fiammetta_events::validate_actions(&repeated_shifts, &model, blueprint, instances)
+            .map_err(|error| {
+                Error::msg(format!(
+                    "assert-invariants main_backup_24_24_fiammetta_ready failed: {error}"
+                ))
+            })?;
+        for target in &fiammetta_targets {
+            validate_operator_cycle_mood(blueprint, instances, report, initial_mood, target)
+                .map_err(|error| {
+                    Error::msg(format!(
+                        "assert-invariants main_backup_24_24_fiammetta_mood failed: {error}"
+                    ))
+                })?;
+        }
+    }
     let mut cycle_workers = HashSet::new();
     for (index, shift) in report.shifts.iter().enumerate() {
         let (active, resting) = if index == 0 {
@@ -5337,7 +5411,9 @@ fn assert_main_backup_24_24_final_state(
             .collect();
         let working_names = shift.assignment.work_position_operator_names(blueprint);
         for name in working_names {
-            if !active_members.contains(name.as_str()) || !cycle_workers.insert(name.clone()) {
+            if !active_members.contains(name.as_str())
+                || (!cycle_workers.insert(name.clone()) && !fiammetta_targets.contains(&name))
+            {
                 return Err(Error::msg(format!(
                     "assert-invariants main_backup_24_24_work_disjoint failed in shift {} for {}",
                     index + 1,
@@ -5393,6 +5469,18 @@ fn assert_main_backup_24_24_final_state(
             ))
         })?;
     Ok(())
+}
+
+fn main_backup_24_24_fiammetta_targets_from_report(report: &TeamRotationReport) -> HashSet<String> {
+    if report.profile != TimedRotationProfile::MainBackup24_24 {
+        return HashSet::new();
+    }
+    report
+        .shifts
+        .iter()
+        .filter_map(|shift| shift.fiammetta.as_ref())
+        .map(|action| action.target.clone())
+        .collect()
 }
 
 fn assert_gold_flow_final_state(
@@ -6200,55 +6288,73 @@ fn schedule_timed_rotation_inner(
             blueprint, operbox, instances, table, options, profile,
         );
     }
-    let report = match profile {
-        TimedRotationProfile::Abc12_6_6 => schedule_abc_rotation(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            [12.0, 6.0, 6.0],
-            options.fiammetta_enable,
-            AbyssalShortShiftPolicy::Opportunistic,
-            TimedRotationProfile::Abc12_6_6,
-            &[],
-            &[],
+    let (report, fiammetta_24_diagnostic) = match profile {
+        TimedRotationProfile::Abc12_6_6 => (
+            schedule_abc_rotation(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                options,
+                [12.0, 6.0, 6.0],
+                options.fiammetta_enable,
+                AbyssalShortShiftPolicy::Opportunistic,
+                TimedRotationProfile::Abc12_6_6,
+                &[],
+                &[],
+            )?,
+            None,
         ),
-        TimedRotationProfile::Abc12_12_12 => schedule_abc_rotation(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            options,
-            [12.0, 12.0, 12.0],
-            options.fiammetta_enable,
-            AbyssalShortShiftPolicy::Disabled,
-            TimedRotationProfile::Abc12_12_12,
-            &[],
-            &[],
+        TimedRotationProfile::Abc12_12_12 => (
+            schedule_abc_rotation(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                options,
+                [12.0, 12.0, 12.0],
+                options.fiammetta_enable,
+                AbyssalShortShiftPolicy::Disabled,
+                TimedRotationProfile::Abc12_12_12,
+                &[],
+                &[],
+            )?,
+            None,
         ),
-        TimedRotationProfile::MainBackup12_12 => {
-            schedule_main_backup_12_12(blueprint, operbox, instances, table, options)
-        }
+        TimedRotationProfile::MainBackup12_12 => (
+            schedule_main_backup_12_12(blueprint, operbox, instances, table, options)?,
+            None,
+        ),
         TimedRotationProfile::MainBackup24_24 => {
-            schedule_main_backup_24_24(blueprint, operbox, instances, table, options)
+            schedule_main_backup_24_24(blueprint, operbox, instances, table, options)?
         }
-        TimedRotationProfile::FiammettaWitch12_12 => Err(Error::msg(
-            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
-        )),
+        TimedRotationProfile::FiammettaWitch12_12 => {
+            return Err(Error::msg(
+                "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+            ));
+        }
         TimedRotationProfile::Fiammetta8_8_4_4 => {
             if !options.fiammetta_enable {
                 return Err(Error::msg(
                     "fiammetta-8844 requires fiammetta_enable=true; disable conflicts with the explicit Fiammetta rotation profile",
                 ));
             }
-            schedule_fiammetta_8_8_4_4(blueprint, operbox, instances, table, options)
+            (
+                schedule_fiammetta_8_8_4_4(blueprint, operbox, instances, table, options)?,
+                None,
+            )
         }
-        TimedRotationProfile::Abyssal7_5_7_5 => {
-            schedule_abyssal_7_5_7_5(blueprint, operbox, instances, table, options)
-        }
-    }?;
-    complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)
+        TimedRotationProfile::Abyssal7_5_7_5 => (
+            schedule_abyssal_7_5_7_5(blueprint, operbox, instances, table, options)?,
+            None,
+        ),
+    };
+    let mut report =
+        complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)?;
+    if let Some(diagnostic) = fiammetta_24_diagnostic {
+        append_main_backup_24_fiammetta_warning(&mut report, diagnostic);
+    }
+    Ok(report)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7711,6 +7817,172 @@ fn solve_policy_disjoint_backup(
     })
 }
 
+fn trade_post_room_for_operator(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    operator: &str,
+) -> Option<RoomId> {
+    assignment.iter_rooms().find_map(|room| {
+        (blueprint
+            .room(&room.room_id)
+            .is_some_and(|spec| spec.kind == FacilityKind::TradePost)
+            && room
+                .operators
+                .iter()
+                .any(|assigned| assigned.name == operator))
+        .then(|| room.room_id.clone())
+    })
+}
+
+fn main_backup_24_24_fiammetta_targets(
+    blueprint: &BaseBlueprint,
+    owner: &OwnedRotationAssignment,
+) -> Vec<String> {
+    let binds = shift_binds_from_plan(&owner.plan);
+    fiammetta_return_priority(blueprint)
+        .into_iter()
+        .filter(|target| {
+            fiammetta_target_is_legal(TimedRotationProfile::MainBackup24_24, target)
+                && !has_multi_member_shift_bind(target, &binds)
+        })
+        .filter(|target| {
+            trade_post_room_for_operator(blueprint, &owner.assignment, target).is_some()
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+fn main_backup_24_24_fiammetta_actions(
+    blueprint: &BaseBlueprint,
+    main: &OwnedRotationAssignment,
+    backup: &OwnedRotationAssignment,
+    first_target: &str,
+    second_target: &str,
+) -> Option<[Option<FiammettaShiftAction>; 2]> {
+    let first_room = trade_post_room_for_operator(blueprint, &main.assignment, first_target)?;
+    let second_room = trade_post_room_for_operator(blueprint, &backup.assignment, second_target)?;
+    Some([
+        Some(FiammettaShiftAction {
+            target: first_target.to_owned(),
+            displaced: String::new(),
+            room_id: first_room,
+        }),
+        Some(FiammettaShiftAction {
+            target: second_target.to_owned(),
+            displaced: String::new(),
+            room_id: second_room,
+        }),
+    ])
+}
+
+fn main_backup_24_24_fiammetta_single_action(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    target: &str,
+) -> Option<FiammettaShiftAction> {
+    Some(FiammettaShiftAction {
+        target: target.to_owned(),
+        displaced: String::new(),
+        room_id: trade_post_room_for_operator(blueprint, assignment, target)?,
+    })
+}
+
+fn main_backup_24_24_probe_report(
+    main: &OwnedRotationAssignment,
+    backup: &OwnedRotationAssignment,
+    actions: &[Option<FiammettaShiftAction>; 2],
+) -> TeamRotationReport {
+    let make_shift = |index: usize, owner: &OwnedRotationAssignment| TeamShiftResult {
+        index,
+        plan_index: index,
+        duration_hours: 24.0,
+        active_teams: vec![if index == 0 {
+            TeamLabel::Alpha
+        } else {
+            TeamLabel::Beta
+        }],
+        resting_team: if index == 0 {
+            TeamLabel::Beta
+        } else {
+            TeamLabel::Alpha
+        },
+        assignment: owner.assignment.clone(),
+        fiammetta: actions[index].clone(),
+        dorm_rest: None,
+        drone: None,
+        transition: ShiftTransition::ReplaceRooms,
+        efficiencies: ShiftEfficiencies::default(),
+        weighted_trade: Efficiency::ZERO,
+        weighted_manufacture: Efficiency::ZERO,
+        weighted_power: Efficiency::ZERO,
+    };
+    let assignment_plans = vec![main.plan.clone(), backup.plan.clone()];
+    TeamRotationReport {
+        profile: TimedRotationProfile::MainBackup24_24,
+        peak_plan: main.plan.clone(),
+        runtime_shift_binds: assignment_plans
+            .iter()
+            .flat_map(shift_binds_from_plan)
+            .collect(),
+        assignment_plans,
+        peak_mood_eta: None,
+        teams: vec![
+            TeamAssignment {
+                label: TeamLabel::Alpha,
+                operators: sorted_assignment_names(&main.assignment),
+            },
+            TeamAssignment {
+                label: TeamLabel::Beta,
+                operators: sorted_assignment_names(&backup.assignment),
+            },
+        ],
+        shifts: vec![make_shift(0, main), make_shift(1, backup)],
+        daily: DailyTotals::default(),
+        warnings: Vec::new(),
+        elapsed: std::time::Duration::ZERO,
+    }
+}
+
+fn validate_main_backup_24_24_fiammetta_candidate(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    options: &AssignBaseOptions,
+    main: &OwnedRotationAssignment,
+    backup: &OwnedRotationAssignment,
+    actions: &[Option<FiammettaShiftAction>; 2],
+) -> Result<()> {
+    if !actions.iter().any(Option::is_some) {
+        return Err(Error::msg(
+            "fiammetta_24_24_candidate requires at least one action",
+        ));
+    }
+    let targets: HashSet<_> = actions
+        .iter()
+        .filter_map(|action| action.as_ref().map(|action| action.target.as_str()))
+        .collect();
+    if targets.len() != actions.iter().filter(|action| action.is_some()).count() {
+        return Err(Error::msg(
+            "fiammetta_24_24_candidate requires distinct action targets",
+        ));
+    }
+    let report = main_backup_24_24_probe_report(main, backup, actions);
+    let mut repeated_shifts = Vec::with_capacity(report.shifts.len() * 2);
+    for cycle in 0..2 {
+        for shift in &report.shifts {
+            let mut repeated = shift.clone();
+            repeated.index += cycle * report.shifts.len();
+            repeated_shifts.push(repeated);
+        }
+    }
+    let model = default_mood_model()?;
+    fiammetta_events::validate_actions(&repeated_shifts, &model, blueprint, instances)?;
+    validate_cycle_mood(blueprint, instances, &report, options.mood)?;
+    for action in actions.iter().flatten() {
+        validate_operator_cycle_mood(blueprint, instances, &report, options.mood, &action.target)?;
+    }
+    Ok(())
+}
+
 /// 为单个 owner assignment 保留式补齐办公室空位。
 ///
 /// - 不清除已有办公室成员（execute_plan / 体系可能已预占，如人间烟火桑葚）。
@@ -7894,6 +8166,7 @@ fn schedule_main_backup_12_12(
         table,
         options,
     )
+    .map(|(report, _)| report)
 }
 
 fn schedule_main_backup_24_24(
@@ -7902,7 +8175,7 @@ fn schedule_main_backup_24_24(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
-) -> Result<TeamRotationReport> {
+) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
     // 24/24 模式：过滤高心情消耗干员（drain >= 1.0）和德拉（互增撑不住24h）
     let filtered_operbox = filter_operbox_for_24_24(operbox);
 
@@ -7917,6 +8190,54 @@ fn schedule_main_backup_24_24(
         table,
         &profile_options,
     )
+}
+
+#[derive(Debug)]
+struct MainBackup24FiammettaDiagnostic {
+    selected_targets: Vec<String>,
+    search_path: Option<&'static str>,
+    candidate_names: Vec<String>,
+    rejection_counts: BTreeMap<&'static str, usize>,
+    reentered_searches: usize,
+}
+
+fn append_main_backup_24_fiammetta_warning(
+    report: &mut TeamRotationReport,
+    diagnostic: MainBackup24FiammettaDiagnostic,
+) {
+    let final_actions: Vec<_> = report
+        .shifts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, shift)| shift.fiammetta.as_ref().map(|action| (index, action)))
+        .collect();
+    let warning = match final_actions.as_slice() {
+        [(shift_index, action)] => {
+            let search_path = diagnostic.search_path.unwrap_or("ordinary_disjoint");
+            Some(format!(
+                "{FINAL_INVARIANT_WARNING_PREFIX} fiammetta_24_24_targets: only one distinct target passed final checks; accepted_target={} accepted_shift={} accepted_room={} search_path={search_path}; candidate_names={:?}; rejected={:?}",
+                action.target,
+                shift_index + 1,
+                action.room_id.0,
+                diagnostic.candidate_names,
+                diagnostic.rejection_counts
+            ))
+        }
+        [] if !diagnostic.selected_targets.is_empty() => Some(format!(
+            "{FINAL_INVARIANT_WARNING_PREFIX} fiammetta_24_24_targets: no selected action survived final checks; selected_targets={:?}; ordinary 24/24 assignments retained",
+            diagnostic.selected_targets
+        )),
+        [] => Some(format!(
+            "{FINAL_INVARIANT_WARNING_PREFIX} fiammetta_24_24_targets: NO_CANDIDATE_UNDER_POLICY; normal Trade candidate names={:?}; reentered backup searches={}; rejected={:?}; ordinary disjoint 24/24 assignments retained",
+            diagnostic.candidate_names,
+            diagnostic.reentered_searches,
+            diagnostic.rejection_counts
+        )),
+        _ => None,
+    };
+    if let Some(warning) = warning {
+        report.warnings.push(warning);
+    }
 }
 
 /// 为 24/24 模式过滤 operbox：移除德克萨斯、拉普兰德，以及心情消耗增加≥0.5的干员
@@ -7973,10 +8294,33 @@ fn schedule_main_backup_profile(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
-) -> Result<TeamRotationReport> {
+) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
     let started = Instant::now();
     let main_hours = state_hours[0];
     let backup_hours = state_hours[1];
+    let fiammetta_enabled = options.fiammetta_enable
+        && operbox.owns("菲亚梅塔")
+        && !fiammetta_action_slots(profile, state_hours.len()).is_empty();
+    let fiammetta_target_candidates =
+        if profile == TimedRotationProfile::MainBackup24_24 && fiammetta_enabled {
+            let normal_trade_pool =
+                build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
+            fiammetta_return_priority(blueprint)
+                .into_iter()
+                .filter(|target| {
+                    fiammetta_target_is_legal(TimedRotationProfile::MainBackup24_24, target)
+                })
+                .filter(|target| {
+                    normal_trade_pool
+                        .entries
+                        .iter()
+                        .any(|entry| entry.name == *target)
+                })
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
     let mut main =
         solve_owned_peak_assignment(blueprint, operbox, instances, table, options, main_hours)?;
     fill_owner_office_seats(
@@ -7991,34 +8335,317 @@ fn schedule_main_backup_profile(
     )?;
     repair_owner_meeting_seats(blueprint, operbox, instances, table, &mut main, main_hours)?;
     let main_forbidden = main.assignment.operator_names();
-    let mut backup = solve_policy_disjoint_backup(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        &main.assignment,
-        backup_hours,
-    )?;
-    fill_owner_office_seats(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        backup_hours,
-        &mut backup,
-        &main_forbidden,
-    )?;
-    let backup_operbox = operbox.excluding(&main_forbidden);
-    repair_owner_meeting_seats(
-        blueprint,
-        &backup_operbox,
-        instances,
-        table,
-        &mut backup,
-        backup_hours,
-    )?;
+    let mut selected_fiammetta_actions: Option<[Option<FiammettaShiftAction>; 2]> = None;
+    let mut fiammetta_rejection_counts: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut fiammetta_reentered_searches = 0;
+    let mut fiammetta_action_search_path = None;
+    let mut backup_candidate = None;
+
+    if profile == TimedRotationProfile::MainBackup24_24 && fiammetta_enabled {
+        let selected_main_targets = main_backup_24_24_fiammetta_targets(blueprint, &main);
+
+        'reentered_targets: for first_target in &selected_main_targets {
+            let mut backup_unavailable = main_forbidden.clone();
+            backup_unavailable.remove(first_target);
+            let candidate_operbox = operbox.excluding(&backup_unavailable);
+            let candidate_trade_pool =
+                build_trade_pool(&candidate_operbox.trade_roster(instances), instances, table)?;
+            if !candidate_trade_pool
+                .entries
+                .iter()
+                .any(|entry| entry.name == *first_target)
+            {
+                return Err(Error::msg(format!(
+                    "fiammetta_24_24_candidate_pool failed: {first_target} was not preserved in the normal Trade pool"
+                )));
+            }
+            eprintln!(
+                "[fiammetta-24-24] reentered normal Trade candidate target={first_target}; candidate pool retained it"
+            );
+
+            fiammetta_reentered_searches += 1;
+            let mut candidate_backup = match solve_owned_peak_assignment(
+                blueprint,
+                &candidate_operbox,
+                instances,
+                table,
+                options,
+                backup_hours,
+            ) {
+                Ok(assignment) => assignment,
+                Err(error) => {
+                    *fiammetta_rejection_counts
+                        .entry("normal_backup_search_rejected_reentered_target")
+                        .or_default() += 1;
+                    eprintln!(
+                        "[fiammetta-24-24] reentered target {first_target} rejected by normal backup search: {error}"
+                    );
+                    continue;
+                }
+            };
+            if fill_owner_office_seats(
+                blueprint,
+                &candidate_operbox,
+                instances,
+                table,
+                options,
+                backup_hours,
+                &mut candidate_backup,
+                &main_forbidden,
+            )
+            .is_err()
+                || repair_owner_meeting_seats(
+                    blueprint,
+                    &operbox.excluding(&main_forbidden),
+                    instances,
+                    table,
+                    &mut candidate_backup,
+                    backup_hours,
+                )
+                .is_err()
+            {
+                *fiammetta_rejection_counts
+                    .entry("ordinary_support_fill_rejected_reentered_target")
+                    .or_default() += 1;
+                continue;
+            }
+
+            let selected_backup_targets =
+                main_backup_24_24_fiammetta_targets(blueprint, &candidate_backup);
+            eprintln!(
+                "[fiammetta-24-24] normal backup Trade search result for reentered target={first_target}: legal selected targets={selected_backup_targets:?}"
+            );
+            for second_target in selected_backup_targets {
+                if second_target == *first_target {
+                    *fiammetta_rejection_counts
+                        .entry("normal_trade_search_reused_first_target")
+                        .or_default() += 1;
+                    continue;
+                }
+                let Some(actions) = main_backup_24_24_fiammetta_actions(
+                    blueprint,
+                    &main,
+                    &candidate_backup,
+                    first_target,
+                    &second_target,
+                ) else {
+                    *fiammetta_rejection_counts
+                        .entry("normal_trade_search_did_not_select_target_in_own_shift")
+                        .or_default() += 1;
+                    continue;
+                };
+                if let Err(error) = validate_main_backup_24_24_fiammetta_candidate(
+                    blueprint,
+                    instances,
+                    options,
+                    &main,
+                    &candidate_backup,
+                    &actions,
+                ) {
+                    *fiammetta_rejection_counts
+                        .entry("cycle_mood_or_ready_rejected_pair")
+                        .or_default() += 1;
+                    eprintln!(
+                        "[fiammetta-24-24] pair {first_target} -> {second_target} rejected by cyclic mood / ready: {error}"
+                    );
+                    continue;
+                }
+
+                eprintln!(
+                    "[fiammetta-24-24] selected normal Trade targets {first_target} -> {second_target}; each is assigned in its action shift and the full cycle passes mood / ready replay"
+                );
+                selected_fiammetta_actions = Some(actions);
+                fiammetta_action_search_path = Some("backup_pool_reentry");
+                backup_candidate = Some(candidate_backup);
+                break 'reentered_targets;
+            }
+
+            if let Some(action) =
+                main_backup_24_24_fiammetta_single_action(blueprint, &main.assignment, first_target)
+            {
+                let actions = [Some(action), None];
+                match validate_main_backup_24_24_fiammetta_candidate(
+                    blueprint,
+                    instances,
+                    options,
+                    &main,
+                    &candidate_backup,
+                    &actions,
+                ) {
+                    Ok(()) => {
+                        eprintln!(
+                            "[fiammetta-24-24] selected one normal Trade target {first_target}; backup search result retained without forcing a second action"
+                        );
+                        selected_fiammetta_actions = Some(actions);
+                        fiammetta_action_search_path = Some("backup_pool_reentry");
+                        backup_candidate = Some(candidate_backup);
+                        break 'reentered_targets;
+                    }
+                    Err(error) => {
+                        *fiammetta_rejection_counts
+                            .entry("single_reentered_target_rejected_by_cycle")
+                            .or_default() += 1;
+                        eprintln!(
+                            "[fiammetta-24-24] single reentered target {first_target} rejected by cyclic mood / ready: {error}"
+                        );
+                    }
+                }
+            }
+        }
+
+        if backup_candidate.is_none() {
+            let mut disjoint_backup = solve_policy_disjoint_backup(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                options,
+                &main.assignment,
+                backup_hours,
+            )?;
+            fill_owner_office_seats(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                options,
+                backup_hours,
+                &mut disjoint_backup,
+                &main_forbidden,
+            )?;
+            let backup_operbox = operbox.excluding(&main_forbidden);
+            repair_owner_meeting_seats(
+                blueprint,
+                &backup_operbox,
+                instances,
+                table,
+                &mut disjoint_backup,
+                backup_hours,
+            )?;
+
+            let disjoint_backup_targets =
+                main_backup_24_24_fiammetta_targets(blueprint, &disjoint_backup);
+            'disjoint_targets: for first_target in &selected_main_targets {
+                for second_target in &disjoint_backup_targets {
+                    if first_target == second_target {
+                        continue;
+                    }
+                    let Some(actions) = main_backup_24_24_fiammetta_actions(
+                        blueprint,
+                        &main,
+                        &disjoint_backup,
+                        first_target,
+                        second_target,
+                    ) else {
+                        continue;
+                    };
+                    if let Err(error) = validate_main_backup_24_24_fiammetta_candidate(
+                        blueprint,
+                        instances,
+                        options,
+                        &main,
+                        &disjoint_backup,
+                        &actions,
+                    ) {
+                        *fiammetta_rejection_counts
+                            .entry("cycle_mood_or_ready_rejected_disjoint_pair")
+                            .or_default() += 1;
+                        eprintln!(
+                            "[fiammetta-24-24] disjoint pair {first_target} -> {second_target} rejected by cyclic mood / ready: {error}"
+                        );
+                        continue;
+                    }
+                    eprintln!(
+                        "[fiammetta-24-24] selected disjoint normal Trade targets {first_target} -> {second_target}; each is assigned in its action shift and the full cycle passes mood / ready replay"
+                    );
+                    selected_fiammetta_actions = Some(actions);
+                    fiammetta_action_search_path = Some("ordinary_disjoint");
+                    break 'disjoint_targets;
+                }
+            }
+
+            if selected_fiammetta_actions.is_none() {
+                'single_targets: for (index, candidates, assignment) in [
+                    (0usize, &selected_main_targets, &main.assignment),
+                    (
+                        1usize,
+                        &disjoint_backup_targets,
+                        &disjoint_backup.assignment,
+                    ),
+                ] {
+                    for target in candidates {
+                        let Some(action) = main_backup_24_24_fiammetta_single_action(
+                            blueprint, assignment, target,
+                        ) else {
+                            continue;
+                        };
+                        let mut actions = [None, None];
+                        actions[index] = Some(action);
+                        match validate_main_backup_24_24_fiammetta_candidate(
+                            blueprint,
+                            instances,
+                            options,
+                            &main,
+                            &disjoint_backup,
+                            &actions,
+                        ) {
+                            Ok(()) => {
+                                selected_fiammetta_actions = Some(actions);
+                                fiammetta_action_search_path = Some("ordinary_disjoint");
+                                break 'single_targets;
+                            }
+                            Err(error) => {
+                                *fiammetta_rejection_counts
+                                    .entry("single_disjoint_target_rejected_by_cycle")
+                                    .or_default() += 1;
+                                eprintln!(
+                                    "[fiammetta-24-24] single disjoint target {target} rejected by cyclic mood / ready: {error}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            backup_candidate = Some(disjoint_backup);
+        }
+    }
+
+    let selected_backup = backup_candidate.take();
+    let backup_was_prepared = selected_backup.is_some();
+    let mut backup = match selected_backup {
+        Some(backup) => backup,
+        None => solve_policy_disjoint_backup(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            &main.assignment,
+            backup_hours,
+        )?,
+    };
+    if !backup_was_prepared {
+        fill_owner_office_seats(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            backup_hours,
+            &mut backup,
+            &main_forbidden,
+        )?;
+        let backup_operbox = operbox.excluding(&main_forbidden);
+        repair_owner_meeting_seats(
+            blueprint,
+            &backup_operbox,
+            instances,
+            table,
+            &mut backup,
+            backup_hours,
+        )?;
+    }
     let teams = vec![
         TeamAssignment {
             label: TeamLabel::Alpha,
@@ -8029,34 +8656,43 @@ fn schedule_main_backup_profile(
             operators: sorted_assignment_names(&backup.assignment),
         },
     ];
-    let fiammetta_enabled = options.fiammetta_enable
-        && operbox.owns("菲亚梅塔")
-        && !fiammetta_action_slots(profile, state_hours.len()).is_empty();
-    let first_fiammetta = fiammetta_enabled
-        .then(|| {
-            first_fiammetta_assignment_target(profile, blueprint, &main.assignment, &HashSet::new())
+    let (first_fiammetta, second_fiammetta) = if profile == TimedRotationProfile::MainBackup24_24 {
+        selected_fiammetta_actions
+            .as_ref()
+            .map(|actions| (actions[0].clone(), actions[1].clone()))
+            .unwrap_or((None, None))
+    } else {
+        let first = fiammetta_enabled
+            .then(|| {
+                first_fiammetta_assignment_target(
+                    profile,
+                    blueprint,
+                    &main.assignment,
+                    &HashSet::new(),
+                )
                 .map(|(target, room_id)| FiammettaShiftAction {
                     target,
                     displaced: String::new(),
                     room_id,
                 })
-        })
-        .flatten();
-    let second_fiammetta = fiammetta_enabled
-        .then(|| {
-            let used = first_fiammetta
-                .as_ref()
-                .map(|action| std::iter::once(action.target.clone()).collect())
-                .unwrap_or_default();
-            first_fiammetta_assignment_target(profile, blueprint, &backup.assignment, &used).map(
-                |(target, room_id)| FiammettaShiftAction {
-                    target,
-                    displaced: String::new(),
-                    room_id,
-                },
-            )
-        })
-        .flatten();
+            })
+            .flatten();
+        let second = fiammetta_enabled
+            .then(|| {
+                let used = first
+                    .as_ref()
+                    .map(|action| std::iter::once(action.target.clone()).collect())
+                    .unwrap_or_default();
+                first_fiammetta_assignment_target(profile, blueprint, &backup.assignment, &used)
+                    .map(|(target, room_id)| FiammettaShiftAction {
+                        target,
+                        displaced: String::new(),
+                        room_id,
+                    })
+            })
+            .flatten();
+        (first, second)
+    };
     let states = state_hours
         .iter()
         .enumerate()
@@ -8085,7 +8721,7 @@ fn schedule_main_backup_profile(
             }
         })
         .collect();
-    finalize_profile_rotation(
+    let report = finalize_profile_rotation(
         profile,
         blueprint,
         operbox,
@@ -8095,7 +8731,23 @@ fn schedule_main_backup_profile(
         teams,
         states,
         started,
-    )
+    )?;
+    let fiammetta_24_diagnostic = (profile == TimedRotationProfile::MainBackup24_24
+        && fiammetta_enabled)
+        .then(|| MainBackup24FiammettaDiagnostic {
+            selected_targets: selected_fiammetta_actions
+                .as_ref()
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|action| action.target.clone())
+                .collect(),
+            search_path: fiammetta_action_search_path,
+            candidate_names: fiammetta_target_candidates,
+            rejection_counts: fiammetta_rejection_counts,
+            reentered_searches: fiammetta_reentered_searches,
+        });
+    Ok((report, fiammetta_24_diagnostic))
 }
 
 fn schedule_ordinary_profile_fallback(
@@ -8115,7 +8767,7 @@ fn schedule_ordinary_profile_fallback(
             ))
         }
     };
-    let mut report = schedule_main_backup_profile(
+    let (mut report, _) = schedule_main_backup_profile(
         profile,
         state_hours,
         blueprint,
@@ -9251,6 +9903,7 @@ fn validate_profile_rotation(
     // 仅二班/深海启用：ABC/菲亚存在 shared 宿舍成员与菲亚事件覆盖，天然
     // 不属于 αβγ teams，不能套用该规则。
     if report.profile.is_two_team() {
+        let fiammetta_targets = main_backup_24_24_fiammetta_targets_from_report(report);
         let team_by_name: HashMap<&str, Vec<TeamLabel>> = {
             let mut map: HashMap<&str, Vec<TeamLabel>> = HashMap::new();
             for team in &report.teams {
@@ -9274,11 +9927,40 @@ fn validate_profile_rotation(
                     .collect()
                 })
                 .unwrap_or_default();
+            let fiammetta_dorm_action = shift.fiammetta.is_some()
+                && blueprint
+                    .rooms_of(FacilityKind::Dormitory)
+                    .into_iter()
+                    .any(|room| {
+                        shift
+                            .assignment
+                            .operators_in(&room.id)
+                            .iter()
+                            .any(|operator| operator.name == FIAMMETTA_NAME)
+                    });
             for operator in shift.assignment.operator_names() {
                 let teams = team_by_name
                     .get(operator.as_str())
                     .map(Vec::as_slice)
                     .unwrap_or(&[]);
+                if operator == FIAMMETTA_NAME && fiammetta_dorm_action {
+                    continue;
+                }
+                if fiammetta_targets.contains(&operator) {
+                    let action_is_here = shift
+                        .fiammetta
+                        .as_ref()
+                        .is_some_and(|action| action.target == operator);
+                    let action_owner_matches =
+                        shift.active_teams.iter().any(|team| teams.contains(team));
+                    if action_is_here && !action_owner_matches {
+                        return Err(Error::msg(format!(
+                            "shift {} Fiammetta action target {operator} is not assigned to its action owner",
+                            shift.index + 1
+                        )));
+                    }
+                    continue;
+                }
                 match teams {
                     [] => {
                         if !dorm_names.contains(&operator) {
@@ -9301,6 +9983,7 @@ fn validate_profile_rotation(
     }
 
     if report.profile.is_two_team() {
+        let fiammetta_targets = main_backup_24_24_fiammetta_targets_from_report(report);
         let alpha: HashSet<_> = report
             .teams
             .iter()
@@ -9328,7 +10011,11 @@ fn validate_profile_rotation(
             .filter(|operator| alpha_work.contains(*operator) && beta_work.contains(*operator))
             .cloned()
             .collect();
-        let allowed_overlap = HashSet::new();
+        let allowed_overlap: HashSet<_> = fiammetta_targets
+            .intersection(&alpha_work)
+            .filter(|operator| beta_work.contains(*operator))
+            .cloned()
+            .collect();
         if overlap != allowed_overlap {
             return Err(Error::msg(
                 "two-team rotation violates work-position-disjoint policy",

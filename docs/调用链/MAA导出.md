@@ -9,7 +9,7 @@
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：`crates/infra-core/src/export/maa.rs::{build_from_team_rotation,build_plan,resolve_drones,load_maa_schedule,assignment_from_maa_plan}`
 > 关联链路：docs/调用链/定时轮换.md、docs/模块/导出与岗位状态.md
-> 核验基线：MaaSchedule、MaaScheduleImport、plans 与 shifts 数量一致
+> 核验基线：菲亚 24/24 Worker plan/plan.compute 与 MAA 投影证据见 `target/codex-runs/fiammetta-2424-20261020-r7/manifest.json`
 
 MAA export 是最终状态的序列化适配器，不重新选择机制、岗位、菲亚目标或无人机房间。
 
@@ -50,7 +50,7 @@ MaaPlan 包含 name、description、Fiammetta、drones 和 rooms。rooms 使用 
 
 ## 菲亚与无人机
 
-若 shift.fiammetta 已有目标，直接投影为 enable/target/order=pre；不重新搜索。定时轮换传入空 priority，没有已确认动作时保持关闭，不会在导出层补回被 ready 排除的动作。兼容 priority 字段不参与这条定时轮换主路径。
+若 shift.fiammetta 已有目标，直接投影为 enable/target/order=pre；不重新搜索。24/24 的该计划 description 说明本班实际菲亚目标，不能据此推导目标也在另一班工作。定时轮换传入空 priority，没有已确认动作时保持关闭，不会在导出层补回被 ready 排除的动作。兼容 priority 字段不参与这条定时轮换主路径。
 
 schedule 的 drone_action 只在实际产品为赤金的制造房且 transition 不是 FiammettaOnly 时返回动作；resolve_drones 只把 room_id 映射为蓝图制造房的 1-based index。找不到 id 时 index=1 是输出映射兜底，不是重新选择目标。
 

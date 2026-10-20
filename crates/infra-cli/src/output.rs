@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use csv::Writer;
 use infra_core::box_profile::{render_box_profile_narrative, BoxProfile};
-use infra_core::layout::BaseAssignment;
+use infra_core::layout::{BaseAssignment, BaseBlueprint};
 use infra_core::pool::PoolSkip;
 use infra_core::schedule::{TeamLabel, TeamRotationReport};
 use infra_core::search::{ManuSearchHit, ManuSearchReport, TradeSearchHit, TradeSearchReport};
@@ -854,7 +854,15 @@ fn shift_room_ops<'a>(
 fn room_active_team(
     op_team: &std::collections::HashMap<String, TeamLabel>,
     ops: &[&str],
+    profile: infra_core::schedule::TimedRotationProfile,
+    shift: &infra_core::schedule::TeamShiftResult,
+    fiammetta_targets: &std::collections::HashSet<String>,
 ) -> Option<TeamLabel> {
+    if profile == infra_core::schedule::TimedRotationProfile::MainBackup24_24
+        && ops.iter().any(|name| fiammetta_targets.contains(*name))
+    {
+        return shift.active_teams.first().copied();
+    }
     ops.iter().find_map(|name| op_team.get(*name).copied())
 }
 
@@ -929,6 +937,7 @@ fn format_shift_station_line(
     op_team: &std::collections::HashMap<String, TeamLabel>,
     profile: infra_core::schedule::TimedRotationProfile,
     room_id: &str,
+    fiammetta_targets: &std::collections::HashSet<String>,
 ) -> String {
     let label = room_display_name(room_id);
     // 查找该房间的评分
@@ -968,7 +977,7 @@ fn format_shift_station_line(
 
     if let Some(ops) = shift_room_ops(shift, room_id) {
         let names = ops.join(", ");
-        if let Some(team) = room_active_team(op_team, &ops) {
+        if let Some(team) = room_active_team(op_team, &ops, profile, shift, fiammetta_targets) {
             format!(
                 "  {label}: {names}（{t}队）{score_hint}",
                 t = team_label(profile, team)
@@ -1100,6 +1109,36 @@ fn write_team_rotation_text(
     report: &TeamRotationReport,
 ) -> Result<(), Error> {
     let op_team = infra_core::schedule::operator_team_map(report);
+    let fiammetta_targets: std::collections::HashSet<String> =
+        if report.profile == infra_core::schedule::TimedRotationProfile::MainBackup24_24 {
+            report
+                .shifts
+                .iter()
+                .filter_map(|shift| shift.fiammetta.as_ref())
+                .map(|action| action.target.clone())
+                .collect()
+        } else {
+            std::collections::HashSet::new()
+        };
+    let fiammetta_action_teams: std::collections::HashMap<String, TeamLabel> =
+        if report.profile == infra_core::schedule::TimedRotationProfile::MainBackup24_24 {
+            report
+                .shifts
+                .iter()
+                .filter_map(|shift| {
+                    let action = shift.fiammetta.as_ref()?;
+                    let team = *shift.active_teams.first()?;
+                    Some((action.target.clone(), team))
+                })
+                .collect()
+        } else {
+            std::collections::HashMap::new()
+        };
+    let fiammetta_blueprint = if fiammetta_targets.is_empty() {
+        None
+    } else {
+        Some(BaseBlueprint::load(Path::new(layout))?)
+    };
 
     report_line(&format!(
         "{}: layout={layout} operbox={operbox} owned={owned} elapsed={:.2?}",
@@ -1141,14 +1180,53 @@ fn write_team_rotation_text(
         "  每日加权效率（三类分开）: 贸易={}  制造={}  发电={}",
         report.daily.trade, report.daily.manufacture, report.daily.power
     ));
+    if !fiammetta_targets.is_empty() {
+        let action_targets: Vec<_> = report
+            .shifts
+            .iter()
+            .filter_map(|shift| {
+                let action = shift.fiammetta.as_ref()?;
+                Some(format!(
+                    "S{} {}（{}）",
+                    shift.index + 1,
+                    action.target,
+                    room_display_name(&action.room_id.0)
+                ))
+            })
+            .collect();
+        report_line(&format!(
+            "  菲亚目标（各自动作班最终在岗）: {}",
+            action_targets.join("；")
+        ));
+    }
 
-    report_line("\n--- 轮换队伍花名册（办公室/会客室尽量满编，缺员见 warnings）---");
+    let team_roster_note = if fiammetta_targets.is_empty() {
+        ""
+    } else {
+        "；回池菲亚目标只列在其动作班所属队伍，逐班工位表显示实际在岗"
+    };
+    report_line(&format!(
+        "\n--- 轮换队伍花名册（办公室/会客室尽量满编，缺员见 warnings{team_roster_note}）---"
+    ));
     for team in &report.teams {
+        let operators: Vec<_> = team
+            .operators
+            .iter()
+            .filter(|name| {
+                fiammetta_action_teams
+                    .get(name.as_str())
+                    .map_or(true, |owner| owner == &team.label)
+            })
+            .collect();
         report_line(&format!(
             "  {} 队 ({} 人): {}",
             team_label(report.profile, team.label),
-            team.operators.len(),
-            team.operators.join(", ")
+            operators.len(),
+            operators
+                .iter()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if !report.warnings.is_empty() {
@@ -1182,6 +1260,20 @@ fn write_team_rotation_text(
             .map(|team| team_label(report.profile, *team))
             .collect();
         let resting = team_by_label(&report.teams, shift.resting_team);
+        let working_fiammetta_targets: std::collections::HashSet<_> = fiammetta_blueprint
+            .as_ref()
+            .map_or_else(std::collections::HashSet::new, |blueprint| {
+                let working_names = shift.assignment.work_position_operator_names(blueprint);
+                fiammetta_targets
+                    .intersection(&working_names)
+                    .cloned()
+                    .collect()
+            });
+        let resting_operators: Vec<_> = resting
+            .operators
+            .iter()
+            .filter(|name| !working_fiammetta_targets.contains(*name))
+            .collect();
         report_line(&format!(
             "\n======== Shift {} · {:.0}h · 上班 {} · 休息 {} ========",
             shift.index + 1,
@@ -1189,10 +1281,23 @@ fn write_team_rotation_text(
             active_names.join("+"),
             team_label(report.profile, shift.resting_team),
         ));
+        if report.profile == infra_core::schedule::TimedRotationProfile::MainBackup24_24 {
+            if let Some(action) = &shift.fiammetta {
+                report_line(&format!(
+                    "  本班菲亚目标: {}（{}）",
+                    action.target,
+                    room_display_name(&action.room_id.0)
+                ));
+            }
+        }
         report_line(&format!(
             "  休息干员（{}队）: {}",
             team_label(report.profile, resting.label),
-            resting.operators.join(", ")
+            resting_operators
+                .iter()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
         if let Some(rest) = &shift.dorm_rest {
             report_line(&format!(
@@ -1224,6 +1329,7 @@ fn write_team_rotation_text(
                 &op_team,
                 report.profile,
                 &room_id,
+                &fiammetta_targets,
             ));
         }
     }
