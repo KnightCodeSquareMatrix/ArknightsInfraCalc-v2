@@ -1761,15 +1761,19 @@ fn expected_signature_keys(options: &BakeManifestOptions) -> BTreeSet<String> {
     let gold_lines = baked_search_baseline().gold_manu_line_count;
     if options.include_trade {
         for level in 1..=3 {
-            for order in [TradeOrderKind::Gold, TradeOrderKind::Originium] {
-                keys.insert(trade_lookup_key(
-                    level,
-                    station_operator_capacity(level),
-                    order,
-                    gold_lines,
-                ));
-            }
+            keys.insert(trade_lookup_key(
+                level,
+                station_operator_capacity(level),
+                TradeOrderKind::Gold,
+                gold_lines,
+            ));
         }
+        keys.insert(trade_lookup_key(
+            3,
+            station_operator_capacity(3),
+            TradeOrderKind::Originium,
+            gold_lines,
+        ));
     }
     if options.include_manufacture {
         for level in 1..=3 {
