@@ -36,7 +36,7 @@ use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::{Condition, RecipeKind, Selector};
 use crate::FacilityKind;
 
-pub const BAKE_SCHEMA_VERSION: u32 = 13;
+pub const BAKE_SCHEMA_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BakeMode {
@@ -1002,7 +1002,7 @@ fn trade_combo_row(
         names,
         operator_indices,
         operator_mask,
-        sort_efficiency: result.efficiency.total_efficiency,
+        sort_efficiency: result.efficiency.final_efficiency,
         order_kind: Some(order_kind),
         recipe: None,
         trade_mechanism_signature,
@@ -1841,7 +1841,7 @@ fn validate_baked_row_for_signature(row: &BakedComboRowDisk, key: &str) -> Resul
         return Err(Error::msg(format!("baked row does not match {key:?}")));
     }
     let sort_efficiency = row
-        .trade_paper_efficiency_millis
+        .trade_final_efficiency_millis
         .or(row.manufacture_final_efficiency_millis)
         .ok_or_else(|| Error::msg(format!("baked row has no final efficiency in {key:?}")))?;
     if row.sort_efficiency_millis != sort_efficiency {

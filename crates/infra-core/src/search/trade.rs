@@ -249,7 +249,7 @@ fn search_trade_split_stations(
 fn trade_efficiency_sort_key(hit: &TradeSearchHit) -> Efficiency {
     hit.breakdown
         .as_ref()
-        .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency)
+        .map_or(hit.final_efficiency, |breakdown| breakdown.final_efficiency)
 }
 
 fn search_trade_single_order(
@@ -1011,35 +1011,6 @@ mod tests {
             !hit.names.contains(&"巫恋".to_string()),
             "但书单走站不应与巫恋同房: {:?}",
             hit
-        );
-    }
-
-    #[test]
-    fn trade_search_score_is_total_efficiency_sort_key() {
-        let hit = TradeSearchHit {
-            names: vec!["a".into()],
-            gold_names: vec![],
-            originium_names: vec![],
-            final_efficiency: Efficiency::from_decimal(1.230),
-            mechanic_equivalent_efficiency: Efficiency::from_decimal(0.450),
-            rule_id: None,
-            unit_trade_per_day: 10_000.0,
-            unit_gold_per_day: 1_000.0,
-            unit_originium_per_day: 0.0,
-            breakdown: Some(TradeEfficiencyBreakdown {
-                paper_efficiency: Efficiency::from_decimal(1.230),
-                final_efficiency: Efficiency::from_decimal(1.230),
-                total_efficiency: Efficiency::from_decimal(1.100),
-                ..Default::default()
-            }),
-        };
-        assert_eq!(
-            trade_efficiency_sort_key(&hit),
-            Efficiency::from_decimal(1.100)
-        );
-        assert_eq!(
-            hit.final_efficiency,
-            hit.breakdown.as_ref().unwrap().final_efficiency
         );
     }
 

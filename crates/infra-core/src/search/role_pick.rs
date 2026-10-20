@@ -285,7 +285,7 @@ fn pick_disjoint_trade_hit(
 fn role_pick_sort_key(hit: &TradeSearchHit) -> Efficiency {
     hit.breakdown
         .as_ref()
-        .map_or(hit.final_efficiency, |breakdown| breakdown.total_efficiency)
+        .map_or(hit.final_efficiency, |breakdown| breakdown.final_efficiency)
 }
 
 fn trade_hit_names(hit: &TradeSearchHit) -> &[String] {
@@ -695,29 +695,5 @@ mod tests {
 
         assert!(hit.names.iter().any(|name| name == "但书"), "{hit:?}");
         assert_eq!(hit.rule_id.as_deref(), Some("gsl_docus_solo_e0"));
-    }
-
-    #[test]
-    fn role_pick_uses_total_efficiency_instead_of_unit_output_multiplier() {
-        let hit = |score: f64, unit_trade_per_day: f64| TradeSearchHit {
-            names: vec![format!("score-{score}")],
-            gold_names: vec![],
-            originium_names: vec![],
-            final_efficiency: Efficiency::from_decimal(score * unit_trade_per_day / 10_000.0),
-            mechanic_equivalent_efficiency: Efficiency::ZERO,
-            rule_id: None,
-            unit_trade_per_day,
-            unit_gold_per_day: 0.0,
-            unit_originium_per_day: 0.0,
-            breakdown: Some(TradeEfficiencyBreakdown {
-                total_efficiency: Efficiency::from_decimal(score),
-                ..Default::default()
-            }),
-        };
-        let high_unit_low_final = hit(1.8, 20_000.0);
-        let low_unit_high_final = hit(2.1, 12_000.0);
-        assert!(
-            role_pick_sort_key(&low_unit_high_final) > role_pick_sort_key(&high_unit_low_final)
-        );
     }
 }

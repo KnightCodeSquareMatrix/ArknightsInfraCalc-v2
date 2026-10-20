@@ -814,7 +814,7 @@ pub(super) fn pick_trade_hit(
                 let score = |hit: &TradeSearchHit| {
                     hit.breakdown
                         .as_ref()
-                        .map_or(hit.final_efficiency, |value| value.total_efficiency)
+                        .map_or(hit.final_efficiency, |value| value.final_efficiency)
                 };
                 if ordinary
                     .as_ref()
