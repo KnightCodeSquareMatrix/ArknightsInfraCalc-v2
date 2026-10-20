@@ -365,9 +365,10 @@ impl ControlShiftAdmission {
     ) -> Result<ControlPool> {
         let required = self.required_names();
         if required.len() > self.closure.capacity {
-            return Err(Error::msg(
-                "control_rotation_admission: required anchors exceed blueprint capacity",
-            ));
+            return Err(Error::ControlRotationRequiredAnchorsExceedCapacity {
+                required: required.len(),
+                capacity: self.closure.capacity,
+            });
         }
         let occupied: HashSet<_> = assignment
             .iter_rooms()

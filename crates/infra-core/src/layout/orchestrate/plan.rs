@@ -62,6 +62,9 @@ pub struct SystemAnchor {
     pub operator: String,
     #[serde(skip)]
     pub(crate) proactive_support: bool,
+    /// Recommendation provenance used only for bounded Plan retry when its required trade fill fails.
+    #[serde(skip)]
+    pub(crate) optional_trade_role: Option<String>,
     /// Present only for a rule role with min_count=0 in the control center.
     #[serde(skip)]
     pub optional_control_role: Option<String>,

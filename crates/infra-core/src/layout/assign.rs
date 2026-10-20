@@ -526,6 +526,7 @@ fn assign_shift_with_preclaimed_plan_inner(
     let mut skip_system_ids = skip_system_ids.clone();
     skip_trade_core_registry_systems(&mut skip_system_ids);
     let mut disabled_conditional_packs = HashSet::new();
+    let mut skipped_optional_trade_roles = HashSet::new();
     loop {
         let stage_started = Instant::now();
         let stage_before = crate::profile::solver_perf_snapshot();
@@ -537,6 +538,7 @@ fn assign_shift_with_preclaimed_plan_inner(
             options.mood,
             &options.system_preferences,
             &options.skipped_optional_control_roles,
+            &skipped_optional_trade_roles,
             options.support_combinations_enable,
             options.registry_sustain_hours,
             mode,
@@ -581,7 +583,37 @@ fn assign_shift_with_preclaimed_plan_inner(
             stage_before,
             stage_after,
         );
-        let assignment = assignment_result?;
+        let assignment = match assignment_result {
+            Ok(assignment) => assignment,
+            Err(Error::OptionalTradeRoleInfeasible {
+                system_id,
+                role_id,
+                operator,
+                message,
+            }) => {
+                let retry = (system_id, role_id, operator);
+                if skipped_optional_trade_roles.len() >= 4
+                    || !skipped_optional_trade_roles.insert(retry.clone())
+                {
+                    return Err(Error::msg(message));
+                }
+                eprintln!(
+                    "[plan-retry] omit optional trade recommendation {}/{}/{} after infeasible required fill: {}",
+                    retry.0, retry.1, retry.2, message
+                );
+                continue;
+            }
+            Err(Error::GoldFlowCoreInfeasible { message }) => {
+                if !skip_system_ids.insert("pozyomka_durin".to_string()) {
+                    return Err(Error::msg(message));
+                }
+                eprintln!(
+                    "[plan-fallback] return the three gold-flow operators to ordinary trade search after the complete core could not fill: {message}"
+                );
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
 
         let requires_final_pack_check = plan.rotation_reserves.iter().any(|reserve| {
             reserve.require_pre_split_halves

@@ -86,6 +86,32 @@ pub(super) fn assign_trade_remainder(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
+    assign_trade_remainder_with_plan_anchors(
+        blueprint,
+        pool,
+        table,
+        instances,
+        gold_lines,
+        options,
+        durin_dorm_planning,
+        &[],
+        assignment,
+        used,
+    )
+}
+
+pub(super) fn assign_trade_remainder_with_plan_anchors(
+    blueprint: &BaseBlueprint,
+    pool: &TradePool,
+    table: &SkillTable,
+    instances: &OperatorInstances,
+    gold_lines: u32,
+    options: &AssignBaseOptions,
+    durin_dorm_planning: Option<u8>,
+    plan_anchors: &[crate::layout::orchestrate::SystemAnchor],
+    assignment: &mut BaseAssignment,
+    used: &mut HashSet<String>,
+) -> Result<()> {
     let mut rooms: Vec<_> = blueprint
         .rooms
         .iter()
@@ -121,8 +147,40 @@ pub(super) fn assign_trade_remainder(
             room.level,
             used,
             &anchors,
-        )
-        .map_err(|e| Error::msg(format!("trade {}: {e}", room.id.0)))?;
+        );
+        let hit = match hit {
+            Ok(hit) => hit,
+            Err(error) => {
+                if let Some(anchor) = plan_anchors.iter().find(|anchor| {
+                    anchor.optional_trade_role.is_some()
+                        && anchor.room_id.as_ref() == Some(&room.id)
+                        && anchors.iter().any(|name| name == &anchor.operator)
+                }) {
+                    return Err(Error::OptionalTradeRoleInfeasible {
+                        system_id: anchor.system_id.clone(),
+                        role_id: anchor.optional_trade_role.clone().unwrap_or_default(),
+                        operator: anchor.operator.clone(),
+                        message: format!("trade {}: {error}", room.id.0),
+                    });
+                }
+                if plan_anchors.iter().any(|anchor| {
+                    anchor.system_id == "pozyomka_durin"
+                        && anchor.facility == FacilityKind::TradePost
+                        && anchor.trade_order == Some(TradeOrderKind::Gold)
+                        && anchor.optional_trade_role.is_none()
+                        && anchor.room_id.as_ref() == Some(&room.id)
+                        && anchors.iter().any(|name| name == &anchor.operator)
+                }) {
+                    return Err(Error::GoldFlowCoreInfeasible {
+                        message: format!(
+                            "four-gold core cannot complete required trade room {}: {error}",
+                            room.id.0
+                        ),
+                    });
+                }
+                return Err(Error::msg(format!("trade {}: {error}", room.id.0)));
+            }
+        };
         commit_trade_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())

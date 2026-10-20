@@ -214,6 +214,8 @@ pub(super) struct RoleSpec {
     pub id: String,
     #[serde(default)]
     pub proactive_support: bool,
+    #[serde(default)]
+    pub optional_trade_recommendation: bool,
     pub facility: FacilityKind,
     #[serde(default)]
     pub facilities: Vec<FacilityKind>,
@@ -1024,6 +1026,7 @@ fn place_role_recursive(
                 system_id: rule_id.to_string(),
                 operator: candidate.name.clone(),
                 proactive_support: role.proactive_support,
+                optional_trade_role: role.optional_trade_recommendation.then(|| role.id.clone()),
                 optional_control_role: (role.min_count == 0
                     && role.facility == FacilityKind::ControlCenter)
                     .then(|| role.id.clone()),
@@ -1111,7 +1114,7 @@ fn enumerate_role_placements<'a>(
         matches!(role.selection, RoleSelection::AllAvailable).then_some(available.len());
     let rooms = matching_rooms(role, ctx, state);
     if role.same_room || role.room_group.is_some() {
-        return rooms
+        let mut placements: Vec<_> = rooms
             .into_iter()
             .filter_map(|room| {
                 let available_slots = role_room_capacity(room)
@@ -1140,6 +1143,11 @@ fn enumerate_role_placements<'a>(
                 .then_some(placement)
             })
             .collect();
+        if placements.is_empty() && role.min_count == 0 {
+            return vec![Vec::new()];
+        }
+        append_optional_trade_omission(role, &mut placements);
+        return placements;
     }
 
     if role.fill_to_capacity || role.competitive {
@@ -1164,6 +1172,7 @@ fn enumerate_role_placements<'a>(
                 break;
             }
         }
+        append_optional_trade_omission(role, &mut placements);
         return placements;
     }
 
@@ -1191,12 +1200,23 @@ fn enumerate_role_placements<'a>(
             break;
         }
     }
-    if placement.len() < role.min_count as usize
+    let mut placements = if placement.len() < role.min_count as usize
         || exact_count.is_some_and(|count| placement.len() != count)
     {
         Vec::new()
     } else {
         vec![placement]
+    };
+    append_optional_trade_omission(role, &mut placements);
+    placements
+}
+
+fn append_optional_trade_omission<'a>(role: &RoleSpec, placements: &mut Vec<RolePlacement<'a>>) {
+    if role.optional_trade_recommendation
+        && role.min_count == 0
+        && !placements.iter().any(Vec::is_empty)
+    {
+        placements.push(Vec::new());
     }
 }
 
@@ -1583,6 +1603,7 @@ fn complete_manufacture_role(
                 system_id: rule_id.to_string(),
                 operator: name.clone(),
                 proactive_support: role.proactive_support,
+                optional_trade_role: None,
                 optional_control_role: None,
                 elite: operator.elite,
                 facility: FacilityKind::Factory,

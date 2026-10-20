@@ -40,8 +40,8 @@ use super::producer_fill::{
 };
 use super::run::{AssignmentRun, StageTimer};
 use super::trade_fill::{
-    assign_trade_remainder, pick_trade_meta_then_plain, refresh_trade_efficiency_snapshots,
-    take_next_trade_room, trade_order_from_room,
+    assign_trade_remainder, assign_trade_remainder_with_plan_anchors, pick_trade_meta_then_plain,
+    refresh_trade_efficiency_snapshots, take_next_trade_room, trade_order_from_room,
 };
 use super::{inject_search_anchor_pool_entries, tag_pool_from_plan, AssignBaseOptions};
 
@@ -1252,7 +1252,7 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.used,
         run.instances,
     )?;
-    assign_trade_remainder(
+    assign_trade_remainder_with_plan_anchors(
         run.blueprint,
         &trade_pool,
         run.table,
@@ -1260,6 +1260,7 @@ fn finish_peak_prefix_candidate<'a>(
         gold_lines,
         run.options,
         Some(run.durin_plan),
+        &plan.anchors,
         &mut run.assignment,
         &mut run.used,
     )?;

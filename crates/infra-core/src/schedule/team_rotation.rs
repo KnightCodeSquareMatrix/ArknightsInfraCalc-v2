@@ -59,7 +59,7 @@ use super::rotation_types::{
     RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies, ShiftTransition, TeamAssignment,
     TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
 };
-use super::shift_bind::{shift_binds_from_plan, validate_final_bind_cycle};
+use super::shift_bind::{shift_binds_from_plan, team_of_operator, validate_final_bind_cycle};
 
 const FIAMMETTA_NAME: &str = "菲亚梅塔";
 const SPHINX_NAME: &str = "深巡";
@@ -4618,18 +4618,18 @@ fn assert_final_rotation_invariants_with_mood(
     }
     let pool = build_control_pool_with_fillers(operbox, instances, table)?;
     let mood = default_mood_model()?;
-    let gold_flow_selected = report
+    let peak_gold_flow_selected = report
         .peak_plan
         .selected_rules
         .iter()
         .find(|rule| rule.rule_id == "pozyomka_durin");
-    let gold_flow_split = gold_flow_selected.and_then(|rule| match rule.alternative_id.as_str() {
-        "two_trade_gold_flow" => Some(2),
-        "three_trade_gold_flow" => Some(3),
-        _ => None,
+    let peak_has_split = peak_gold_flow_selected.is_some_and(|rule| {
+        matches!(
+            rule.alternative_id.as_str(),
+            "two_trade_gold_flow" | "three_trade_gold_flow"
+        )
     });
     let mut split_witness = false;
-    let mut single_witness = false;
     for shift in &report.shifts {
         let plan = report
             .assignment_plans
@@ -4637,12 +4637,17 @@ fn assert_final_rotation_invariants_with_mood(
             .ok_or_else(|| {
                 Error::msg("assert-invariants gold_flow_core_real_lines failed: missing Plan")
             })?;
-        if plan
+        let gold_flow_selected = plan
             .selected_rules
             .iter()
-            .any(|rule| rule.rule_id == "pozyomka_durin")
-            && blueprint.gold_manu_line_count() < 4
-        {
+            .find(|rule| rule.rule_id == "pozyomka_durin");
+        let gold_flow_split =
+            gold_flow_selected.and_then(|rule| match rule.alternative_id.as_str() {
+                "two_trade_gold_flow" => Some(2),
+                "three_trade_gold_flow" => Some(3),
+                _ => None,
+            });
+        if gold_flow_selected.is_some() && blueprint.gold_manu_line_count() < 4 {
             return Err(Error::msg(format!(
                 "assert-invariants gold_flow_core_real_lines failed in shift {}: core selected with {} real gold lines (need 4)",
                 shift.index + 1,
@@ -4714,81 +4719,57 @@ fn assert_final_rotation_invariants_with_mood(
         }
         let durin_count = assert_gold_flow_final_state(blueprint, shift, instances, table)?;
         if let Some(room_count) = gold_flow_split {
-            let gold_room_of = |name: &str| {
-                blueprint
-                    .rooms_of(FacilityKind::TradePost)
-                    .into_iter()
-                    .filter(|room| {
-                        matches!(
-                            room.product,
-                            Some(RoomProduct::Trade {
-                                order: TradeOrderKind::Gold
-                            })
-                        )
-                    })
-                    .find(|room| {
-                        shift
-                            .assignment
-                            .operators_in(&room.id)
-                            .iter()
-                            .any(|op| op.name == name)
-                    })
-                    .map(|room| &room.id)
-            };
-            let rooms: Option<Vec<_>> = ["巫恋", "龙舌兰", "绮良", "鸿雪", "图耶"]
-                .iter()
-                .map(|name| gold_room_of(name))
-                .collect();
-            if let Some(rooms) = rooms {
-                split_witness = true;
+            if let Some([kirara_room, pozyomka_room, tuye_room]) =
+                gold_flow_core_rooms_for_shift(blueprint, report, shift)?
+            {
+                for (name, room) in [
+                    ("绮良", &kirara_room),
+                    ("鸿雪", &pozyomka_room),
+                    ("图耶", &tuye_room),
+                ] {
+                    if !shift
+                        .assignment
+                        .operators_in(room)
+                        .iter()
+                        .any(|operator| operator.name == name && operator.elite >= 2)
+                    {
+                        return Err(Error::msg(format!(
+                            "assert-invariants gold_flow_split_admission failed in shift {}: core operator {} is not E2 in a gold TradePost",
+                            shift.index + 1,
+                            name
+                        )));
+                    }
+                }
                 if durin_count != 4 {
                     return Err(Error::msg(format!(
                         "assert-invariants gold_flow_group_durin_presence failed in shift {}: got {}",
-                        shift.index + 1, durin_count
+                        shift.index + 1,
+                        durin_count
                     )));
                 }
-                let valid = rooms[0] == rooms[1]
-                    && rooms[1] == rooms[2]
-                    && rooms[2] != rooms[3]
-                    && if room_count == 2 {
-                        rooms[3] == rooms[4]
-                    } else {
-                        rooms[3] != rooms[4] && rooms[2] != rooms[4]
-                    };
+                let valid = if room_count == 2 {
+                    kirara_room != pozyomka_room
+                        && kirara_room != tuye_room
+                        && pozyomka_room == tuye_room
+                } else {
+                    kirara_room != pozyomka_room
+                        && kirara_room != tuye_room
+                        && pozyomka_room != tuye_room
+                };
                 if !valid {
                     return Err(Error::msg(format!(
                         "assert-invariants gold_flow_split_admission failed in shift {}",
                         shift.index + 1
                     )));
                 }
-            }
-        }
-        if gold_flow_selected.is_some_and(|rule| rule.alternative_id == "single_trade_gold_flow") {
-            let trio_working = blueprint
-                .rooms_of(FacilityKind::TradePost)
-                .iter()
-                .any(|room| {
-                    matches!(
-                        room.product,
-                        Some(RoomProduct::Trade {
-                            order: TradeOrderKind::Gold
-                        })
-                    ) && crate::trade::gold_flow::has_ordered_trio(
-                        shift
-                            .assignment
-                            .operators_in(&room.id)
-                            .iter()
-                            .map(|op| op.name.as_str()),
-                    )
-                });
-            if trio_working {
-                single_witness = true;
-                if durin_count != 4 {
-                    return Err(Error::msg(format!(
-                        "assert-invariants gold_flow_group_durin_presence failed in shift {}: got {}",
-                        shift.index + 1, durin_count
-                    )));
-                }
+                split_witness = true;
+                validate_gold_flow_recommendation_anchors(
+                    plan,
+                    &kirara_room,
+                    &pozyomka_room,
+                    &tuye_room,
+                    shift.index,
+                )?;
             }
         }
         if shift_works_in_trade(blueprint, &shift.assignment, SPHINX_NAME)
@@ -5240,19 +5221,148 @@ fn assert_final_rotation_invariants_with_mood(
             }
         }
     }
-    if gold_flow_split.is_some() && !split_witness {
+    if peak_has_split && !split_witness {
         return Err(Error::msg(
             "assert-invariants gold_flow_split_admission failed: selected group has no working shift",
         ));
     }
-    if gold_flow_selected.is_some_and(|rule| rule.alternative_id == "single_trade_gold_flow")
-        && !single_witness
-    {
-        return Err(Error::msg(
-            "assert-invariants gold_flow_single_admission failed: selected group has no working shift",
-        ));
+    Ok(())
+}
+
+fn validate_gold_flow_recommendation_anchors(
+    plan: &AssignmentPlan,
+    kirara_room: &RoomId,
+    pozyomka_room: &RoomId,
+    tuye_room: &RoomId,
+    shift_index: usize,
+) -> Result<()> {
+    for anchor in plan.anchors.iter().filter(|anchor| {
+        anchor.system_id == "pozyomka_durin" && anchor.optional_trade_role.is_some()
+    }) {
+        let expected_room = match anchor.optional_trade_role.as_deref() {
+            Some("witch" | "tequila") => kirara_room,
+            Some("docus") => tuye_room,
+            Some("closure") => pozyomka_room,
+            _ => continue,
+        };
+        if anchor.room_id.as_ref() != Some(expected_room) {
+            return Err(Error::msg(format!(
+                "assert-invariants gold_flow_recommendation_geometry failed in shift {}: role {} operator {} is not co-located with its core room",
+                shift_index + 1,
+                anchor.optional_trade_role.as_deref().unwrap_or("unknown"),
+                anchor.operator
+            )));
+        }
     }
     Ok(())
+}
+
+fn gold_flow_core_rooms_for_shift(
+    blueprint: &BaseBlueprint,
+    report: &TeamRotationReport,
+    shift: &TeamShiftResult,
+) -> Result<Option<[RoomId; 3]>> {
+    let core_names = ["绮良", "鸿雪", "图耶"];
+    let working = core_names.map(|name| operator_has_non_dorm_assignment(blueprint, shift, name));
+
+    if matches!(
+        report.profile,
+        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
+    ) {
+        let has_core_bind = report.runtime_shift_binds.iter().any(|bind| {
+            core_names
+                .iter()
+                .all(|name| bind.operators.iter().any(|operator| operator == name))
+                && bind.on_shifts == 2
+                && bind.off_shifts == 1
+        });
+        if !has_core_bind {
+            return Err(Error::msg(format!(
+                "assert-invariants gold_flow_shift_bind failed in shift {}: selected core has no synchronized two-on/one-off bind",
+                shift.index + 1
+            )));
+        }
+        let core_team = team_of_operator(report, core_names[0]).ok_or_else(|| {
+            Error::msg(format!(
+                "assert-invariants gold_flow_shift_bind failed in shift {}: missing core team",
+                shift.index + 1
+            ))
+        })?;
+        if core_names
+            .iter()
+            .skip(1)
+            .any(|name| team_of_operator(report, name) != Some(core_team))
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants gold_flow_shift_bind failed in shift {}: core members are assigned to different teams",
+                shift.index + 1
+            )));
+        }
+        if shift.resting_team == core_team {
+            if working.into_iter().any(|is_working| is_working) {
+                return Err(Error::msg(format!(
+                    "assert-invariants gold_flow_shift_bind failed in shift {}: a core member works while the bound team rests",
+                    shift.index + 1
+                )));
+            }
+            return Ok(None);
+        }
+    } else if working.iter().all(|is_working| !is_working) {
+        return Ok(None);
+    }
+
+    if working.iter().any(|is_working| !is_working) {
+        return Err(Error::msg(format!(
+            "assert-invariants gold_flow_shift_bind failed in shift {}: core members are split between work and rest",
+            shift.index + 1
+        )));
+    }
+
+    let [Some(kirara), Some(pozyomka), Some(tuye)] = core_names.map(|name| {
+        blueprint
+            .rooms_of(FacilityKind::TradePost)
+            .into_iter()
+            .filter(|room| {
+                matches!(
+                    room.product,
+                    Some(RoomProduct::Trade {
+                        order: TradeOrderKind::Gold
+                    })
+                )
+            })
+            .find(|room| {
+                shift
+                    .assignment
+                    .operators_in(&room.id)
+                    .iter()
+                    .any(|operator| operator.name == name)
+            })
+            .map(|room| room.id.clone())
+    }) else {
+        return Err(Error::msg(format!(
+            "assert-invariants gold_flow_split_admission failed in shift {}: active core member is not in a gold TradePost",
+            shift.index + 1
+        )));
+    };
+
+    Ok(Some([kirara, pozyomka, tuye]))
+}
+
+fn operator_has_non_dorm_assignment(
+    blueprint: &BaseBlueprint,
+    shift: &TeamShiftResult,
+    name: &str,
+) -> bool {
+    shift.assignment.iter_rooms().any(|room| {
+        room.operators.iter().any(|operator| operator.name == name)
+            && blueprint
+                .room(&room.room_id)
+                .is_some_and(|spec| spec.kind != FacilityKind::Dormitory)
+    }) || shift
+        .assignment
+        .training_assist
+        .as_ref()
+        .is_some_and(|operator| operator.name == name)
 }
 
 fn assert_main_backup_24_24_final_state(
@@ -6437,6 +6547,28 @@ fn schedule_abc_rotation(
             &mut eta_failure,
         );
         match result {
+            Err(error @ Error::ControlRotationRequiredAnchorsExceedCapacity { .. })
+                if !skip_systems.contains(&"pozyomka_durin") =>
+            {
+                let mut fallback_skip = skip_systems.to_vec();
+                fallback_skip.push("pozyomka_durin");
+                eprintln!(
+                    "[rotation-fallback] retry ordinary trade Plan after the four-gold core made required control anchors infeasible: {error}"
+                );
+                return schedule_abc_rotation(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &retry_options,
+                    shift_hours,
+                    enable_fiammetta_return,
+                    abyssal_policy,
+                    profile,
+                    gamma_relaxed,
+                    &fallback_skip,
+                );
+            }
             Err(error) => {
                 let Some(failure) = eta_failure else {
                     return Err(error);
@@ -9000,6 +9132,7 @@ fn augment_abyssal_profile_plan(
         system_id: SYSTEM_ID.to_string(),
         operator: producer.to_string(),
         proactive_support: false,
+        optional_trade_role: None,
         optional_control_role: None,
         elite: producer_progress.elite,
         facility: FacilityKind::ControlCenter,
@@ -9020,6 +9153,7 @@ fn augment_abyssal_profile_plan(
             system_id: SYSTEM_ID.to_string(),
             operator: operator.clone(),
             proactive_support: false,
+            optional_trade_role: None,
             optional_control_role: None,
             elite: progress.elite,
             facility: FacilityKind::Factory,

@@ -67,6 +67,7 @@ pub fn build_plan_with_runtime(
         mood,
         preferences,
         &std::collections::HashSet::new(),
+        &std::collections::HashSet::new(),
         false,
         None,
         mode,
@@ -87,6 +88,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     mood: f64,
     preferences: &std::collections::HashMap<String, String>,
     skipped_optional_control_roles: &std::collections::HashSet<(String, String, String)>,
+    skipped_optional_trade_roles: &std::collections::HashSet<(String, String, String)>,
     support_combinations_enable: bool,
     registry_sustain_hours: Option<f64>,
     mode: AssignShiftMode,
@@ -133,6 +135,25 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
         }
     }
     loop {
+        for rule in &mut catalog.rules {
+            for alternative in &mut rule.alternatives {
+                for role in alternative.roles.iter_mut().chain(
+                    alternative
+                        .conditional_packs
+                        .iter_mut()
+                        .flat_map(|pack| &mut pack.roles),
+                ) {
+                    if !role.optional_trade_recommendation {
+                        continue;
+                    }
+                    for (system_id, role_id, name) in skipped_optional_trade_roles {
+                        if system_id == &rule.id && role_id == &role.id {
+                            role.candidates.retain(|candidate| candidate.name != *name);
+                        }
+                    }
+                }
+            }
+        }
         let (mut plan, scratch) = compile_plan_once(
             &catalog,
             blueprint,

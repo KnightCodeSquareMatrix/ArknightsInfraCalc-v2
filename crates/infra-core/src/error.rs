@@ -32,6 +32,20 @@ pub enum Error {
         report: Box<crate::schedule::TeamRotationReport>,
         message: String,
     },
+    /// A recommended Plan role made its required trade-room fill infeasible.
+    #[error("{message}")]
+    OptionalTradeRoleInfeasible {
+        system_id: String,
+        role_id: String,
+        operator: String,
+        message: String,
+    },
+    /// The selected gold-flow core cannot be completed as a whole candidate.
+    #[error("{message}")]
+    GoldFlowCoreInfeasible { message: String },
+    /// The selected Plan's required control anchors cannot fit the facility.
+    #[error("control_rotation_admission: required anchors exceed blueprint capacity")]
+    ControlRotationRequiredAnchorsExceedCapacity { required: usize, capacity: usize },
 }
 
 impl Error {
