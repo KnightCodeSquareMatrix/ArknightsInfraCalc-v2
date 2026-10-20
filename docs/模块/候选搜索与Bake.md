@@ -8,7 +8,7 @@
 > 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
 > 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,joint_trade}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}`
 > 关联链路：`docs/调用链/技能到房间结算.md`; `docs/调用链/跨设施状态刷新.md`
-> 核验基线：`947f1a2`
+> 核验基线：`01cbec5`; `target/codex-runs/trade-final-efficiency-unit-20261020-r2/`; `out/trade-final-efficiency-unit-20261020/baked-final-r2/`
 
 ## 搜索链
 
@@ -34,7 +34,11 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## Bake
 
-`bake_catalogs` 用 live solver 生成 schema v13 catalog 和 input fingerprint。`validate_baked_catalog` 检查 schema、输入 hash、row 集与 combo table hash。`BakeMode::Auto` 不兼容就回 live，`Disabled` 禁用，`Required` 对 miss 失败。生成物不可手工编辑为规则。
+`bake_catalogs` 用 live solver 生成 schema v14 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。旧 catalog 因 schema 不匹配需重建，`data/baked/` 不提交生成表。
+
+Baked 行复原贸易产出时，`trade_output_per_day = unit_trade_per_day × paper total_efficiency`，`originium_shards_per_day = unit_originium_per_day × paper total_efficiency`；`gold_consumption_per_day` 所需的 scale 未持久化，仍保持默认值而不得伪造。该复原由 `01cbec5` 修正，尚无该提交后的新鲜构建与完整 live-vs-baked 重跑证据。
+
+`BakeMode::Auto` 不兼容就回 live，`Disabled` 禁用，`Required` 对 miss 失败。生成物不可手工编辑为规则。
 
 黑键—巫恋产品禁配只在读取已验证完整的贸易 Bake 表时过滤，先排除非法行再取前 K 条；它本身不造成 `Required` miss。其他未表示的同站禁配仍由 `Auto` 回 live、`Required` 报错。catalog 的可执行文件指纹失效时照常 miss，需另行重建，不能拿旧表证明命中。
 

@@ -8,7 +8,7 @@
 > 代码范围：`crates/infra-cli/src/commands/{plan.rs,serve.rs,plan_compute.rs}`、`crates/infra-core/src/{box_profile,schedule,layout,export,training_advice}`
 > 代码锚点：`crates/infra-cli/src/main.rs::run` → `crates/infra-cli/src/commands/plan.rs::plan_cmd` / `crates/infra-cli/src/commands/serve.rs::handle_request` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan` / `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_for_plan_compute` → `crates/infra-cli/src/commands/plan_compute.rs::compute_plan_inner`
 > 关联链路：`docs/接口/CLI与Worker.md`; `docs/接口/输入输出与兼容.md`; `docs/调用链/debug与验证.md`
-> 核验基线：标准 243 layout + full-e2 operbox；Worker `ping` 与 `plan.compute`；`--assert-invariants`
+> 核验基线：标准 243 layout + full-e2 operbox；Worker `ping` 与 `plan.compute`；`--assert-invariants`；贸易最终效率续接 `ddf5218`/`3f1d92e`/`01cbec5`
 
 ## 两个入口汇合
 
@@ -51,7 +51,7 @@ run_user_rotation_probe_with_profile_and_preferences(
 
 核心三人形成自己的同步轮休绑定，不让建议队友合并改变核心轮休队形。ABC 三班按两上休一核对；其他 profile 按各自团队拓扑核对同上同下，不把三班 2/1 次数套到主备两班。门禁按最终非宿舍工作岗位计数：核心 team 的休班上三人必须全不在工作岗位，落在宿舍属于休息；实际工作班分别满足相应双站/三站几何，并至少有一个完整工作班证明核心实际生效。普通入口保留排班和可定位质量 warning，显式 `--assert-invariants` 才对最终真实拆组、班数或几何错误失败。
 
-**尚未实现的择优**：用户 10-20 已明确比较字段为 `TradeEfficiency::final_efficiency`：技能效率计入纸面总效率，再乘特殊订单单位产出倍率；`mechanic_equivalent_efficiency` 仅解释机制，不重复计入。当前 Plan 阶段仍按优先级与 exclusive group 提交首个可行候选，没有跨完整候选评分器；单个候选内的排序不能证明两套完整 Plan 已比较。现有部分 Trade 搜索 consumer 仍用未乘特殊订单倍率的 `total_efficiency`，排班周期汇总也仍走纸面值，尚未贯通；本轮不声称已实现四赤金对普通核心的择优或全局最优。
+**尚未实现的择优**：用户 10-20 已明确比较字段为 `TradeEfficiency::final_efficiency`：技能效率计入纸面总效率，再乘特殊订单单位产出倍率；`mechanic_equivalent_efficiency` 仅解释机制，不重复计入。单房 `search_trade_triples`、`role_pick` 和贸易补入比较已在 `ddf5218` 改为读取 `final_efficiency`；`Stations` 仍是独立的站数加权复合。当前 Plan 阶段仍按优先级与 exclusive group 提交首个可行候选，没有跨完整候选评分器；单个候选内的排序不能证明两套完整 Plan 已比较。排班周期汇总/跨域 weighted policy 仍读纸面口径，四赤金对普通完整 Plan 的同场比较尚未实现，因此不声称已实现该择优或全局最优。
 
 Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不入选，技能本身仍按实际数值结算。`--prefer rosemary_perception=recruit_refresh_witch` 已是未知 alternative，不能再解除任何贸易禁配；黑键—巫恋同站限制由贸易搜索执行，不依赖该规则是否激活。
 
