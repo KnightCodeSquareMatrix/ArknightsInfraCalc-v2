@@ -2348,6 +2348,8 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
     let mechanic_equivalent_efficiency = row.trade_mechanic_equivalent_efficiency?;
     let unit_trade_per_day = row.unit_trade_per_day.unwrap_or(0.0);
     let unit_gold_per_day = row.unit_gold_per_day.unwrap_or(0.0);
+    let unit_originium_per_day = row.unit_originium_per_day.unwrap_or(0.0);
+    let total_efficiency = row.trade_paper_efficiency?;
     Some(TradeSearchHit {
         names: row.names.clone(),
         gold_names: vec![],
@@ -2357,7 +2359,7 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
         rule_id: row.rule_id.clone(),
         unit_trade_per_day,
         unit_gold_per_day,
-        unit_originium_per_day: row.unit_originium_per_day.unwrap_or(0.0),
+        unit_originium_per_day,
         breakdown: Some(TradeEfficiencyBreakdown {
             base_efficiency: {
                 let base = row.trade_base_efficiency?;
@@ -2371,7 +2373,7 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
             skill_efficiency: row.trade_skill_efficiency?,
             control_efficiency: row.trade_control_efficiency?,
             paper_efficiency: row.trade_paper_efficiency?,
-            total_efficiency: row.trade_paper_efficiency?,
+            total_efficiency,
             mechanic_equivalent_efficiency,
             unit_output_multiplier: row.trade_unit_output_multiplier?,
             final_efficiency,
@@ -2381,6 +2383,8 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
             combined_output_value: row.trade_combined_output_value?,
             unit_trade_per_day,
             unit_gold_per_day,
+            trade_output_per_day: unit_trade_per_day * total_efficiency.as_f64(),
+            originium_shards_per_day: unit_originium_per_day * total_efficiency.as_f64(),
             rule_id: row.rule_id.clone(),
             ..TradeEfficiencyBreakdown::default()
         }),
