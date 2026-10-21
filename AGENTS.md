@@ -66,8 +66,6 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 共享工作区保持一个 writer。并行任务优先拆分为只读调查；确需并行写入时，按不重叠的文件 owner 划分，所有 writer 从同一明确 base SHA 建立隔离 worktree，并由一个集成人负责顺序提交。
 - 并行 writer 不手动 merge 文件内容：集成人逐个 `cherry-pick` 已验证的原子提交。若两个任务必须改同一文件，改为串行执行或由单一 writer 集成；不得并行编辑后依赖人工冲突拼接。
 - 非简单且存在独立调查、提取或审阅轴时，默认积极使用边界明确的只读 subagent；不为凑数量委派。主 Agent 必须检查真实文件、diff、日志和产物。
-- 委派前按当前运行时选择真实可用的具名 profile；Codex 使用 `.codex/agents/`，OpenCode 使用 `.opencode/agents/`。任务名或提示词不能证明模型已切换；无法选择低成本 profile 时，不把机械提取批量回落到默认 Sol。
-- 当前 Magpie / Codex 模型路由：除最后的独立终审外，所有子代理（调查、提取、规划、阶段审阅、实现 writer、验证）一律使用 DeepSeek，对应模型别名为 `gpt-6-luna`。实现使用 `deepseek-writer`，阶段审阅使用 `stage-reviewer`；默认 worker 也须显式指定同一模型。Sol / Astra / Terra reviewer 仅用于最后的独立终审，保留现有终审配置；模型不可用时报告实际错误，不静默回退到其他模型。
 - 子代理始终使用独立上下文：Codex collaboration 委派显式设置 `fork_turns="none"`，提供只含目标、边界、必要来源与验证问题的自包含简报，不复制主会话全文或其他代理结论。共享文件系统不等于共享对话上下文。
 - 对边界已明确的阶段性分析、计划、当前代码/diff 或 evidence packet，优先用 `stage-reviewer` 做快速对抗初审；它只能裁决当前阶段是否继续，不能替代用户语义裁决或适用的领域 Sol 最终审阅。
 - 用户明确授权无人值守修复时，按 `docs/QUALITY_AND_AUDIT.md` §2.3 的固定 `PAUSE_REASON`、冻结证据包和重试上限自动推进；未触发该枚举不得因一般不确定性暂停，也不得自行扩大业务语义、保证等级或外部副作用范围。
