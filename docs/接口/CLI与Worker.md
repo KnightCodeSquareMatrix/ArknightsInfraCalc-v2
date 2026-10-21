@@ -12,6 +12,8 @@
 
 本页只记录接口和模块责任。游戏机制由机制知识库提供；求解器的候选、编排和结算行为由 `infra-core` 的领域文档与代码提供。
 
+本次提交包含 Worker v7 WIP 源码与契约，但实现状态仍为 `in-progress`，未完成 fresh release 验收或部署；消费者必须以实际 `ping` 和契约 hash 为准。
+
 ## 用户可见入口
 
 | 命令 | 代码入口 | 输入 | 输出或用途 |
@@ -41,19 +43,19 @@
 
 ## 常驻 Worker
 
-`serve_cmd` 启动时加载运行时表、编译六个 `plan.compute` JSON Schema，并计算每个 schema 的 SHA-256 与当前可执行文件指纹。随后逐行读取 stdin：
+`serve_cmd` 当前 WIP 源码启动时加载运行时表、编译七个 `plan.compute` JSON Schema，并计算每个 schema 的 SHA-256 与当前可执行文件指纹；本次提交一并记录 v7 机器契约，但未完成 fresh release 验收或部署。随后逐行读取 stdin：
 
 ```text
 JSON request line → handle_request → method handler → JSON response line
 ```
 
-支持 `ping`、`plan`、`plan.compute`。`ping` 返回协议版本、支持的 schema 版本（v1–v6）、每版本契约 hash、solver 可执行文件 hash、构建 commit 和时间。`plan.compute` 当前用 v6；v1–v5 历史 schema 仍可结构解析旧龙巫 wire，但解码后会在求解前明确返回 `PLAN_FAILED`，不等于该 profile 仍受支持，也不会走普通主备 fallback。空白行跳过；EOF 正常退出；单行超过 8 MiB 返回 `FRAME_TOO_LARGE` 后继续读取下一行；非 UTF-8 返回 `INVALID_UTF8`。
+支持 `ping`、`plan`、`plan.compute`。本次 WIP 源码的 `ping` 返回协议版本、支持的 schema 版本（v1–v7）、每版本契约 hash、solver 可执行文件 hash、构建 commit 和时间；部署消费者仍须以实际响应为准。`plan.compute` v7 保留 v6 named rotation 字符串，并增加普通主备/ABC 的 topology + `shift_hours` 对象；v1–v6 schema 文件与 wire 含义不变，v6 保持闭集。v3–v5 历史 schema 可结构解析旧龙巫 wire，但解码后会在求解前明确返回 `PLAN_FAILED`，不等于该 profile 仍受支持，也不会走普通主备 fallback；v1/v2 未包含该枚举。空白行跳过；EOF 正常退出；单行超过 8 MiB 返回 `FRAME_TOO_LARGE` 后继续读取下一行；非 UTF-8 返回 `INVALID_UTF8`。
 
 Worker stdout 必须保持 JSONL，不能混入人类日志。请求解析、未知方法和协议错误没有业务 result；`plan.compute` 的求解失败通常在外层 `error` 同时保留结构化 result，详见[错误与诊断](错误与诊断.md)。
 
 ## 责任边界
 
-`plan`、`layout team-rotation`、`layout test` 和 `layout analyze` 使用 `--enable-support-combinations` 显式开启主动挂件组合，未指定默认关闭。Worker `plan` 使用顶层布尔参数 `support_combinations_enable`；`plan.compute` v6 使用 `options.support_combinations_enable`，所有入口缺省均为 `false`。`debug rerun` 接受 v1–v6，并保留请求开关；旧包未记录该字段时按当前默认关闭重跑，结果差异不等同于旧二进制回归。记录了已删除龙巫 profile 的旧 bundle 会明确失败，不能静默变成普通主备。
+`plan`、`layout team-rotation`、`layout test` 和 `layout analyze` 使用 `--enable-support-combinations` 显式开启主动挂件组合，未指定默认关闭。Worker `plan` 使用顶层布尔参数 `support_combinations_enable`；`plan.compute` v6–v7 使用 `options.support_combinations_enable`，所有入口缺省均为 `false`。本次 v7 WIP 允许 `debug rerun` 携带 topology 时长对象，但未完成 fresh release 验收。旧包未记录该字段时按当前默认关闭重跑，结果差异不等同于旧二进制回归。记录了已删除龙巫 profile 的旧 bundle 会明确失败，不能静默变成普通主备。
 
 - `commands/*.rs` 负责参数、文件和协议适配，调用 `infra-core`；
 - `commands/plan_compute.rs` 是 `plan` 与 `plan.compute` 共用的单次编排入口；

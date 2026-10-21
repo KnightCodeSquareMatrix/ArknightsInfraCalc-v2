@@ -212,7 +212,7 @@ WorkforceIndex
 
 ## 9. Timed profiles 与默认 αβγ ABC
 
-`schedule_timed_rotation` 在默认 ABC、ABC `12/12/12`、主备 `12/12`、主备 `24/24`、菲亚 `8/8/4/4` 和深海 `7/5/7/5` 六个具名 profile 中分派。独立龙巫二班已从产品支持中删除。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
+`schedule_timed_rotation_request` 分派六个具名 profile，也接受普通二/三班 topology 的按序时长请求；菲亚 `8/8/4/4` 和深海 `7/5/7/5` 继续使用具名四班路径。独立龙巫二班已从产品支持中删除。默认 ABC 先生成当前启发式流程选出的 `peak` 主力编制和对应 `AssignmentPlan`，再把生产设施切成 H1/H2 两半：
 
 ```text
 α = peak 的 H1
@@ -261,7 +261,7 @@ MAA 导出消费最终各班 assignment，而不是重新解释效率。`plan` �
 - 工具人池用于贸易等明确适用的领域；普通排班制造使用全部合法普通候选；
 - 单房 `C(n,k)` 组合求值用 Rayon 并行；
 - 当前跨房依赖通过顺序 commit + `resolve`，保证后房能看到前房已提交状态；前房选型仍看不到后房最终成员，双向联合反馈属于未来 A+ 的已知改造边界；
-- Bake 保存 schema v13 单房候选索引、整数效率和首批贸易 room-local 机制签名，并校验 combo table bytes/hash、逐 signature 行数和完整贸易 row universe；
+- Bake 保存 schema v15 单房候选索引、整数效率和首批贸易 room-local 机制签名，并校验 combo table bytes/hash、逐 signature 行数和完整贸易 row universe；
 - Bake 使用前检查数据指纹、CLI 生成器、房间签名、练度和布局兼容性；
 - 动态候选投影、非基准布局或旧 schema 等不安全情况会走实时搜索。
 

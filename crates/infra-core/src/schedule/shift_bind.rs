@@ -7,9 +7,7 @@ use std::collections::HashSet;
 
 use crate::layout::{AssignmentPlan, BaseAssignment, BaseBlueprint, FacilityKind, RoomId};
 
-use super::rotation_types::{
-    FacilityHalf, RuntimeShiftBind, TeamLabel, TeamRotationReport, TimedRotationProfile,
-};
+use super::rotation_types::{FacilityHalf, RuntimeShiftBind, TeamLabel, TeamRotationReport};
 
 /// 从统一 plan 提取运行期绑定组。plan 的 shift_binds 仅在体系激活时产出，已隐含 ownership gate。
 pub fn shift_binds_from_plan(plan: &AssignmentPlan) -> Vec<RuntimeShiftBind> {
@@ -392,10 +390,7 @@ pub(crate) fn validate_final_bind_cycle(
     blueprint: &BaseBlueprint,
     report: &TeamRotationReport,
 ) -> Result<(), String> {
-    let abc = matches!(
-        report.profile,
-        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
-    );
+    let abc = report.profile.is_ordinary_abc();
     let mut source_binds = Vec::new();
     for (plan_index, plan) in report.assignment_plans.iter().enumerate() {
         for bind in shift_binds_from_plan(plan) {

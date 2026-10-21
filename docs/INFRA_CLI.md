@@ -46,10 +46,10 @@ stdout / stderr / JSON / CSV / MAA
 
 | 命令 | 入口 | 核心调用 |
 |---|---|---|
-| `plan` | `plan_cmd` | `compute_plan` → `schedule_timed_rotation` → profile/MAA |
+| `plan` | `plan_cmd` | `compute_plan` → `schedule_timed_rotation_request` → profile/MAA |
 | `serve` | `serve_cmd` | `handle_request` → `handle_plan`/`handle_plan_compute` |
 | `layout test` | `layout_test_cmd` | `assign_shift`/`resolve_base` 或固定 assignment |
-| `layout team-rotation` | `layout_team_rotation_cmd` | `schedule_timed_rotation` → `build_from_team_rotation` |
+| `layout team-rotation` | `layout_team_rotation_cmd` | `schedule_timed_rotation_request` → `build_from_team_rotation` |
 | `layout analyze` | `layout_analyze_cmd` | `build_box_profile` |
 | `layout eval` | `layout_eval_cmd` | `resolve_base` → 正式设施 solver → JSON/text |
 | `debug rerun` | `rerun_cmd` | bundle snapshot → `compute_plan` → behavior projection |

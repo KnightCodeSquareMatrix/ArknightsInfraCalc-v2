@@ -30,7 +30,7 @@
 
 ```text
 layout / operbox / runtime data
-  -> schedule_timed_rotation (timed path)
+  -> schedule_timed_rotation_request (timed path)
        -> assign_shift* (reference and shift construction)
   -> assign_shift* (single-shift path)
        -> build_plan
@@ -44,7 +44,7 @@ layout / operbox / runtime data
 
 - Layout 的概念主路径是 `build_plan -> execute_plan -> fill -> resolve`；`layout/assign/pipeline.rs` 是阶段顺序与 resolve 时机的实现 owner。
 - L1 interpreter 只认 `buff_id`；L2 处理领域机制；L3 shortcut 只结算实际组合，不负责体系选型或进编。
-- `schedule_timed_rotation` 当前接受六个闭集 profile：ABC `12/6/6`、ABC `12/12/12`、主备 `12/12`、主备 `24/24`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`；独立龙巫二班已从产品支持中删除，旧 CLI/Worker 请求明确失败；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班与轮换](模块/排班与轮换.md)，当前实现见 [定时轮换](调用链/定时轮换.md)。
+- `schedule_timed_rotation_request` 接受六个具名 profile，并支持普通二/三班 topology 按序指定时长；菲亚 `8/8/4/4`、深海 `7/5/7/5` 仍为具名四班路径。独立龙巫二班已从产品支持中删除，旧 CLI/Worker 请求明确失败；`schedule_team_rotation` 是默认 ABC 薄包装。模式边界见 [排班与轮换](模块/排班与轮换.md)，当前实现见 [定时轮换](调用链/定时轮换.md)。
 - CLI 和 export 只消费 core 结果；`plan`、`plan.compute` 与 legacy Worker `plan` 共享 `commands/plan_compute.rs` 的一次 rotation 结果。
 
 ## `infra-core` 模块索引

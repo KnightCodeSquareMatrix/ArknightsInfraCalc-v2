@@ -12,6 +12,8 @@
 
 ## 两个入口汇合
 
+本次提交包含 plan.compute v7 WIP 源码与契约；generic 轮换仍为 `in-progress`，未完成 fresh release 验收或部署，消费者以实际 `ping` 为准。
+
 ```text
 argv plan ─────────────┐
 serve method=plan ────┼→ compute_plan → compute_plan_inner
@@ -26,24 +28,24 @@ serve plan.compute ───┘                 │
 ## 阶段一：适配与加载
 
 - CLI：`commands/plan.rs::plan_cmd` 解析 `--layout`、`--operbox`、`--baseline`、`--rotation`、`--top`、`--prefer`、输出路径和 `--assert-invariants`，加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable`。
-- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v6 嵌入 schema。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败；v6 schema 不包含该枚举。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
+- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v7 嵌入 schema。v7 保留旧 named rotation，并允许普通主备/ABC 使用 topology + `shift_hours`；v1–v6 wire 不变，v6 拒绝该对象。该 v7 代码与契约属于本次 WIP 提交，未完成 fresh release 验收或部署。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
 - Worker `plan`：`handle_plan` 在反序列化路径参数前拒绝旧龙巫 wire；其他请求默认加载 243/full-e2，调用同一 `compute_plan`。
 
 布局语义校验拒绝超出 1–5 级的宿舍 `level`。旧 `dorm_ambience_level` 可读取但不参与结算；`dorm_beds` 仅负责容量；旧 `scenario.initial_global.monster_cuisine` 可读取但会从初始资源池忽略。CLI 文件加载与 Worker 内联布局使用同一 `BaseBlueprint::validate`，不会把这些遗留字段当作当前料理来源。其他真正非法输入仍在此阶段返回，不应进入 solver 根因分析。
 
 ## 阶段二：共享 Plan 编排
 
-`plan_compute::compute_plan_inner` 首先调用：
+本次 WIP 提交的 `plan_compute::compute_plan_inner` 使用 request-based probe：
 
 ```text
-run_user_rotation_probe_with_profile_and_preferences(
+run_user_rotation_probe_with_request_and_preferences(
   blueprint, operbox, instances, skill_table,
-  top_k, rotation_profile, system_preferences,
-   fiammetta_enable, support_combinations_enable, optional candidate output
+  top_k, rotation_request, system_preferences,
+  fiammetta_enable, support_combinations_enable, optional candidate output
 )
 ```
 
-该 probe 进入 `schedule_timed_rotation`，由 rotation profile 分派单班编排和多班轮换。Peak/shift assignment、Plan、resolve、房间搜索、跨设施状态和最终 rotation 都属于 `infra-core`；CLI 只接收 `LayoutProbe`。
+本次 WIP 提交的入口使用 `run_user_rotation_probe_with_request_and_preferences` 并调用 `schedule_timed_rotation_request`，将具名 profile 映射到兼容策略、将泛型 request 按 topology 与有序时长序列构造普通二/三班；这些改动仍未完成 fresh release 验收。Peak/shift assignment、Plan、resolve、房间搜索、跨设施状态和最终 rotation 都属于 `infra-core`；CLI 只接收 `LayoutProbe`。
 
 主动挂件开关从请求经 probe、`AssignBaseOptions` 进入 Plan 编译，缺省关闭。规则中 `proactive_support=true` 的角色在关闭时不参与落位；主角色和普通角色保持原有竞争，未选中的支持角色不产生 active dependency。开启时不改变当前规则。最终 `support_combination_policy` 断言按 Plan 认领及当班 assignment 检查，允许自然在岗读数，不按姓名或 tag 拒绝成员。该 policy 不序列化为输出字段。
 

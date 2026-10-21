@@ -12,5 +12,6 @@ pub use eval::{default_schedule_export_path, reference_shift_assignment, run_sch
 pub use narrative::render_box_profile_narrative;
 pub use probe::{
     run_layout_probe, run_user_rotation_probe, run_user_rotation_probe_with_profile,
-    run_user_rotation_probe_with_profile_and_preferences, LayoutProbe,
+    run_user_rotation_probe_with_profile_and_preferences,
+    run_user_rotation_probe_with_request_and_preferences, LayoutProbe,
 };

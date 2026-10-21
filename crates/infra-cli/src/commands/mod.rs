@@ -18,6 +18,7 @@ pub use profile::profile_cmd;
 pub use serve::serve_cmd;
 pub use verify::verify_cmd;
 
+#[cfg(test)]
 fn timed_rotation_profile_from_args(
     args: &[String],
 ) -> Result<infra_core::schedule::TimedRotationProfile, infra_core::Error> {
@@ -26,6 +27,17 @@ fn timed_rotation_profile_from_args(
     };
     args.get(index + 1)
         .ok_or_else(|| infra_core::Error::msg("missing --rotation <profile>"))?
+        .parse()
+}
+
+fn timed_rotation_request_from_args(
+    args: &[String],
+) -> Result<infra_core::schedule::TimedRotationRequest, infra_core::Error> {
+    let Some(index) = args.iter().position(|arg| arg == "--rotation") else {
+        return Ok(infra_core::schedule::TimedRotationRequest::default());
+    };
+    args.get(index + 1)
+        .ok_or_else(|| infra_core::Error::msg("missing --rotation <profile-or-topology@hours>"))?
         .parse()
 }
 

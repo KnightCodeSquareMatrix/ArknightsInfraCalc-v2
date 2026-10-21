@@ -7,7 +7,10 @@ use crate::layout::{assign_base_greedy, resolve_base, AssignBaseOptions, BaseBlu
 use crate::manufacture::ManuSearchRecipeMode;
 use crate::operbox::OperBox;
 use crate::pool::{build_manufacture_pool, build_trade_pool};
-use crate::schedule::{schedule_team_rotation, schedule_timed_rotation, TimedRotationProfile};
+use crate::schedule::{
+    schedule_team_rotation, schedule_timed_rotation_request, TimedRotationProfile,
+    TimedRotationRequest,
+};
 use crate::search::{
     search_manufacture_triples, search_trade_triples, ManuSearchOptions, ManuSearchReport,
     TradeSearchOptions, TradeSearchReport,
@@ -83,7 +86,33 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
     support_combinations_enable: bool,
     fiammetta_candidates_out: Option<std::path::PathBuf>,
 ) -> Result<LayoutProbe> {
-    let rotation = schedule_timed_rotation(
+    run_user_rotation_probe_with_request_and_preferences(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        top_k,
+        TimedRotationRequest::Named(profile),
+        system_preferences,
+        fiammetta_enable,
+        support_combinations_enable,
+        fiammetta_candidates_out,
+    )
+}
+
+pub fn run_user_rotation_probe_with_request_and_preferences(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    top_k: usize,
+    rotation_request: TimedRotationRequest,
+    system_preferences: &HashMap<String, String>,
+    fiammetta_enable: bool,
+    support_combinations_enable: bool,
+    fiammetta_candidates_out: Option<std::path::PathBuf>,
+) -> Result<LayoutProbe> {
+    let rotation = schedule_timed_rotation_request(
         blueprint,
         operbox,
         instances,
@@ -96,7 +125,7 @@ pub fn run_user_rotation_probe_with_profile_and_preferences(
             fiammetta_candidates_out,
             ..AssignBaseOptions::default()
         },
-        profile,
+        rotation_request,
     )?;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);

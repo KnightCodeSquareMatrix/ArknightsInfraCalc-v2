@@ -6,7 +6,7 @@
 //!   [`BaseBlueprint`].
 //! - Build one shift with [`assign_shift`] or [`assign_base_greedy`], then inspect derived
 //!   context with [`resolve_base`]. The [`layout`] module owns Plan execution and facility fill.
-//! - Build a named timed schedule with [`schedule_timed_rotation`].
+//! - Build a named or generic timed schedule with [`schedule_timed_rotation_request`].
 //!   [`schedule_team_rotation`] is the default ABC convenience wrapper.
 //! - Evaluate facility candidates through [`search`] and the [`trade`], [`manufacture`],
 //!   [`power`], and [`control`] domain modules.
@@ -132,8 +132,9 @@ pub use response_dependency::{
 pub use roster::{OperatorProgress, Roster};
 pub use schedule::{
     evaluate_base_assignment_efficiencies, operator_team_map, schedule_team_rotation,
-    schedule_timed_rotation, DailyTotals, DormRestPlan, ShiftEfficiencies, ShiftTransition,
-    TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
+    schedule_timed_rotation_request, DailyTotals, DormRestPlan, GenericRotationTiming,
+    ShiftEfficiencies, ShiftTransition, TeamAssignment, TeamLabel, TeamRotationReport,
+    TeamShiftResult, TimedRotationProfile, TimedRotationRequest,
 };
 pub use scoring::{
     evaluate_control_inject_policy, evaluate_trade_manufacture_weighted_efficiency, EffPct,

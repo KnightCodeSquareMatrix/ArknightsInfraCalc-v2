@@ -150,6 +150,12 @@ pub enum TimedRotationProfile {
     /// Two complete, disjoint 24-hour main/backup states over a 48-hour cycle.
     #[serde(rename = "main_backup_24_24")]
     MainBackup24_24,
+    /// An ordinary two-team topology whose ordered durations are supplied separately.
+    #[serde(rename = "generic_main_backup")]
+    GenericMainBackup,
+    /// An ordinary αβγ topology whose ordered durations are supplied separately.
+    #[serde(rename = "generic_abc")]
+    GenericAbc,
     /// Legacy wire token retained only so older requests can be explicitly rejected.
     #[doc(hidden)]
     #[serde(rename = "fiammetta_witch_12_12")]
@@ -169,6 +175,8 @@ impl TimedRotationProfile {
             Self::Abc12_12_12 => "abc-121212",
             Self::MainBackup12_12 => "2",
             Self::MainBackup24_24 => "main-backup-2424",
+            Self::GenericMainBackup => "main-backup-custom",
+            Self::GenericAbc => "abc-custom",
             Self::FiammettaWitch12_12 => "fiammetta-witch-1212 (removed)",
             Self::Fiammetta8_8_4_4 => "fiammetta-8844",
             Self::Abyssal7_5_7_5 => "abyssal-7575",
@@ -181,6 +189,8 @@ impl TimedRotationProfile {
             Self::Abc12_12_12 => "ABC 三班 12/12/12",
             Self::MainBackup12_12 => "二班主替 12/12",
             Self::MainBackup24_24 => "二班主替 24/24",
+            Self::GenericMainBackup => "二班主替自定义时长",
+            Self::GenericAbc => "ABC 三班自定义时长",
             Self::FiammettaWitch12_12 => "已删除的龙巫二班",
             Self::Fiammetta8_8_4_4 => "菲亚插班 8/8/4/4",
             Self::Abyssal7_5_7_5 => "深海四班 7/5/7/5",
@@ -192,16 +202,165 @@ impl TimedRotationProfile {
             Self::Abc12_6_6 => "3班",
             Self::Abc12_12_12 => "3班",
             Self::MainBackup12_12 | Self::MainBackup24_24 => "2班",
+            Self::GenericMainBackup => "2班",
+            Self::GenericAbc => "3班",
             Self::FiammettaWitch12_12 => "不支持",
             Self::Fiammetta8_8_4_4 | Self::Abyssal7_5_7_5 => "4班",
         }
     }
 
+    pub const fn maa_uses_rest_team_dorm_autofill(self) -> bool {
+        matches!(
+            self,
+            Self::MainBackup12_12 | Self::MainBackup24_24 | Self::GenericMainBackup
+        )
+    }
+
+    pub const fn is_ordinary_abc(self) -> bool {
+        matches!(self, Self::Abc12_6_6 | Self::Abc12_12_12 | Self::GenericAbc)
+    }
+
+    pub const fn is_ordinary_main_backup(self) -> bool {
+        matches!(
+            self,
+            Self::MainBackup12_12 | Self::MainBackup24_24 | Self::GenericMainBackup
+        )
+    }
+
     pub const fn is_two_team(self) -> bool {
         matches!(
             self,
-            Self::MainBackup12_12 | Self::MainBackup24_24 | Self::Abyssal7_5_7_5
+            Self::MainBackup12_12
+                | Self::MainBackup24_24
+                | Self::GenericMainBackup
+                | Self::Abyssal7_5_7_5
         )
+    }
+}
+
+/// Explicit timing input for the ordinary two-team or αβγ rotation topologies.
+/// Legacy named profiles remain plain strings on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TimedRotationRequest {
+    Named(TimedRotationProfile),
+    Generic(GenericRotationTiming),
+}
+
+/// Ordered durations for an ordinary rotation topology.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "topology", rename_all = "snake_case")]
+pub enum GenericRotationTiming {
+    MainBackup { shift_hours: [f64; 2] },
+    Abc { shift_hours: [f64; 3] },
+}
+
+impl Default for TimedRotationRequest {
+    fn default() -> Self {
+        Self::Named(TimedRotationProfile::default())
+    }
+}
+
+impl PartialEq<TimedRotationProfile> for TimedRotationRequest {
+    fn eq(&self, other: &TimedRotationProfile) -> bool {
+        matches!(self, Self::Named(profile) if profile == other)
+    }
+}
+
+impl From<TimedRotationProfile> for TimedRotationRequest {
+    fn from(profile: TimedRotationProfile) -> Self {
+        Self::Named(profile)
+    }
+}
+
+impl TimedRotationRequest {
+    pub fn profile(&self) -> TimedRotationProfile {
+        match self {
+            Self::Named(profile) => *profile,
+            Self::Generic(GenericRotationTiming::MainBackup { .. }) => {
+                TimedRotationProfile::GenericMainBackup
+            }
+            Self::Generic(GenericRotationTiming::Abc { .. }) => TimedRotationProfile::GenericAbc,
+        }
+    }
+
+    pub fn generic_timing(&self) -> Option<&GenericRotationTiming> {
+        match self {
+            Self::Named(_) => None,
+            Self::Generic(timing) => Some(timing),
+        }
+    }
+
+    /// Preserve the established profile strategy for named sequences supplied
+    /// through the generic syntax; other duration sequences stay generic.
+    pub fn preserve_named_timing(self) -> Self {
+        match self {
+            Self::Generic(GenericRotationTiming::MainBackup { shift_hours })
+                if shift_hours == [12.0, 12.0] =>
+            {
+                Self::Named(TimedRotationProfile::MainBackup12_12)
+            }
+            Self::Generic(GenericRotationTiming::MainBackup { shift_hours })
+                if shift_hours == [24.0, 24.0] =>
+            {
+                Self::Named(TimedRotationProfile::MainBackup24_24)
+            }
+            Self::Generic(GenericRotationTiming::Abc { shift_hours })
+                if shift_hours == [12.0, 6.0, 6.0] =>
+            {
+                Self::Named(TimedRotationProfile::Abc12_6_6)
+            }
+            Self::Generic(GenericRotationTiming::Abc { shift_hours })
+                if shift_hours == [12.0, 12.0, 12.0] =>
+            {
+                Self::Named(TimedRotationProfile::Abc12_12_12)
+            }
+            request => request,
+        }
+    }
+}
+
+impl std::str::FromStr for TimedRotationRequest {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        let Some((topology, durations)) = value.trim().split_once('@') else {
+            return value.parse::<TimedRotationProfile>().map(Self::Named);
+        };
+        let parsed: Vec<f64> = durations
+            .split('/')
+            .map(|part| {
+                part.trim()
+                    .parse::<f64>()
+                    .map_err(|_| Error::msg(format!("invalid rotation duration {part:?}")))
+            })
+            .collect::<Result<_>>()?;
+        let request = match topology.trim().to_ascii_lowercase().as_str() {
+            "main-backup" | "main_backup" => {
+                let shift_hours: [f64; 2] = parsed.try_into().map_err(|durations: Vec<f64>| {
+                    Error::msg(format!(
+                        "main-backup rotation requires 2 ordered durations, got {}",
+                        durations.len()
+                    ))
+                })?;
+                Self::Generic(GenericRotationTiming::MainBackup { shift_hours })
+            }
+            "abc" => {
+                let shift_hours: [f64; 3] = parsed.try_into().map_err(|durations: Vec<f64>| {
+                    Error::msg(format!(
+                        "ABC rotation requires 3 ordered durations, got {}",
+                        durations.len()
+                    ))
+                })?;
+                Self::Generic(GenericRotationTiming::Abc { shift_hours })
+            }
+            _ => {
+                return Err(Error::msg(format!(
+                    "unsupported rotation topology {topology:?}; expected main-backup or abc"
+                )))
+            }
+        };
+        Ok(request.preserve_named_timing())
     }
 }
 

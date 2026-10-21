@@ -485,6 +485,7 @@ pub(crate) fn assert_final_control_rotation(
                 report.profile,
                 TimedRotationProfile::Abc12_6_6
                     | TimedRotationProfile::Abc12_12_12
+                    | TimedRotationProfile::GenericAbc
                     | TimedRotationProfile::Fiammetta8_8_4_4
             ) {
                 return Err(Error::msg(

@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use infra_core::box_profile::{
-    build_box_profile_from_current_probe, run_user_rotation_probe_with_profile_and_preferences,
+    build_box_profile_from_current_probe, run_user_rotation_probe_with_request_and_preferences,
     BoxProfile, BoxProfileOptions, LayoutProbe,
 };
 use infra_core::export::{build_from_team_rotation, MaaExportOptions, MaaSchedule};
 use infra_core::instances::OperatorInstances;
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
-use infra_core::schedule::{assert_final_rotation_invariants, TimedRotationProfile};
+use infra_core::schedule::{assert_final_rotation_invariants, TimedRotationRequest};
 use infra_core::skill_table::SkillTable;
 use infra_core::Error;
 use serde::Deserialize;
@@ -40,7 +40,7 @@ pub(super) struct PlanComputeLabels {
 #[serde(deny_unknown_fields)]
 pub(super) struct PlanComputeOptions {
     #[serde(default)]
-    pub rotation: TimedRotationProfile,
+    pub rotation: TimedRotationRequest,
     #[serde(default = "default_top_k")]
     pub top: usize,
     #[serde(default)]
@@ -128,7 +128,7 @@ pub(super) struct PlanComputeInput<'a> {
     pub operbox_label: &'a str,
     pub baseline_operbox: Option<&'a Path>,
     pub top_k: usize,
-    pub rotation_profile: TimedRotationProfile,
+    pub rotation_request: TimedRotationRequest,
     pub system_preferences: &'a HashMap<String, String>,
     pub maa_title: Option<&'a str>,
     pub fiammetta_candidates_out: Option<PathBuf>,
@@ -216,13 +216,13 @@ fn compute_plan_inner(
 ) -> PlanComputeAttempt {
     let stage_started = Instant::now();
     let stage_before = infra_core::profile::solver_perf_snapshot();
-    let current_result = run_user_rotation_probe_with_profile_and_preferences(
+    let current_result = run_user_rotation_probe_with_request_and_preferences(
         input.blueprint,
         input.operbox,
         resources.instances,
         resources.table,
         input.top_k,
-        input.rotation_profile,
+        input.rotation_request.clone(),
         input.system_preferences,
         input.fiammetta_enable,
         input.support_combinations_enable,
@@ -316,7 +316,8 @@ fn compute_plan_inner(
                 &BoxProfileOptions {
                     top_k: input.top_k,
                     baseline_operbox: input.baseline_operbox.map(Path::to_path_buf),
-                    rotation_profile: input.rotation_profile,
+                    rotation_profile: input.rotation_request.profile(),
+                    rotation_request: Some(input.rotation_request),
                     system_preferences: input.system_preferences.clone(),
                     fiammetta_enable: input.fiammetta_enable,
                     support_combinations_enable: input.support_combinations_enable,

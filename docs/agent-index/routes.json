@@ -105,28 +105,33 @@
         "班次互斥错误",
         "同上同下错误",
         "profile 不识别",
-        "休息状态错误"
+        "休息状态错误",
+        "泡泡火神未进入首个源石房",
+        "源石预占被后续阶段拆开"
       ],
       "entrypoints": [
-        "crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation"
+        "crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation_request"
       ],
       "chain_doc": "docs/调用链/定时轮换.md",
       "module_docs": [
         "docs/模块/排班与轮换.md",
-        "docs/模块/导出与岗位状态.md"
+        "docs/模块/导出与岗位状态.md",
+        "docs/泡泡火神源石优先.md"
       ],
       "mechanics": [
         "docs/知识库引用.md#可引用范围"
       ],
       "verification": [
-        "infra-cli layout team-rotation --layout <path> --operbox <path> --json"
+        "cargo build --release -p infra-cli",
+        "target/release/infra-cli plan --operbox <path> --rotation <named|main-backup@H1/H2|abc@H1/H2/H3> --assert-invariants --maa-out out/<task>-maa.json",
+        "python3 scripts/assert_rotation_invariants.py --binary target/release/infra-cli --skip-build --group representative"
       ],
       "vault_refs": [
         "docs/5-换班操作/定时换班.md",
         "docs/1-基础设定/设施与进驻/心情与宿舍.md"
       ],
       "priority": 70,
-      "when": "profile、班次互斥、shift_bind、连续工作或 dorm_rest 异常时选择。"
+      "when": "profile、班次互斥、shift_bind、连续工作、dorm_rest，或普通二/三班泡泡/火神源石预占未成立/被拆开时选择；资格、选房、班次、保护和 gate 细节读 docs/泡泡火神源石优先.md。"
     },
     {
       "id": "EXPORT.MAA",

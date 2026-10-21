@@ -279,9 +279,34 @@ fn apply_shadow_trade_manufacture_pair(
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
 ) -> Result<Option<(BaseAssignment, HashSet<String>)>> {
+    let frozen_factory_room = run
+        .options
+        .preclaimed_factory_room
+        .as_ref()
+        .map(|room_id| {
+            let room = run.blueprint.room(room_id).ok_or_else(|| {
+                Error::msg(format!(
+                    "preclaimed factory room {} disappeared before the shadow trade/manufacture comparison",
+                    room_id.0
+                ))
+            })?;
+            if room.kind != FacilityKind::Factory {
+                return Err(Error::msg(format!(
+                    "preclaimed room {} is not a factory",
+                    room_id.0
+                )));
+            }
+            Ok(room_id)
+        })
+        .transpose()?;
     let mut assignment = run.assignment.clone();
     let mut used = run.used.clone();
-    clear_production_rooms(run.blueprint, &mut assignment, &mut used);
+    clear_production_rooms(
+        run.blueprint,
+        &mut assignment,
+        &mut used,
+        frozen_factory_room,
+    );
 
     let Some((trade_room, manu_room, trade_hit, manu_hit)) =
         probe_shadow_pair(run, trade_pool, manu_pool, gold_lines, &assignment, &used)?
@@ -408,13 +433,15 @@ fn clear_production_rooms(
     blueprint: &BaseBlueprint,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
+    frozen_factory_room: Option<&crate::layout::RoomId>,
 ) {
     let filled: HashSet<String> = assignment
         .iter_rooms()
         .filter(|room| {
-            blueprint.room(&room.room_id).is_some_and(|spec| {
-                matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
-            })
+            frozen_factory_room.is_none_or(|frozen| room.room_id != *frozen)
+                && blueprint.room(&room.room_id).is_some_and(|spec| {
+                    matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
+                })
         })
         .flat_map(|room| room.operators.iter().map(|operator| operator.name.clone()))
         .collect();
@@ -422,9 +449,10 @@ fn clear_production_rooms(
         return;
     }
     assignment.remove_operators_where(|room_id, _| {
-        blueprint.room(room_id).is_some_and(|spec| {
-            matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
-        })
+        frozen_factory_room.is_none_or(|frozen| room_id != frozen)
+            && blueprint.room(room_id).is_some_and(|spec| {
+                matches!(spec.kind, FacilityKind::TradePost | FacilityKind::Factory)
+            })
     });
     used.retain(|name| !filled.contains(name));
 }

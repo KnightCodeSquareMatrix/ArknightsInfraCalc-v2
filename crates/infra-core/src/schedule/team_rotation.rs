@@ -178,6 +178,117 @@ fn rotation_shortfall_warnings(
 const CYCLE_REST_WARNING_PREFIX: &str = "rotation_cycle_rest:";
 /// 最终排班校验违规：不拒绝输出，只作为诊断警告，便于人工修正与 Agent 定位。
 const FINAL_INVARIANT_WARNING_PREFIX: &str = "rotation_final_invariant:";
+const ORIGINIUM_PAIR_SYSTEM_ID: &str = "rotation_originium_pair";
+const ORIGINIUM_PAIR_WARNING: &str = "originium pair preclaim failed";
+const ORIGINIUM_PAIR_OPERATORS: [&str; 2] = ["泡泡", "火神"];
+
+#[derive(Debug, Clone)]
+enum OriginiumPairPreclaim {
+    Inactive,
+    Active(RoomId),
+}
+
+struct OriginiumPairContext {
+    preclaim: OriginiumPairPreclaim,
+    warning: Option<String>,
+}
+
+impl OriginiumPairContext {
+    /// The selected preclaim room is the scheduling fact.  Consumers must not
+    /// rediscover it from "both operators happen to be in this room" after a
+    /// later stage has moved one of them.
+    fn from_peak_plan(plan: &AssignmentPlan) -> Result<Self> {
+        let rooms: Vec<_> = plan
+            .anchors
+            .iter()
+            .filter(|anchor| anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID)
+            .filter_map(|anchor| anchor.room_id.clone())
+            .collect();
+        let mut unique = rooms.clone();
+        unique.sort_by(|left, right| left.0.cmp(&right.0));
+        unique.dedup();
+        match unique.as_slice() {
+            [] => Ok(Self {
+                preclaim: OriginiumPairPreclaim::Inactive,
+                warning: None,
+            }),
+            [room_id]
+                if rooms.len() == ORIGINIUM_PAIR_OPERATORS.len()
+                    && ORIGINIUM_PAIR_OPERATORS.iter().all(|name| {
+                        plan.anchors.iter().any(|anchor| {
+                            anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID
+                                && anchor.operator == *name
+                                && anchor.room_id.as_ref() == Some(room_id)
+                        })
+                    }) =>
+            {
+                Ok(Self {
+                    preclaim: OriginiumPairPreclaim::Active(room_id.clone()),
+                    warning: None,
+                })
+            }
+            _ => Err(Error::msg(format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: preclaim Plan has inconsistent room anchors"
+            ))),
+        }
+    }
+
+    fn for_ordinary_rotation(blueprint: &BaseBlueprint, operbox: &OperBox) -> Result<Self> {
+        let eligible = operbox.elite_of("泡泡").is_some_and(|elite| elite >= 1)
+            && operbox.elite_of("火神").is_some_and(|elite| elite >= 2);
+        if !eligible {
+            return Ok(Self {
+                preclaim: OriginiumPairPreclaim::Inactive,
+                warning: None,
+            });
+        }
+        // A layout without a legal room is not a failed preference: the composition
+        // cannot apply, so ordinary scheduling remains the normal result and stays silent.
+        let Some(room_id) = Self::legal_room(blueprint) else {
+            return Ok(Self {
+                preclaim: OriginiumPairPreclaim::Inactive,
+                warning: None,
+            });
+        };
+        Ok(Self {
+            preclaim: OriginiumPairPreclaim::Active(room_id),
+            warning: None,
+        })
+    }
+
+    fn room_id(&self) -> Option<&RoomId> {
+        match &self.preclaim {
+            OriginiumPairPreclaim::Inactive => None,
+            OriginiumPairPreclaim::Active(room_id) => Some(room_id),
+        }
+    }
+
+    fn matches_room(&self, room_id: &RoomId) -> bool {
+        self.room_id() == Some(room_id)
+    }
+
+    fn legal_room(blueprint: &BaseBlueprint) -> Option<RoomId> {
+        blueprint
+            .rooms
+            .iter()
+            .find(|room| {
+                room.kind == FacilityKind::Factory
+                    && room.level == 3
+                    && room.operator_capacity() >= 3
+                    && matches!(
+                        room.product.as_ref(),
+                        Some(RoomProduct::Factory {
+                            recipe: crate::types::RecipeKind::Originium
+                        })
+                    )
+            })
+            .map(|room| room.id.clone())
+    }
+
+    fn warning(&self) -> Option<String> {
+        self.warning.clone()
+    }
+}
 
 fn automation_lancet_shift_proof(
     blueprint: &BaseBlueprint,
@@ -1623,12 +1734,9 @@ fn fill_rotation_vacancies(
         }
     }
     excluded.insert(FIAMMETTA_NAME.to_string());
-    let allowed_operbox = if report.profile == TimedRotationProfile::MainBackup24_24 {
-        filter_operbox_for_24_24(operbox)
-    } else {
-        operbox.clone()
-    };
-    let roster = allowed_operbox.roster_excluding(&excluded);
+    // Long-shift admission is decided by the actual ETA/mood replay below;
+    // do not hide operators behind a profile-specific name blacklist.
+    let roster = operbox.roster_excluding(&excluded);
     let mut candidates: Vec<_> = roster
         .names()
         .filter_map(|name| {
@@ -1693,7 +1801,7 @@ fn fill_rotation_vacancies(
             .filter(|name| {
                 fallback_candidate_eta_fits(
                     blueprint,
-                    &allowed_operbox,
+                    operbox,
                     instances,
                     report,
                     initial_mood,
@@ -1781,7 +1889,7 @@ fn fill_rotation_vacancies(
                 }
                 fallback_candidate_eta_fits(
                     blueprint,
-                    &allowed_operbox,
+                    operbox,
                     instances,
                     &trial_report,
                     initial_mood,
@@ -1789,7 +1897,7 @@ fn fill_rotation_vacancies(
                 ) && budget_safe.iter().all(|name| {
                     fallback_candidate_eta_fits(
                         blueprint,
-                        &allowed_operbox,
+                        operbox,
                         instances,
                         &trial_report,
                         initial_mood,
@@ -1853,6 +1961,7 @@ fn split_production_facilities(
     peak: &BaseAssignment,
     binds: &[RuntimeShiftBind],
     reserves: &[ResolvedRoleReserve],
+    originium_pair: &OriginiumPairContext,
 ) -> Result<[FacilityHalf; 2]> {
     let room_kind: HashMap<_, _> = blueprint
         .rooms
@@ -1865,6 +1974,17 @@ fn split_production_facilities(
         binds.iter().map(|bind| bind.operators.as_slice()),
     )
     .map_err(Error::msg)?;
+    if originium_pair.room_id().is_some_and(|room_id| {
+        !half_components
+            .iter()
+            .flatten()
+            .any(|component| component.contains(room_id))
+    }) {
+        return Err(Error::msg(format!(
+            "{ORIGINIUM_PAIR_SYSTEM_ID}: frozen pair room {} is absent from production halves",
+            originium_pair.room_id().expect("checked preclaim room").0
+        )));
+    }
 
     for reserve in reserves
         .iter()
@@ -1921,6 +2041,16 @@ fn split_production_facilities(
                 reserve.reserve_id
             )));
         };
+        let moved_component = &half_components[source][component_index];
+        if originium_pair
+            .room_id()
+            .is_some_and(|room_id| moved_component.contains(room_id))
+        {
+            return Err(Error::msg(format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: rotation reserve {} would move the frozen pair room component",
+                reserve.reserve_id
+            )));
+        }
         let moved = half_components[source].remove(component_index);
         half_components[target].push(moved);
     }
@@ -2401,11 +2531,30 @@ fn fiammetta_action_slots(profile: TimedRotationProfile, shift_count: usize) -> 
     (0..count.min(shift_count)).collect()
 }
 
+/// Generic two/three-shift requests use one action slot for each state longer
+/// than 12 hours.  Named profiles retain their established slot policy above.
+fn fiammetta_action_slots_for_shifts(
+    profile: TimedRotationProfile,
+    shifts: &[TeamShiftResult],
+) -> Vec<usize> {
+    if matches!(
+        profile,
+        TimedRotationProfile::GenericMainBackup | TimedRotationProfile::GenericAbc
+    ) {
+        return shifts
+            .iter()
+            .enumerate()
+            .filter_map(|(index, shift)| (shift.duration_hours > 12.0).then_some(index))
+            .collect();
+    }
+    fiammetta_action_slots(profile, shifts.len())
+}
+
 fn validate_fiammetta_action_policy(
     profile: TimedRotationProfile,
     shifts: &[TeamShiftResult],
 ) -> Result<()> {
-    let slots = fiammetta_action_slots(profile, shifts.len());
+    let slots = fiammetta_action_slots_for_shifts(profile, shifts);
     let mut targets = HashSet::new();
     for shift in shifts {
         if let Some(action) = &shift.fiammetta {
@@ -3014,12 +3163,9 @@ fn finalize_timed_rotation(
     let structure_result = validate_final_bind_cycle(blueprint, &report)
         .map_err(Error::msg)
         .and_then(|_| {
-            if matches!(
-                report.profile,
-                TimedRotationProfile::Abc12_6_6
-                    | TimedRotationProfile::Abc12_12_12
-                    | TimedRotationProfile::Fiammetta8_8_4_4
-            ) {
+            if report.profile.is_ordinary_abc()
+                || report.profile == TimedRotationProfile::Fiammetta8_8_4_4
+            {
                 validate_final_rotation_invariants(blueprint, &report.shifts, &[], &[])
             } else {
                 validate_profile_rotation(blueprint, instances, &report)
@@ -3090,9 +3236,19 @@ fn finalize_timed_rotation(
     );
     if let Err(error) = invariant_result {
         // 最终不变量违规不拒绝输出：排班照常返回，违规作为诊断警告交给人工修正。
-        report
+        let preclaim_failure_already_reported = report
             .warnings
-            .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
+            .iter()
+            .any(|warning| warning.contains(ORIGINIUM_PAIR_WARNING));
+        let duplicate_originium_diagnostic = preclaim_failure_already_reported
+            && error
+                .to_string()
+                .contains(&format!("{ORIGINIUM_PAIR_SYSTEM_ID} failed"));
+        if !duplicate_originium_diagnostic {
+            report
+                .warnings
+                .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
+        }
     }
     crate::profile::emit_solver_stage(
         "rotation_finalize",
@@ -3394,12 +3550,13 @@ fn apply_profile_fiammetta_rotation(
     teams: &[TeamAssignment],
     continuous_roles: &[crate::layout::ContinuousRole],
     shift_binds: &[RuntimeShiftBind],
+    originium_pair: &OriginiumPairContext,
     shifts: &mut [TeamShiftResult],
 ) -> Result<bool> {
     if !operbox.owns("菲亚梅塔") || shifts.is_empty() {
         return Ok(false);
     }
-    let slots = fiammetta_action_slots(profile, shifts.len());
+    let slots = fiammetta_action_slots_for_shifts(profile, shifts);
     if slots.is_empty() {
         return Ok(false);
     }
@@ -3440,6 +3597,14 @@ fn apply_profile_fiammetta_rotation(
             let Some(room_kind) = blueprint.room(&room_id).map(|room| room.kind) else {
                 continue;
             };
+            if room_kind == FacilityKind::Factory
+                && (originium_pair.matches_room(&room_id)
+                    || candidate_shifts.iter().any(|shift| {
+                        originium_pair_room_has_pair(blueprint, &shift.assignment, &room_id)
+                    }))
+            {
+                continue;
+            }
             let mut trial = candidate_shifts.clone();
             let mut failed = false;
             for shift in &mut trial {
@@ -3768,6 +3933,26 @@ fn room_containing_operator(
     })
 }
 
+fn originium_pair_room_has_pair(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    room_id: &RoomId,
+) -> bool {
+    let operators = assignment.operators_in(room_id);
+    ORIGINIUM_PAIR_OPERATORS
+        .iter()
+        .all(|name| operators.iter().any(|operator| operator.name == *name))
+        && blueprint.room(room_id).is_some_and(|room| {
+            room.kind == FacilityKind::Factory
+                && matches!(
+                    room.product.as_ref(),
+                    Some(RoomProduct::Factory {
+                        recipe: crate::types::RecipeKind::Originium
+                    })
+                )
+        })
+}
+
 fn is_warmup_operator(
     name: &str,
     tier: PromotionTier,
@@ -3798,6 +3983,7 @@ fn align_warmup_rooms(
     instances: &OperatorInstances,
     assignment: &mut BaseAssignment,
     sticky_rooms: &mut HashMap<String, RoomId>,
+    originium_pair: &OriginiumPairContext,
 ) {
     let ops: Vec<(String, FacilityKind)> = assignment
         .iter_rooms()
@@ -3822,6 +4008,13 @@ fn align_warmup_rooms(
             continue;
         };
         if current_room == anchor_room {
+            continue;
+        }
+        if originium_pair.matches_room(&current_room)
+            || originium_pair.matches_room(&anchor_room)
+            || originium_pair_room_has_pair(blueprint, assignment, &current_room)
+            || originium_pair_room_has_pair(blueprint, assignment, &anchor_room)
+        {
             continue;
         }
         if rooms_compatible_for_swap(blueprint, &current_room, &anchor_room, kind)
@@ -3851,6 +4044,7 @@ struct AbyssalBuildCtx<'a> {
     manu_pool: &'a ManuPool,
     used_ab: &'a HashSet<String>,
     blocked_ops: &'a HashSet<String>,
+    originium_pair_room: Option<&'a RoomId>,
     shared: &'a BaseAssignment,
     beta: &'a BaseAssignment,
     gamma_h1: &'a BaseAssignment,
@@ -3948,7 +4142,15 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         return Vec::new();
     }
 
-    if ctx.mutable_manu_rooms.is_empty() {
+    // The originium pair is a cross-shift hard anchor.  Its first-shift room
+    // must survive the abyssal rebuild instead of being cleared as mutable H1.
+    let mutable_manu_rooms: Vec<RoomId> = ctx
+        .mutable_manu_rooms
+        .iter()
+        .filter(|room_id| ctx.originium_pair_room != Some(*room_id))
+        .cloned()
+        .collect();
+    if mutable_manu_rooms.is_empty() {
         return Vec::new();
     }
 
@@ -3967,7 +4169,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
     let mut count_vectors = Vec::new();
     enumerate_abyssal_counts(
         hunters.len(),
-        ctx.mutable_manu_rooms.len(),
+        mutable_manu_rooms.len(),
         &mut Vec::new(),
         &mut count_vectors,
     );
@@ -3975,7 +4177,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
     let mut out = Vec::new();
     for counts in count_vectors {
         let mut candidate = base.clone();
-        for room_id in ctx.mutable_manu_rooms {
+        for room_id in &mutable_manu_rooms {
             clear_room(&mut candidate, room_id.0.as_str());
         }
         let mut used = candidate.operator_names();
@@ -3983,7 +4185,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
         let mut next_hunter = 0;
         let mut ok = true;
         for (room_idx, count) in counts.iter().copied().enumerate() {
-            let room_id = &ctx.mutable_manu_rooms[room_idx];
+            let room_id = &mutable_manu_rooms[room_idx];
             let required = ctx
                 .required_manu_by_room
                 .get(room_id)
@@ -4035,7 +4237,7 @@ fn build_abyssal_s2_candidates(ctx: &AbyssalBuildCtx<'_>) -> Vec<AbyssalCandidat
 
         let mut gamma_ops: Vec<String> = candidate
             .iter_rooms()
-            .filter(|room| ctx.mutable_manu_rooms.contains(&room.room_id))
+            .filter(|room| mutable_manu_rooms.contains(&room.room_id))
             .flat_map(|room| room.operators.iter())
             .map(|op| op.name.clone())
             .collect();
@@ -4428,13 +4630,13 @@ pub fn schedule_team_rotation(
     table: &SkillTable,
     options: &AssignBaseOptions,
 ) -> Result<TeamRotationReport> {
-    schedule_timed_rotation(
+    schedule_timed_rotation_request(
         blueprint,
         operbox,
         instances,
         table,
         options,
-        TimedRotationProfile::default(),
+        TimedRotationProfile::default().into(),
     )
 }
 
@@ -4461,6 +4663,7 @@ fn assert_final_rotation_invariants_with_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
+    assert_final_originium_pair(blueprint, operbox, report)?;
     validate_final_bind_cycle(blueprint, report)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     validate_fiammetta_action_policy(report.profile, &report.shifts)
@@ -5150,10 +5353,7 @@ fn assert_final_rotation_invariants_with_mood(
             )));
         }
     }
-    if matches!(
-        report.profile,
-        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
-    ) {
+    if report.profile.is_ordinary_abc() {
         let full_rest = report.profile == TimedRotationProfile::Abc12_12_12;
         for shift in &report.shifts {
             let resting: HashSet<&str> = report
@@ -5265,10 +5465,7 @@ fn gold_flow_core_rooms_for_shift(
     let core_names = ["绮良", "鸿雪", "图耶"];
     let working = core_names.map(|name| operator_has_non_dorm_assignment(blueprint, shift, name));
 
-    if matches!(
-        report.profile,
-        TimedRotationProfile::Abc12_6_6 | TimedRotationProfile::Abc12_12_12
-    ) {
+    if report.profile.is_ordinary_abc() {
         let has_core_bind = report.runtime_shift_binds.iter().any(|bind| {
             core_names
                 .iter()
@@ -5346,6 +5543,305 @@ fn gold_flow_core_rooms_for_shift(
     };
 
     Ok(Some([kirara, pozyomka, tuye]))
+}
+
+fn assert_final_originium_pair(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    report: &TeamRotationReport,
+) -> Result<()> {
+    if !(report.profile.is_ordinary_abc() || report.profile.is_ordinary_main_backup()) {
+        return Ok(());
+    }
+    if !(operbox.elite_of("泡泡").is_some_and(|elite| elite >= 1)
+        && operbox.elite_of("火神").is_some_and(|elite| elite >= 2))
+    {
+        return Ok(());
+    }
+    let originium_pair = OriginiumPairContext::from_peak_plan(&report.peak_plan)?;
+    let Some(expected_room) = OriginiumPairContext::legal_room(blueprint) else {
+        if originium_pair.room_id().is_some() {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: peak Plan preclaims a room when no legal originium factory exists"
+            )));
+        }
+        return Ok(());
+    };
+    let Some(room_id) = originium_pair.room_id() else {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: eligible pair and legal room exist but peak Plan has no preclaim anchors"
+        )));
+    };
+    if room_id != &expected_room {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: preclaim room {} is not the first legal room {}",
+            room_id.0, expected_room.0
+        )));
+    }
+    let room_spec = blueprint.room(room_id).ok_or_else(|| {
+        Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: frozen room {} disappeared",
+            room_id.0
+        ))
+    })?;
+    if room_spec.kind != FacilityKind::Factory
+        || room_spec.level != 3
+        || room_spec.operator_capacity() < 3
+        || !matches!(
+            room_spec.product.as_ref(),
+            Some(RoomProduct::Factory {
+                recipe: crate::types::RecipeKind::Originium
+            })
+        )
+    {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: room {} is not a legal level-3 originium factory",
+            room_id.0
+        )));
+    }
+    if report
+        .peak_plan
+        .anchors
+        .iter()
+        .filter(|anchor| anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID)
+        .count()
+        != 2
+    {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: peak Plan must contain exactly two pair anchors"
+        )));
+    }
+    for name in ORIGINIUM_PAIR_OPERATORS {
+        let team_memberships = report
+            .teams
+            .iter()
+            .filter(|team| team.operators.iter().any(|member| member == name))
+            .count();
+        let alpha_memberships = report
+            .teams
+            .iter()
+            .filter(|team| {
+                team.label == TeamLabel::Alpha && team.operators.iter().any(|member| member == name)
+            })
+            .count();
+        if team_memberships != 1
+            || alpha_memberships != 1
+            || team_of_operator(report, name) != Some(TeamLabel::Alpha)
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: {name} must belong to alpha exactly once"
+            )));
+        }
+        let peak_anchor =
+            report.peak_plan.anchors.iter().find(|anchor| {
+                anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID && anchor.operator == name
+            });
+        if !peak_anchor.is_some_and(|anchor| {
+            anchor.room_id.as_ref() == Some(room_id)
+                && anchor.facility == FacilityKind::Factory
+                && anchor.recipe == Some(crate::types::RecipeKind::Originium)
+                && anchor.fill_policy == AnchorFillPolicy::ManufactureRecipe
+        }) {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: peak Plan lacks the expected anchor for {name} in {}",
+                room_id.0
+            )));
+        }
+    }
+
+    let expected_shift_count = if report.profile.is_ordinary_abc() {
+        3
+    } else {
+        2
+    };
+    if report.shifts.len() != expected_shift_count
+        || report
+            .shifts
+            .iter()
+            .any(|shift| shift.index >= expected_shift_count)
+        || report
+            .shifts
+            .iter()
+            .map(|shift| shift.index)
+            .collect::<HashSet<_>>()
+            .len()
+            != expected_shift_count
+    {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: topology requires {expected_shift_count} uniquely indexed shifts"
+        )));
+    }
+    let mut alpha_working_shifts = 0;
+    let mut alpha_maximum_shifts = 0usize;
+    let max_duration = report
+        .shifts
+        .iter()
+        .map(|shift| shift.duration_hours)
+        .max_by(f64::total_cmp)
+        .ok_or_else(|| Error::msg("rotation has no shifts"))?;
+
+    for shift in &report.shifts {
+        let alpha_active = shift.active_teams.contains(&TeamLabel::Alpha);
+        if report.profile.is_ordinary_abc() {
+            if shift.active_teams.len() != 2
+                || shift.active_teams.contains(&shift.resting_team)
+                || !TeamLabel::ALL.contains(&shift.resting_team)
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: ABC shift {} has inconsistent active/resting teams",
+                    shift.index + 1
+                )));
+            }
+        } else if shift.active_teams.len() != 1
+            || shift.active_teams.contains(&shift.resting_team)
+            || !TeamLabel::ALL.contains(&shift.resting_team)
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: main/backup shift {} has inconsistent active/resting teams",
+                shift.index + 1
+            )));
+        }
+        let pair_members_in_room = ORIGINIUM_PAIR_OPERATORS
+            .iter()
+            .filter(|name| {
+                shift
+                    .assignment
+                    .operators_in(room_id)
+                    .iter()
+                    .any(|operator| operator.name == **name)
+            })
+            .count();
+        let pair_any_working = ORIGINIUM_PAIR_OPERATORS
+            .iter()
+            .any(|name| operator_has_non_dorm_assignment(blueprint, shift, name));
+        let pair_working = ORIGINIUM_PAIR_OPERATORS
+            .iter()
+            .all(|name| operator_has_non_dorm_assignment(blueprint, shift, name));
+        if alpha_active {
+            alpha_working_shifts += 1;
+            if !pair_working || pair_members_in_room != ORIGINIUM_PAIR_OPERATORS.len() {
+                return Err(Error::msg(format!(
+                    "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: alpha shift {} must work both anchors together in frozen room {}",
+                    shift.index + 1,
+                    room_id.0
+                )));
+            }
+            if shift.duration_hours.total_cmp(&max_duration).is_eq() {
+                alpha_maximum_shifts += 1;
+            }
+            let plan = report.assignment_plans.get(shift.plan_index).ok_or_else(|| {
+                Error::msg(format!(
+                    "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed in shift {}: missing owning Plan",
+                    shift.index + 1
+                ))
+            })?;
+            for name in ORIGINIUM_PAIR_OPERATORS {
+                let anchor_matches = plan.anchors.iter().any(|anchor| {
+                    anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID
+                        && anchor.operator == name
+                        && anchor.room_id.as_ref() == Some(room_id)
+                        && anchor.facility == FacilityKind::Factory
+                        && anchor.recipe == Some(crate::types::RecipeKind::Originium)
+                        && anchor.fill_policy == AnchorFillPolicy::ManufactureRecipe
+                });
+                if !anchor_matches {
+                    return Err(Error::msg(format!(
+                        "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed in shift {}: owning Plan lacks anchor for {name} in room {}",
+                        shift.index + 1,
+                        room_id.0
+                    )));
+                }
+            }
+        } else if pair_any_working || pair_members_in_room > 0 {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: pair appears in work/rest topology mismatch in shift {}",
+                shift.index + 1
+            )));
+        }
+        if let Some(room) = shift.assignment.room_assignment(room_id) {
+            for name in ORIGINIUM_PAIR_OPERATORS {
+                if room
+                    .operators
+                    .iter()
+                    .filter(|operator| operator.name == name)
+                    .count()
+                    > 1
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed in shift {}: duplicate {name} in room {}",
+                        shift.index + 1,
+                        room_id.0
+                    )));
+                }
+            }
+        }
+    }
+    let expected_alpha_work_shifts = if report.profile.is_ordinary_abc() {
+        2
+    } else {
+        1
+    };
+    let expected_bind = if report.profile.is_ordinary_abc() {
+        (2, 1)
+    } else {
+        (1, 1)
+    };
+    let pair_has_topology_bind = report.runtime_shift_binds.iter().any(|bind| {
+        bind.operators.len() == ORIGINIUM_PAIR_OPERATORS.len()
+            && ORIGINIUM_PAIR_OPERATORS
+                .iter()
+                .all(|name| bind.operators.iter().any(|operator| operator == name))
+            && (bind.on_shifts, bind.off_shifts) == expected_bind
+    });
+    if !pair_has_topology_bind {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: pair has no topology bind with on/off {:?}",
+            expected_bind
+        )));
+    }
+    let maximum_shift_count = report
+        .shifts
+        .iter()
+        .filter(|shift| shift.duration_hours.total_cmp(&max_duration).is_eq())
+        .count();
+    let expected_alpha_maximum_shifts = if report.profile.is_ordinary_abc() {
+        maximum_shift_count.min(expected_alpha_work_shifts)
+    } else {
+        1
+    };
+    if alpha_working_shifts != expected_alpha_work_shifts
+        || alpha_maximum_shifts != expected_alpha_maximum_shifts
+    {
+        return Err(Error::msg(format!(
+            "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed: alpha must cover its {expected_alpha_work_shifts} topology work shift(s) and as many longest shift(s) as topology permits; got work={alpha_working_shifts}, longest={alpha_maximum_shifts}, expected_longest={expected_alpha_maximum_shifts}"
+        )));
+    }
+
+    for shift in report
+        .shifts
+        .iter()
+        .filter(|shift| shift.active_teams.contains(&TeamLabel::Alpha))
+    {
+        let plan = report.assignment_plans.get(shift.plan_index).ok_or_else(|| {
+            Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed in shift {}: missing owning Plan",
+                shift.index + 1
+            ))
+        })?;
+        if plan
+            .anchors
+            .iter()
+            .filter(|anchor| anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID)
+            .count()
+            < 2
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants {ORIGINIUM_PAIR_SYSTEM_ID} failed in shift {}: incomplete owner anchors",
+                shift.index + 1
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn operator_has_non_dorm_assignment(
@@ -5964,6 +6460,7 @@ pub fn schedule_abc_rotation_candidates(
             profile,
             &[],
             &[],
+            true,
         )?;
         let report =
             complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)?;
@@ -5985,6 +6482,7 @@ pub fn schedule_abc_rotation_candidates(
         profile,
         &[],
         &[],
+        true,
     )
     .and_then(|baseline| {
         complete_timed_rotation(blueprint, operbox, instances, table, options.mood, baseline)
@@ -6047,6 +6545,7 @@ pub fn schedule_abc_rotation_candidates(
             profile,
             &relaxed,
             &[],
+            true,
         ) {
             Ok(mut candidate) => {
                 let attached = attach_fiammetta_target_actions(
@@ -6127,6 +6626,7 @@ pub fn schedule_abc_rotation_candidates(
             profile,
             &relaxed,
             &["trade_core"],
+            true,
         ) {
             Ok(mut candidate) => {
                 let attached = attach_fiammetta_target_actions(
@@ -6269,7 +6769,7 @@ fn attach_fiammetta_target_actions(
             "fiammetta target actions require owned Fiammetta",
         ));
     }
-    let slots = fiammetta_action_slots(profile, shifts.len());
+    let slots = fiammetta_action_slots_for_shifts(profile, shifts);
     if slots.is_empty() || targets.is_empty() {
         return Ok(());
     }
@@ -6344,24 +6844,31 @@ fn downgrade_cycle_mood_rejection(error: Error) -> Result<TeamRotationReport> {
     Ok(report)
 }
 
-pub fn schedule_timed_rotation(
+pub fn schedule_timed_rotation_request(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
-    profile: TimedRotationProfile,
+    request: super::rotation_types::TimedRotationRequest,
 ) -> Result<TeamRotationReport> {
-    if profile == TimedRotationProfile::FiammettaWitch12_12 {
-        return Err(Error::msg(
-            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
-        ));
-    }
+    let request = request.preserve_named_timing();
     let started = Instant::now();
     let before = crate::profile::solver_perf_snapshot();
-    let result =
-        schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile)
-            .or_else(downgrade_cycle_mood_rejection);
+    let result = match request {
+        super::rotation_types::TimedRotationRequest::Named(profile) => {
+            schedule_timed_rotation_named(blueprint, operbox, instances, table, options, profile)
+        }
+        super::rotation_types::TimedRotationRequest::Generic(
+            super::rotation_types::GenericRotationTiming::MainBackup { shift_hours },
+        ) => {
+            schedule_generic_main_backup(blueprint, operbox, instances, table, options, shift_hours)
+        }
+        super::rotation_types::TimedRotationRequest::Generic(
+            super::rotation_types::GenericRotationTiming::Abc { shift_hours },
+        ) => schedule_generic_abc(blueprint, operbox, instances, table, options, shift_hours),
+    }
+    .or_else(downgrade_cycle_mood_rejection);
     let after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_resolve_stage(
         "rotation_resolve",
@@ -6380,6 +6887,23 @@ pub fn schedule_timed_rotation(
         after,
     );
     result
+}
+
+fn schedule_timed_rotation_named(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    profile: TimedRotationProfile,
+) -> Result<TeamRotationReport> {
+    if profile == TimedRotationProfile::FiammettaWitch12_12 {
+        return Err(Error::msg(
+            "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
+        ));
+    }
+    schedule_timed_rotation_inner(blueprint, operbox, instances, table, options, profile)
+        .or_else(downgrade_cycle_mood_rejection)
 }
 
 fn schedule_timed_rotation_inner(
@@ -6412,6 +6936,7 @@ fn schedule_timed_rotation_inner(
                 TimedRotationProfile::Abc12_6_6,
                 &[],
                 &[],
+                true,
             )?,
             None,
         ),
@@ -6428,6 +6953,7 @@ fn schedule_timed_rotation_inner(
                 TimedRotationProfile::Abc12_12_12,
                 &[],
                 &[],
+                true,
             )?,
             None,
         ),
@@ -6437,6 +6963,11 @@ fn schedule_timed_rotation_inner(
         ),
         TimedRotationProfile::MainBackup24_24 => {
             schedule_main_backup_24_24(blueprint, operbox, instances, table, options)?
+        }
+        TimedRotationProfile::GenericMainBackup | TimedRotationProfile::GenericAbc => {
+            return Err(Error::msg(
+                "generic rotation profiles require an explicit ordered timing request",
+            ));
         }
         TimedRotationProfile::FiammettaWitch12_12 => {
             return Err(Error::msg(
@@ -6465,6 +6996,162 @@ fn schedule_timed_rotation_inner(
         append_main_backup_24_fiammetta_warning(&mut report, diagnostic);
     }
     Ok(report)
+}
+
+fn first_longest_shift_index(shift_hours: &[f64]) -> usize {
+    let mut longest = 0;
+    for index in 1..shift_hours.len() {
+        if shift_hours[index].total_cmp(&shift_hours[longest]).is_gt() {
+            longest = index;
+        }
+    }
+    longest
+}
+
+fn rotate_shift_hours_to_alpha<const N: usize>(shift_hours: [f64; N]) -> ([f64; N], usize) {
+    let offset = first_longest_shift_index(&shift_hours);
+    (
+        std::array::from_fn(|index| shift_hours[(offset + index) % N]),
+        offset,
+    )
+}
+
+/// For ABC, alpha works states 0 and 2 and rests state 1.  When two shifts
+/// share the maximum duration, put the rest state on the shorter shift so the
+/// alpha-owned pair covers both tied maxima.  Equal-all-shift input keeps the
+/// original phase for deterministic compatibility.
+fn rotate_abc_shift_hours_to_alpha(shift_hours: [f64; 3]) -> ([f64; 3], usize) {
+    let maximum = shift_hours
+        .iter()
+        .copied()
+        .max_by(f64::total_cmp)
+        .expect("ABC has three shift durations");
+    let mut best_offset = 0usize;
+    let mut best_score = (0usize, false, 0usize);
+    for offset in 0..shift_hours.len() {
+        let ordered: [f64; 3] = std::array::from_fn(|index| shift_hours[(offset + index) % 3]);
+        let alpha_maxima = [ordered[0], ordered[2]]
+            .into_iter()
+            .filter(|hours| hours.total_cmp(&maximum).is_eq())
+            .count();
+        let score = (
+            alpha_maxima,
+            ordered[0].total_cmp(&maximum).is_eq(),
+            usize::MAX - offset,
+        );
+        if score > best_score {
+            best_score = score;
+            best_offset = offset;
+        }
+    }
+    (
+        std::array::from_fn(|index| shift_hours[(best_offset + index) % 3]),
+        best_offset,
+    )
+}
+
+fn restore_input_shift_order(
+    report: &mut TeamRotationReport,
+    rotation_offset: usize,
+) -> Result<()> {
+    let count = report.shifts.len();
+    if count == 0 || rotation_offset >= count {
+        return Err(Error::msg(
+            "generic rotation produced an invalid cyclic shift order",
+        ));
+    }
+    let mut ordered: Vec<Option<TeamShiftResult>> = (0..count).map(|_| None).collect();
+    for mut shift in report.shifts.drain(..) {
+        if shift.index >= count {
+            return Err(Error::msg(
+                "generic rotation produced an out-of-range shift index",
+            ));
+        }
+        let input_index = (rotation_offset + shift.index) % count;
+        shift.index = input_index;
+        ordered[input_index] = Some(shift);
+    }
+    report.shifts = ordered
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| Error::msg("generic rotation omitted an input shift"))?;
+    Ok(())
+}
+
+fn schedule_generic_main_backup(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    input_hours: [f64; 2],
+) -> Result<TeamRotationReport> {
+    let (ordered_hours, alpha_offset) = rotate_shift_hours_to_alpha(input_hours);
+    let result = schedule_main_backup_profile(
+        TimedRotationProfile::GenericMainBackup,
+        &ordered_hours,
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        true,
+    );
+    let (mut report, _) = match result {
+        Ok(result) => result,
+        Err(error)
+            if error
+                .to_string()
+                .starts_with("all peak prefix candidates are infeasible") =>
+        {
+            let mut fallback_options = options.clone();
+            fallback_options.control_work_hours = None;
+            let (mut report, diagnostic) = schedule_main_backup_profile(
+                TimedRotationProfile::GenericMainBackup,
+                &ordered_hours,
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &fallback_options,
+                false,
+            )?;
+            report.warnings.push(format!(
+                "{FINAL_INVARIANT_WARNING_PREFIX} generic main/backup constrained peak candidate set exhausted; ordinary assignments retained: {error}"
+            ));
+            (report, diagnostic)
+        }
+        Err(error) => return Err(error),
+    };
+    restore_input_shift_order(&mut report, alpha_offset)?;
+    complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)
+}
+
+fn schedule_generic_abc(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    input_hours: [f64; 3],
+) -> Result<TeamRotationReport> {
+    let (ordered_hours, alpha_offset) = rotate_abc_shift_hours_to_alpha(input_hours);
+    let mut report = schedule_abc_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        ordered_hours,
+        true,
+        AbyssalShortShiftPolicy::Disabled,
+        TimedRotationProfile::GenericAbc,
+        &[],
+        &[],
+        true,
+    )?;
+    restore_input_shift_order(&mut report, alpha_offset)?;
+    complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -6524,12 +7211,14 @@ fn schedule_abc_rotation(
     profile: TimedRotationProfile,
     gamma_relaxed: &[&str],
     skip_systems: &[&str],
+    enable_originium_pair: bool,
 ) -> Result<TeamRotationReport> {
     let mut retry_options = options.clone();
     let mut reversed_halves = false;
     let mut control_team_attempt = 0;
     loop {
         let mut eta_failure = None;
+        let mut originium_pair_active = false;
         let result = schedule_abc_rotation_once(
             blueprint,
             operbox,
@@ -6545,6 +7234,8 @@ fn schedule_abc_rotation(
             reversed_halves,
             control_team_attempt,
             &mut eta_failure,
+            &mut originium_pair_active,
+            enable_originium_pair,
         );
         match result {
             Err(error @ Error::ControlRotationRequiredAnchorsExceedCapacity { .. })
@@ -6567,13 +7258,14 @@ fn schedule_abc_rotation(
                     profile,
                     gamma_relaxed,
                     &fallback_skip,
+                    enable_originium_pair,
                 );
             }
             Err(error) => {
                 let Some(failure) = eta_failure else {
                     return Err(error);
                 };
-                if !reversed_halves {
+                if !reversed_halves && !originium_pair_active {
                     reversed_halves = true;
                     eprintln!("[rotation-eta] retry ABC with reversed production halves: {error}");
                     continue;
@@ -6615,16 +7307,28 @@ fn schedule_abc_rotation_once(
     reversed_halves: bool,
     control_team_attempt: usize,
     eta_failure: &mut Option<AbcRotationEtaFailure>,
+    originium_pair_active: &mut bool,
+    enable_originium_pair: bool,
 ) -> Result<TeamRotationReport> {
+    *originium_pair_active = false;
     let t0 = Instant::now();
     let m0 = crate::profile::solver_perf_snapshot();
     let cycle_hours: f64 = shift_hours.iter().sum();
     blueprint.validate()?;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let mut originium_pair = if enable_originium_pair {
+        OriginiumPairContext::for_ordinary_rotation(blueprint, operbox)?
+    } else {
+        OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        }
+    };
     let mut peak_options = options.clone();
     peak_options.shift_hours = shift_hours[0] + shift_hours[1].max(shift_hours[2]);
     peak_options.registry_sustain_hours = Some(peak_options.shift_hours);
+    peak_options.preclaimed_factory_room = originium_pair.room_id().cloned();
     let mut gamma_h1_options = options.clone();
     gamma_h1_options.shift_hours = shift_hours[1];
     let mut gamma_h2_options = options.clone();
@@ -6635,19 +7339,62 @@ fn schedule_abc_rotation_once(
     // 深海链因歌蕾蒂娅心情消耗 ~3.2/h（最长约 7h），不可进入 12h 主班；
     // 唯一入口是后续 S2 6h 短班的有/无深海双路径评分对比。
     let peak_skip: HashSet<String> = skip_systems.iter().map(|s| s.to_string()).collect();
-    let peak_result = assign_shift_with_plan_skip(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        &peak_options,
-        AssignShiftMode::Peak,
-        &BaseAssignment::default(),
-        &peak_skip,
-    )?;
+    let peak_result = if let Some(room_id) = originium_pair.room_id().cloned() {
+        match assign_originium_pair_peak(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &peak_options,
+            &peak_skip,
+            &room_id,
+            2,
+            1,
+        ) {
+            Ok(result) => result,
+            Err(error) if originium_pair_preclaim_failure_allows_fallback(&error) => {
+                originium_pair.preclaim = OriginiumPairPreclaim::Inactive;
+                peak_options.preclaimed_factory_room = None;
+                originium_pair.warning = Some(format!(
+                    "{FINAL_INVARIANT_WARNING_PREFIX} {ORIGINIUM_PAIR_WARNING}: {error}; ordinary peak retained"
+                ));
+                assign_shift_with_plan_skip(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &peak_options,
+                    AssignShiftMode::Peak,
+                    &BaseAssignment::default(),
+                    &peak_skip,
+                )?
+            }
+            Err(error) => return Err(error),
+        }
+    } else {
+        assign_shift_with_plan_skip(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &peak_options,
+            AssignShiftMode::Peak,
+            &BaseAssignment::default(),
+            &peak_skip,
+        )?
+    };
     let peak = peak_result.assignment;
     let mut peak_plan = peak_result.plan;
     peak_plan.resolve_actual_producer_dependencies(blueprint, &peak, instances, table)?;
+    if originium_pair.room_id().is_some() {
+        let plan_pair = OriginiumPairContext::from_peak_plan(&peak_plan)?;
+        if plan_pair.room_id() != originium_pair.room_id() {
+            return Err(Error::msg(format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: peak Plan lost its frozen preclaim room"
+            )));
+        }
+    }
+    *originium_pair_active = originium_pair.room_id().is_some();
     let mut shift_binds = shift_binds_from_plan(&peak_plan);
     let peak_office_names = peak_office_operators(blueprint, &peak);
     let rotating_anchor_names = bound_rotating_anchor_operators(blueprint, &peak, &shift_binds);
@@ -6731,11 +7478,29 @@ fn schedule_abc_rotation_once(
         }
     }
     let bound_office_names = bound_office_operators(blueprint, &peak, &shift_binds);
-    let mut halves =
-        split_production_facilities(blueprint, &peak, &shift_binds, &peak_plan.rotation_reserves)?;
+    let mut halves = split_production_facilities(
+        blueprint,
+        &peak,
+        &shift_binds,
+        &peak_plan.rotation_reserves,
+        &originium_pair,
+    )?;
     // Retry the two intact halves in the other work/rest orientation. Gamma and
     // every dependent cohort are rebuilt below; no bind component is moved or split.
-    if reversed_halves {
+    if let Some(room_id) = originium_pair.room_id() {
+        let alpha_half = halves
+            .iter()
+            .position(|half| half.manu.contains(room_id))
+            .ok_or_else(|| {
+                Error::msg(format!(
+                    "{ORIGINIUM_PAIR_SYSTEM_ID}: frozen pair room {} is absent from production halves",
+                    room_id.0
+                ))
+            })?;
+        if alpha_half != 0 {
+            halves.swap(0, alpha_half);
+        }
+    } else if reversed_halves {
         halves.swap(0, 1);
     }
     let [h1, h2] = halves;
@@ -7513,7 +8278,13 @@ fn schedule_abc_rotation_once(
             let mut base_used = base.operator_names();
             assign_ctrl(&mut base, &mut base_used, &[])?;
             let mut base_warmup_rooms = warmup_sticky_rooms.clone();
-            align_warmup_rooms(blueprint, instances, &mut base, &mut base_warmup_rooms);
+            align_warmup_rooms(
+                blueprint,
+                instances,
+                &mut base,
+                &mut base_warmup_rooms,
+                &originium_pair,
+            );
             clear_production_efficiencies(blueprint, &mut base);
             let score_base = evaluate_base_assignment_efficiencies(
                 blueprint,
@@ -7536,6 +8307,7 @@ fn schedule_abc_rotation_once(
                 manu_pool: &pools.manu,
                 used_ab: &used_ab,
                 blocked_ops: &alpha_blocked_ops,
+                originium_pair_room: originium_pair.room_id(),
                 shared: &shared,
                 beta: &beta,
                 gamma_h1: &gamma_h1,
@@ -7569,6 +8341,7 @@ fn schedule_abc_rotation_once(
                     instances,
                     &mut candidate.assignment,
                     &mut candidate_warmup_rooms,
+                    &originium_pair,
                 );
                 if !candidate
                     .assignment
@@ -7657,6 +8430,7 @@ fn schedule_abc_rotation_once(
                 instances,
                 &mut assignment,
                 &mut warmup_sticky_rooms,
+                &originium_pair,
             );
             print_trade_rotation_debug("S1/S3 before final score", &assignment);
             clear_production_efficiencies(blueprint, &mut assignment);
@@ -7747,6 +8521,9 @@ fn schedule_abc_rotation_once(
         shifts,
         elapsed: t0.elapsed(),
     };
+    if let Some(warning) = originium_pair.warning() {
+        report.warnings.push(warning);
+    }
 
     // Publish actual work cohorts rather than the unused candidate directory.
     let actual_work: HashSet<_> = report
@@ -7782,6 +8559,7 @@ fn schedule_abc_rotation_once(
             &report.teams,
             &report.peak_plan.continuous_roles,
             &report.runtime_shift_binds,
+            &originium_pair,
             &mut report.shifts,
         ) {
             Ok(applied) => applied,
@@ -7827,7 +8605,13 @@ fn schedule_abc_rotation_once(
         power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
         production: average_cycle_production(blueprint, &report.shifts),
     };
+    let quality_warnings: Vec<_> = report
+        .warnings
+        .into_iter()
+        .filter(|warning| warning.starts_with(FINAL_INVARIANT_WARNING_PREFIX))
+        .collect();
     report.warnings = rotation_shortfall_warnings(blueprint, &report.shifts);
+    report.warnings.extend(quality_warnings);
     let t4 = Instant::now();
     let m4 = crate::profile::solver_perf_snapshot();
 
@@ -7851,6 +8635,156 @@ fn schedule_abc_rotation_once(
 
     report.elapsed = t4.duration_since(t0);
     Ok(report)
+}
+
+fn originium_pair_operator(
+    operbox: &OperBox,
+    name: &str,
+    room_id: &RoomId,
+) -> Result<AssignedOperator> {
+    let progress = operbox.progress_of(name).ok_or_else(|| {
+        Error::msg(format!(
+            "{ORIGINIUM_PAIR_SYSTEM_ID}: {name} is not owned for room {}",
+            room_id.0
+        ))
+    })?;
+    Ok(AssignedOperator::from_progress(name, progress))
+}
+
+fn originium_pair_preclaim_failure_allows_fallback(error: &Error) -> bool {
+    match error {
+        // The pair preclaim is a preference layered on the ordinary peak plan.
+        // Its hardware is retained in the failed assignment, so only the
+        // manufacture completion errors of that anchored room are optional.
+        Error::OptionalRotationPlacementInfeasible { .. } => true,
+        _ => false,
+    }
+}
+
+fn assign_originium_pair_peak(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    skip_systems: &HashSet<String>,
+    room_id: &RoomId,
+    on_shifts: u8,
+    off_shifts: u8,
+) -> Result<crate::layout::AssignShiftResult> {
+    let mut planning_seed = BaseAssignment::default();
+    planning_seed.set_room(
+        room_id.clone(),
+        ORIGINIUM_PAIR_OPERATORS
+            .iter()
+            .map(|name| originium_pair_operator(operbox, name, room_id))
+            .collect::<Result<Vec<_>>>()?,
+    );
+    let execution_seed = BaseAssignment::default();
+    let room = blueprint.room(room_id).ok_or_else(|| {
+        Error::msg(format!(
+            "{ORIGINIUM_PAIR_SYSTEM_ID}: target room {} disappeared",
+            room_id.0
+        ))
+    })?;
+    if room.kind != FacilityKind::Factory
+        || room.level != 3
+        || !matches!(
+            room.product.as_ref(),
+            Some(RoomProduct::Factory {
+                recipe: crate::types::RecipeKind::Originium
+            })
+        )
+        || room.operator_capacity() < 3
+    {
+        return Err(Error::msg(format!(
+            "{ORIGINIUM_PAIR_SYSTEM_ID}: target room {} is not a legal originium factory",
+            room_id.0
+        )));
+    }
+    let result = assign_shift_with_preclaimed_plan(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        AssignShiftMode::Peak,
+        &planning_seed,
+        &execution_seed,
+        skip_systems,
+        |plan| {
+            for name in ORIGINIUM_PAIR_OPERATORS {
+                let elite = operbox.elite_of(name).ok_or_else(|| {
+                    Error::msg(format!(
+                        "{ORIGINIUM_PAIR_SYSTEM_ID}: missing elite for {name}"
+                    ))
+                })?;
+                if plan.anchors.iter().any(|anchor| {
+                    anchor.system_id == ORIGINIUM_PAIR_SYSTEM_ID && anchor.operator == name
+                }) {
+                    continue;
+                }
+                plan.anchors.push(SystemAnchor {
+                    system_id: ORIGINIUM_PAIR_SYSTEM_ID.to_string(),
+                    operator: name.to_string(),
+                    proactive_support: false,
+                    optional_trade_role: None,
+                    optional_control_role: None,
+                    elite,
+                    facility: FacilityKind::Factory,
+                    room_id: Some(room_id.clone()),
+                    recipe: Some(crate::types::RecipeKind::Originium),
+                    trade_order: None,
+                    work_mood: None,
+                    rest_facility: None,
+                    fill_policy: AnchorFillPolicy::ManufactureRecipe,
+                });
+            }
+            if !plan.shift_binds.iter().any(|bind| {
+                bind.operators.len() == ORIGINIUM_PAIR_OPERATORS.len()
+                    && ORIGINIUM_PAIR_OPERATORS
+                        .iter()
+                        .all(|name| bind.operators.iter().any(|member| member == name))
+            }) {
+                plan.shift_binds.push(ShiftBind {
+                    operators: ORIGINIUM_PAIR_OPERATORS
+                        .iter()
+                        .map(|name| (*name).to_string())
+                        .collect(),
+                    on_shifts,
+                    off_shifts,
+                });
+            }
+            Ok(())
+        },
+    )
+    .map_err(|error| match error {
+        Error::ManufactureAnchoredCompletionInfeasible {
+            room_id: failed_room,
+            anchor_count: 2,
+        } if failed_room == room_id.0 => Error::OptionalRotationPlacementInfeasible {
+            message: format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: target room {} could not be completed with its two preclaimed anchors",
+                room_id.0
+            ),
+        },
+        error => error,
+    })?;
+    let room = result.assignment.operators_in(room_id);
+    let missing: Vec<_> = ORIGINIUM_PAIR_OPERATORS
+        .iter()
+        .filter(|name| !room.iter().any(|operator| operator.name == **name))
+        .copied()
+        .collect();
+    if !missing.is_empty() {
+        return Err(Error::OptionalRotationPlacementInfeasible {
+            message: format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: assignment pipeline displaced preclaimed pair in room {}: missing {missing:?}",
+                room_id.0
+            ),
+        });
+    }
+    Ok(result)
 }
 
 #[derive(Debug, Clone)]
@@ -7918,6 +8852,55 @@ fn solve_owned_peak_assignment(
     Ok(OwnedRotationAssignment {
         assignment: result.assignment,
         plan: result.plan,
+    })
+}
+
+fn solve_owned_peak_with_originium_pair(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    shift_hours: f64,
+    pair: &OriginiumPairContext,
+) -> Result<OwnedRotationAssignment> {
+    let Some(room_id) = pair.room_id() else {
+        let mut ordinary_options = options.clone();
+        ordinary_options.shift_hours = shift_hours;
+        ordinary_options.preclaimed_factory_room = None;
+        return solve_owned_peak_assignment(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &ordinary_options,
+            shift_hours,
+        );
+    };
+    let mut peak_options = options.clone();
+    peak_options.shift_hours = shift_hours;
+    peak_options.preclaimed_factory_room = Some(room_id.clone());
+    let result = assign_originium_pair_peak(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        &peak_options,
+        &HashSet::new(),
+        room_id,
+        1,
+        1,
+    )?;
+    let mut plan = result.plan;
+    plan.resolve_actual_producer_dependencies(blueprint, &result.assignment, instances, table)?;
+    if OriginiumPairContext::from_peak_plan(&plan)?.room_id() != Some(room_id) {
+        return Err(Error::msg(format!(
+            "{ORIGINIUM_PAIR_SYSTEM_ID}: main/backup peak Plan lost its frozen preclaim room"
+        )));
+    }
+    Ok(OwnedRotationAssignment {
+        assignment: result.assignment,
+        plan,
     })
 }
 
@@ -8297,6 +9280,7 @@ fn schedule_main_backup_12_12(
         instances,
         table,
         options,
+        false,
     )
     .map(|(report, _)| report)
 }
@@ -8308,20 +9292,47 @@ fn schedule_main_backup_24_24(
     table: &SkillTable,
     options: &AssignBaseOptions,
 ) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
-    // 24/24 模式：过滤高心情消耗干员（drain >= 1.0）和德拉（互增撑不住24h）
-    let filtered_operbox = filter_operbox_for_24_24(operbox);
-
     let mut profile_options = options.clone();
     profile_options.control_work_hours = Some(24.0);
-    schedule_main_backup_profile(
+    let result = schedule_main_backup_profile(
         TimedRotationProfile::MainBackup24_24,
         &[24.0, 24.0],
         blueprint,
-        &filtered_operbox,
+        operbox,
         instances,
         table,
         &profile_options,
-    )
+        false,
+    );
+    match result {
+        Ok(result) => Ok(result),
+        Err(error)
+            if error
+                .to_string()
+                .starts_with("all peak prefix candidates are infeasible") =>
+        {
+            // ETA remains the candidate policy.  If it rejects every candidate,
+            // preserve the requested 24/24 product shape and expose the quality
+            // loss to normal callers; the explicit invariant gate still fails.
+            let mut fallback_options = options.clone();
+            fallback_options.control_work_hours = None;
+            let (mut report, diagnostic) = schedule_main_backup_profile(
+                TimedRotationProfile::MainBackup24_24,
+                &[24.0, 24.0],
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &fallback_options,
+                false,
+            )?;
+            report.warnings.push(format!(
+                "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_24_24 constrained peak candidate set exhausted; ordinary 24h assignments retained: {error}"
+            ));
+            Ok((report, diagnostic))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[derive(Debug)]
@@ -8372,52 +9383,6 @@ fn append_main_backup_24_fiammetta_warning(
     }
 }
 
-/// 为 24/24 模式过滤 operbox：移除德克萨斯、拉普兰德，以及心情消耗增加≥0.5的干员
-fn filter_operbox_for_24_24(operbox: &OperBox) -> OperBox {
-    // 德拉特殊组合：两人互增 drain=1.9/h，24h 撑不住
-    // drain_delta >= 0.5 的干员（从 mood_model.json 读取）
-    const FORBIDDEN_NAMES_24_24: &[&str] = &[
-        "德克萨斯",
-        "拉普兰德",
-        // operator_mood_skills 中 drain_delta >= 0.5 的干员
-        "地灵",
-        "夕",
-        "怒潮凛冬",
-        "惊蛰",
-        "斥罪",
-        "水灯心",
-        "涤火杰西卡",
-        "见行者",
-        "重岳",
-        "阿",
-        "麒麟R夜刀",
-        // todo 区特殊干员
-        "歌蕾蒂娅",
-    ];
-
-    // entries 与 owned 必须同步：部分路径按 entry.own 筛候选，部分按 owned 判断拥有。
-    let mut filtered_owned = operbox.owned.clone();
-    for name in FORBIDDEN_NAMES_24_24 {
-        filtered_owned.remove(*name);
-    }
-    let entries = operbox
-        .entries
-        .iter()
-        .map(|entry| {
-            let mut entry = entry.clone();
-            if FORBIDDEN_NAMES_24_24.contains(&entry.name.as_str()) {
-                entry.own = false;
-            }
-            entry
-        })
-        .collect();
-
-    OperBox {
-        entries,
-        owned: filtered_owned,
-    }
-}
-
 fn schedule_main_backup_profile(
     profile: TimedRotationProfile,
     state_hours: &[f64],
@@ -8426,13 +9391,42 @@ fn schedule_main_backup_profile(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
+    enforce_generic_control_eta: bool,
 ) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
     let started = Instant::now();
     let main_hours = state_hours[0];
     let backup_hours = state_hours[1];
-    let fiammetta_enabled = options.fiammetta_enable
-        && operbox.owns("菲亚梅塔")
-        && !fiammetta_action_slots(profile, state_hours.len()).is_empty();
+    let owner_options = |hours: f64| {
+        let mut owner_options = options.clone();
+        if profile == TimedRotationProfile::GenericMainBackup && enforce_generic_control_eta {
+            owner_options.control_work_hours = Some(hours);
+        }
+        owner_options
+    };
+    let main_options = owner_options(main_hours);
+    let backup_options = owner_options(backup_hours);
+    let mut originium_pair = if profile.is_ordinary_main_backup() {
+        OriginiumPairContext::for_ordinary_rotation(blueprint, operbox)?
+    } else {
+        OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        }
+    };
+    let fiammetta_slots: Vec<usize> = if matches!(
+        profile,
+        TimedRotationProfile::GenericMainBackup | TimedRotationProfile::GenericAbc
+    ) {
+        state_hours
+            .iter()
+            .enumerate()
+            .filter_map(|(index, hours)| (*hours > 12.0).then_some(index))
+            .collect()
+    } else {
+        fiammetta_action_slots(profile, state_hours.len())
+    };
+    let fiammetta_enabled =
+        options.fiammetta_enable && operbox.owns("菲亚梅塔") && !fiammetta_slots.is_empty();
     let fiammetta_target_candidates =
         if profile == TimedRotationProfile::MainBackup24_24 && fiammetta_enabled {
             let normal_trade_pool =
@@ -8453,8 +9447,42 @@ fn schedule_main_backup_profile(
         } else {
             Vec::new()
         };
-    let mut main =
-        solve_owned_peak_assignment(blueprint, operbox, instances, table, options, main_hours)?;
+    let mut main = match solve_owned_peak_with_originium_pair(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        &main_options,
+        main_hours,
+        &originium_pair,
+    ) {
+        Ok(main) => main,
+        Err(error)
+            if originium_pair.room_id().is_some()
+                && originium_pair_preclaim_failure_allows_fallback(&error) =>
+        {
+            let room_id = originium_pair
+                .room_id()
+                .cloned()
+                .expect("preclaim failure has a target room");
+            originium_pair.preclaim = OriginiumPairPreclaim::Inactive;
+            originium_pair.warning = Some(format!(
+                "{FINAL_INVARIANT_WARNING_PREFIX} {ORIGINIUM_PAIR_WARNING}: {} could not complete room {}; ordinary main retained",
+                error, room_id.0
+            ));
+            let mut ordinary_options = main_options.clone();
+            ordinary_options.preclaimed_factory_room = None;
+            solve_owned_peak_assignment(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &ordinary_options,
+                main_hours,
+            )?
+        }
+        Err(error) => return Err(error),
+    };
     fill_owner_office_seats(
         blueprint,
         operbox,
@@ -8501,7 +9529,7 @@ fn schedule_main_backup_profile(
                 &candidate_operbox,
                 instances,
                 table,
-                options,
+                &backup_options,
                 backup_hours,
             ) {
                 Ok(assignment) => assignment,
@@ -8631,7 +9659,7 @@ fn schedule_main_backup_profile(
                 operbox,
                 instances,
                 table,
-                options,
+                &backup_options,
                 &main.assignment,
                 backup_hours,
             )?;
@@ -8752,7 +9780,7 @@ fn schedule_main_backup_profile(
             operbox,
             instances,
             table,
-            options,
+            &backup_options,
             &main.assignment,
             backup_hours,
         )?,
@@ -8794,8 +9822,8 @@ fn schedule_main_backup_profile(
             .map(|actions| (actions[0].clone(), actions[1].clone()))
             .unwrap_or((None, None))
     } else {
-        let first = fiammetta_enabled
-            .then(|| {
+        let first = if fiammetta_enabled && fiammetta_slots.contains(&0) {
+            {
                 first_fiammetta_assignment_target(
                     profile,
                     blueprint,
@@ -8807,10 +9835,12 @@ fn schedule_main_backup_profile(
                     displaced: String::new(),
                     room_id,
                 })
-            })
-            .flatten();
-        let second = fiammetta_enabled
-            .then(|| {
+            }
+        } else {
+            None
+        };
+        let second = if fiammetta_enabled && fiammetta_slots.contains(&1) {
+            {
                 let used = first
                     .as_ref()
                     .map(|action| std::iter::once(action.target.clone()).collect())
@@ -8821,8 +9851,10 @@ fn schedule_main_backup_profile(
                         displaced: String::new(),
                         room_id,
                     })
-            })
-            .flatten();
+            }
+        } else {
+            None
+        };
         (first, second)
     };
     let states = state_hours
@@ -8853,17 +9885,19 @@ fn schedule_main_backup_profile(
             }
         })
         .collect();
-    let report = finalize_profile_rotation(
-        profile,
-        blueprint,
-        operbox,
-        instances,
-        table,
-        vec![main, backup],
-        teams,
-        states,
-        started,
-    )?;
+    let owners = vec![main, backup];
+    let mut report = if profile.is_ordinary_main_backup() {
+        build_rotation_report_shell(
+            profile, blueprint, instances, owners, teams, states, started,
+        )?
+    } else {
+        finalize_profile_rotation(
+            profile, blueprint, operbox, instances, table, owners, teams, states, started,
+        )?
+    };
+    if let Some(warning) = originium_pair.warning() {
+        report.warnings.push(warning);
+    }
     let fiammetta_24_diagnostic = (profile == TimedRotationProfile::MainBackup24_24
         && fiammetta_enabled)
         .then(|| MainBackup24FiammettaDiagnostic {
@@ -8907,6 +9941,7 @@ fn schedule_ordinary_profile_fallback(
         instances,
         table,
         options,
+        false,
     )?;
     report.warnings.push(format!(
         "{FINAL_INVARIANT_WARNING_PREFIX} {reason}; special claims unavailable, ordinary assignments retain requested {} timing",
@@ -8937,6 +9972,7 @@ fn schedule_fiammetta_8_8_4_4(
         TimedRotationProfile::Abc12_6_6,
         &[],
         &[],
+        false,
     )?;
     let binds = raw.runtime_shift_binds.clone();
     let fiammetta_owner = raw.shifts[0].assignment.clone();
@@ -9003,6 +10039,10 @@ fn schedule_fiammetta_8_8_4_4(
     )?;
     report.runtime_shift_binds = binds;
     if options.fiammetta_enable {
+        let inactive_originium_pair = OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        };
         let applied = match apply_profile_fiammetta_rotation(
             blueprint,
             operbox,
@@ -9013,6 +10053,7 @@ fn schedule_fiammetta_8_8_4_4(
             &report.teams,
             &raw.peak_plan.continuous_roles,
             &report.runtime_shift_binds,
+            &inactive_originium_pair,
             &mut report.shifts,
         ) {
             Ok(applied) => applied,
@@ -9761,6 +10802,75 @@ fn score_fiammetta_continuation(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn build_rotation_report_shell(
+    profile: TimedRotationProfile,
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    owners: Vec<OwnedRotationAssignment>,
+    teams: Vec<TeamAssignment>,
+    states: Vec<RotationStateSpec>,
+    started: Instant,
+) -> Result<TeamRotationReport> {
+    if owners.is_empty() || states.is_empty() {
+        return Err(Error::msg("timed rotation requires assignments and states"));
+    }
+    let mut shifts = Vec::with_capacity(states.len());
+    let proposals: Vec<_> = states.iter().map(|state| state.fiammetta.clone()).collect();
+    for (index, state) in states.iter().enumerate() {
+        let owner = owners.get(state.owner_index).ok_or_else(|| {
+            Error::msg(format!(
+                "rotation state {} references missing plan owner {}",
+                index + 1,
+                state.owner_index
+            ))
+        })?;
+        let mut assignment = owner.assignment.clone();
+        clear_production_efficiencies(blueprint, &mut assignment);
+        shifts.push(TeamShiftResult {
+            index,
+            plan_index: state.owner_index,
+            duration_hours: state.duration_hours,
+            active_teams: state.active_teams.clone(),
+            resting_team: state.resting_team,
+            assignment,
+            fiammetta: None,
+            dorm_rest: state.dorm_rest.clone(),
+            drone: drone_action(blueprint, state.transition),
+            transition: state.transition,
+            efficiencies: ShiftEfficiencies::default(),
+            weighted_trade: Efficiency::ZERO,
+            weighted_manufacture: Efficiency::ZERO,
+            weighted_power: Efficiency::ZERO,
+        });
+    }
+    retry_profile_fiammetta_slots(blueprint, instances, &proposals, &mut shifts)?;
+    let assignment_plans: Vec<_> = owners.iter().map(|owner| owner.plan.clone()).collect();
+    let runtime_shift_binds = assignment_plans
+        .iter()
+        .flat_map(shift_binds_from_plan)
+        .collect();
+    let peak_plan = assignment_plans[0].clone();
+    let peak_mood_eta = Some(shift_eta_with_instances(
+        default_mood_model()?,
+        blueprint,
+        &owners[0].assignment,
+        instances,
+    ));
+    let report = TeamRotationReport {
+        profile,
+        peak_plan,
+        assignment_plans,
+        runtime_shift_binds,
+        peak_mood_eta,
+        teams,
+        shifts,
+        daily: DailyTotals::default(),
+        warnings: Vec::new(),
+        elapsed: started.elapsed(),
+    };
+    Ok(report)
+}
+
 fn finalize_profile_rotation(
     profile: TimedRotationProfile,
     blueprint: &BaseBlueprint,
@@ -10678,7 +11788,7 @@ mod tests {
     #[test]
     fn abc_12_12_12_reuses_abc_team_rotation_for_a_36_hour_cycle() {
         let (blueprint, operbox, instances, table) = fixtures();
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -10687,7 +11797,7 @@ mod tests {
                 support_combinations_enable: true,
                 ..Default::default()
             },
-            TimedRotationProfile::Abc12_12_12,
+            TimedRotationProfile::Abc12_12_12.into(),
         )
         .unwrap();
 
@@ -10757,13 +11867,13 @@ mod tests {
     fn named_four_shift_profiles_fail_their_hard_preconditions() {
         let (blueprint, operbox, instances, table) = fixtures();
         let no_fiammetta = operbox.excluding(&HashSet::from(["菲亚梅塔".to_string()]));
-        let fiammetta_error = schedule_timed_rotation(
+        let fiammetta_error = schedule_timed_rotation_request(
             &blueprint,
             &no_fiammetta,
             &instances,
             &table,
             &AssignBaseOptions::default(),
-            TimedRotationProfile::Fiammetta8_8_4_4,
+            TimedRotationProfile::Fiammetta8_8_4_4.into(),
         )
         .unwrap_err();
         assert!(fiammetta_error.to_string().contains("requires an owned"));
@@ -10782,13 +11892,13 @@ mod tests {
             .map(|entry| entry.name.clone())
             .collect();
         let no_abyssal = operbox.excluding(&excluded_abyssal);
-        let abyssal_error = schedule_timed_rotation(
+        let abyssal_error = schedule_timed_rotation_request(
             &blueprint,
             &no_abyssal,
             &instances,
             &table,
             &AssignBaseOptions::default(),
-            TimedRotationProfile::Abyssal7_5_7_5,
+            TimedRotationProfile::Abyssal7_5_7_5.into(),
         )
         .unwrap_err();
         assert!(abyssal_error
@@ -10850,7 +11960,7 @@ mod tests {
     #[test]
     fn timed_two_shift_builds_disjoint_complete_states() {
         let (blueprint, operbox, instances, table) = fixtures();
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -10859,7 +11969,7 @@ mod tests {
                 top_k: 5,
                 ..Default::default()
             },
-            TimedRotationProfile::MainBackup12_12,
+            TimedRotationProfile::MainBackup12_12.into(),
         )
         .unwrap();
         assert_eq!(report.profile, TimedRotationProfile::MainBackup12_12);
@@ -10909,7 +12019,7 @@ mod tests {
     #[test]
     fn timed_two_shift_office_fill_keeps_disjoint_states_and_warnings() {
         let (blueprint, operbox, instances, table) = fixtures();
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -10918,7 +12028,7 @@ mod tests {
                 top_k: 5,
                 ..Default::default()
             },
-            TimedRotationProfile::MainBackup12_12,
+            TimedRotationProfile::MainBackup12_12.into(),
         )
         .unwrap();
         // 主替互斥必须保持（main-fill-before-backup 后仍成立）。
@@ -11256,7 +12366,7 @@ mod tests {
         if !operbox.owns("菲亚梅塔") {
             return;
         }
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -11265,7 +12375,7 @@ mod tests {
                 top_k: 5,
                 ..Default::default()
             },
-            TimedRotationProfile::Fiammetta8_8_4_4,
+            TimedRotationProfile::Fiammetta8_8_4_4.into(),
         )
         .unwrap();
         assert_eq!(
@@ -11313,7 +12423,7 @@ mod tests {
     #[test]
     fn timed_abyssal_profile_owns_four_consumers_and_alternates() {
         let (blueprint, operbox, instances, table) = fixtures();
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -11322,7 +12432,7 @@ mod tests {
                 top_k: 5,
                 ..Default::default()
             },
-            TimedRotationProfile::Abyssal7_5_7_5,
+            TimedRotationProfile::Abyssal7_5_7_5.into(),
         )
         .unwrap();
         assert_eq!(report.assignment_plans.len(), 2);
@@ -11844,6 +12954,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -11924,6 +13035,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -11980,6 +13092,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -12099,6 +13212,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -12188,6 +13302,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -12274,6 +13389,7 @@ mod tests {
             manu_pool: &manu_pool,
             used_ab: &HashSet::new(),
             blocked_ops: &blocked_ops,
+            originium_pair_room: None,
             shared: &shared,
             beta: &beta,
             gamma_h1: &gamma_h1,
@@ -12813,7 +13929,7 @@ mod tests {
             operbox.owns("菲亚梅塔"),
             "fixture 必须拥有菲亚梅塔，否则本测试无法区分关闭与缺员"
         );
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -12823,14 +13939,14 @@ mod tests {
                 fiammetta_enable: false,
                 ..Default::default()
             },
-            TimedRotationProfile::default(),
+            TimedRotationProfile::default().into(),
         )
         .unwrap();
         assert!(
             report.shifts.iter().all(|shift| shift.fiammetta.is_none()),
             "fiammetta_enable=false 时不得产生任何菲亚回岗动作"
         );
-        let with_fiammetta = schedule_timed_rotation(
+        let with_fiammetta = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -12840,7 +13956,7 @@ mod tests {
                 fiammetta_enable: true,
                 ..Default::default()
             },
-            TimedRotationProfile::default(),
+            TimedRotationProfile::default().into(),
         )
         .unwrap();
         assert!(
@@ -12855,7 +13971,7 @@ mod tests {
     #[test]
     fn fiammetta_enable_false_rejects_8844_profile() {
         let (blueprint, operbox, instances, table) = user_243_fixtures();
-        let err = schedule_timed_rotation(
+        let err = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -12865,7 +13981,7 @@ mod tests {
                 fiammetta_enable: false,
                 ..Default::default()
             },
-            TimedRotationProfile::Fiammetta8_8_4_4,
+            TimedRotationProfile::Fiammetta8_8_4_4.into(),
         )
         .unwrap_err();
         assert!(
@@ -13893,7 +15009,7 @@ mod tests {
         let beta_tailors: HashSet<_> = beta_tailor_names(&trade_pool, &table).into_iter().collect();
         assert!(beta_tailors.len() >= 2, "fixture must own two beta tailors");
 
-        let report = schedule_timed_rotation(
+        let report = schedule_timed_rotation_request(
             &blueprint,
             &operbox,
             &instances,
@@ -13902,7 +15018,7 @@ mod tests {
                 top_k: 20,
                 ..Default::default()
             },
-            TimedRotationProfile::Abc12_12_12,
+            TimedRotationProfile::Abc12_12_12.into(),
         )
         .unwrap();
 
@@ -14081,7 +15197,12 @@ mod tests {
             off_shifts: 1,
         };
 
-        let [h1, h2] = split_production_facilities(&blueprint, &peak, &[bind], &[]).unwrap();
+        let inactive = OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        };
+        let [h1, h2] =
+            split_production_facilities(&blueprint, &peak, &[bind], &[], &inactive).unwrap();
         let bound = [
             RoomId::from("manu_1"),
             RoomId::from("manu_2"),
@@ -14117,7 +15238,11 @@ mod tests {
         };
         let reserve = witch_rotation_reserve();
 
-        let error = split_production_facilities(&blueprint, &peak, &[bind], &[reserve])
+        let inactive = OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        };
+        let error = split_production_facilities(&blueprint, &peak, &[bind], &[reserve], &inactive)
             .expect_err("schedule must not rescue a guarded pack by moving components");
         assert!(
             error
@@ -14425,7 +15550,12 @@ mod tests {
             on_shifts: 2,
             off_shifts: 1,
         };
-        let error = split_production_facilities(&blueprint, &peak, &[bind], &[]).unwrap_err();
+        let inactive = OriginiumPairContext {
+            preclaim: OriginiumPairPreclaim::Inactive,
+            warning: None,
+        };
+        let error =
+            split_production_facilities(&blueprint, &peak, &[bind], &[], &inactive).unwrap_err();
         assert!(error.to_string().contains("missing from peak"));
     }
 

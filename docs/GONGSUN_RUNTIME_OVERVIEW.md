@@ -115,7 +115,7 @@ shortcut 只结算实际组合，不能因为组合很强就负责把人塞进�
 
 ## 7. 单班怎样变成轮换
 
-`schedule_timed_rotation` 当前支持：
+`schedule_timed_rotation_request` 当前支持：
 
 | profile | 形状 | 用途 |
 |---|---|---|

@@ -17,7 +17,7 @@ use infra_core::Error;
 use super::prefix_shadow::{prefix_shadow_out_from_args, run_prefix_shadow, PrefixShadowInput};
 
 pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
-    let rotation_profile = super::timed_rotation_profile_from_args(args)?;
+    let rotation_request = super::timed_rotation_request_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = match layout_path_from_args(args) {
         Some(p) => p,
@@ -80,7 +80,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             operbox_label: &operbox_label,
             baseline_operbox: Some(&baseline_path),
             top_k,
-            rotation_profile,
+            rotation_request: rotation_request.clone(),
             system_preferences: &system_preferences,
             maa_title,
             fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
@@ -131,7 +131,7 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
             instances: &instances,
             table: &table,
             baseline_options: &shadow_options,
-            profile: rotation_profile,
+            rotation_request: rotation_request.clone(),
             baseline: rotation,
         });
         let stage_after = infra_core::profile::solver_perf_snapshot();

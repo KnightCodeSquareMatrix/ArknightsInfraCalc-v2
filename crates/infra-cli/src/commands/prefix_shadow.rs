@@ -13,8 +13,8 @@ use infra_core::response_dependency::{
     ResolvedProducerDependency,
 };
 use infra_core::schedule::{
-    schedule_timed_rotation, DailyTotals, ShiftEfficiencies, TeamRotationReport,
-    TimedRotationProfile,
+    schedule_timed_rotation_request, DailyTotals, ShiftEfficiencies, TeamRotationReport,
+    TimedRotationProfile, TimedRotationRequest,
 };
 use infra_core::scoring::{ScoringPolicyId, TradeManufactureEfficiencyWeights};
 use infra_core::skill_table::SkillTable;
@@ -41,7 +41,7 @@ pub(super) struct PrefixShadowInput<'a> {
     pub instances: &'a OperatorInstances,
     pub table: &'a SkillTable,
     pub baseline_options: &'a AssignBaseOptions,
-    pub profile: TimedRotationProfile,
+    pub rotation_request: TimedRotationRequest,
     pub baseline: &'a TeamRotationReport,
 }
 
@@ -65,13 +65,13 @@ fn write_prefix_shadow_report(input: PrefixShadowInput<'_>) -> Result<(), Error>
         ScoringPolicyId::TradeManufactureWeightedEfficiencyV1;
 
     let started = Instant::now();
-    let candidate = schedule_timed_rotation(
+    let candidate = schedule_timed_rotation_request(
         input.blueprint,
         input.operbox,
         input.instances,
         input.table,
         &candidate_options,
-        input.profile,
+        input.rotation_request,
     );
     let candidate_elapsed = started.elapsed();
 
@@ -123,7 +123,7 @@ fn write_prefix_shadow_report(input: PrefixShadowInput<'_>) -> Result<(), Error>
         inputs: ShadowInputs {
             layout: input.layout_label,
             operbox: input.operbox_label,
-            rotation: input.profile,
+            rotation: input.rotation_request.profile(),
         },
         baseline,
         candidate,

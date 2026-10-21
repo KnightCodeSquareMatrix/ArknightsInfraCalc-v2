@@ -72,6 +72,9 @@ pub struct AssignBaseOptions {
     /// shadow runs opt into V1 explicitly.
     pub dynamic_producer_policy: ScoringPolicyId,
     pub trade_manufacture_weights: TradeManufactureEfficiencyWeights,
+    /// Frozen timed-rotation preclaim room.  A shadow production rebuild must
+    /// leave this room and its anchored members untouched.
+    pub preclaimed_factory_room: Option<crate::layout::RoomId>,
 }
 
 impl Default for AssignBaseOptions {
@@ -91,6 +94,7 @@ impl Default for AssignBaseOptions {
             support_combinations_enable: false,
             dynamic_producer_policy: ScoringPolicyId::ControlInjectRawSumV0,
             trade_manufacture_weights: TradeManufactureEfficiencyWeights::default(),
+            preclaimed_factory_room: None,
         }
     }
 }

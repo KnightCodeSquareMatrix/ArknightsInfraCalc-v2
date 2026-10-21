@@ -46,6 +46,15 @@ pub enum Error {
     /// The selected Plan's required control anchors cannot fit the facility.
     #[error("control_rotation_admission: required anchors exceed blueprint capacity")]
     ControlRotationRequiredAnchorsExceedCapacity { required: usize, capacity: usize },
+    /// An optional timed-rotation preclaim could not complete its facility fill.
+    #[error("{message}")]
+    OptionalRotationPlacementInfeasible { message: String },
+    /// A manufacture room with hard anchors could not be completed and scored.
+    #[error("manufacture {room_id} produced no anchored hit with {anchor_count} anchors")]
+    ManufactureAnchoredCompletionInfeasible {
+        room_id: String,
+        anchor_count: usize,
+    },
 }
 
 impl Error {

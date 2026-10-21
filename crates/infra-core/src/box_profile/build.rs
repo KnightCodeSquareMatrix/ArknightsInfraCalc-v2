@@ -7,17 +7,18 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::BaseBlueprint;
 use crate::operbox::{default_operbox_full_e2_path, OperBox};
-use crate::schedule::TimedRotationProfile;
+use crate::schedule::{TimedRotationProfile, TimedRotationRequest};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
 use super::eval::{default_schedule_export_path, run_schedule_eval_probe};
-use super::probe::{run_user_rotation_probe_with_profile_and_preferences, LayoutProbe};
+use super::probe::LayoutProbe;
 
 #[derive(Debug, Clone)]
 pub struct BoxProfileOptions {
     pub top_k: usize,
     pub rotation_profile: TimedRotationProfile,
+    pub rotation_request: Option<TimedRotationRequest>,
     pub system_preferences: std::collections::HashMap<String, String>,
     /// 菲亚梅塔主力回岗覆盖开关；`false` 时 current 排班不生成回岗动作。
     pub fiammetta_enable: bool,
@@ -35,6 +36,7 @@ impl Default for BoxProfileOptions {
         Self {
             top_k: 10,
             rotation_profile: TimedRotationProfile::default(),
+            rotation_request: None,
             system_preferences: std::collections::HashMap::new(),
             fiammetta_enable: true,
             support_combinations_enable: false,
@@ -135,13 +137,16 @@ pub fn build_box_profile(
     options: &BoxProfileOptions,
 ) -> Result<BoxProfile> {
     // current：用户练度 → solver 排班；baseline：公孙固定编制 + 顶配练度 eval。
-    let current = run_user_rotation_probe_with_profile_and_preferences(
+    let rotation_request = options
+        .rotation_request
+        .unwrap_or(TimedRotationRequest::Named(options.rotation_profile));
+    let current = super::probe::run_user_rotation_probe_with_request_and_preferences(
         blueprint,
         operbox,
         instances,
         table,
         options.top_k,
-        options.rotation_profile,
+        rotation_request,
         &options.system_preferences,
         options.fiammetta_enable,
         options.support_combinations_enable,

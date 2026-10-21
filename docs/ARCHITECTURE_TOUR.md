@@ -35,7 +35,7 @@ Worker `plan.compute` ─────┼─→ commands/plan_compute.rs::compute
 legacy Worker `plan` ──────┘
                                 │
                                 └─ run_user_rotation_probe_with_profile_and_preferences
-                                     └─ schedule_timed_rotation
+                                     └─ schedule_timed_rotation_request
                                           └─ selected profile assignment path
                                                ├─ build_plan
                                                └─ run_shift_pipeline
@@ -56,7 +56,7 @@ legacy Worker `plan` ──────┘
 [commands/plan.rs](../crates/infra-cli/src/commands/plan.rs) 的 argv `plan`、[commands/serve.rs](../crates/infra-cli/src/commands/serve.rs) 的内联 `plan.compute` 和 legacy Worker `plan` 都汇合到 [commands/plan_compute.rs](../crates/infra-cli/src/commands/plan_compute.rs) 的 `compute_plan`：
 
 1. adapter 校验 argv、文件路径或内联 JSON，并准备 `BaseBlueprint`、`OperBox`、instances 与 skill table。
-2. `compute_plan` 调用一次 `run_user_rotation_probe_with_profile_and_preferences`；该 probe 通过所选 `TimedRotationProfile` 进入 `schedule_timed_rotation`。
+2. `compute_plan` 调用一次 `run_user_rotation_probe_with_profile_and_preferences`；该 probe 通过所选 `TimedRotationProfile` 进入 `schedule_timed_rotation_request`。
 3. 请求 profile 时，`build_box_profile_from_current_probe` 消费该 probe，不再运行第二次用户 rotation；profile 仍独立评估固定 baseline。
 4. 请求 MAA 时，`build_from_team_rotation` 消费同一 `current.rotation`。
 5. argv `plan` 用同一 rotation 打印文本并总是写 profile；`plan.compute` 返回 profile、rotation summary、MAA，并以同一请求的 operbox/layout 附加结构化练卡建议；legacy Worker `plan` 返回 rotation 摘要，并按请求生成文件输出。
@@ -80,7 +80,7 @@ OperBoxEntry
 
 ## 5. `build_plan`：结构选型 + late competitive 比较，输出统一 Plan
 
-`schedule_timed_rotation` 先分派具名 profile；需要构造 Peak 的路径会调用 `assign_shift_with_plan_skip`，后者在 [layout/assign.rs](../crates/infra-core/src/layout/assign.rs) 中先调用 [orchestrate/select.rs](../crates/infra-core/src/layout/orchestrate/select.rs) 的 `build_plan`。默认 ABC 经由该路径生成 peak assignment 与 plan。
+`schedule_timed_rotation_request` 按 `TimedRotationRequest` 分派具名 profile 或普通二/三班时长 topology；需要构造 Peak 的路径会调用 `assign_shift_with_plan_skip`，后者在 [layout/assign.rs](../crates/infra-core/src/layout/assign.rs) 中先调用 [orchestrate/select.rs](../crates/infra-core/src/layout/orchestrate/select.rs) 的 `build_plan`。默认 ABC 经由该路径生成 peak assignment 与 plan。
 
 `build_plan` 按唯一优先级顺序合并三段来源：
 
@@ -181,9 +181,9 @@ L3 不是候选选型器。它只在真实三人组和 producer manifest 已确�
 
 中枢搜索当前使用 `ControlInjectRawSumV0` 局部 policy。它是对贸易/制造注入分量的具名排序 heuristic，不是全基建产出函数，也不能冒充贸易最终效率。数值定义见 [EFFICIENCY_MODEL.md](EFFICIENCY_MODEL.md) 与 [SCORING_MODEL.md](SCORING_MODEL.md)。
 
-## 11. `schedule_timed_rotation`：分派具名定时轮换
+## 11. `schedule_timed_rotation_request`：分派具名或泛型定时轮换
 
-[schedule/team_rotation.rs](../crates/infra-core/src/schedule/team_rotation.rs) 以闭集 profile 分派默认 ABC `12/6/6`、ABC `12/12/12`、二班 `12/12`、菲亚 `8/8/4/4` 和深海 `7/5/7/5`。`schedule_team_rotation` 只是默认 ABC 的薄包装；下面步骤描述 ABC 路径：
+[schedule/team_rotation.rs](../crates/infra-core/src/schedule/team_rotation.rs) 以 `TimedRotationRequest` 分派六个具名 profile，或普通二/三班的 topology 与有序时长。`schedule_team_rotation` 只是默认 ABC 的薄包装；下面步骤描述 ABC 路径：
 
 独立求解的主力/替补各自保留 `AssignmentPlan`，最终 `shifts[].plan_index` 指向真实 owner。CLI 和 MAA 不参与 profile 选型或机制重算。
 

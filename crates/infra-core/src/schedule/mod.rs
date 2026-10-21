@@ -12,8 +12,9 @@ mod team_rotation;
 pub use base_rotation::evaluate_base_assignment_efficiencies;
 pub use rotation_types::{
     DailyProduction, DailyTotals, DormRestPlan, DroneAction, FacilityHalf, FiammettaShiftAction,
-    RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies, ShiftTransition, TeamAssignment,
-    TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
+    GenericRotationTiming, RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies,
+    ShiftTransition, TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult,
+    TimedRotationProfile, TimedRotationRequest,
 };
 pub use shift_bind::{
     align_shift_binds_in_halves, bound_operator_names, operator_in_shift, resting_shift_index,
@@ -21,5 +22,5 @@ pub use shift_bind::{
 };
 pub use team_rotation::{
     assert_final_rotation_invariants, fiammetta_return_priority, operator_team_map,
-    schedule_team_rotation, schedule_timed_rotation, FIAMMETTA_RETURN_PRIORITY,
+    schedule_team_rotation, schedule_timed_rotation_request, FIAMMETTA_RETURN_PRIORITY,
 };

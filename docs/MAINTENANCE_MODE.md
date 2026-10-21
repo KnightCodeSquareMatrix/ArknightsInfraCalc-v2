@@ -23,7 +23,7 @@
 | 体系核心缺失或容量冲突 | `build_plan`、`execute_plan`、`used`、rotation admission | 单房 solver |
 | 单房效率错误 | `resolve_base` → 对应 trade/manufacture/power solver | CLI 参数 |
 | 跨设施资源/中枢错误 | `resolve_base`、control/global_resource/cross_facility | 贸易房局部加法 |
-| 轮换、休息、bind 错误 | `schedule_timed_rotation`、shift bind、final invariant | MAA exporter |
+| 轮换、休息、bind 错误 | `schedule_timed_rotation_request`、shift bind、final invariant | MAA exporter |
 | assignment 正确、MAA 字段错误 | `export/maa.rs` | 上游重求解 |
 | profile 错误 | `box_profile` 投影与 baseline | rotation 选择 |
 

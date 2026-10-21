@@ -32,6 +32,7 @@ fn manu_recipe_fill_priority(recipe: RecipeKind) -> u8 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn assign_manufacture_lines(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -350,7 +351,7 @@ pub(crate) fn assign_manu_room_with_anchors(
         }
     }
 
-    let filler_need = capacity - anchors.len();
+    let requested_filler_count = capacity - anchors.len();
     let general_pool = filter_general_manufacture_search_pool(pool);
     let fillers: Vec<ManuPoolEntry> = general_pool
         .entries
@@ -364,33 +365,51 @@ pub(crate) fn assign_manu_room_with_anchors(
         })
         .cloned()
         .collect();
-    let filler_need = filler_need.min(fillers.len());
-
-    let mut combos = Vec::new();
-    collect_manu_filler_combos(&fillers, filler_need, 0, &mut Vec::new(), &mut combos);
-    let Some(hit) = combos
-        .into_iter()
-        .filter_map(|mut combo| {
-            let mut entries = anchors.clone();
-            entries.append(&mut combo);
-            score_manu_entries(&entries, table, layout, options, recipe, room_level)
-        })
-        .max_by(|a, b| {
-            a.final_efficiency
-                .cmp(&b.final_efficiency)
-                .then_with(|| {
-                    a.storage
-                        .gold
-                        .max(a.storage.battle_record)
-                        .cmp(&b.storage.gold.max(b.storage.battle_record))
-                })
-                .then_with(|| b.names.cmp(&a.names))
-        })
-    else {
-        return Err(Error::msg(format!(
-            "manufacture {} produced no anchored hit",
-            room_id.0
-        )));
+    let max_filler_count = requested_filler_count.min(fillers.len());
+    let allow_preclaim_shortfall = options.preclaimed_factory_room.as_ref() == Some(room_id);
+    let mut best_hit = None;
+    let filler_counts: Vec<usize> = if allow_preclaim_shortfall {
+        (0..=max_filler_count).rev().collect()
+    } else {
+        vec![max_filler_count]
+    };
+    for filler_count in filler_counts {
+        let mut combos = Vec::new();
+        collect_manu_filler_combos(&fillers, filler_count, 0, &mut Vec::new(), &mut combos);
+        best_hit = combos
+            .into_iter()
+            .filter_map(|mut combo| {
+                let mut entries = anchors.clone();
+                entries.append(&mut combo);
+                score_manu_entries(&entries, table, layout, options, recipe, room_level)
+            })
+            .max_by(|a, b| {
+                a.final_efficiency
+                    .cmp(&b.final_efficiency)
+                    .then_with(|| {
+                        a.storage
+                            .gold
+                            .max(a.storage.battle_record)
+                            .cmp(&b.storage.gold.max(b.storage.battle_record))
+                    })
+                    .then_with(|| b.names.cmp(&a.names))
+            });
+        if best_hit.is_some() {
+            break;
+        }
+    }
+    let Some(hit) = best_hit else {
+        return Err(if allow_preclaim_shortfall {
+            Error::ManufactureAnchoredCompletionInfeasible {
+                room_id: room_id.0.clone(),
+                anchor_count: anchors.len(),
+            }
+        } else {
+            Error::msg(format!(
+                "manufacture {} produced no anchored hit",
+                room_id.0
+            ))
+        });
     };
     let mut commit_pool = pool.clone();
     for anchor in anchors {

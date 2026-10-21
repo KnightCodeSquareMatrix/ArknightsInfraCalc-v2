@@ -15,7 +15,7 @@ use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{default_layout_243_path, default_operbox_full_e2_path, OperBox};
 use infra_core::schedule::{
     DailyTotals, RoomEfficiencyLine, ShiftEfficiencies, TeamLabel, TeamRotationReport,
-    TimedRotationProfile,
+    TimedRotationProfile, TimedRotationRequest,
 };
 use infra_core::skill_table::{default_skill_table_path, SkillTable};
 use infra_core::training_advice::{
@@ -28,7 +28,7 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 6;
+const PLAN_SCHEMA_VERSION: u32 = 7;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
@@ -43,6 +43,8 @@ const PLAN_COMPUTE_SCHEMA_V5_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v5.schema.json");
 const PLAN_COMPUTE_SCHEMA_V6_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v6.schema.json");
+const PLAN_COMPUTE_SCHEMA_V7_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v7.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
@@ -70,12 +72,14 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_schema_v4: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V4_JSON)?,
         plan_schema_v5: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V5_JSON)?,
         plan_schema_v6: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V6_JSON)?,
+        plan_schema_v7: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V7_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
         plan_contract_sha256_v4: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V4_JSON),
         plan_contract_sha256_v5: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V5_JSON),
         plan_contract_sha256_v6: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V6_JSON),
+        plan_contract_sha256_v7: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V7_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -122,7 +126,9 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
 }
 
 fn print_serve_usage() {
-    eprintln!("  plan.compute v6: options.support_combinations_enable boolean, default false");
+    eprintln!(
+        "  plan.compute v7: options.rotation accepts a legacy profile or topology + shift_hours"
+    );
     eprintln!("  plan: support_combinations_enable boolean, default false");
     eprintln!("Usage:");
     eprintln!("  infra-cli serve");
@@ -222,12 +228,14 @@ struct ServeState {
     plan_schema_v4: JSONSchema,
     plan_schema_v5: JSONSchema,
     plan_schema_v6: JSONSchema,
+    plan_schema_v7: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
     plan_contract_sha256_v3: String,
     plan_contract_sha256_v4: String,
     plan_contract_sha256_v5: String,
     plan_contract_sha256_v6: String,
+    plan_contract_sha256_v7: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -286,6 +294,32 @@ fn validate_plan_compute_params(
     Err(Error::msg(format!(
         "plan.compute params do not match schema v{schema_version}: {details}"
     )))
+}
+
+pub(super) fn validate_recorded_plan_compute_params(
+    params: &serde_json::Value,
+) -> Result<(), Error> {
+    let schema_version = params
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| Error::msg("plan.compute params require schema_version"))?
+        as u32;
+    let schema_json = match schema_version {
+        1 => PLAN_COMPUTE_SCHEMA_V1_JSON,
+        2 => PLAN_COMPUTE_SCHEMA_V2_JSON,
+        3 => PLAN_COMPUTE_SCHEMA_V3_JSON,
+        4 => PLAN_COMPUTE_SCHEMA_V4_JSON,
+        5 => PLAN_COMPUTE_SCHEMA_V5_JSON,
+        6 => PLAN_COMPUTE_SCHEMA_V6_JSON,
+        7 => PLAN_COMPUTE_SCHEMA_V7_JSON,
+        other => {
+            return Err(Error::msg(format!(
+                "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
+            )))
+        }
+    };
+    let schema = compile_plan_compute_schema(schema_json)?;
+    validate_plan_compute_params(&schema, params, schema_version)
 }
 
 fn spawn_background_bake() -> Option<thread::JoinHandle<()>> {
@@ -491,7 +525,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6],
+                "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6, 7],
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,
@@ -500,6 +534,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                     "4": state.plan_contract_sha256_v4,
                     "5": state.plan_contract_sha256_v5,
                     "6": state.plan_contract_sha256_v6,
+                    "7": state.plan_contract_sha256_v7,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -674,6 +709,7 @@ fn handle_plan_compute(
         4 => &state.plan_schema_v4,
         5 => &state.plan_schema_v5,
         6 => &state.plan_schema_v6,
+        7 => &state.plan_schema_v7,
         other => {
             return Err(Error::msg(format!(
                 "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
@@ -717,7 +753,7 @@ fn handle_plan_compute(
             operbox_label: &operbox_label,
             baseline_operbox: None,
             top_k: params.options.top,
-            rotation_profile: params.options.rotation,
+            rotation_request: params.options.rotation,
             system_preferences: &params.options.system_preferences,
             maa_title: params.options.maa_title.as_deref(),
             fiammetta_candidates_out: None,
@@ -871,7 +907,7 @@ fn handle_plan(state: &ServeState, params: serde_json::Value) -> Result<serde_js
             operbox_label: &operbox_label,
             baseline_operbox: Some(&baseline_path),
             top_k: top,
-            rotation_profile,
+            rotation_request: TimedRotationRequest::Named(rotation_profile),
             system_preferences: &system_preferences,
             maa_title: params.maa_title.as_deref(),
             fiammetta_candidates_out: None,
@@ -1132,6 +1168,37 @@ mod tests {
         value["schema_version"] = serde_json::json!(3);
         value["options"]["unexpected"] = serde_json::json!(true);
         assert!(validate_plan_compute_params(&schema, &value, 3).is_err());
+    }
+
+    #[test]
+    fn plan_compute_schema_v7_accepts_topology_objects_and_legacy_profiles() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V7_JSON).unwrap();
+        for rotation in [
+            serde_json::json!({"topology":"main_backup","shift_hours":[8,16]}),
+            serde_json::json!({"topology":"abc","shift_hours":[6,12,6]}),
+            serde_json::json!("main_backup_12_12"),
+        ] {
+            let mut value = valid_compute_params();
+            value["schema_version"] = serde_json::json!(7);
+            value["options"]["rotation"] = rotation.clone();
+
+            validate_plan_compute_params(&schema, &value, 7).unwrap();
+            validate_recorded_plan_compute_params(&value).unwrap();
+            let params: PlanComputeParams = serde_json::from_value(value).unwrap();
+            let expected: TimedRotationRequest = serde_json::from_value(rotation).unwrap();
+            assert_eq!(params.options.rotation, expected);
+        }
+    }
+
+    #[test]
+    fn plan_compute_v6_remains_closed_to_generic_topology_objects() {
+        let schema = compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V6_JSON).unwrap();
+        let mut value = valid_compute_params();
+        value["schema_version"] = serde_json::json!(6);
+        value["options"]["rotation"] =
+            serde_json::json!({"topology":"main_backup","shift_hours":[8,16]});
+
+        assert!(validate_plan_compute_params(&schema, &value, 6).is_err());
     }
 
     #[test]

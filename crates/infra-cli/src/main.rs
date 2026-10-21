@@ -79,7 +79,7 @@ fn run() -> Result<(), Error> {
 
 fn print_usage() {
     eprintln!("Usage:");
-    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-8844|abyssal-7575>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
+    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
     eprintln!(
         "      [--profile-out <file.json>] [--rotation-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--assert-invariants] [--json]"
     );
@@ -95,14 +95,14 @@ fn print_usage() {
     eprintln!("  infra-cli bake [all|trade|manufacture] [--out <dir>] [--limit-per-signature <n>]");
     eprintln!("  infra-cli bake validate [--out <dir>]");
     eprintln!("  infra-cli bake verify [--out <dir>]");
-    eprintln!("  infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <profile>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]");
+    eprintln!("  infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]");
     eprintln!("  infra-cli serve");
     eprintln!("  infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]");
     eprintln!("  infra-cli layout analyze --layout <path> --operbox <path> [--baseline <operbox>] [--top <n>] [-o profile.json] [--json]");
     eprintln!(
         "  infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
     );
-    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
+    eprintln!("  infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]");
     eprintln!("  infra-cli profile layout-full [--layout <path>] [--operbox <path>] [--top <n>] [--runs <n>] [--label <name>]");
     eprintln!("  infra-cli profile analyze-compare [--layout <path>] [--operbox <path>] [--schedule <path>] [--runs <n>]");
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");

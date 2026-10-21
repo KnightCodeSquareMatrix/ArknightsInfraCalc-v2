@@ -22,7 +22,7 @@
 | 干员未进池、tier、设施技能或 buff_id 错误 | [`INPUT.SKILL_MAPPING`](生成索引/Agent路由.md#inputskill_mapping) | [技能到房间结算](调用链/技能到房间结算.md) → 输入与技能映射 |
 | 候选未考虑、排序/剪枝或 Bake 异常 | [`SEARCH.BAKE`](生成索引/Agent路由.md#searchbake) | [候选搜索与 Bake](调用链/候选搜索与Bake.md) → 候选搜索模块 |
 | ETA、宿舍、办公室或会客室异常 | [`MOOD.SUPPORT`](生成索引/Agent路由.md#moodsupport) | [跨设施状态刷新](调用链/跨设施状态刷新.md) → 心情与辅助设施 |
-| 班次互斥、profile、休息或绑定错误 | [`ROTATION.TIMED`](生成索引/Agent路由.md#rotationtimed) | [定时轮换](调用链/定时轮换.md) → 排班模块 |
+| 班次互斥、profile、休息或绑定错误；泡泡/火神未进首个源石房 | [`ROTATION.TIMED`](生成索引/Agent路由.md#rotationtimed) | [定时轮换](调用链/定时轮换.md) → [源石优先](泡泡火神源石优先.md) → 排班模块 |
 | MAA 字段或房间与 assignment 不同 | [`EXPORT.MAA`](生成索引/Agent路由.md#exportmaa) | [MAA 导出](调用链/MAA导出.md) → 导出接口 |
 | 线上反馈、debug bundle 或求解错误 | [`DIAGNOSTICS.DEBUG`](生成索引/Agent路由.md#diagnosticsdebug) | [debug 与验证](调用链/debug与验证.md) → 错误诊断接口 |
 | 回归 case 失败或需要保留失败证据 | [`VERIFY.REGRESSION`](生成索引/Agent路由.md#verifyregression) | [debug 与验证](调用链/debug与验证.md) → 求解错误台账 |
@@ -34,7 +34,7 @@
 |---|---|---|
 | `infra-cli plan` / `serve` | [CLI 与 Worker](接口/CLI与Worker.md) → [plan 请求](调用链/plan请求.md) | `crates/infra-cli/src/main.rs::run` → `commands/plan_compute.rs::compute_plan` |
 | `layout test` / `layout eval` | [输入输出与兼容](接口/输入输出与兼容.md) → [跨设施状态刷新](调用链/跨设施状态刷新.md) | `crates/infra-cli/src/commands/layout.rs` |
-| `layout team-rotation` | [排班与轮换](模块/排班与轮换.md) → [定时轮换](调用链/定时轮换.md) | `crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation` |
+| `layout team-rotation` | [排班与轮换](模块/排班与轮换.md) → [定时轮换](调用链/定时轮换.md) | `crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation_request` |
 | `debug rerun` | [错误与诊断](接口/错误与诊断.md) → [debug 与验证](调用链/debug与验证.md) | `crates/infra-cli/src/commands/debug.rs::debug_cmd` |
 | `bake` / `profile` / `verify` | [候选搜索与 Bake](模块/候选搜索与Bake.md) → [debug 与验证](调用链/debug与验证.md) | 对应 `crates/infra-cli/src/commands/*.rs` |
 
@@ -91,6 +91,7 @@
 | `schedule.fiammetta-candidates` | [菲亚梅塔候选分支适配层设计](菲亚梅塔候选分支适配层设计.md) |
 | `schedule.mode` | [排班模式](排班模式.md) |
 | `schedule.timed` | [定时换班](定时换班.md) |
+| `schedule.timed.originium-pair` | [泡泡火神源石优先](泡泡火神源石优先.md) |
 | `scoring.efficiency` | [直接效率与整数结算](EFFICIENCY_MODEL.md) |
 | `scoring.policy` | [搜索评分与排序策略](SCORING_MODEL.md) |
 | `system.automation-group` | [自动化组体系论证（公孙长乐 × InfraCalc）](公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md) |
@@ -109,5 +110,6 @@
 | [ADR 0008: 办公室连续工作时长预算与通用轮换准入](ADR/0008-office-continuous-work-budget.md) | `proposed` | 规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则 |
 | [ADR 0009: 无人机效率转化与产出核算](ADR/0009-drone-efficiency-conversion-and-production-accounting.md) | `accepted` | 记录发电效率、无人机库存、目标分配与制造贸易额外产出的统一裁决 |
 | [ADR 0010: 菲亚梅塔固定策略分支与完整排班重算接入](ADR/0010-fiammetta-fixed-branches-full-recompute.md) | `superseded` | 菲亚梅塔作为阶段间固定策略分支选择器，N/A/B 三候选各自从同一 Box 完整重算整个排班；候选不预排锁房，靠 L1 shortcut 自然选中 + trade_core 偏好改写上班优先级，菲亚对固定两人各换一次心情，按完整周期收益选 winner |
+| [ADR 0011: 二/三班通用时长排班与泡泡火神全局强制](ADR/0011-generic-two-three-shift-rotation.md) | `accepted` | 为普通二班/三班增加输入时长并共用终态收尾，在全部该范围内强制泡泡/火神源石预占 |
 | [ADR 0012: 十月排班需求的分项交付判定与关闭边界](ADR/0012-october-rotation-delivery-boundaries.md) | `accepted` | 记录六项十月排班需求在各自语义边界内的交付状态，不把局部实现或工作区草稿合并宣称为整体完成 |
 <!-- END GENERATED DECISIONS -->

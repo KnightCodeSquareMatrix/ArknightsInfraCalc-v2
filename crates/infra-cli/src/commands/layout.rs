@@ -19,7 +19,6 @@ use infra_core::manufacture::ManuSearchRecipeMode;
 use infra_core::operbox::OperBox;
 use infra_core::pool::{build_manufacture_pool, build_trade_pool};
 use infra_core::power::{solve_power, PowerRoomInput};
-use infra_core::schedule::schedule_timed_rotation;
 use infra_core::search::{
     search_manufacture_triples, search_trade_triples, ManuSearchOptions, TradeSearchOptions,
 };
@@ -48,7 +47,7 @@ pub fn layout_cmd(args: &[String]) -> Result<(), Error> {
                 "       infra-cli layout eval --layout <path> --operbox <path> --assignment <path> [--text | --explain-json]"
             );
             eprintln!(
-                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <2|3|12/12/12|24/24|fiammetta-8844|abyssal-7575>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
+                "       infra-cli layout team-rotation --layout <path> --operbox <path> [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--no-fiammetta] [--prefix-shadow-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--maa-title <title>] [-o <file.csv>] [--text|--json]"
             );
             Err(Error::msg(format!(
                 "unknown layout command {:?}",
@@ -153,7 +152,7 @@ fn should_emit_primary_output(out: &OutputOptions, wrote_maa: bool) -> bool {
 }
 
 fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
-    let rotation_profile = super::timed_rotation_profile_from_args(args)?;
+    let rotation_request = super::timed_rotation_request_from_args(args)?;
     let out = OutputOptions::from_args(args);
     let layout_path = layout_path_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
@@ -180,13 +179,13 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
         fiammetta_candidates_out: fiammetta_candidates_out_from_args(args),
         ..AssignBaseOptions::default()
     };
-    let report = schedule_timed_rotation(
+    let report = infra_core::schedule::schedule_timed_rotation_request(
         &blueprint,
         &operbox,
         &instances,
         &table,
         &options,
-        rotation_profile,
+        rotation_request.clone(),
     )?;
 
     if let Some(path) = prefix_shadow_out_from_args(args)? {
@@ -199,7 +198,7 @@ fn layout_team_rotation_cmd(args: &[String]) -> Result<(), Error> {
             instances: &instances,
             table: &table,
             baseline_options: &options,
-            profile: rotation_profile,
+            rotation_request,
             baseline: &report,
         });
     }

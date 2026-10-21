@@ -23,7 +23,7 @@ MAA export 是最终状态的序列化适配器，不重新选择机制、岗位
 | `rooms.recycle` | 已投影 | 每个蓝图回收站写一个 `MaaRecycleSlot`，字段仅为 `operators`，成员直接来自该房间的最终 `BaseAssignment`。 |
 | `operatorsA` / `operatorsB` | 不在本次输出范围 | MAA 的 A/B 是训练室字段；回收站遵循普通 `operators` 名单，不沿用旧 A/B 草案。 |
 
-官方 [MAA 基建排班协议示例](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/zh-cn/protocol/base-scheduling-schema.md#L153-L156) 中，`rooms.recycle` 是与制造、贸易同级的数组，示例项为 `{ "operators": ["芬", "克洛丝"] }`；固定版本 [schema](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/maa-infra.schema.json#L189-L195) 将其限制为最多一个普通房间项。该协议仅证明所查上游提交的字段，不代表所有 MAA 发布版 GUI 均已启用；export 只投影、不补选。回收站轮换设计及新旧协议差异见 [回收站设计稿 §7](../TODO/回收站选人放人与轮换设计.md#7-plancompute-v6-契约)。
+官方 [MAA 基建排班协议示例](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/zh-cn/protocol/base-scheduling-schema.md#L153-L156) 中，`rooms.recycle` 是与制造、贸易同级的数组，示例项为 `{ "operators": ["芬", "克洛丝"] }`；固定版本 [schema](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/maa-infra.schema.json#L189-L195) 将其限制为最多一个普通房间项。该协议仅证明所查上游提交的字段，不代表所有 MAA 发布版 GUI 均已启用；export 只投影、不补选。回收站轮换设计及新旧协议差异见 [回收站设计稿 §7](../TODO/回收站选人放人与轮换设计.md#7-plancompute-v8-契约)。
 
 ## 写出链
 
@@ -42,9 +42,11 @@ MAA export 是最终状态的序列化适配器，不重新选择机制、岗位
 
 plan --maa-out 和 serve plan.compute 都走这条路径。save 负责创建父目录、pretty JSON 和写入；失败返回带路径的错误。
 
+本次 WIP 的 named rotation 与 `rooms.recycle` 投影为已提交行为；generic 二/三班的实际时长、planTimes 和 v7 请求也已提交，但尚未 fresh release 验收，不能据此保证所有部署版本或 MAA 执行端支持。
+
 ## 顶层字段
 
-MaaSchedule 的 author/title/description/id/buildingType 来自 MaaExportOptions。planTimes 显式选项优先，否则由当前 profile 决定：ABC 为 3班，主备为 2班，菲亚插班/深海为 4班。独立龙巫二班已删除；旧请求在导出前失败，不会映射到主备。plans 与 TeamRotationReport.shifts 一一对应，顺序不重排。
+MaaSchedule 的 author/title/description/id/buildingType 来自 MaaExportOptions。planTimes 显式选项优先，否则由兼容 profile 策略串决定：ABC/generic ABC 为 3班，主备/generic main-backup 为 2班，菲亚插班/深海为 4班。泛型每计划名称、描述与下次执行间隔使用最终实际时长。二班休班队宿舍 autofill 使用显式 MAA 策略事实，不以 `plan_times()=="2班"` 充当策略 owner。独立龙巫二班已删除；旧请求在导出前失败，不会映射到主备。plans 与 TeamRotationReport.shifts 一一对应，顺序不重排。
 
 MaaPlan 包含 name、description、Fiammetta、drones 和 rooms。rooms 使用 MAA 固定名称：trading、manufacture、power、dormitory、control、meeting、hire、processing、recycle。通用 `MaaRoomSlot` 承载已有房间字段；回收站用专属 `MaaRecycleSlot`，仅序列化 `operators`，没有 A/B、product 或额外补位行为。布局不含回收站时 `recycle` 省略；含回收站时按蓝图顺序写出其最终名单。
 

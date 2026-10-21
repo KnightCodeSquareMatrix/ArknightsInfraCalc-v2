@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use infra_core::instances::{default_instances_path, OperatorInstances};
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
-use infra_core::schedule::{TeamRotationReport, TimedRotationProfile};
+use infra_core::schedule::{TeamRotationReport, TimedRotationProfile, TimedRotationRequest};
 use infra_core::skill_table::{data_path, default_skill_table_path, SkillTable};
 use infra_core::Error;
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,7 @@ struct RerunInputSummary {
     layout_sha256: String,
     operbox_sha256: String,
     top_k: OptionWithOrigin<usize>,
-    rotation: OptionWithOrigin<TimedRotationProfile>,
+    rotation: OptionWithOrigin<TimedRotationRequest>,
 }
 
 #[derive(Debug, Serialize)]
@@ -209,7 +209,7 @@ pub fn debug_cmd(args: &[String]) -> Result<(), Error> {
     match args.first().map(String::as_str) {
         Some("rerun") => rerun_cmd(&args[1..]),
         _ => Err(Error::msg(
-            "usage: infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <profile>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]",
+            "usage: infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]",
         )),
     }
 }
@@ -280,14 +280,10 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
         support_combinations_enable,
         labels,
     ) = if request.method == "plan.compute" {
+        super::serve::validate_recorded_plan_compute_params(&request.params)
+            .map_err(|error| Error::msg(format!("recorded plan.compute contract: {error}")))?;
         let params: PlanComputeParams = serde_json::from_value(request.params.clone())
             .map_err(|error| Error::msg(format!("plan.compute params parse: {error}")))?;
-        if !(1..=6).contains(&params.schema_version) {
-            return Err(Error::msg(format!(
-                "unsupported plan schema version {}; expected 1 through 6",
-                params.schema_version
-            )));
-        }
         let labels = (
             params
                 .labels
@@ -334,7 +330,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
 
     let top_k = rerun_top_k(args, &bundle)?;
     let rotation = rerun_rotation(args, &bundle)?;
-    if rotation.value == TimedRotationProfile::FiammettaWitch12_12 {
+    if rotation.value.profile() == TimedRotationProfile::FiammettaWitch12_12 {
         return Err(Error::msg(
             "unsupported rotation profile fiammetta_witch_12_12: this product mode was removed; no fallback is performed",
         ));
@@ -354,7 +350,7 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
             operbox_label: &labels.1,
             baseline_operbox: None,
             top_k: top_k.value,
-            rotation_profile: rotation.value,
+            rotation_request: rotation.value,
             system_preferences: &system_preferences,
             maa_title: None,
             fiammetta_candidates_out: None,
@@ -623,7 +619,7 @@ fn rerun_top_k(
 fn rerun_rotation(
     args: &[String],
     bundle: &DebugBundleEnvelope,
-) -> Result<OptionWithOrigin<TimedRotationProfile>, Error> {
+) -> Result<OptionWithOrigin<TimedRotationRequest>, Error> {
     if let Some(value) = optional_value(args, "--rotation") {
         return Ok(OptionWithOrigin {
             value: value.parse()?,
@@ -639,14 +635,14 @@ fn rerun_rotation(
         })
     }) {
         // serve 侧协议名（serde wire name）只通过 serde 反序列化，不走 CLI FromStr 别名。
-        let profile = TimedRotationProfile::deserialize(value)?;
+        let rotation = TimedRotationRequest::deserialize(value)?;
         return Ok(OptionWithOrigin {
-            value: profile,
+            value: rotation,
             origin: "recorded_request",
         });
     }
     Ok(OptionWithOrigin {
-        value: TimedRotationProfile::default(),
+        value: TimedRotationRequest::default(),
         origin: "historical_default",
     })
 }
@@ -1487,7 +1483,7 @@ mod tests {
                 origin: "recorded_request",
             },
             rotation: OptionWithOrigin {
-                value: TimedRotationProfile::default(),
+                value: TimedRotationRequest::default(),
                 origin: "historical_default",
             },
         };

@@ -5,7 +5,7 @@
 > 当前真源：docs/文档生命周期.md；docs/INDEX.md；docs/排班模式.md；docs/定时换班.md
 > 摘要：为排班统一内核重构建立可分片检索、单向引用和事实状态可辨识的项目文档结构
 > 代码范围：docs/**；crates/infra-core/src/schedule/**；crates/infra-core/src/export/**；crates/infra-cli/src/commands/**
-> 代码锚点：docs/INDEX.md；docs/文档生命周期.md；crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation
+> 代码锚点：docs/INDEX.md；docs/文档生命周期.md；crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation_request
 > 关联链路：docs/调用链/定时轮换.md；docs/调用链/MAA导出.md
 > 核验基线：HEAD 824ce88 + target/codex-runs/rotation-unification-20261018/status-before.txt
 
