@@ -18,7 +18,7 @@
 
 ## 具名跨域 policy
 
-`ScoringPolicyId::TradeManufactureWeightedEfficiencyV1` 是动态 producer 联合候选使用的显式 policy：比较已完整 resolve 的候选时，对贸易和制造效率分别乘权后相加。当前该 policy 和排班周期汇总仍读取纸面效率，尚未统一到单房 `final_efficiency`；这是开放项，不得当成已贯通。权重属于排序 policy，不改变任何单房结算。控制中枢使用 `ControlFillPolicy` 的顺序和 ledger 事实，不调用跨域总分。
+`ScoringPolicyId::TradeManufactureWeightedEfficiencyV1` 是动态 producer 联合候选使用的显式 policy：比较已完整 resolve 的候选时，对贸易和制造效率分别乘权后相加。该跨域 policy 仍读取纸面效率，尚未统一到单房 `final_efficiency`；这是开放项，不得当成已贯通。排班逐房及周期汇总已使用 Trade `final_efficiency`（纸面总效率乘单位产出倍率），不改变既有房间求和与分钟权重。权重属于排序 policy，不改变任何单房结算。控制中枢使用 `ControlFillPolicy` 的顺序和 ledger 事实，不调用跨域总分。
 
 候选闭包中的 `upper_bound`、prefix pruning 和 shadow branch 是剪枝或 policy；除非对应代码证明等价，文档和输出不得称为全局最优。完整池模式只改变候选范围，不改变域公式。
 

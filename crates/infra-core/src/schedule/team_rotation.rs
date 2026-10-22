@@ -43,6 +43,7 @@ use crate::tier::PromotionTier;
 use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput};
 use crate::trade::legality::witch_core_station_ok;
 use crate::trade::shortcut::match_witch_group_shortcut;
+use crate::trade::solve_trade_with_shift;
 
 use super::base_rotation::evaluate_base_assignment_efficiencies;
 use super::control_rotation::{assert_final_control_rotation, ControlRotationClosure};
@@ -4678,6 +4679,7 @@ fn assert_final_rotation_invariants_with_mood(
     if report.profile == TimedRotationProfile::MainBackup24_24 {
         assert_main_backup_24_24_final_state(blueprint, instances, table, report, initial_mood)?;
     }
+    assert_rotation_trade_final_efficiency(blueprint, operbox, instances, table, report)?;
     crate::layout::assert_support_combination_policy(&report.assignment_plans, &report.shifts)?;
     assert_recycle_rotation(blueprint, operbox, instances, table, report)?;
     for shift in &report.shifts {
@@ -5423,6 +5425,196 @@ fn assert_final_rotation_invariants_with_mood(
         ));
     }
     Ok(())
+}
+
+/// Recompute the final Trade efficiency from each final assignment without using
+/// the report's snapshots or the normal aggregate evaluator. This keeps the
+/// final report check independent of the value it is proving.
+fn assert_rotation_trade_final_efficiency(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    report: &TeamRotationReport,
+) -> Result<()> {
+    for shift in &report.shifts {
+        let expected = if shift.transition == ShiftTransition::FiammettaOnly {
+            let action = shift.fiammetta.as_ref().ok_or_else(|| {
+                Error::msg(format!(
+                    "assert-invariants rotation_trade_final_efficiency: FiammettaOnly shift {} has no action",
+                    shift.index + 1
+                ))
+            })?;
+            let first = direct_trade_final_facts(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &shift.assignment,
+                8.0,
+            )?;
+            let total = direct_trade_final_facts(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &shift.assignment,
+                16.0,
+            )?;
+            total
+                .into_iter()
+                .map(|(room_id, (count, total_final, total_paper))| {
+                    let (_, first_final, first_paper) = first
+                        .get(&room_id)
+                        .copied()
+                        .ok_or_else(|| {
+                            Error::msg(format!(
+                                "assert-invariants rotation_trade_final_efficiency: room {} missing 8h fact in shift {}",
+                                room_id,
+                                shift.index + 1
+                            ))
+                        })?;
+                    let (final_efficiency, paper_efficiency) =
+                        if room_id == action.room_id.0 {
+                            (first_final, first_paper)
+                        } else {
+                            (
+                                continuation_efficiency(total_final, first_final),
+                                continuation_efficiency(total_paper, first_paper),
+                            )
+                        };
+                    Ok((room_id, (count, final_efficiency, paper_efficiency)))
+                })
+                .collect::<Result<HashMap<_, _>>>()?
+        } else {
+            direct_trade_final_facts(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &shift.assignment,
+                shift.duration_hours,
+            )?
+        };
+
+        let mut actual = HashMap::new();
+        for line in &shift.efficiencies.room_lines {
+            if blueprint
+                .room(&RoomId::new(line.room_id.clone()))
+                .is_some_and(|room| room.kind == FacilityKind::TradePost)
+            {
+                if actual.insert(line.room_id.clone(), line).is_some() {
+                    return Err(Error::msg(format!(
+                        "assert-invariants rotation_trade_final_efficiency: duplicate room {} in shift {}",
+                        line.room_id,
+                        shift.index + 1
+                    )));
+                }
+            }
+        }
+        if actual.len() != expected.len()
+            || actual.len() != blueprint.rooms_of(FacilityKind::TradePost).len()
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants rotation_trade_final_efficiency: incomplete roomset in shift {}",
+                shift.index + 1
+            )));
+        }
+        let mut expected_sum = Efficiency::ZERO;
+        for (room_id, (count, final_efficiency, paper_efficiency)) in expected {
+            let line = actual.get(&room_id).ok_or_else(|| {
+                Error::msg(format!(
+                    "assert-invariants rotation_trade_final_efficiency: missing room {} in shift {}",
+                    room_id,
+                    shift.index + 1
+                ))
+            })?;
+            if line.operator_count != count
+                || line.trade_efficiency != final_efficiency
+                || line.final_efficiency != final_efficiency
+                || line.total_efficiency != paper_efficiency
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants rotation_trade_final_efficiency: room {} mismatch in shift {} (count {}, trade {}, final {}, paper {}) {}",
+                    room_id,
+                    shift.index + 1,
+                    line.operator_count,
+                    line.trade_efficiency,
+                    line.final_efficiency,
+                    line.total_efficiency,
+                    paper_efficiency,
+                )));
+            }
+            expected_sum += final_efficiency;
+        }
+        if shift.efficiencies.trade_efficiency != expected_sum {
+            return Err(Error::msg(format!(
+                "assert-invariants rotation_trade_final_efficiency: domain sum mismatch in shift {} (got {}, expected {})",
+                shift.index + 1,
+                shift.efficiencies.trade_efficiency,
+                expected_sum
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn direct_trade_final_facts(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    assignment: &BaseAssignment,
+    shift_hours: f64,
+) -> Result<HashMap<String, (usize, Efficiency, Efficiency)>> {
+    let mut clean = assignment.clone();
+    clear_production_efficiencies(blueprint, &mut clean);
+    let durin_plan = operbox.durin_dorm_planning_count(instances);
+    let resolved = resolve_base(
+        blueprint,
+        &clean,
+        Some(instances),
+        Some(table),
+        24.0,
+        Some(durin_plan),
+    )?;
+    let mut facts = HashMap::new();
+    let gold_production_lines = resolved.gold_manu_line_count();
+    for room in &resolved.trade_rooms {
+        let (final_efficiency, paper_efficiency) = if room.operators.is_empty() {
+            (Efficiency::ZERO, Efficiency::ZERO)
+        } else {
+            let input = TradeRoomInput {
+                level: room.level,
+                operators: room.operators.clone(),
+                order_count: None,
+                mood: 24.0,
+                gold_production_lines: Some(gold_production_lines),
+                durin_virtual_lines: None,
+                human_fireworks: None,
+                layout: Arc::new(room.layout.clone()),
+                active_order_kind: room.order,
+            };
+            let result = solve_trade_with_shift(&input, table, shift_hours)?;
+            (
+                result.efficiency.final_efficiency,
+                result.efficiency.paper.paper_efficiency,
+            )
+        };
+        if facts
+            .insert(
+                room.id.0.clone(),
+                (room.operators.len(), final_efficiency, paper_efficiency),
+            )
+            .is_some()
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants rotation_trade_final_efficiency: duplicate resolved room {}",
+                room.id.0
+            )));
+        }
+    }
+    Ok(facts)
 }
 
 fn validate_gold_flow_recommendation_anchors(

@@ -23,7 +23,7 @@
 
 ## 各域边界
 
-贸易：`TradeEfficiency` 同时保存纸面效率（基础效率 + 干员技能效率 + 全局加成）、订单机制等效项、单位产出和 `final_efficiency`。搜索主键是 `TradeSearchHit::final_efficiency`，实际日产出再乘 `unit_trade_per_day × shift_hours / 24`；shortcut 的单位产出不能再把 `mechanic_equivalent_efficiency` 乘一次。
+贸易：`TradeEfficiency` 同时保存纸面效率（基础效率 + 干员技能效率 + 全局加成）、订单机制等效项、单位产出和 `final_efficiency = total_efficiency × unit_output_multiplier`。搜索及排班逐房、周期效率均使用 `final_efficiency`；实际日产出沿原单位产出结算，不把该 final 再乘入产出。shortcut 的单位产出不能再把 `mechanic_equivalent_efficiency` 乘一次。
 
 制造：单站总效率 = 基础效率 + 干员技能效率 + 全局加成；基础效率已包含非红脸干员的进驻增量。多线由 `ManuEfficiencyBreakdown::aggregate_lines` 按线数加权。仓库上限和产出分解与效率分开保存。
 
@@ -31,7 +31,7 @@
 
 ## 排班与输出
 
-`RoomEfficiencySnapshot` 是 assignment 上已结算的事实。出口层优先消费快照；只有手写 assignment 没有快照时才调用对应域 solver 重算。`ShiftEfficiencies` 依据班次分钟数做整数比例折算，`DailyTotals` 分开报告各域。若需要组合排序，必须引用 [`SCORING_MODEL.md`](SCORING_MODEL.md) 中具名 policy。
+`RoomEfficiencySnapshot` 是 assignment 上已结算的事实。出口层优先消费快照；只有手写 assignment 没有快照时才调用对应域 solver 重算。Trade 排班从完整快照的 `trade_total_efficiency × trade_unit_output_multiplier` 恢复 final（不依赖不序列化的 legacy `trade_final_efficiency`），否则由 Trade solver 重算；`line.total_efficiency` 仍是纸面值。`ShiftEfficiencies` 依据班次分钟数做整数比例折算，`DailyTotals` 分开报告各域。跨域组合排序及完整 Plan 对比仍须另有明确 policy / proof，不由本次周期汇总贯通推出。若需要组合排序，必须引用 [`SCORING_MODEL.md`](SCORING_MODEL.md) 中具名 policy。
 
 ## 诊断
 

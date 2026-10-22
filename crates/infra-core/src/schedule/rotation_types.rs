@@ -27,7 +27,7 @@ pub struct RoomEfficiencyLine {
     /// Paper total before an order-specific multiplier is applied.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     pub total_efficiency: Efficiency,
-    /// Legacy compatibility field; current direct efficiency is `total_efficiency`.
+    /// Final direct efficiency after the trade unit-output multiplier.
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
     #[serde(skip_serializing)]
     pub final_efficiency: Efficiency,

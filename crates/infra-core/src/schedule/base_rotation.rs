@@ -49,8 +49,14 @@ pub fn evaluate_base_assignment_efficiencies(
             .efficiency_in(&room.id)
             .filter(|s| s.has_trade_breakdown())
         {
-            trade_efficiency += snapshot.trade_total_efficiency;
-            line.trade_efficiency = snapshot.trade_total_efficiency;
+            let final_efficiency = snapshot.trade_total_efficiency
+                * if snapshot.trade_unit_output_multiplier.is_zero() {
+                    Efficiency::ONE
+                } else {
+                    snapshot.trade_unit_output_multiplier
+                };
+            trade_efficiency += final_efficiency;
+            line.trade_efficiency = final_efficiency;
             line.trade_skill_efficiency = snapshot.trade_skill_efficiency;
             line.operator_efficiency = snapshot.trade_skill_efficiency;
             line.base_efficiency = snapshot.trade_base_efficiency;
@@ -61,7 +67,7 @@ pub fn evaluate_base_assignment_efficiencies(
                 snapshot.trade_unit_output_multiplier
             };
             line.total_efficiency = snapshot.trade_paper_efficiency;
-            line.final_efficiency = snapshot.trade_total_efficiency;
+            line.final_efficiency = final_efficiency;
             line.trade_output_per_day = snapshot.trade_output_per_day;
             line.gold_consumption_per_day = snapshot.gold_consumption_per_day;
             line.originium_shards_per_day = snapshot.trade_originium_shards_per_day;
@@ -90,14 +96,14 @@ pub fn evaluate_base_assignment_efficiencies(
                 active_order_kind: room.order,
             };
             let result = solve_trade_with_shift(&input, table, shift_hours)?;
-            trade_efficiency += result.efficiency.total_efficiency;
-            line.trade_efficiency = result.efficiency.total_efficiency;
+            trade_efficiency += result.efficiency.final_efficiency;
+            line.trade_efficiency = result.efficiency.final_efficiency;
             line.trade_skill_efficiency = result.efficiency.paper.skill_efficiency;
             line.operator_efficiency = result.efficiency.paper.skill_efficiency;
             line.base_efficiency = result.efficiency.paper.base_efficiency;
             line.global_efficiency = result.efficiency.paper.control_efficiency;
             line.total_efficiency = result.efficiency.paper.paper_efficiency;
-            line.final_efficiency = result.efficiency.total_efficiency;
+            line.final_efficiency = result.efficiency.final_efficiency;
             line.trade_output_per_day = result.production.unit.unit_trade_per_day
                 * result.efficiency.total_efficiency.as_f64();
             line.gold_consumption_per_day = result.production.unit.gold_consumption_per_day
