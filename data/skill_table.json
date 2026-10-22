@@ -6028,6 +6028,8 @@
     { "id": "control_mp_cost[011]", "skill_name": "捍卫之道", "facility": "control", "tier": "tier_up", "atoms": [] },
     { "id": "control_mp_cost[013]", "skill_name": "点滴关照", "facility": "control", "tier": "tier_0", "atoms": [] },
     { "id": "control_mp_cost[014]", "skill_name": "总工程师", "facility": "control", "tier": "tier_0", "atoms": [] },
+    { "id": "control_mp_cost_double[000]", "skill_name": "魔王传承", "facility": "control", "tier": "tier_0", "atoms": [] },
+    { "id": "control_mp_cost_double[001]", "skill_name": "“未完的故事”", "facility": "control", "tier": "tier_up", "atoms": [] },
     {
       "id": "control_upMeetingSpeed[000]",
       "skill_name": "世事洞明",

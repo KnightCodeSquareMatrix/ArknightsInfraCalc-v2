@@ -97,6 +97,10 @@
     { "name": "维什戴尔", "elite": 2, "skill": "巴别塔之帜", "value": 0.1, "covers": ["power", "factory", "trade", "office", "reception"], "bonus_when_control_contains": "魔王", "bonus_value": 0.1, "note": "取最高不叠加；魔王同在中枢时额外+0.1(总0.2)" },
     { "name": "重岳", "elite": 2, "skill": "孤光共照", "value": 0.05, "covers": ["power", "factory", "trade", "office", "reception"], "note": "取最高不叠加；每20人间烟火额外+0.05，见 todo" }
   ],
+  "control_pair_recovery": [
+    { "source": "魔王", "partner": "阿米娅", "elite": 0, "value": 0.05, "source_buff_id": "control_mp_cost_double[000]" },
+    { "source": "魔王", "partner": "阿米娅", "elite": 2, "value": 0.1, "source_buff_id": "control_mp_cost_double[001]" }
+  ],
   "control_smiley_recovery": {
     "per_provider": 0.05,
     "note": "笑脸类：每名在岗提供者使中枢全员恢复+0.05，可叠加；精二玛恩纳在岗时把这些提供者的总和扩散到生产/功能设施。",
@@ -262,7 +266,6 @@
     { "category": "control_internal_recovery_count", "text": "陈 德才兼备 / 早露 学生会会长 / 灵知 幕后指挥：每对应派系干员使中枢所有+0.05" },
     { "category": "control_internal_recovery_count", "text": "异格者(寒芒克洛丝;濯尘芙蓉;炎狱炎熔) / 彩虹小队(战车;灰烬;闪击;霜华)：每对应干员使中枢所有+0.05(彩六4人示例达0.8)" },
     { "category": "control_internal_recovery_conditional", "text": "老鲤 浮生得闲：当与阿同中枢，中枢所有恢复+0.25" },
-    { "category": "control_pair_recovery", "text": "魔王 魔王传承 E0 / “未完的故事” E2：当与阿米娅同中枢，自身与阿米娅恢复+0.05/+0.1" },
     { "category": "dorm_directional_recovery", "text": "摩根：推进之王对该宿舍格拉斯哥帮干员恢复额外+0.3" },
     { "category": "dorm_directional_recovery", "text": "黑 沏茶 / 特米米 烤肉大师 / 深靛 毒剂师之友 / 寒檀 降生于冰寒 / 新约能天使 圣城趣事通 E2：单回+0.55，对特定目标额外+0.45" },
     { "category": "dorm_threshold_recovery", "text": "撷英调香师 净化呼吸 E2：心情20以下干员恢复额外+0.1" },

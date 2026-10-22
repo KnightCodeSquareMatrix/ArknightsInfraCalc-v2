@@ -101,6 +101,7 @@ pub(crate) fn operator_net_drain_with_sui(
     x -= model.control_uniform_recovery_for_facility(inputs.facility, inputs.control_ops);
     x += self_skill_delta(model, inputs, sui_member);
     x += room_skill_delta(model, inputs);
+    x -= model.control_pair_recovery_for_operator(inputs.facility, inputs.name, inputs.room_ops);
     x.max(0.0)
 }
 
