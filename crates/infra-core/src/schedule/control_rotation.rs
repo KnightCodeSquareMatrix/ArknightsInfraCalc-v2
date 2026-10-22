@@ -594,6 +594,7 @@ pub(crate) fn assert_control_mood_mapping(
     report: &TeamRotationReport,
 ) -> Result<()> {
     let model = crate::mood::default_mood_model()?;
+    assert_control_pair_recovery(blueprint, instances, table, report, model)?;
     let rainbow = model
         .control_faction_recovery
         .iter()
@@ -704,6 +705,189 @@ pub(crate) fn assert_control_mood_mapping(
                 return Err(Error::msg(
                     "assert-invariants control_mood_projection: unresolved actual source",
                 ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn assert_control_pair_recovery(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    report: &TeamRotationReport,
+    model: &crate::mood::MoodModel,
+) -> Result<()> {
+    use crate::tier::PromotionTier;
+
+    let contract = [
+        (
+            0,
+            0.05,
+            "control_mp_cost_double[000]",
+            "魔王传承",
+            PromotionTier::Tier0,
+        ),
+        (
+            2,
+            0.1,
+            "control_mp_cost_double[001]",
+            "“未完的故事”",
+            PromotionTier::TierUp,
+        ),
+    ];
+    if model.control_pair_recovery.len() != contract.len() {
+        return Err(Error::msg(
+            "assert-invariants control_pair_recovery: expected exactly two mappings",
+        ));
+    }
+    for (elite, value, id, skill_name, tier) in contract {
+        for name in ["魔王", "阿米娅"] {
+            let instance = instances.get(name, tier);
+            let resolved = instances.resolve_control_buff_ids(name, tier);
+            if instance.is_none_or(|instance| {
+                instance.name != name
+                    || instance.tier != tier.as_str()
+                    || !instance.facilities.contains_key("control")
+            }) || resolved.is_empty()
+                || resolved.iter().any(|buff| {
+                    table
+                        .get(buff)
+                        .is_none_or(|skill| skill.facility != "control")
+                        || buff == "control_mp_aegir2[010]"
+                })
+                || instances
+                    .tags_for(name, tier)
+                    .iter()
+                    .any(|tag| tag == "cc.g.abyssal")
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants control_pair_recovery: invalid pair instance or abyssal post-delta premise for {name}@{}",
+                    tier.as_str()
+                )));
+            }
+        }
+        let entries: Vec<_> = model
+            .control_pair_recovery
+            .iter()
+            .filter(|entry| {
+                entry.source == "魔王"
+                    && entry.partner == "阿米娅"
+                    && entry.elite == elite
+                    && entry.source_buff_id == id
+                    && entry.value.is_finite()
+                    && (entry.value - value).abs() <= 1e-9
+            })
+            .collect();
+        let buffs = instances.resolve_control_buff_ids("魔王", tier);
+        if entries.len() != 1
+            || instances.get("魔王", tier).is_none()
+            || buffs.iter().filter(|buff| buff.as_str() == id).count() != 1
+            || contract.iter().any(|(_, _, other, _, _)| {
+                *other != id && buffs.iter().any(|buff| buff.as_str() == *other)
+            })
+            || table.get(id).is_none_or(|skill| {
+                skill.skill_name != skill_name
+                    || skill.facility != "control"
+                    || skill.tier != tier.as_str()
+                    || !skill.atoms.is_empty()
+            })
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants control_pair_recovery: mapping/instance/delegation mismatch for {id}"
+            )));
+        }
+    }
+
+    let mut disabled = model.clone();
+    disabled.control_pair_recovery.clear();
+    for shift in &report.shifts {
+        let enabled_eta =
+            crate::mood::shift_eta_with_instances(model, blueprint, &shift.assignment, instances);
+        let disabled_eta = crate::mood::shift_eta_with_instances(
+            &disabled,
+            blueprint,
+            &shift.assignment,
+            instances,
+        );
+        if enabled_eta.per_op.len() != disabled_eta.per_op.len() {
+            return Err(Error::msg(
+                "assert-invariants control_pair_recovery: working membership changed",
+            ));
+        }
+        for room in &blueprint.rooms {
+            let operators = shift.assignment.operators_in(&room.id);
+            let room_ops: Vec<_> = operators
+                .iter()
+                .map(|op| (op.name.clone(), op.elite))
+                .collect();
+            // Independent witness: only the actual pair's two members benefit;
+            // the source's E2 replaces E0 regardless of the partner's progress.
+            let pair_value = if room.kind == FacilityKind::ControlCenter
+                && operators.iter().any(|op| op.name == "阿米娅")
+            {
+                operators
+                    .iter()
+                    .find(|op| op.name == "魔王")
+                    .map_or(0.0, |op| if op.elite >= 2 { 0.1 } else { 0.05 })
+            } else {
+                0.0
+            };
+            for op in operators {
+                let expected = if matches!(op.name.as_str(), "魔王" | "阿米娅") {
+                    pair_value
+                } else {
+                    0.0
+                };
+                let projected =
+                    model.control_pair_recovery_for_operator(room.kind, &op.name, &room_ops);
+                if !projected.is_finite() || (projected - expected).abs() > 1e-9 {
+                    return Err(Error::msg(format!(
+                        "assert-invariants control_pair_recovery: shift {} room {} operator {} projection {projected}, expected {expected}",
+                        shift.index + 1, room.id.0, op.name
+                    )));
+                }
+                if crate::mood::facility_key(room.kind).is_none() {
+                    continue;
+                }
+                let enabled = enabled_eta.operator_in_room(&op.name, &room.id.0);
+                let baseline = disabled_eta.operator_in_room(&op.name, &room.id.0);
+                let (Some(enabled), Some(baseline)) = (enabled, baseline) else {
+                    return Err(Error::msg(format!(
+                        "assert-invariants control_pair_recovery: missing contextual ETA for {} in {}",
+                        op.name, room.id.0
+                    )));
+                };
+                if !baseline.drain_per_hour.is_finite()
+                    || !enabled.drain_per_hour.is_finite()
+                    || baseline.drain_per_hour < 0.0
+                    || enabled.drain_per_hour < 0.0
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants control_pair_recovery: nonfinite or negative contextual drain for {} in {}",
+                        op.name, room.id.0
+                    )));
+                }
+                let expected_drain = (baseline.drain_per_hour - expected).max(0.0);
+                if (enabled.drain_per_hour - expected_drain).abs() > 1e-9 {
+                    return Err(Error::msg(format!(
+                        "assert-invariants control_pair_recovery: shift {} room {} operator {} contextual drain {}, disabled {}, recovery {expected}, expected {expected_drain}",
+                        shift.index + 1, room.id.0, op.name,
+                        enabled.drain_per_hour, baseline.drain_per_hour
+                    )));
+                }
+                for eta in [enabled, baseline] {
+                    if eta.workable_hours.is_none() != (eta.drain_per_hour == 0.0)
+                        || eta
+                            .workable_hours
+                            .is_some_and(|hours| !hours.is_finite() || hours <= 0.0)
+                    {
+                        return Err(Error::msg(format!(
+                            "assert-invariants control_pair_recovery: contextual ETA zero-drain contract failed for {} in {}",
+                            op.name, room.id.0
+                        )));
+                    }
+                }
             }
         }
     }

@@ -16,7 +16,7 @@ pub use eta::{
 };
 pub use recovery::{dorm_recovery_rates, DormOccupant};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -87,6 +87,16 @@ pub struct ControlGlobalRecovery {
     pub bonus_when_control_contains: Option<String>,
     #[serde(default)]
     pub bonus_value: f64,
+}
+
+/// Recovery limited to a source and partner actually sharing a control room.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ControlPairRecovery {
+    pub source: String,
+    pub partner: String,
+    pub elite: u8,
+    pub value: f64,
+    pub source_buff_id: String,
 }
 
 /// 中枢候选补位使用的全局回复摘要。它不参与实际心情结算，实际取最高仍由
@@ -186,6 +196,8 @@ pub struct MoodModel {
     #[serde(default)]
     pub control_global_recovery: Vec<ControlGlobalRecovery>,
     #[serde(default)]
+    pub control_pair_recovery: Vec<ControlPairRecovery>,
+    #[serde(default)]
     pub control_smiley_recovery: Option<ControlSmileyRecovery>,
     #[serde(default)]
     pub control_faction_recovery: Vec<ControlFactionRecovery>,
@@ -194,6 +206,36 @@ pub struct MoodModel {
 }
 
 impl MoodModel {
+    pub(crate) fn control_pair_recovery_for_operator(
+        &self,
+        facility: FacilityKind,
+        beneficiary: &str,
+        room_ops: &[(String, u8)],
+    ) -> f64 {
+        if facility != FacilityKind::ControlCenter {
+            return 0.0;
+        }
+        let mut active: HashMap<(&str, &str), &ControlPairRecovery> = HashMap::new();
+        for entry in &self.control_pair_recovery {
+            if (beneficiary != entry.source && beneficiary != entry.partner)
+                || !room_ops
+                    .iter()
+                    .any(|(name, elite)| name == &entry.source && *elite >= entry.elite)
+                || !room_ops.iter().any(|(name, _)| name == &entry.partner)
+            {
+                continue;
+            }
+            let key = (entry.source.as_str(), entry.partner.as_str());
+            if active
+                .get(&key)
+                .is_none_or(|current| entry.elite > current.elite)
+            {
+                active.insert(key, entry);
+            }
+        }
+        active.values().map(|entry| entry.value).sum()
+    }
+
     /// Actual uniform recovery in one facility, without occupancy or individual
     /// drain. Search consumes the same projection as settlement.
     pub(crate) fn control_uniform_recovery_for_facility(
@@ -250,6 +292,26 @@ impl MoodModel {
             return Err(Error::msg(
                 "mood_model.rest_threshold must be >= 0 and < mood_cap",
             ));
+        }
+        let mut pair_tiers = HashSet::new();
+        for entry in &self.control_pair_recovery {
+            if entry.source.trim().is_empty()
+                || entry.partner.trim().is_empty()
+                || entry.source == entry.partner
+                || entry.source_buff_id.trim().is_empty()
+                || entry.elite > 2
+                || !entry.value.is_finite()
+                || entry.value < 0.0
+            {
+                return Err(Error::msg(
+                    "mood_model.control_pair_recovery: invalid entry",
+                ));
+            }
+            if !pair_tiers.insert((&entry.source, &entry.partner, entry.elite)) {
+                return Err(Error::msg(
+                    "mood_model.control_pair_recovery: duplicate source/partner/elite",
+                ));
+            }
         }
         Ok(())
     }
