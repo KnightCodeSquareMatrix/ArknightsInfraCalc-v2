@@ -124,11 +124,67 @@ fn weighted_for_cycle(efficiency: Efficiency, hours: f64, cycle_hours: f64) -> E
     efficiency.scale_ratio(minutes, cycle_minutes)
 }
 
+// Both ratio terms and the denominator's rounding adjustment must fit in i64
+// for any i32 efficiency; the extra two units leave that sign/rounding margin.
+const MAX_ROTATION_DURATION_MINUTES: i64 = i64::MAX / (i32::MAX as i64 + 2);
+
+pub(crate) fn validate_rotation_duration_hours(
+    hours: impl IntoIterator<Item = f64>,
+) -> Result<f64> {
+    let max_minutes = MAX_ROTATION_DURATION_MINUTES as f64;
+    let mut shift_count = 0usize;
+    let mut cycle_hours = 0.0f64;
+    let mut cycle_minutes = 0i64;
+    for hours in hours {
+        shift_count += 1;
+        if !hours.is_finite() || hours <= 0.0 {
+            return Err(Error::msg(format!(
+                "rotation_duration_input: shift {shift_count} must be finite and positive"
+            )));
+        }
+        let minutes = (hours * 60.0).round();
+        if !minutes.is_finite() || minutes > max_minutes {
+            return Err(Error::msg(format!(
+                "rotation_duration_input: shift {shift_count} minutes exceed arithmetic safety limit"
+            )));
+        }
+        if minutes < 1.0 {
+            return Err(Error::msg(format!(
+                "rotation_duration_input: shift {shift_count} must round to at least one minute"
+            )));
+        }
+        cycle_minutes = cycle_minutes
+            .checked_add(minutes as i64)
+            .filter(|minutes| *minutes <= MAX_ROTATION_DURATION_MINUTES)
+            .ok_or_else(|| {
+                Error::msg("rotation_duration_input: cycle minutes exceed arithmetic safety limit")
+            })?;
+        cycle_hours += hours;
+    }
+    if shift_count == 0 {
+        return Err(Error::msg(
+            "rotation_duration_input: at least one shift is required",
+        ));
+    }
+    if !cycle_hours.is_finite() || cycle_hours <= 0.0 {
+        return Err(Error::msg(
+            "rotation_duration_input: cycle duration must be finite and positive",
+        ));
+    }
+    let rounded_cycle_minutes = (cycle_hours * 60.0).round();
+    if !rounded_cycle_minutes.is_finite() || rounded_cycle_minutes > max_minutes {
+        return Err(Error::msg(
+            "rotation_duration_input: cycle minutes exceed arithmetic safety limit",
+        ));
+    }
+    Ok(cycle_hours)
+}
+
 /// 一组须同队、同休的轮换干员（运行期，来自统一 plan）。
 #[derive(Debug, Clone)]
 pub struct RuntimeShiftBind {
     pub operators: Vec<String>,
-    /// αβγ 周期内上岗班次数（当前固定 12h+6h+6h → 2）。
+    /// 轮换周期内上岗班次数（由 Plan 绑定声明，不从固定时序推导）。
     pub on_shifts: u8,
     pub off_shifts: u8,
 }
@@ -291,6 +347,20 @@ impl TimedRotationRequest {
         }
     }
 
+    pub(crate) fn validate_duration_input(&self) -> Result<()> {
+        match self {
+            Self::Named(_) => Ok(()),
+            Self::Generic(GenericRotationTiming::MainBackup { shift_hours }) => {
+                validate_rotation_duration_hours(*shift_hours)?;
+                Ok(())
+            }
+            Self::Generic(GenericRotationTiming::Abc { shift_hours }) => {
+                validate_rotation_duration_hours(*shift_hours)?;
+                Ok(())
+            }
+        }
+    }
+
     /// Preserve the established profile strategy for named sequences supplied
     /// through the generic syntax; other duration sequences stay generic.
     pub fn preserve_named_timing(self) -> Self {
@@ -360,6 +430,7 @@ impl std::str::FromStr for TimedRotationRequest {
                 )))
             }
         };
+        request.validate_duration_input()?;
         Ok(request.preserve_named_timing())
     }
 }
