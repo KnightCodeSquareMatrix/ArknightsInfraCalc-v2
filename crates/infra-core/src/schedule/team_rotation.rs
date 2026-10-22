@@ -55,9 +55,10 @@ use super::room_admission::{
 };
 use super::rotation_scoring::{clear_production_efficiencies, rescore_standard_shifts};
 use super::rotation_types::{
-    DailyProduction, DailyTotals, DormRestPlan, DroneAction, FacilityHalf, FiammettaShiftAction,
-    RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies, ShiftTransition, TeamAssignment,
-    TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
+    validate_rotation_duration_hours, DailyProduction, DailyTotals, DormRestPlan, DroneAction,
+    FacilityHalf, FiammettaShiftAction, RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies,
+    ShiftTransition, TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult,
+    TimedRotationProfile,
 };
 use super::shift_bind::{shift_binds_from_plan, team_of_operator, validate_final_bind_cycle};
 
@@ -3026,10 +3027,8 @@ fn finalize_timed_rotation(
     mut report: TeamRotationReport,
 ) -> Result<TeamRotationReport> {
     let total_started = Instant::now();
-    let cycle_hours: f64 = report.shifts.iter().map(|shift| shift.duration_hours).sum();
-    if cycle_hours <= 0.0 {
-        return Err(Error::msg("rotation cycle must have positive duration"));
-    }
+    let cycle_hours =
+        validate_rotation_duration_hours(report.shifts.iter().map(|shift| shift.duration_hours))?;
     let total_before = crate::profile::solver_perf_snapshot();
     let stage_started = Instant::now();
     let stage_before = total_before;
@@ -4663,6 +4662,9 @@ fn assert_final_rotation_invariants_with_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
+    let cycle_hours =
+        validate_rotation_duration_hours(report.shifts.iter().map(|shift| shift.duration_hours))
+            .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     assert_final_originium_pair(blueprint, operbox, report)?;
     validate_final_bind_cycle(blueprint, report)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
@@ -4744,12 +4746,6 @@ fn assert_final_rotation_invariants_with_mood(
                 )));
             }
         }
-    }
-    let cycle_hours: f64 = report.shifts.iter().map(|shift| shift.duration_hours).sum();
-    if cycle_hours <= 0.0 {
-        return Err(Error::msg(
-            "assert-invariants rotation_cycle_weighting failed: empty or zero-duration cycle",
-        ));
     }
     let expected_rest_warnings = rotation_cycle_rest_warnings(blueprint, report);
     let actual_rest_warnings: Vec<_> = report
@@ -6852,6 +6848,7 @@ pub fn schedule_timed_rotation_request(
     options: &AssignBaseOptions,
     request: super::rotation_types::TimedRotationRequest,
 ) -> Result<TeamRotationReport> {
+    request.validate_duration_input()?;
     let request = request.preserve_named_timing();
     let started = Instant::now();
     let before = crate::profile::solver_perf_snapshot();
