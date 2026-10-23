@@ -2486,6 +2486,7 @@ fn validate_fiammetta_continuous_targets(
         profile,
         TimedRotationProfile::Abc12_6_6
             | TimedRotationProfile::Abc12_12_12
+            | TimedRotationProfile::GenericAbc
             | TimedRotationProfile::Fiammetta8_8_4_4
     ) {
         return Ok(());
@@ -2995,6 +2996,7 @@ fn complete_timed_rotation(
     instances: &OperatorInstances,
     table: &SkillTable,
     initial_mood: f64,
+    fiammetta_enable: bool,
     mut report: TeamRotationReport,
 ) -> Result<TeamRotationReport> {
     for shift in &mut report.shifts {
@@ -3016,7 +3018,15 @@ fn complete_timed_rotation(
     ) {
         return Err(Error::with_rotation(&report, error));
     }
-    finalize_timed_rotation(blueprint, operbox, instances, table, initial_mood, report)
+    finalize_timed_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        initial_mood,
+        fiammetta_enable,
+        report,
+    )
 }
 
 fn finalize_timed_rotation(
@@ -3025,6 +3035,7 @@ fn finalize_timed_rotation(
     instances: &OperatorInstances,
     table: &SkillTable,
     initial_mood: f64,
+    fiammetta_enable: bool,
     mut report: TeamRotationReport,
 ) -> Result<TeamRotationReport> {
     let total_started = Instant::now();
@@ -3220,6 +3231,7 @@ fn finalize_timed_rotation(
         table,
         &report,
         initial_mood,
+        Some(fiammetta_enable),
     );
     stage_after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_solver_stage(
@@ -4652,7 +4664,33 @@ pub fn assert_final_rotation_invariants(
             "assert-invariants unsupported rotation profile fiammetta_witch_12_12: this product mode was removed",
         ));
     }
-    assert_final_rotation_invariants_with_mood(blueprint, operbox, instances, table, report, 24.0)
+    assert_final_rotation_invariants_with_mood(
+        blueprint, operbox, instances, table, report, 24.0, None,
+    )
+}
+
+pub fn assert_final_rotation_invariants_for_request(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    report: &TeamRotationReport,
+    fiammetta_enable: bool,
+) -> Result<()> {
+    if report.profile == TimedRotationProfile::FiammettaWitch12_12 {
+        return Err(Error::msg(
+            "assert-invariants unsupported rotation profile fiammetta_witch_12_12: this product mode was removed",
+        ));
+    }
+    assert_final_rotation_invariants_with_mood(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        report,
+        24.0,
+        Some(fiammetta_enable),
+    )
 }
 
 fn assert_final_rotation_invariants_with_mood(
@@ -4662,6 +4700,7 @@ fn assert_final_rotation_invariants_with_mood(
     table: &SkillTable,
     report: &TeamRotationReport,
     initial_mood: f64,
+    fiammetta_enable: Option<bool>,
 ) -> Result<()> {
     let cycle_hours =
         validate_rotation_duration_hours(report.shifts.iter().map(|shift| shift.duration_hours))
@@ -4669,6 +4708,20 @@ fn assert_final_rotation_invariants_with_mood(
     assert_final_originium_pair(blueprint, operbox, report)?;
     validate_final_bind_cycle(blueprint, report)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+    if fiammetta_enable == Some(false) {
+        if let Some((shift_index, action)) = report
+            .shifts
+            .iter()
+            .enumerate()
+            .find_map(|(index, shift)| shift.fiammetta.as_ref().map(|action| (index, action)))
+        {
+            return Err(Error::msg(format!(
+                "assert-invariants fiammetta_disabled failed in shift {}: action for {} is present while disabled",
+                shift_index + 1,
+                action.target
+            )));
+        }
+    }
     validate_fiammetta_action_policy(report.profile, &report.shifts)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     let mood_model = default_mood_model()?;
@@ -6631,8 +6684,44 @@ pub fn schedule_abc_rotation_candidates(
             ))
         }
     };
+    schedule_abc_rotation_candidates_with_timing(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        shift_hours,
+        profile,
+        None,
+    )
+}
+
+fn schedule_abc_rotation_candidates_with_timing(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    shift_hours: [f64; 3],
+    profile: TimedRotationProfile,
+    input_order_offset: Option<usize>,
+) -> Result<TeamRotationReport> {
     let a_eligible = fiammetta_a_eligible(blueprint, operbox);
     let b_eligible = fiammetta_b_eligible(blueprint, operbox, instances, table)?;
+    let finish_candidate = |mut report: TeamRotationReport, fiammetta_enable: bool| {
+        if let Some(offset) = input_order_offset {
+            restore_input_shift_order(&mut report, offset)?;
+        }
+        complete_timed_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options.mood,
+            fiammetta_enable,
+            report,
+        )
+    };
     if !options.fiammetta_enable || !operbox.owns(FIAMMETTA_NAME) || (!a_eligible && !b_eligible) {
         let mut baseline_options = options.clone();
         baseline_options.fiammetta_enable = false;
@@ -6650,8 +6739,7 @@ pub fn schedule_abc_rotation_candidates(
             &[],
             true,
         )?;
-        let report =
-            complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)?;
+        let report = finish_candidate(report, false)?;
         write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &report);
         return Ok(report);
     }
@@ -6672,9 +6760,7 @@ pub fn schedule_abc_rotation_candidates(
         &[],
         true,
     )
-    .and_then(|baseline| {
-        complete_timed_rotation(blueprint, operbox, instances, table, options.mood, baseline)
-    });
+    .and_then(|baseline| finish_candidate(baseline, false));
     let (mut winner, baseline_error) = match baseline_result {
         Ok(baseline) => {
             write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &baseline);
@@ -6744,16 +6830,7 @@ pub fn schedule_abc_rotation_candidates(
                     &a_targets,
                     &mut candidate.shifts,
                 )
-                .and_then(|_| {
-                    complete_timed_rotation(
-                        blueprint,
-                        operbox,
-                        instances,
-                        table,
-                        options.mood,
-                        candidate,
-                    )
-                });
+                .and_then(|_| finish_candidate(candidate, true));
                 match attached {
                     Ok(candidate) => {
                         write_candidate_report(
@@ -6825,16 +6902,7 @@ pub fn schedule_abc_rotation_candidates(
                     &relaxed,
                     &mut candidate.shifts,
                 )
-                .and_then(|_| {
-                    complete_timed_rotation(
-                        blueprint,
-                        operbox,
-                        instances,
-                        table,
-                        options.mood,
-                        candidate,
-                    )
-                });
+                .and_then(|_| finish_candidate(candidate, true));
                 match attached {
                     Ok(candidate) => {
                         write_candidate_report(
@@ -6963,13 +7031,21 @@ fn attach_fiammetta_target_actions(
     }
     let mood_model = default_mood_model()?;
     let action_budget = slots.len();
+    let action_indices = if matches!(
+        profile,
+        TimedRotationProfile::GenericMainBackup | TimedRotationProfile::GenericAbc
+    ) {
+        slots
+    } else {
+        (0..shifts.len()).collect()
+    };
     let mut used_slots = 0usize;
     let mut consumed_shifts = HashSet::new();
     for target in targets {
         if used_slots >= action_budget {
             break;
         }
-        let Some(slot) = (0..shifts.len()).find(|slot| {
+        let Some(slot) = action_indices.iter().copied().find(|slot| {
             !consumed_shifts.contains(slot)
                 && shifts[*slot].assignment.iter_rooms().any(|room| {
                     blueprint.room(&room.room_id).is_some_and(|spec| {
@@ -7179,8 +7255,15 @@ fn schedule_timed_rotation_inner(
             None,
         ),
     };
-    let mut report =
-        complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)?;
+    let mut report = complete_timed_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options.mood,
+        options.fiammetta_enable,
+        report,
+    )?;
     if let Some(diagnostic) = fiammetta_24_diagnostic {
         append_main_backup_24_fiammetta_warning(&mut report, diagnostic);
     }
@@ -7313,7 +7396,15 @@ fn schedule_generic_main_backup(
         Err(error) => return Err(error),
     };
     restore_input_shift_order(&mut report, alpha_offset)?;
-    complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)
+    complete_timed_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options.mood,
+        options.fiammetta_enable,
+        report,
+    )
 }
 
 fn schedule_generic_abc(
@@ -7325,22 +7416,16 @@ fn schedule_generic_abc(
     input_hours: [f64; 3],
 ) -> Result<TeamRotationReport> {
     let (ordered_hours, alpha_offset) = rotate_abc_shift_hours_to_alpha(input_hours);
-    let mut report = schedule_abc_rotation(
+    schedule_abc_rotation_candidates_with_timing(
         blueprint,
         operbox,
         instances,
         table,
         options,
         ordered_hours,
-        true,
-        AbyssalShortShiftPolicy::Disabled,
         TimedRotationProfile::GenericAbc,
-        &[],
-        &[],
-        true,
-    )?;
-    restore_input_shift_order(&mut report, alpha_offset)?;
-    complete_timed_rotation(blueprint, operbox, instances, table, options.mood, report)
+        Some(alpha_offset),
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

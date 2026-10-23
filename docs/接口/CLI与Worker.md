@@ -39,7 +39,9 @@
 - stderr：`layout=`、`operbox=`、阶段性能记录以及 profile/rotation/MAA 文件路径；
 - 文件：profile 默认写到 operbox 同目录，`--profile-out` 可覆盖；`--maa-out`、`--rotation-out`、`--output-dir` 显式请求才写入。
 
-`--prefer rosemary_perception=recruit_refresh_witch` 已不再是可用值；当前感知体系可选 `recruit_refresh`、`high_perception`、`recruit_refresh_zilan`，不可行时仍按规则回退。独立“龙巫二班”已删除，CLI 不列出其旧别名，显式传入旧 wire/别名会返回不支持错误，不降级成主备排班。`--assert-invariants` 在共享编排完成后调用 `assert_final_rotation_invariants`，其中包含最终班次黑键与巫恋贸易禁同站及 `rotation_bind` 工作/支持统计检查。宿舍入住不算绑定工作班；真实拆组、班数或支持缺席在普通产品中保留排班及 warning，在显式验收中返回错误。断言失败时命令失败；这不是输出层错误。
+`--no-fiammetta` 将排班请求的 `fiammetta_enable` 置为 false；普通定时轮换不得产生菲亚动作。Worker `plan.compute` 使用 `options.fiammetta_enable`（缺省为 true）和 `options.assert_invariants` 表达相同请求。两者开启终态检查时都会把请求开关与最终 rotation 一起核对，不能只检查动作是否 ready。
+
+`--prefer rosemary_perception=recruit_refresh_witch` 已不再是可用值；当前感知体系可选 `recruit_refresh`、`high_perception`、`recruit_refresh_zilan`，不可行时仍按规则回退。独立“龙巫二班”已删除，CLI 不列出其旧别名，显式传入旧 wire/别名会返回不支持错误，不降级成主备排班。`--assert-invariants` 在共享编排完成后调用 request-aware `assert_final_rotation_invariants_for_request`，将 `fiammetta_enable` 请求与最终班次动作一并核对；通用无请求入口 `assert_final_rotation_invariants` 保留给兼容调用方。其余检查包含最终班次黑键与巫恋贸易禁同站及 `rotation_bind` 工作/支持统计。宿舍入住不算绑定工作班；真实拆组、班数或支持缺席在普通产品中保留排班及 warning，在显式验收中返回错误。断言失败时命令失败；这不是输出层错误。
 
 ## 常驻 Worker
 
