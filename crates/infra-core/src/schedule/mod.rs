@@ -21,6 +21,7 @@ pub use shift_bind::{
     shift_binds_from_plan, team_of_operator, verify_shift_binds,
 };
 pub use team_rotation::{
-    assert_final_rotation_invariants, fiammetta_return_priority, operator_team_map,
-    schedule_team_rotation, schedule_timed_rotation_request, FIAMMETTA_RETURN_PRIORITY,
+    assert_final_rotation_invariants, assert_final_rotation_invariants_for_request,
+    fiammetta_return_priority, operator_team_map, schedule_team_rotation,
+    schedule_timed_rotation_request, FIAMMETTA_RETURN_PRIORITY,
 };

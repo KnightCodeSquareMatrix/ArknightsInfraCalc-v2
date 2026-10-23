@@ -10,7 +10,7 @@ use infra_core::export::{build_from_team_rotation, MaaExportOptions, MaaSchedule
 use infra_core::instances::OperatorInstances;
 use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
-use infra_core::schedule::{assert_final_rotation_invariants, TimedRotationRequest};
+use infra_core::schedule::{assert_final_rotation_invariants_for_request, TimedRotationRequest};
 use infra_core::skill_table::SkillTable;
 use infra_core::Error;
 use serde::Deserialize;
@@ -269,12 +269,13 @@ fn compute_plan_inner(
     if input.assert_invariants {
         let stage_started = Instant::now();
         let stage_before = infra_core::profile::solver_perf_snapshot();
-        let invariant_result = assert_final_rotation_invariants(
+        let invariant_result = assert_final_rotation_invariants_for_request(
             input.blueprint,
             input.operbox,
             resources.instances,
             resources.table,
             &current.rotation,
+            input.fiammetta_enable,
         );
         let stage_after = infra_core::profile::solver_perf_snapshot();
         infra_core::profile::emit_solver_stage(

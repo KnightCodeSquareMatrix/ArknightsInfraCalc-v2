@@ -31,6 +31,7 @@
 ### D2. 拓扑构造分开、终态收尾共用，不抽象四班专用语义
 
 - 普通二班与三班保留各自的 topology-specific 周期构造；两条路径进入共同的完成/终态收尾 owner。策略层仍保留二队主备与 ABC 等真实不同的队伍/轮休拓扑；不能把“班次数”当作队伍拓扑，也不能把所有差异塞进新的通用 DSL。泛型 ABC 并列最长时休班相位放在较短班，尽量让 α 覆盖全部可覆盖的并列最长班；完全等长保留旧相位。
+- 用户于 2026-10-23 明确：普通泛型 ABC 同样使用菲亚 N/A/B 候选层；候选按调用方实际班时和 α 相位独立完整求解，再比较完整周期价值。此策略层不合并主备与 ABC 的拓扑构造，也不改变普通主备或四班专用路径。
 - 共同收尾 owner 负责消费已构造的实际时长，完成普通补位、周期加权、最终效率/心情结算、warnings 和最终 assignment 检查。MAA 只投影最终报告，不重新决定班次、房间或成员。
 - 本轮不要求把两种 topology 的构造合并成统一周期执行器；后续若要删除重复构造或提取更深层执行器，必须另有行为等价证据，不得由本 ADR 推导已完成。
 - 候选准入和终态复核可以分阶段执行，但最终“实际工作岗位、休息、bind/required presence”的语义只有一个终态 owner；宿舍 presence 不得被算成工作。
@@ -65,6 +66,10 @@
 实现前从实际调用链确认 CLI、Worker/plan.compute、配置模型、schedule、finalizer、MAA 和 `--assert-invariants` 的 owner；检查当前未提交源石预占 diff 并保留可复用行为，不能覆盖或将它误认为已交付。先声明一次完整的行为范围，然后由单一 writer 完成纵向修改。
 
 既有具名时序的菲亚动作槽、宿舍自动填充提示、ABC 与主备队伍拓扑仍由各自 canonical 裁决。普通泛型每个超过 12h 的班次最多生成一次菲亚动作；动作仍受 ready、目标去重和最终 assignment 核对。24/24 named 与泛型长班均按实际 ETA/心情准入，取消姓名排除名单；泛型超过 24h 使用输入的实际班长，不继承 named 24/24 的姓名策略。
+
+### 当前续接补充（2026-10-23）
+
+普通泛型 ABC 已接入 N/A/B，与 named ABC 共用候选策略而继续保留实际时长和 α 相位；恢复输入顺序时移动整份班次结果。`fiammetta_enable=false` 时只运行 N，CLI/Worker 共用的 request-aware invariant gate 另核对最终没有菲亚动作。该源码单元经 fresh release、ABC/主备各 38 个 Box/配置 gate、H2 最长的真实动作见证、本地 Worker 和独立 `gpt-6.1-sol` 终审 `PASS`；证据与适用范围见 active-change §6.9 的本日 checkpoint。pair 局部预占失败的完整 Box 配对 witness 等本 ADR 其余证明仍未闭合，故本 ADR 保持 `in-progress`，不能将该局部 PASS 推广为整体交付。
 
 至少用真实 Box 经过正常排班入口生成完整二班与三班结果、最终 assignment、warnings 和 MAA；覆盖旧 named timing 的行为基线、代表性非均匀时长（总周期 24/36/48h）、泛型菲亚动作、bubble/vulcan 合法/不适用/预占失败与短员边界、最长班/α归属、绑定和休息。使用 release 的 `--assert-invariants` 与 representative/high-owned 持久 Box gate，核对每班最终 assignment 和 MAA；Python 只调用 Rust gate，不复制规则。轮换/MAA 终态 assertion diff 须经适用的独立领域复核。不得新增或运行源码单元测试来替代真实 Box 入口与 invariant gate。
 
