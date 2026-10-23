@@ -5,7 +5,6 @@ use crate::instances::{default_instances_path, OperatorInstances};
 use crate::layout::assignment::BaseAssignment;
 use crate::layout::blueprint::BaseBlueprint;
 use crate::layout::shift::AssignShiftMode;
-use crate::layout::system::select_registry_systems;
 use crate::layout::system::SlotFillMode;
 use crate::layout::tier::OperatorTier;
 use crate::operbox::OperBox;
@@ -70,6 +69,7 @@ pub fn build_plan_with_runtime(
         &std::collections::HashSet::new(),
         false,
         None,
+        None,
         mode,
         seed,
         skip_system_ids,
@@ -91,6 +91,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     skipped_optional_trade_roles: &std::collections::HashSet<(String, String, String)>,
     support_combinations_enable: bool,
     registry_sustain_hours: Option<f64>,
+    control_work_hours: Option<f64>,
     mode: AssignShiftMode,
     seed: &BaseAssignment,
     skip_system_ids: &std::collections::HashSet<String>,
@@ -167,6 +168,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             skip_system_ids,
             disabled_conditional_packs,
             registry_sustain_hours,
+            control_work_hours,
         )?;
         plan.support_combinations_enable = support_combinations_enable;
         if crate::layout::blackkey_witch_same_trade_room(&scratch, blueprint) {
@@ -197,6 +199,7 @@ fn compile_plan_once(
     skip_system_ids: &std::collections::HashSet<String>,
     disabled_conditional_packs: &std::collections::HashSet<String>,
     registry_sustain_hours: Option<f64>,
+    control_work_hours: Option<f64>,
 ) -> Result<(AssignmentPlan, BaseAssignment)> {
     // priority >= 19 是用户确认的硬/主要体系；先于 legacy registry 编译。
     let mut compiled = compile_rules(
@@ -227,7 +230,11 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let registry_claims = select_registry_systems(
+    let mut mood_admission =
+        registry_mood_admission(control_work_hours, blueprint, operbox, instances, mood)?;
+    let mut admit_all = |_: &crate::layout::system::RegistrySystemClaim, _: &BaseAssignment| true;
+    let admission = mood_admission.as_deref_mut().unwrap_or(&mut admit_all);
+    let registry_claims = crate::layout::system::select_registry_systems_with_admission(
         blueprint,
         operbox,
         mode,
@@ -236,6 +243,7 @@ fn compile_plan_once(
         &registry_skip,
         &compiled.claimed_exclusive_groups,
         registry_sustain_hours.filter(|_| mode == AssignShiftMode::Peak),
+        admission,
     );
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(
@@ -455,6 +463,90 @@ fn compile_plan_once(
     };
     plan.control_requirement_sources()?;
     Ok((plan, final_scratch))
+}
+
+fn registry_mood_admission<'a>(
+    hours: Option<f64>,
+    blueprint: &'a BaseBlueprint,
+    operbox: &'a OperBox,
+    instances: &'a OperatorInstances,
+    initial_mood: f64,
+) -> Result<
+    Option<
+        Box<dyn FnMut(&crate::layout::system::RegistrySystemClaim, &BaseAssignment) -> bool + 'a>,
+    >,
+> {
+    let Some(hours) = hours else {
+        return Ok(None);
+    };
+    let model = crate::mood::default_mood_model()?;
+    const ABYSSAL_CONTROL_DRAIN_BUFF: &str = "control_mp_aegir2[010]";
+    Ok(Some(Box::new(move |claim, trial| {
+        let control_claims: Vec<_> = claim
+            .slots
+            .iter()
+            .filter(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
+            .collect();
+        if !control_claims
+            .iter()
+            .any(|slot| slot.fill != SlotFillMode::Search && !slot.operators.is_empty())
+        {
+            return true;
+        }
+        if control_claims
+            .iter()
+            .any(|slot| slot.fill == SlotFillMode::Search)
+        {
+            return true;
+        }
+        let control = trial.control_operators();
+        if control.len() != 5 || control.iter().any(|op| op.name.starts_with("__")) {
+            return true;
+        }
+        let mut names: Vec<_> = control.iter().map(|op| op.name.as_str()).collect();
+        names.sort_unstable();
+        names.dedup();
+        if names.len() != 5
+            || control.iter().any(|op| {
+                operbox.progress_of(&op.name).is_none_or(|progress| {
+                    progress.elite != op.elite
+                        || (op.level != 0 && progress.level != op.level)
+                        || (op.rarity != 0 && progress.rarity != op.rarity)
+                })
+            })
+        {
+            return true;
+        }
+        let control_names: std::collections::HashSet<_> = names.into_iter().collect();
+        if control.iter().any(|op| {
+            instances
+                .resolve_control_buff_ids(&op.name, op.tier())
+                .iter()
+                .any(|buff_id| buff_id == ABYSSAL_CONTROL_DRAIN_BUFF)
+        }) {
+            return true;
+        }
+        let available = initial_mood.min(model.mood_cap);
+        let control_eta: Vec<_> =
+            crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances)
+                .per_op
+                .into_iter()
+                .filter(|op| op.room_id == "control")
+                .collect();
+        if control_eta.len() != control_names.len() {
+            return true;
+        }
+        let mut eta_names = std::collections::HashSet::new();
+        if control_eta.iter().any(|op| {
+            !control_names.contains(op.name.as_str()) || !eta_names.insert(op.name.as_str())
+        }) || eta_names.len() != control_names.len()
+        {
+            return true;
+        }
+        control_eta
+            .iter()
+            .all(|op| crate::mood::fits_work_budget(&model, available, op.drain_per_hour, hours))
+    })))
 }
 
 fn has_usable_abyssal_combination(

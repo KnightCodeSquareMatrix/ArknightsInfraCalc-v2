@@ -66,6 +66,9 @@ use super::shift_bind::{shift_binds_from_plan, team_of_operator, validate_final_
 const FIAMMETTA_NAME: &str = "菲亚梅塔";
 const SPHINX_NAME: &str = "深巡";
 const ULPIANUS_NAME: &str = "乌尔比安";
+const PEAK_PREFIX_CANDIDATE_EXHAUSTION: &str = "all peak prefix candidates are infeasible";
+const DISJOINT_BACKUP_ERROR_PREFIX: &str =
+    "no solution under current-main complete-state-disjoint backup policy: ";
 // ABC admission uses this state only for ETA; it does not choose beds or change
 // production assignments. A 12/12/12 off-shift is the approved full-rest approximation;
 // any other off-shift recovers at the lowest dormitory base rate (no skill bonus, no
@@ -7350,6 +7353,16 @@ fn restore_input_shift_order(
     Ok(())
 }
 
+fn is_peak_prefix_candidate_exhaustion(error: &Error) -> bool {
+    let Error::Msg(message) = error else {
+        return false;
+    };
+    let message = message
+        .strip_prefix(DISJOINT_BACKUP_ERROR_PREFIX)
+        .unwrap_or(message);
+    message == PEAK_PREFIX_CANDIDATE_EXHAUSTION
+}
+
 fn schedule_generic_main_backup(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -7371,11 +7384,7 @@ fn schedule_generic_main_backup(
     );
     let (mut report, _) = match result {
         Ok(result) => result,
-        Err(error)
-            if error
-                .to_string()
-                .starts_with("all peak prefix candidates are infeasible") =>
-        {
+        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
             let mut fallback_options = options.clone();
             fallback_options.control_work_hours = None;
             let (mut report, diagnostic) = schedule_main_backup_profile(
@@ -9206,6 +9215,69 @@ fn solve_policy_disjoint_backup(
     })
 }
 
+fn solve_disjoint_backup_with_budget_fallback(
+    profile: TimedRotationProfile,
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    main: &BaseAssignment,
+    shift_hours: f64,
+) -> Result<(OwnedRotationAssignment, Option<String>)> {
+    match solve_policy_disjoint_backup(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        main,
+        shift_hours,
+    ) {
+        Ok(backup) => Ok((backup, None)),
+        Err(error)
+            if options.control_work_hours.is_some()
+                && matches!(
+                    profile,
+                    TimedRotationProfile::MainBackup12_12
+                        | TimedRotationProfile::MainBackup24_24
+                        | TimedRotationProfile::GenericMainBackup
+                        | TimedRotationProfile::Abyssal7_5_7_5
+                )
+                && is_peak_prefix_candidate_exhaustion(&error) =>
+        {
+            let mut fallback_options = options.clone();
+            fallback_options.control_work_hours = None;
+            let backup = solve_policy_disjoint_backup(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &fallback_options,
+                main,
+                shift_hours,
+            )?;
+            let warning = match profile {
+                TimedRotationProfile::MainBackup12_12 => format!(
+                    "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_12_12 constrained backup candidate set exhausted; ordinary 12h backup retained: {error}"
+                ),
+                TimedRotationProfile::MainBackup24_24 => format!(
+                    "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_24_24 constrained backup candidate set exhausted; ordinary 24h backup retained: {error}"
+                ),
+                TimedRotationProfile::GenericMainBackup => format!(
+                    "{FINAL_INVARIANT_WARNING_PREFIX} generic main/backup constrained backup candidate set exhausted; ordinary {shift_hours}h backup retained: {error}"
+                ),
+                TimedRotationProfile::Abyssal7_5_7_5 => format!(
+                    "{FINAL_INVARIANT_WARNING_PREFIX} abyssal_7_5_7_5 constrained backup candidate set exhausted; ordinary 5h backup retained: {error}"
+                ),
+                _ => unreachable!("only main/backup profiles use this fallback"),
+            };
+            Ok((backup, Some(warning)))
+        }
+        Err(error) => Err(error),
+    }
+}
+
 fn trade_post_room_for_operator(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
@@ -9546,17 +9618,40 @@ fn schedule_main_backup_12_12(
     table: &SkillTable,
     options: &AssignBaseOptions,
 ) -> Result<TeamRotationReport> {
-    schedule_main_backup_profile(
+    let mut profile_options = options.clone();
+    profile_options.control_work_hours = Some(12.0);
+    let result = schedule_main_backup_profile(
         TimedRotationProfile::MainBackup12_12,
         &[12.0, 12.0],
         blueprint,
         operbox,
         instances,
         table,
-        options,
+        &profile_options,
         false,
-    )
-    .map(|(report, _)| report)
+    );
+    match result {
+        Ok((report, _)) => Ok(report),
+        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
+            let mut fallback_options = options.clone();
+            fallback_options.control_work_hours = None;
+            let (mut report, _) = schedule_main_backup_profile(
+                TimedRotationProfile::MainBackup12_12,
+                &[12.0, 12.0],
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &fallback_options,
+                false,
+            )?;
+            report.warnings.push(format!(
+                "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_12_12 constrained peak candidate set exhausted; ordinary 12h assignments retained: {error}"
+            ));
+            Ok(report)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn schedule_main_backup_24_24(
@@ -9580,11 +9675,7 @@ fn schedule_main_backup_24_24(
     );
     match result {
         Ok(result) => Ok(result),
-        Err(error)
-            if error
-                .to_string()
-                .starts_with("all peak prefix candidates are infeasible") =>
-        {
+        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
             // ETA remains the candidate policy.  If it rejects every candidate,
             // preserve the requested 24/24 product shape and expose the quality
             // loss to normal callers; the explicit invariant gate still fails.
@@ -9774,6 +9865,7 @@ fn schedule_main_backup_profile(
     let mut fiammetta_reentered_searches = 0;
     let mut fiammetta_action_search_path = None;
     let mut backup_candidate = None;
+    let mut backup_budget_fallback_warning = None;
 
     if profile == TimedRotationProfile::MainBackup24_24 && fiammetta_enabled {
         let selected_main_targets = main_backup_24_24_fiammetta_targets(blueprint, &main);
@@ -9928,15 +10020,18 @@ fn schedule_main_backup_profile(
         }
 
         if backup_candidate.is_none() {
-            let mut disjoint_backup = solve_policy_disjoint_backup(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &backup_options,
-                &main.assignment,
-                backup_hours,
-            )?;
+            let (mut disjoint_backup, fallback_warning) =
+                solve_disjoint_backup_with_budget_fallback(
+                    profile,
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &backup_options,
+                    &main.assignment,
+                    backup_hours,
+                )?;
+            backup_budget_fallback_warning = fallback_warning;
             fill_owner_office_seats(
                 blueprint,
                 operbox,
@@ -10049,15 +10144,20 @@ fn schedule_main_backup_profile(
     let backup_was_prepared = selected_backup.is_some();
     let mut backup = match selected_backup {
         Some(backup) => backup,
-        None => solve_policy_disjoint_backup(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            &backup_options,
-            &main.assignment,
-            backup_hours,
-        )?,
+        None => {
+            let (backup, fallback_warning) = solve_disjoint_backup_with_budget_fallback(
+                profile,
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &backup_options,
+                &main.assignment,
+                backup_hours,
+            )?;
+            backup_budget_fallback_warning = fallback_warning;
+            backup
+        }
     };
     if !backup_was_prepared {
         fill_owner_office_seats(
@@ -10170,6 +10270,9 @@ fn schedule_main_backup_profile(
         )?
     };
     if let Some(warning) = originium_pair.warning() {
+        report.warnings.push(warning);
+    }
+    if let Some(warning) = backup_budget_fallback_warning {
         report.warnings.push(warning);
     }
     let fiammetta_24_diagnostic = (profile == TimedRotationProfile::MainBackup24_24
@@ -10807,21 +10910,23 @@ fn schedule_abyssal_7_5_7_5(
     options: &AssignBaseOptions,
 ) -> Result<TeamRotationReport> {
     let started = Instant::now();
-    let mut main = match solve_abyssal_profile_main(blueprint, operbox, instances, table, options)?
-    {
-        ProfileOwnerCandidate::Ready(owner) => owner,
-        ProfileOwnerCandidate::Unavailable(reason) => {
-            return schedule_ordinary_profile_fallback(
-                TimedRotationProfile::Abyssal7_5_7_5,
-                blueprint,
-                operbox,
-                instances,
-                table,
-                options,
-                reason,
-            );
-        }
-    };
+    let mut main_options = options.clone();
+    main_options.control_work_hours = Some(7.0);
+    let mut main =
+        match solve_abyssal_profile_main(blueprint, operbox, instances, table, &main_options)? {
+            ProfileOwnerCandidate::Ready(owner) => owner,
+            ProfileOwnerCandidate::Unavailable(reason) => {
+                return schedule_ordinary_profile_fallback(
+                    TimedRotationProfile::Abyssal7_5_7_5,
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    options,
+                    reason,
+                );
+            }
+        };
     fill_owner_office_seats(
         blueprint,
         operbox,
@@ -10833,12 +10938,15 @@ fn schedule_abyssal_7_5_7_5(
         &HashSet::new(),
     )?;
     let main_forbidden: HashSet<String> = main.assignment.operator_names();
-    let mut backup = solve_policy_disjoint_backup(
+    let mut backup_options = options.clone();
+    backup_options.control_work_hours = Some(5.0);
+    let (mut backup, backup_budget_warning) = solve_disjoint_backup_with_budget_fallback(
+        TimedRotationProfile::Abyssal7_5_7_5,
         blueprint,
         operbox,
         instances,
         table,
-        options,
+        &backup_options,
         &main.assignment,
         5.0,
     )?;
@@ -10922,6 +11030,9 @@ fn schedule_abyssal_7_5_7_5(
         report.warnings.push(format!(
             "{FINAL_INVARIANT_WARNING_PREFIX} abyssal-7575 requires one single-target and one group dorm manager who can fully recover the control producer during each 5h rest; no unproven recovery group emitted"
         ));
+    }
+    if let Some(warning) = backup_budget_warning {
+        report.warnings.push(warning);
     }
     Ok(report)
 }

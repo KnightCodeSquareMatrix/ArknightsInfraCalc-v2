@@ -587,6 +587,31 @@ pub fn select_registry_systems(
     inherited_exclusive_groups: &HashSet<String>,
     sustain_hours: Option<f64>,
 ) -> Vec<RegistrySystemClaim> {
+    let mut admit_all = |_: &RegistrySystemClaim, _: &BaseAssignment| true;
+    select_registry_systems_with_admission(
+        blueprint,
+        operbox,
+        mode,
+        assignment,
+        used,
+        skip_system_ids,
+        inherited_exclusive_groups,
+        sustain_hours,
+        &mut admit_all,
+    )
+}
+
+pub(crate) fn select_registry_systems_with_admission(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    mode: AssignShiftMode,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    skip_system_ids: &HashSet<String>,
+    inherited_exclusive_groups: &HashSet<String>,
+    sustain_hours: Option<f64>,
+    admission: &mut dyn FnMut(&RegistrySystemClaim, &BaseAssignment) -> bool,
+) -> Vec<RegistrySystemClaim> {
     let Some(cache) = base_systems_cache() else {
         return Vec::new();
     };
@@ -608,6 +633,7 @@ pub fn select_registry_systems(
         &mut claimed_groups,
         skip_system_ids,
         sustain_hours,
+        admission,
         &mut selected,
     );
 
@@ -623,6 +649,7 @@ pub fn select_registry_systems(
         &mut claimed_groups,
         skip_system_ids,
         sustain_hours,
+        admission,
         &mut selected,
     );
 
@@ -694,6 +721,7 @@ fn select_tier(
     claimed_groups: &mut HashSet<String>,
     skip_system_ids: &HashSet<String>,
     sustain_hours: Option<f64>,
+    admission: &mut dyn FnMut(&RegistrySystemClaim, &BaseAssignment) -> bool,
     out: &mut Vec<RegistrySystemClaim>,
 ) {
     for system in systems_by_tier_and_priority(cache, tier) {
@@ -717,6 +745,12 @@ fn select_tier(
             if !claim_control_pins_sustain(&plan.claim, hours) {
                 continue;
             }
+        }
+        let mut trial = scratch.clone();
+        let mut trial_used = scratch_used.clone();
+        apply_registry_claim_to_assignment(&plan.claim, &mut trial, &mut trial_used);
+        if !admission(&plan.claim, &trial) {
+            continue;
         }
         apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
         if let Some(group) = system.exclusive_group.clone() {

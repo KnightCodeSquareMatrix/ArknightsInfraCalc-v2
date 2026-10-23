@@ -48,6 +48,7 @@ mod tests {
             &std::collections::HashSet::new(),
             true,
             None,
+            None,
             AssignShiftMode::Peak,
             &BaseAssignment::default(),
             &std::collections::HashSet::new(),

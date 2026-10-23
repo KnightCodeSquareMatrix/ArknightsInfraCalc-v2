@@ -498,33 +498,6 @@ pub(crate) fn assign_shift_with_preclaimed_plan<F>(
 where
     F: FnMut(&mut AssignmentPlan) -> Result<()>,
 {
-    assign_shift_with_preclaimed_plan_inner(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        mode,
-        planning_seed,
-        execution_seed,
-        skip_system_ids,
-        &mut augment_plan,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn assign_shift_with_preclaimed_plan_inner(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    mode: AssignShiftMode,
-    planning_seed: &BaseAssignment,
-    execution_seed: &BaseAssignment,
-    skip_system_ids: &HashSet<String>,
-    augment_plan: &mut dyn FnMut(&mut AssignmentPlan) -> Result<()>,
-) -> Result<AssignShiftResult> {
     blueprint.validate()?;
 
     let mut skip_system_ids = skip_system_ids.clone();
@@ -545,6 +518,7 @@ fn assign_shift_with_preclaimed_plan_inner(
             &skipped_optional_trade_roles,
             options.support_combinations_enable,
             options.registry_sustain_hours,
+            options.control_work_hours,
             mode,
             planning_seed,
             &skip_system_ids,
