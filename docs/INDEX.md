@@ -112,4 +112,5 @@
 | [ADR 0010: 菲亚梅塔固定策略分支与完整排班重算接入](ADR/0010-fiammetta-fixed-branches-full-recompute.md) | `superseded` | 菲亚梅塔作为阶段间固定策略分支选择器，N/A/B 三候选各自从同一 Box 完整重算整个排班；候选不预排锁房，靠 L1 shortcut 自然选中 + trade_core 偏好改写上班优先级，菲亚对固定两人各换一次心情，按完整周期收益选 winner |
 | [ADR 0011: 二/三班通用时长排班与泡泡火神全局强制](ADR/0011-generic-two-three-shift-rotation.md) | `accepted` | 为普通二班/三班增加输入时长并共用终态收尾，在全部该范围内强制泡泡/火神源石预占 |
 | [ADR 0012: 十月排班需求的分项交付判定与关闭边界](ADR/0012-october-rotation-delivery-boundaries.md) | `accepted` | 记录六项十月排班需求在各自语义边界内的交付状态，不把局部实现或工作区草稿合并宣称为整体完成 |
+| [ADR 0013: 四赤金作为 Trade Core 候选](ADR/0013-four-gold-trade-core-candidate.md) | `accepted` | 明确四赤金是 Trade Core 候选中的专用跨站方案，并规定其与普通 Trade Core 的比较边界 |
 <!-- END GENERATED DECISIONS -->
