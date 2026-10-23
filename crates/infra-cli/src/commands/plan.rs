@@ -17,6 +17,10 @@ use infra_core::Error;
 use super::prefix_shadow::{prefix_shadow_out_from_args, run_prefix_shadow, PrefixShadowInput};
 
 pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
+    if has_plan_help_flag(args) {
+        return Err(Error::msg("plan does not support --help or -h"));
+    }
+
     let rotation_request = super::timed_rotation_request_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = match layout_path_from_args(args) {
@@ -211,6 +215,36 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         stage_after,
     );
     output_result
+}
+
+fn has_plan_help_flag(args: &[String]) -> bool {
+    args.iter().enumerate().any(|(index, arg)| {
+        if arg != "--help" && arg != "-h" {
+            return false;
+        }
+
+        !index
+            .checked_sub(1)
+            .and_then(|previous| args.get(previous))
+            .is_some_and(|option| {
+                matches!(
+                    option.as_str(),
+                    "--operbox"
+                        | "--layout"
+                        | "--baseline"
+                        | "--top"
+                        | "--rotation"
+                        | "--prefer"
+                        | "--prefix-shadow-out"
+                        | "--profile-out"
+                        | "--rotation-out"
+                        | "--output-dir"
+                        | "--maa-out"
+                        | "--maa-title"
+                        | "--fiammetta-candidates-out"
+                )
+            })
+    })
 }
 
 fn system_preferences_from_args(

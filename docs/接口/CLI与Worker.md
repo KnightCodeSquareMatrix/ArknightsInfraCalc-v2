@@ -8,7 +8,7 @@
 > 代码范围：`crates/infra-cli/src/main.rs`、`crates/infra-cli/src/commands/`
 > 代码锚点：`crates/infra-cli/src/main.rs::run`; `crates/infra-cli/src/commands/serve.rs::serve_cmd`; `crates/infra-cli/src/commands/plan.rs::plan_cmd`; `crates/infra-cli/src/commands/plan_compute.rs::compute_plan`
 > 关联链路：`docs/调用链/plan请求.md`; `docs/接口/错误与诊断.md`; `docs/接口/输入输出与兼容.md`
-> 核验基线：`infra-cli --help`、`infra-cli serve --help`、`cargo run -q -p infra-cli -- plan --help`
+> 核验基线：`infra-cli --help`、`infra-cli serve --help`；`plan --help`/`plan -h` 应在输入加载前报错
 
 本页只记录接口和模块责任。游戏机制由机制知识库提供；求解器的候选、编排和结算行为由 `infra-core` 的领域文档与代码提供。
 
@@ -18,7 +18,7 @@
 
 | 命令 | 代码入口 | 输入 | 输出或用途 |
 |---|---|---|---|
-| `plan` | `commands/plan.rs::plan_cmd` | `--operbox`、可选 `--layout`、轮换和输出路径 | 一次排班 probe；stdout 报告，stderr 元数据/路径，profile/MAA/rotation 可写文件 |
+| `plan` | `commands/plan.rs::plan_cmd` | `--operbox`、可选 `--layout`、轮换和输出路径 | 一次排班 probe；stdout 报告，stderr 元数据/路径，profile/MAA/rotation 可写文件；不接受 `--help`/`-h` |
 | `serve` | `commands/serve.rs::serve_cmd` | stdin 一行一个 JSON 请求 | stdout 一行一个 JSON 响应；stderr 只写日志和性能信息 |
 | `layout test` | `commands/layout.rs::layout_test_cmd` | layout、operbox，可选 assignment | 单班搜索或固定编制检查 |
 | `layout team-rotation` | `commands/layout.rs::layout_team_rotation_cmd` | layout、operbox、轮换 | 只做排班和可选 MAA，不生成账号 profile |
@@ -33,7 +33,7 @@
 
 ## `plan` 的标准流
 
-`plan_cmd` 读取路径、加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable` 和 baseline，然后调用共享 `plan_compute::compute_plan`。它不会实现机制公式。成功后：
+`plan_cmd` 遇到 `--help` 或 `-h` 会在任何输入加载和排班前报错退出；plan 不提供帮助命令，避免把帮助标记误当普通参数后继续运行并写 profile。其他请求读取路径、加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable` 和 baseline，然后调用共享 `plan_compute::compute_plan`。它不会实现机制公式。成功后：
 
 - stdout：账号画像和轮换的可读报告；`--json` 时只打印 profile JSON；
 - stderr：`layout=`、`operbox=`、阶段性能记录以及 profile/rotation/MAA 文件路径；
