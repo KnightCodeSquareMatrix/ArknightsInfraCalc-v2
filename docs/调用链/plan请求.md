@@ -27,7 +27,7 @@ serve plan.compute ───┘                 │
 
 ## 阶段一：适配与加载
 
-- CLI：`commands/plan.rs::plan_cmd` 解析 `--layout`、`--operbox`、`--baseline`、`--rotation`、`--top`、`--prefer`、输出路径和 `--assert-invariants`，加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable`。
+- CLI：`commands/plan.rs::plan_cmd` 首先拒绝 `--help` 和独立的 `-h`（`--maa-title -h` 中的 `-h` 仍为标题值），因此不加载输入、不运行排班、不写 profile；随后解析 `--layout`、`--operbox`、`--baseline`、`--rotation`、`--top`、`--prefer`、输出路径和 `--assert-invariants`，再加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable`。
 - Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v7 嵌入 schema。v7 保留旧 named rotation，并允许普通主备/ABC 使用 topology + `shift_hours`；v1–v6 wire 不变，v6 拒绝该对象。该 v7 代码与契约属于本次 WIP 提交，未完成 fresh release 验收或部署。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
 - Worker `plan`：`handle_plan` 在反序列化路径参数前拒绝旧龙巫 wire；其他请求默认加载 243/full-e2，调用同一 `compute_plan`。
 

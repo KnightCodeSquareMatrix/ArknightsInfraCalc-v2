@@ -17,6 +17,21 @@ use infra_core::Error;
 use super::prefix_shadow::{prefix_shadow_out_from_args, run_prefix_shadow, PrefixShadowInput};
 
 pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
+    let contains_help_flag = args
+        .iter()
+        .enumerate()
+        .any(|(index, arg)| match arg.as_str() {
+            "--help" => true,
+            "-h" => !index
+                .checked_sub(1)
+                .and_then(|previous| args.get(previous))
+                .is_some_and(|option| option == "--maa-title"),
+            _ => false,
+        });
+    if contains_help_flag {
+        return Err(Error::msg("plan does not support --help or -h"));
+    }
+
     let rotation_request = super::timed_rotation_request_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = match layout_path_from_args(args) {

@@ -8,7 +8,7 @@
 > 代码范围：`crates/infra-cli/src/main.rs`、`crates/infra-cli/src/commands/`
 > 代码锚点：`crates/infra-cli/src/main.rs::run`; `crates/infra-cli/src/commands/serve.rs::serve_cmd`; `crates/infra-cli/src/commands/plan.rs::plan_cmd`; `crates/infra-cli/src/commands/plan_compute.rs::compute_plan`
 > 关联链路：`docs/调用链/plan请求.md`; `docs/接口/错误与诊断.md`; `docs/接口/输入输出与兼容.md`
-> 核验基线：`infra-cli --help`、`infra-cli serve --help`、`cargo run -q -p infra-cli -- plan --help`
+> 核验基线：`infra-cli --help`、`infra-cli serve --help`；`plan --help` 明确拒绝且不得触发求解或 profile 写入
 
 本页只记录接口和模块责任。游戏机制由机制知识库提供；求解器的候选、编排和结算行为由 `infra-core` 的领域文档与代码提供。
 
@@ -33,7 +33,7 @@
 
 ## `plan` 的标准流
 
-`plan_cmd` 读取路径、加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable` 和 baseline，然后调用共享 `plan_compute::compute_plan`。它不会实现机制公式。成功后：
+`plan_cmd` 会在读取路径和加载输入前拒绝 `--help`；`-h` 也会被拒绝，只有作为 `--maa-title` 的值时例外。该入口不提供帮助输出。通过参数检查后才加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable` 和 baseline，再调用共享 `plan_compute::compute_plan`。它不会实现机制公式。成功后：
 
 - stdout：账号画像和轮换的可读报告；`--json` 时只打印 profile JSON；
 - stderr：`layout=`、`operbox=`、阶段性能记录以及 profile/rotation/MAA 文件路径；
