@@ -893,6 +893,20 @@ fn search_control_in_order(
     options: &ControlSearchOptions,
     eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
 ) -> Result<Vec<ControlSearchHit>> {
+    let observe_control =
+        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
+    macro_rules! observe {
+        ($($arg:tt)*) => {
+            if observe_control {
+                use std::io::Write as _;
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "[INFRA-CONTROL-OBSERVE] {}",
+                    format_args!($($arg)*)
+                );
+            }
+        };
+    }
     let model = crate::mood::default_mood_model()?;
     let mut entries: Vec<_> =
         pool.entries
@@ -917,6 +931,9 @@ fn search_control_in_order(
         .map(|entry| entry.to_control_operator())
         .collect();
     if selected.len() != options.must_include.len() || selected.len() > capacity {
+        observe!("search_control initial_prefix={:?} must_include={:?} capacity={capacity} rejected=missing_or_over_capacity_required",
+            selected.iter().map(|op| &op.name).collect::<Vec<_>>(),
+            options.must_include.iter().collect::<std::collections::BTreeSet<_>>());
         return Ok(Vec::new());
     }
     let evaluate = |ops: &[ControlOperator]| {
@@ -942,6 +959,10 @@ fn search_control_in_order(
                 }))
     };
     if !legal(&selected) {
+        observe!(
+            "search_control initial_prefix={:?} rejected=illegal_required_prefix",
+            selected.iter().map(|op| &op.name).collect::<Vec<_>>()
+        );
         return Ok(Vec::new());
     }
     let group_count = |ops: &[ControlOperator], candidates: &HashSet<String>| {
@@ -993,6 +1014,17 @@ fn search_control_in_order(
     };
     for (candidates, min_count) in &options.candidate_requirements {
         while group_count(&selected, candidates) < usize::from(*min_count) {
+            let prefix = observe_control.then(|| {
+                selected
+                    .iter()
+                    .map(|op| op.name.as_str())
+                    .collect::<Vec<_>>()
+            });
+            if observe_control {
+                let mut group_names: Vec<_> = candidates.iter().map(String::as_str).collect();
+                group_names.sort_unstable();
+                observe!("control_step stage=required_group prefix={prefix:?} group_candidates={group_names:?} min_count={min_count}");
+            }
             let mut ranked = Vec::new();
             for entry in &entries {
                 if !candidates.contains(&entry.name)
@@ -1002,11 +1034,22 @@ fn search_control_in_order(
                 }
                 let mut trial = selected.clone();
                 trial.push(entry.to_control_operator());
-                if trial.len() > capacity
-                    || !legal(&trial)
-                    || !groups_can_fit(&trial)
-                    || !accepts_complete(&trial)
-                {
+                let trial_names = observe_control
+                    .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
+                if trial.len() > capacity {
+                    observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_capacity trial={trial_names:?}", entry.name);
+                    continue;
+                }
+                if !legal(&trial) {
+                    observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
+                    continue;
+                }
+                if !groups_can_fit(&trial) {
+                    observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
+                    continue;
+                }
+                if !accepts_complete(&trial) {
+                    observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_complete_eligibility trial={trial_names:?}", entry.name);
                     continue;
                 }
                 let result = evaluate(&trial);
@@ -1029,8 +1072,17 @@ fn search_control_in_order(
                     .unwrap_or_else(|| a.name.cmp(&b.name))
             });
             let Some((entry, _)) = ranked.first() else {
+                observe!("control_step stage=required_group prefix={prefix:?} result=no_candidate");
                 return Ok(Vec::new());
             };
+            observe!(
+                "control_select stage=required_group prefix={prefix:?} candidate={} ranked={:?}",
+                entry.name,
+                ranked
+                    .iter()
+                    .map(|(candidate, scores)| (&candidate.name, scores))
+                    .collect::<Vec<_>>()
+            );
             selected.push(entry.to_control_operator());
         }
     }
@@ -1039,7 +1091,15 @@ fn search_control_in_order(
         if selected.len() >= capacity {
             break;
         }
+        let prefix = observe_control.then(|| {
+            selected
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>()
+        });
         let before = evaluate(&selected);
+        let before_score = value(&before, region);
+        observe!("control_step stage=regional region={region} prefix={prefix:?} current_score={before_score}");
         let mut best: Option<(&crate::pool::ControlPoolEntry, f64)> = None;
         for entry in &entries {
             if selected.iter().any(|op| op.name == entry.name) {
@@ -1047,30 +1107,54 @@ fn search_control_in_order(
             }
             let mut trial = selected.clone();
             trial.push(entry.to_control_operator());
-            if !legal(&trial) || !groups_can_fit(&trial) {
+            let trial_names = observe_control
+                .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
+            if !legal(&trial) {
+                observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
+                continue;
+            }
+            if !groups_can_fit(&trial) {
+                observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
                 continue;
             }
             let result = evaluate(&trial);
             let score = value(&result, region);
-            if score <= value(&before, region) {
+            if score <= before_score {
+                observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=no_improvement score={score} current={before_score} trial={trial_names:?}", entry.name);
                 continue;
             }
             if !accepts_complete(&trial) {
+                observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=rejected_complete_eligibility score={score} trial={trial_names:?}", entry.name);
                 continue;
             }
+            observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=eligible score={score} previous_best={:?} trial={trial_names:?}",
+                entry.name,
+                best.map(|(previous, score)| (&previous.name, score)));
             if best.is_none_or(|(previous, previous_value)| {
                 score > previous_value || (score == previous_value && entry.name < previous.name)
             }) {
                 best = Some((entry, score));
             }
         }
-        if let Some((entry, _)) = best {
+        if let Some((entry, score)) = best {
+            observe!("control_select stage=regional region={region} prefix={prefix:?} candidate={} score={score}", entry.name);
             selected.push(entry.to_control_operator());
+        } else {
+            observe!(
+                "control_select stage=regional region={region} prefix={prefix:?} candidate=none"
+            );
         }
     }
     // The recovery family has a single owner. Its common five-facility
     // projection includes spread smileys but never individual drain or ETA.
     if selected.len() < capacity {
+        let prefix = observe_control.then(|| {
+            selected
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>()
+        });
+        observe!("control_step stage=global_recovery prefix={prefix:?}");
         let mut best = None;
         for entry in &entries {
             if selected.iter().any(|op| op.name == entry.name)
@@ -1083,7 +1167,18 @@ fn search_control_in_order(
             }
             let mut trial = selected.clone();
             trial.push(entry.to_control_operator());
-            if !legal(&trial) || !groups_can_fit(&trial) || !accepts_complete(&trial) {
+            let trial_names = observe_control
+                .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
+            if !legal(&trial) {
+                observe!("control_try stage=global_recovery prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
+                continue;
+            }
+            if !groups_can_fit(&trial) {
+                observe!("control_try stage=global_recovery prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
+                continue;
+            }
+            if !accepts_complete(&trial) {
+                observe!("control_try stage=global_recovery prefix={prefix:?} candidate={} result=rejected_complete_eligibility trial={trial_names:?}", entry.name);
                 continue;
             }
             let control: Vec<_> = trial.iter().map(|op| (op.name.clone(), op.elite)).collect();
@@ -1098,7 +1193,7 @@ fn search_control_in_order(
             // Only a facility-by-facility dominance relation is meaningful:
             // trade/factory recovery cannot be traded against office recovery.
             // Non-dominating effects retain stable identity order.
-            if best.as_ref().is_none_or(
+            let is_better = best.as_ref().is_none_or(
                 |(_, previous_values): &(&crate::pool::ControlPoolEntry, [f64; 5])| {
                     values
                         .iter()
@@ -1109,15 +1204,30 @@ fn search_control_in_order(
                             .zip(previous_values)
                             .any(|(value, previous)| value > previous)
                 },
-            ) {
+            );
+            observe!("control_try stage=global_recovery prefix={prefix:?} candidate={} result={} facility_recovery={values:?} trial={trial_names:?}", entry.name, if is_better { "policy_promoted" } else { "policy_not_promoted" });
+            if is_better {
                 best = Some((*entry, values));
             }
         }
         if let Some((entry, _)) = best {
+            observe!(
+                "control_select stage=global_recovery prefix={prefix:?} candidate={}",
+                entry.name
+            );
             selected.push(entry.to_control_operator());
+        } else {
+            observe!("control_select stage=global_recovery prefix={prefix:?} candidate=none");
         }
     }
     while selected.len() < capacity && selected.len() < entries.len() {
+        let prefix = observe_control.then(|| {
+            selected
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>()
+        });
+        observe!("control_step stage=mood_and_ordinary_fill prefix={prefix:?}");
         let control: Vec<_> = selected
             .iter()
             .map(|op| (op.name.clone(), op.elite))
@@ -1134,7 +1244,14 @@ fn search_control_in_order(
             }
             let mut trial = selected.clone();
             trial.push(entry.to_control_operator());
-            if !legal(&trial) || !groups_can_fit(&trial) {
+            let trial_names = observe_control
+                .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
+            if !legal(&trial) {
+                observe!("control_try stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
+                continue;
+            }
+            if !groups_can_fit(&trial) {
+                observe!("control_try stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
                 continue;
             }
             let after: Vec<_> = trial.iter().map(|op| (op.name.clone(), op.elite)).collect();
@@ -1167,8 +1284,10 @@ fn search_control_in_order(
                 internal
             };
             if !accepts_complete(&trial) {
+                observe!("control_try stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} result=rejected_complete_eligibility preferred={preferred} effect={effect} trial={trial_names:?}", entry.name);
                 continue;
             }
+            observe!("control_try stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} result=eligible preferred={preferred} effect={effect} trial={trial_names:?}", entry.name);
             ranked.push((*entry, preferred, effect.max(0.0)));
         }
         ranked.sort_by(|(a, ap, av), (b, bp, bv)| {
@@ -1177,8 +1296,12 @@ fn search_control_in_order(
                 .then_with(|| a.name.cmp(&b.name))
         });
         let Some((entry, ..)) = ranked.first() else {
+            observe!(
+                "control_step stage=mood_and_ordinary_fill prefix={prefix:?} result=no_candidate"
+            );
             return Ok(Vec::new());
         };
+        observe!("control_select stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} ranked={:?}", entry.name, ranked.iter().map(|(candidate, preferred, effect)| (&candidate.name, preferred, effect)).collect::<Vec<_>>());
         selected.push(entry.to_control_operator());
     }
     if !options
@@ -1186,13 +1309,19 @@ fn search_control_in_order(
         .iter()
         .all(|(candidates, min)| group_count(&selected, candidates) >= usize::from(*min))
     {
+        observe!(
+            "control_result selected={:?} rejected=final_min_count",
+            selected.iter().map(|op| &op.name).collect::<Vec<_>>()
+        );
         return Ok(Vec::new());
     }
     let mut names: Vec<_> = selected.iter().map(|op| op.name.clone()).collect();
     names.sort();
     if eligibility.is_some_and(|accept| !accept(&names)) {
+        observe!("control_result selected={names:?} rejected=final_eligibility");
         return Ok(Vec::new());
     }
+    observe!("control_result selected={names:?} accepted=true");
     let result = evaluate(&selected);
     let summary = model.control_global_recovery_summary(
         &selected

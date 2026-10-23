@@ -102,6 +102,20 @@ fn assign_control_inner(
     used: &mut HashSet<String>,
 ) -> Result<bool> {
     const MAX_CONTROL: usize = 5;
+    let observe_control =
+        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
+    macro_rules! observe {
+        ($($arg:tt)*) => {
+            if observe_control {
+                use std::io::Write as _;
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "[INFRA-CONTROL-OBSERVE] {}",
+                    format_args!($($arg)*)
+                );
+            }
+        };
+    }
     let pinned: HashSet<String> = assignment
         .control_operators()
         .into_iter()
@@ -141,7 +155,7 @@ fn assign_control_inner(
             ));
         }
         let names: Vec<_> = pinned.iter().cloned().collect();
-        return Ok(pinned.len() == MAX_CONTROL
+        let accepted = pinned.len() == MAX_CONTROL
             && required_all.is_none_or(|required| required.is_subset(&pinned))
             && candidate_requirements.iter().all(|group| {
                 pinned
@@ -151,13 +165,32 @@ fn assign_control_inner(
                     >= usize::from(group.min_count)
             })
             && excluded.is_none_or(|excluded| pinned.is_disjoint(excluded))
-            && eligibility.is_none_or(|accept| accept(&names)));
+            && eligibility.is_none_or(|accept| accept(&names));
+        if observe_control {
+            let pinned_log: std::collections::BTreeSet<_> = pinned.iter().collect();
+            let required_log: Option<std::collections::BTreeSet<_>> =
+                required_all.map(|names| names.iter().collect());
+            let excluded_log: Option<std::collections::BTreeSet<_>> =
+                excluded.map(|names| names.iter().collect());
+            observe!(
+                "control_fill fixed_prefix={pinned_log:?} required_all={required_log:?} requirements={candidate_requirements:?} excluded={excluded_log:?} accepted={accepted}"
+            );
+        }
+        return Ok(accepted);
     }
     if pool.entries.is_empty() {
-        return Ok(required_all.is_none_or(HashSet::is_empty)
+        let accepted = required_all.is_none_or(HashSet::is_empty)
             && candidate_requirements
                 .iter()
-                .all(|group| group.min_count == 0));
+                .all(|group| group.min_count == 0);
+        if observe_control {
+            let required_log: Option<std::collections::BTreeSet<_>> =
+                required_all.map(|names| names.iter().collect());
+            observe!(
+                "control_fill empty_pool required_all={required_log:?} requirements={candidate_requirements:?} accepted={accepted}"
+            );
+        }
+        return Ok(accepted);
     }
     let requirements: Vec<(HashSet<String>, u8)> = candidate_requirements
         .iter()
@@ -205,9 +238,35 @@ fn assign_control_inner(
         excluded.unwrap_or(&empty_excluded),
     )?;
 
+    if observe_control {
+        let mut pins_log: Vec<_> = pinned.iter().cloned().collect();
+        pins_log.sort();
+        let mut must_include_log: Vec<_> = must_include.iter().cloned().collect();
+        must_include_log.sort();
+        let mut excluded_log: Vec<_> = excluded
+            .unwrap_or(&empty_excluded)
+            .iter()
+            .cloned()
+            .collect();
+        excluded_log.sort();
+        let required_log: Option<std::collections::BTreeSet<_>> =
+            required_all.map(|names| names.iter().collect());
+        let identities: Vec<_> = filtered_pool
+            .entries
+            .iter()
+            .map(|entry| &entry.name)
+            .collect();
+        observe!("control_fill pins={pins_log:?} must_include={must_include_log:?} required_all={required_log:?} excluded={excluded_log:?} requirements={:?} filtered_candidates={identities:?}",
+            candidate_requirements
+                .iter()
+                .map(|group| (&group.candidates, group.min_count))
+                .collect::<Vec<_>>());
+    }
+
     let combos =
         search_control_combos_with_eligibility(&filtered_pool, table, &control_opts, eligibility)?;
     let Some(hit) = pick_control_extending_pins(combos, &must_include, used, &|h| &h.names) else {
+        observe!("control_fill no_hit_after_policy");
         if required_all.is_some() {
             return Ok(false);
         }
@@ -250,6 +309,7 @@ fn assign_control_inner(
         used,
         &pinned,
     )?;
+    observe!("control_fill trial_assignment={:?}", hit.names);
     assignment.note_facts.control_skillless_fallback_names = skillless_fallback_names;
     Ok(true)
 }

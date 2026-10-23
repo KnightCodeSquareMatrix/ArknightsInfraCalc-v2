@@ -81,6 +81,69 @@ fn run_shift_pipeline_with_producer_pruning(
     plan: &AssignmentPlan,
     enable_producer_pruning: bool,
 ) -> Result<BaseAssignment> {
+    let observe_control =
+        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
+    macro_rules! observe {
+        ($($arg:tt)*) => {
+            if observe_control {
+                use std::io::Write as _;
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "[INFRA-CONTROL-OBSERVE] {}",
+                    format_args!($($arg)*)
+                );
+            }
+        };
+    }
+    if observe_control {
+        let mut roster: Vec<_> = operbox.roster().names().cloned().collect();
+        roster.sort();
+        let mut pins: Vec<_> = seed
+            .control_operators()
+            .into_iter()
+            .map(|op| op.name)
+            .collect();
+        pins.sort();
+        observe!("pipeline mode={mode:?} shift_hours={} control_work_hours={:?} control_room_capacity={:?} operbox_size={} operbox_identity={:?} seed_control_pins={pins:?}",
+            options.shift_hours,
+            options.control_work_hours,
+            blueprint.rooms.iter().find(|room| room.kind == FacilityKind::ControlCenter).map(|room| room.operator_capacity()),
+            roster.len(),
+            roster);
+        for claim in &plan.registry_claims {
+            observe!(
+                "plan_claim id={} bind_all={} on_shifts={} off_shifts={} control_allowed={:?} slots={:?}",
+                claim.system_id,
+                claim.bind_all,
+                claim.on_shifts,
+                claim.off_shifts,
+                claim.control_allowed_operators,
+                claim
+                    .slots
+                    .iter()
+                    .filter(|slot| slot.facility == FacilityKind::ControlCenter)
+                    .map(|slot| (
+                        &slot.room_id,
+                        slot.fill,
+                        slot.required_count,
+                        slot.operators
+                            .iter()
+                            .map(|op| op.name.as_str())
+                            .collect::<Vec<_>>()
+                    ))
+                    .collect::<Vec<_>>()
+            );
+        }
+        observe!(
+            "plan_control_requirements={:?} control_exclusions={:?} control_pins={:?}",
+            plan.control_candidate_requirements,
+            plan.control_exclusions,
+            seed.control_operators()
+                .iter()
+                .map(|op| op.name.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
     let enable_producer_pruning =
         producer_pruning_enabled(enable_producer_pruning, options.dynamic_producer_policy);
     let mut timer = StageTimer::new("单班");
@@ -142,6 +205,13 @@ fn run_shift_pipeline_with_producer_pruning(
                     .map(|(_, producer)| producer.clone())
                     .collect();
                 let excluded: HashSet<_> = all_dynamic.difference(&required).cloned().collect();
+                if observe_control {
+                    let mut required_log: Vec<_> = required.iter().cloned().collect();
+                    required_log.sort();
+                    let mut excluded_log: Vec<_> = excluded.iter().cloned().collect();
+                    excluded_log.sort();
+                    observe!("producer_mask mask={mask} required={required_log:?} excluded={excluded_log:?}");
+                }
                 if let Some(candidate) = prepare_peak_control_candidate(
                     run.clone(),
                     plan,
@@ -152,6 +222,8 @@ fn run_shift_pipeline_with_producer_pruning(
                     mask,
                 )? {
                     prepared.push(candidate);
+                } else {
+                    observe!("prepare_return_none mask={mask}");
                 }
             }
             prepared.sort_by(|left, right| {
@@ -170,6 +242,11 @@ fn run_shift_pipeline_with_producer_pruning(
                         .map(|best: &PeakPrefixCandidate<'_>| best.policy_sort_key),
                     prepared.policy_upper_bound,
                 ) {
+                    observe!(
+                        "peak_prefix mask={} result=pruned_by_policy_upper_bound upper_bound={:?}",
+                        prepared.stable_order,
+                        prepared.policy_upper_bound
+                    );
                     continue;
                 }
                 let stable_order = prepared.stable_order;
@@ -194,9 +271,20 @@ fn run_shift_pipeline_with_producer_pruning(
                     best = Some(candidate);
                 }
             }
-            run = best
-                .ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?
-                .run;
+            let best =
+                best.ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?;
+            observe!(
+                "peak_prefix_winner mask={} policy_sort_key={:?} control={:?}",
+                best.stable_order,
+                best.policy_sort_key,
+                best.run
+                    .assignment
+                    .control_operators()
+                    .iter()
+                    .map(|op| op.name.as_str())
+                    .collect::<Vec<_>>()
+            );
+            run = best.run;
             // 只对最终 winner 做一次夜烟 trade/manufacture 归属比较；候选循环内不再
             // 为每个中枢候选重算整套生产填充。候选循环使用含喀兰杰市场的 trade_pool，
             // 这里的比较必须使用同一池，否则重填结果会与 winner 原结果漂移。
@@ -258,6 +346,14 @@ fn run_shift_pipeline_with_producer_pruning(
     timer.mark("stable_sort");
 
     timer.report();
+    observe!(
+        "pipeline_result control={:?}",
+        run.assignment
+            .control_operators()
+            .iter()
+            .map(|op| op.name.as_str())
+            .collect::<Vec<_>>()
+    );
     Ok(run.assignment)
 }
 
@@ -1112,6 +1208,20 @@ fn prepare_peak_control_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
+    let observe_control =
+        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
+    macro_rules! observe {
+        ($($arg:tt)*) => {
+            if observe_control {
+                use std::io::Write as _;
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "[INFRA-CONTROL-OBSERVE] {}",
+                    format_args!($($arg)*)
+                );
+            }
+        };
+    }
     let control_names: HashSet<String> = run
         .assignment
         .control_operators()
@@ -1151,17 +1261,35 @@ fn prepare_peak_control_candidate<'a>(
             })
             .collect::<Option<Vec<_>>>()
         else {
+            observe!(
+                "control_eta mask={stable_order} candidate={names:?} rejected=missing_pool_entry"
+            );
             return false;
         };
         trial.set_room("control", operators);
         let available = initial_mood.min(model.mood_cap);
-        crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances)
+        let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
+        let accepted = eta
             .per_op
             .iter()
             .filter(|operator| names.contains(&operator.name))
             .all(|operator| {
-                crate::mood::fits_work_budget(model, available, operator.drain_per_hour, hours)
-            })
+                let fits = crate::mood::fits_work_budget(
+                    model,
+                    available,
+                    operator.drain_per_hour,
+                    hours,
+                );
+                observe!(
+                    "control_eta_operator mask={stable_order} candidate={names:?} operator={} drain_per_hour={} initial_available_mood={available} work_hours={hours} fits={fits}",
+                    operator.name,
+                    operator.drain_per_hour
+                );
+                fits
+            });
+        observe!("control_eta mask={stable_order} candidate={names:?} initial_available_mood={available} work_hours={hours} accepted={accepted} per_operator={:?}",
+            eta.per_op.iter().map(|operator| (&operator.name, operator.drain_per_hour)).collect::<Vec<_>>());
+        accepted
     };
     let control_eligibility = work_hours
         .is_some()
@@ -1183,6 +1311,9 @@ fn prepare_peak_control_candidate<'a>(
                 control_eligibility,
                 &mut run.used,
             )? {
+                observe!(
+                    "prepare_return_none mask={stable_order} reason=dynamic_control_no_legal_fill"
+                );
                 return Ok(None);
             }
         } else {
@@ -1208,6 +1339,7 @@ fn prepare_peak_control_candidate<'a>(
         .map(|operator| operator.name)
         .collect();
     if !fits_control_work_budget(&selected_names) {
+        observe!("prepare_return_none mask={stable_order} reason=selected_control_work_budget selected={selected_names:?}");
         return Ok(None);
     }
     if let Some((required, excluded)) = dynamic_set {
@@ -1218,6 +1350,9 @@ fn prepare_peak_control_candidate<'a>(
             .map(|op| op.name)
             .collect();
         if !required.is_subset(&control_names) || !control_names.is_disjoint(excluded) {
+            observe!("prepare_return_none mask={stable_order} reason=dynamic_presence_mismatch selected={selected_names:?} missing_required={:?} present_excluded={:?}",
+                required.difference(&control_names).collect::<std::collections::BTreeSet<_>>(),
+                control_names.intersection(excluded).collect::<std::collections::BTreeSet<_>>());
             return Ok(None);
         }
     }
