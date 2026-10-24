@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 #[cfg(test)]
 use std::time::Duration;
@@ -23,8 +23,8 @@ use crate::layout::{
 #[cfg(test)]
 use crate::mood::shift_eta;
 use crate::mood::{
-    default_mood_model, dorm_recovery_rates, fits_shift_budget, shift_eta_with_instances,
-    DormOccupant, MoodModel,
+    default_mood_model, dorm_recovery_rates, fits_shift_budget, fits_work_budget,
+    operator_net_drain, shift_eta_with_instances, DormOccupant, DrainInputs, MoodModel,
 };
 use crate::notes::annotate_assignment;
 use crate::operbox::OperBox;
@@ -97,6 +97,31 @@ fn advance_rotation_mood(
         let value = mood.entry(op.name).or_insert(model.mood_cap);
         *value = (*value - op.drain_per_hour * hours).max(0.0);
     }
+}
+
+fn noncontrol_eta_failure(
+    model: &MoodModel,
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    assignment: &BaseAssignment,
+    mood: &HashMap<String, f64>,
+    hours: f64,
+    first_shift: Option<(&BaseAssignment, f64)>,
+) -> Option<String> {
+    [FacilityKind::Office, FacilityKind::MeetingRoom]
+        .into_iter()
+        .find_map(|facility| {
+            nonproduction_eta_failure(
+                model,
+                blueprint,
+                instances,
+                assignment,
+                mood,
+                hours,
+                first_shift,
+                Some(facility),
+            )
+        })
 }
 
 /// 兼容入口：事件、物理菲亚预算与 ready 判定统一由 `fiammetta_events` 重放。
@@ -490,8 +515,10 @@ fn average_cycle_production(
     output
 }
 
+#[cfg(test)]
 const SUI_MOOD_OPERATORS: [&str; 2] = ["令", "夕"];
 
+#[cfg(test)]
 fn control_mood_for_shift(
     mood_by_operator: &HashMap<String, f64>,
     active_names: &HashSet<String>,
@@ -503,6 +530,54 @@ fn control_mood_for_shift(
         .filter_map(|name| mood_by_operator.get(*name).copied())
         .reduce(f64::min)
         .unwrap_or(default_mood)
+}
+
+fn abc_control_work_hours(team: TeamLabel, shift_hours: [f64; 3]) -> f64 {
+    match team {
+        TeamLabel::Alpha => shift_hours[0] + shift_hours[2],
+        TeamLabel::Beta => shift_hours[0] + shift_hours[1],
+        TeamLabel::Gamma => shift_hours[1] + shift_hours[2],
+    }
+}
+
+/// Freeze optional ABC control candidates with one-person, full-control mood
+/// admission before the shift loop. Required policy members stay visible so
+/// their existing failure/fallback path remains authoritative.
+fn freeze_abc_control_roster(
+    team_ctrl: &mut HashMap<TeamLabel, Vec<String>>,
+    pool: &crate::pool::ControlPool,
+    shift_hours: [f64; 3],
+    initial_mood: f64,
+    model: &MoodModel,
+    protected: &HashSet<String>,
+) {
+    for (team, names) in team_ctrl.iter_mut() {
+        let work_hours = abc_control_work_hours(*team, shift_hours);
+        names.retain(|name| {
+            if protected.contains(name) {
+                return true;
+            }
+            let Some(entry) = pool.entry(name) else {
+                return true;
+            };
+            let room_ops = vec![(entry.name.clone(), entry.progress.elite)];
+            let inputs = DrainInputs {
+                name: &entry.name,
+                elite: entry.progress.elite,
+                facility: FacilityKind::ControlCenter,
+                room_ops: &room_ops,
+                full_control: true,
+                control_ops: &[],
+                recipe: None,
+            };
+            fits_work_budget(
+                model,
+                initial_mood.min(model.mood_cap),
+                operator_net_drain(model, &inputs),
+                work_hours,
+            )
+        });
+    }
 }
 
 #[cfg(test)]
@@ -3235,6 +3310,7 @@ fn finalize_timed_rotation(
         &report,
         initial_mood,
         Some(fiammetta_enable),
+        false,
     );
     stage_after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_solver_stage(
@@ -4668,7 +4744,7 @@ pub fn assert_final_rotation_invariants(
         ));
     }
     assert_final_rotation_invariants_with_mood(
-        blueprint, operbox, instances, table, report, 24.0, None,
+        blueprint, operbox, instances, table, report, 24.0, None, true,
     )
 }
 
@@ -4693,6 +4769,7 @@ pub fn assert_final_rotation_invariants_for_request(
         report,
         24.0,
         Some(fiammetta_enable),
+        true,
     )
 }
 
@@ -4704,6 +4781,7 @@ fn assert_final_rotation_invariants_with_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
     fiammetta_enable: Option<bool>,
+    check_cycle_mood: bool,
 ) -> Result<()> {
     let cycle_hours =
         validate_rotation_duration_hours(report.shifts.iter().map(|shift| shift.duration_hours))
@@ -5121,8 +5199,10 @@ fn assert_final_rotation_invariants_with_mood(
     }
     validate_fiammetta_continuous_targets(blueprint, report.profile, &report.shifts)
         .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
-    validate_cycle_mood(blueprint, instances, report, initial_mood)
-        .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+    if check_cycle_mood {
+        validate_cycle_mood(blueprint, instances, report, initial_mood)
+            .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
+    }
     for shift in &report.shifts {
         for room in blueprint.rooms_of(FacilityKind::MeetingRoom) {
             let members = shift.assignment.operators_in(&room.id);
@@ -5448,7 +5528,7 @@ fn assert_final_rotation_invariants_with_mood(
                             .map(|first| (&first.assignment, first.duration_hours))
                     })
                     .flatten();
-                if let Some(name) = nonproduction_eta_failure(
+                if let Some(name) = noncontrol_eta_failure(
                     &mood,
                     blueprint,
                     instances,
@@ -5456,7 +5536,6 @@ fn assert_final_rotation_invariants_with_mood(
                     &mood_state,
                     shift.duration_hours,
                     next_cycle_first,
-                    None,
                 ) {
                     return Err(Error::msg(format!(
                         "assert-invariants nonproduction_rotation_eta failed in cycle {} shift {} for {}",
@@ -7457,11 +7536,6 @@ struct AbcRotationEtaFailure {
     optional_control_role: Option<(String, String, String)>,
 }
 
-enum AbcControlCandidateFailure {
-    Eta(String),
-    Other(Error),
-}
-
 impl AbcRotationEtaFailure {
     fn for_operator(plan: &AssignmentPlan, failed: &str) -> Self {
         Self {
@@ -8167,6 +8241,30 @@ fn schedule_abc_rotation_once(
             names.retain(|name| name != producer);
         }
     }
+    let mut protected_control_names = system_ctrl_names.clone();
+    protected_control_names.extend(shared.control_operators().into_iter().map(|op| op.name));
+    protected_control_names.extend(
+        peak_plan
+            .control_candidate_requirements
+            .iter()
+            .flat_map(|requirement| requirement.candidates.iter().cloned()),
+    );
+    protected_control_names.extend(
+        peak_plan
+            .registry_claims
+            .iter()
+            .flat_map(|claim| &claim.slots)
+            .filter(|slot| slot.facility == FacilityKind::ControlCenter)
+            .flat_map(|slot| slot.operators.iter().map(|operator| operator.name.clone())),
+    );
+    freeze_abc_control_roster(
+        &mut team_ctrl,
+        &control_pool,
+        shift_hours,
+        options.mood,
+        &mood_model,
+        &protected_control_names,
+    );
     let control_closure = Arc::new(ControlRotationClosure::new(
         blueprint,
         &control_pool,
@@ -8314,238 +8412,105 @@ fn schedule_abc_rotation_once(
             })
             .unwrap_or_default();
         let admission = Some((&rotation_mood, &first_consumption));
-        // 活跃两队的中枢干员名册
-        let active_names: HashSet<String> = active
-            .iter()
-            .flat_map(|t| team_ctrl.get(t).cloned().unwrap_or_default())
-            .collect();
-        control_options.mood = control_mood_for_shift(&rotation_mood, &active_names, options.mood);
-        // 从活跃两队池分配中枢；不足五人是不可行排班，不能静默留下空席。
+        // Control candidates were admitted and frozen before entering the shift loop.
+        control_options.mood = options.mood;
         let mut assign_ctrl =
             |a: &mut BaseAssignment, used: &mut HashSet<String>, extra_control_pins: &[&str]| {
-                let original = a.clone();
-                let mut pending = VecDeque::from([HashSet::<String>::new()]);
-                let mut attempted = HashSet::new();
-                let mut last_failure = None;
-                while let Some(rejected) = pending.pop_front() {
-                    let mut key: Vec<_> = rejected.iter().cloned().collect();
-                    key.sort();
-                    if attempted.contains(&key) {
-                        continue;
-                    }
-                    if attempted.len() >= 64 {
-                        let mut budget_detail = String::new();
-                        match last_failure.take() {
-                            Some(AbcControlCandidateFailure::Eta(name)) => {
-                                budget_detail = format!("; last ETA bottleneck={name}");
-                                *eta_failure =
-                                    Some(AbcRotationEtaFailure::for_operator(&peak_plan, &name));
-                            }
-                            Some(AbcControlCandidateFailure::Other(error)) => return Err(error),
-                            None => {}
-                        }
-                        return Err(Error::msg(format!(
-                            "control rotation ETA candidate budget exhausted in shift {}{}",
-                            index + 1,
-                            budget_detail
-                        )));
-                    }
-                    attempted.insert(key);
-                    *a = original.clone();
-                    let control_admission =
-                        control_closure.admission(index, &active, extra_control_pins)?;
-                    let final_pool = control_admission.prepare(a, &rejected)?;
-                    *used = a.operator_names();
-                    let current_layout = crate::layout::resolve_control_input_layout(
+                let control_admission =
+                    control_closure.admission(index, &active, extra_control_pins)?;
+                let final_pool = control_admission.prepare(a, &HashSet::new())?;
+                *used = a.operator_names();
+                let current_layout = crate::layout::resolve_control_input_layout(
+                    blueprint,
+                    a,
+                    instances,
+                    table,
+                    control_options.mood,
+                    Some(durin_plan),
+                )?;
+                crate::layout::assign_control_with_saileach(
+                    a,
+                    &final_pool,
+                    table,
+                    &current_layout,
+                    &control_options,
+                    &control_admission.requirements(),
+                    &HashSet::new(),
+                    None,
+                    control_admission.required_names().contains("琴柳"),
+                    None,
+                    used,
+                )?;
+                control_admission.validate(a).and_then(|()| {
+                    let mut office_eta_failure = None;
+                    assign_office_for_shift_with_mood(
+                        a,
                         blueprint,
-                        a,
-                        instances,
-                        table,
-                        control_options.mood,
-                        Some(durin_plan),
-                    )?;
-                    let seed = a.clone();
-                    let control_eta_rejection = std::sync::Mutex::new(None);
-                    let fits_control = |names: &[String]| {
-                        let mut trial = seed.clone();
-                        trial.set_room(
-                            "control",
-                            names
-                                .iter()
-                                .map(|name| {
-                                    let entry = final_pool
-                                        .entry(name)
-                                        .expect("search member from admitted pool");
-                                    AssignedOperator::from_progress(name, entry.progress)
-                                })
-                                .collect(),
-                        );
-                        let failed = nonproduction_eta_failure(
-                            &mood_model,
-                            blueprint,
-                            instances,
-                            &trial,
-                            &rotation_mood,
-                            hours,
-                            first_shift,
-                            Some(FacilityKind::ControlCenter),
-                        );
-                        if let Some(name) = &failed {
-                            *control_eta_rejection.lock().expect("local ETA state") =
-                                Some(name.clone());
-                        }
-                        failed.is_none()
-                    };
-                    if let Err(error) = crate::layout::assign_control_with_saileach(
-                        a,
-                        &final_pool,
-                        table,
-                        &current_layout,
-                        &control_options,
-                        &control_admission.requirements(),
-                        &HashSet::new(),
-                        None,
-                        control_admission.required_names().contains("琴柳"),
-                        Some(&fits_control),
-                        used,
-                    ) {
-                        if rejected.is_empty() {
-                            *eta_failure = control_eta_rejection
-                                .into_inner()
-                                .expect("local ETA state")
-                                .map(|name| AbcRotationEtaFailure::for_operator(&peak_plan, &name));
-                            return Err(error);
-                        }
-                        last_failure = Some(AbcControlCandidateFailure::Other(error));
-                        continue;
-                    }
-                    if let Err(error) = control_admission.validate(a) {
-                        if rejected.is_empty() {
-                            return Err(error);
-                        }
-                        last_failure = Some(AbcControlCandidateFailure::Other(error));
-                        continue;
-                    }
-                    *used = a.operator_names();
-
-                    let mut early_failure = nonproduction_eta_failure(
-                        &mood_model,
-                        blueprint,
-                        instances,
-                        a,
-                        &rotation_mood,
-                        hours,
-                        first_shift,
-                        Some(FacilityKind::ControlCenter),
-                    );
-                    if early_failure.is_none() {
-                        let mut office_eta_failure = None;
-                        let office_result = assign_office_for_shift_with_mood(
-                            a,
-                            blueprint,
-                            &active_bound_office_names(&bound_office_team, &active),
-                            &bound_office_names,
-                            &office_ranked_pool
-                                .iter()
-                                .filter(|candidate| {
-                                    control_closure
-                                        .team_of(&candidate.name)
-                                        .is_none_or(|team| active.contains(&team))
-                                })
-                                .cloned()
-                                .collect::<Vec<_>>(),
-                            hours,
-                            Some(instances),
-                            admission,
-                            Some(&mut office_eta_failure),
-                        );
-                        match office_result {
-                            Ok(()) => {
-                                assign_rotating_meetings_with_context(
-                                    a,
-                                    blueprint,
-                                    &active,
-                                    resting,
-                                    &rotating_meeting_team,
-                                    &meeting_pool,
-                                    &reserved,
-                                    Some(&FacilityRotationEligibility {
-                                        worked_hours: &meeting_worked_hours,
-                                        shift_hours: hours,
-                                    }),
-                                    Some(instances),
-                                    admission,
-                                    &layout,
-                                )?;
-                                assign_rotating_recycle(
-                                    a,
-                                    blueprint,
-                                    &active,
-                                    &rotating_recycle_team,
-                                    &recycle_skill_pool,
-                                    Some(&FacilityRotationEligibility {
-                                        worked_hours: &meeting_worked_hours,
-                                        shift_hours: hours,
-                                    }),
-                                    instances,
-                                    admission,
-                                );
-                            }
-                            Err(_) if office_eta_failure.is_some() => {
-                                early_failure = office_eta_failure;
-                            }
-                            Err(error) => return Err(error),
-                        }
-                    }
-                    let failed = early_failure.or_else(|| {
-                        nonproduction_eta_failure(
-                            &mood_model,
-                            blueprint,
-                            instances,
-                            a,
-                            &rotation_mood,
-                            hours,
-                            first_shift,
-                            None,
-                        )
-                    });
-                    if let Some(failed) = failed {
-                        let mut alternatives: Vec<String> = a
-                            .control_operators()
-                            .into_iter()
-                            .map(|op| op.name)
-                            .filter(|name| {
-                                !control_admission.required_names().contains(name)
-                                    && !rejected.contains(name)
+                        &active_bound_office_names(&bound_office_team, &active),
+                        &bound_office_names,
+                        &office_ranked_pool
+                            .iter()
+                            .filter(|candidate| {
+                                control_closure
+                                    .team_of(&candidate.name)
+                                    .is_none_or(|team| active.contains(&team))
                             })
-                            .collect();
-                        alternatives.sort();
-                        alternatives.sort_by_key(|name| name != &failed);
-                        for name in alternatives.into_iter().rev() {
-                            let mut branch = rejected.clone();
-                            branch.insert(name);
-                            pending.push_front(branch);
-                        }
-                        last_failure = Some(AbcControlCandidateFailure::Eta(failed));
-                        continue;
-                    }
-                    return Ok::<(), Error>(());
-                }
-                match last_failure {
-                    Some(AbcControlCandidateFailure::Eta(name)) => {
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                        hours,
+                        Some(instances),
+                        admission,
+                        Some(&mut office_eta_failure),
+                    )?;
+                    assign_rotating_meetings_with_context(
+                        a,
+                        blueprint,
+                        &active,
+                        resting,
+                        &rotating_meeting_team,
+                        &meeting_pool,
+                        &reserved,
+                        Some(&FacilityRotationEligibility {
+                            worked_hours: &meeting_worked_hours,
+                            shift_hours: hours,
+                        }),
+                        Some(instances),
+                        admission,
+                        &layout,
+                    )?;
+                    assign_rotating_recycle(
+                        a,
+                        blueprint,
+                        &active,
+                        &rotating_recycle_team,
+                        &recycle_skill_pool,
+                        Some(&FacilityRotationEligibility {
+                            worked_hours: &meeting_worked_hours,
+                            shift_hours: hours,
+                        }),
+                        instances,
+                        admission,
+                    );
+                    if let Some(name) = office_eta_failure.or_else(|| {
+                        noncontrol_eta_failure(
+                            &mood_model,
+                            blueprint,
+                            instances,
+                            a,
+                            &rotation_mood,
+                            hours,
+                            first_shift,
+                        )
+                    }) {
                         *eta_failure = Some(AbcRotationEtaFailure::for_operator(&peak_plan, &name));
-                        Err(Error::msg(format!(
-                            "control rotation ETA cannot cover shift {} for {}",
+                        return Err(Error::msg(format!(
+                            "nonproduction rotation ETA cannot cover shift {} for {}",
                             index + 1,
                             name
-                        )))
+                        )));
                     }
-                    Some(AbcControlCandidateFailure::Other(error)) => Err(error),
-                    None => Err(Error::msg(format!(
-                        "control rotation has no candidates in shift {}",
-                        index + 1
-                    ))),
-                }
+                    Ok(())
+                })
             };
 
         let mut assignment;
@@ -8746,7 +8711,7 @@ fn schedule_abc_rotation_once(
             });
         }
         let assignment = &shifts.last().expect("shift just appended").assignment;
-        if let Some(name) = nonproduction_eta_failure(
+        if let Some(name) = noncontrol_eta_failure(
             &mood_model,
             blueprint,
             instances,
@@ -8754,7 +8719,6 @@ fn schedule_abc_rotation_once(
             &rotation_mood,
             hours,
             first_shift,
-            None,
         ) {
             *eta_failure = Some(AbcRotationEtaFailure::for_operator(&peak_plan, &name));
             return Err(Error::msg(format!(

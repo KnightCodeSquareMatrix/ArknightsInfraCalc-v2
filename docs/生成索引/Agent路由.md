@@ -71,21 +71,21 @@
 
 **优先级**：`70`
 
-**症状**：班次互斥错误、同上同下错误、profile 不识别、休息状态错误
+**症状**：班次互斥错误、同上同下错误、profile 不识别、休息状态错误、泡泡火神未进入首个源石房、源石预占被后续阶段拆开
 
-**判别**：profile、班次互斥、shift_bind、连续工作或 dorm_rest 异常时选择。
+**判别**：profile、班次互斥、shift_bind、连续工作、dorm_rest，或普通二/三班泡泡/火神源石预占未成立/被拆开时选择；资格、选房、班次、保护和 gate 细节读 docs/泡泡火神源石优先.md。
 
-**入口**：`crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation`
+**入口**：`crates/infra-core/src/schedule/team_rotation.rs::schedule_timed_rotation_request`
 
 **完整调用链**：[docs/调用链/定时轮换.md](../调用链/定时轮换.md)
 
-**模块 owner**：[docs/模块/排班与轮换.md](../模块/排班与轮换.md)；[docs/模块/导出与岗位状态.md](../模块/导出与岗位状态.md)
+**模块 owner**：[docs/模块/排班与轮换.md](../模块/排班与轮换.md)；[docs/模块/导出与岗位状态.md](../模块/导出与岗位状态.md)；[docs/泡泡火神源石优先.md](../泡泡火神源石优先.md)
 
 **机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
 
 **知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/5-换班操作/定时换班.md`；`docs/1-基础设定/设施与进驻/心情与宿舍.md`
 
-**验证**：`infra-cli layout team-rotation --layout <path> --operbox <path> --json`
+**验证**：`cargo build --release -p infra-cli`；`target/release/infra-cli plan --operbox <path> --rotation <named|main-backup@H1/H2|abc@H1/H2/H3> --assert-invariants --maa-out out/<task>-maa.json`；`python3 scripts/assert_rotation_invariants.py --binary target/release/infra-cli --skip-build --group representative`
 
 ## `EXPORT.MAA`：MAA 导出
 

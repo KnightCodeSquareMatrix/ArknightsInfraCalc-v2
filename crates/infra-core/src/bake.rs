@@ -36,7 +36,7 @@ use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::{Condition, RecipeKind, Selector};
 use crate::FacilityKind;
 
-pub const BAKE_SCHEMA_VERSION: u32 = 14;
+pub const BAKE_SCHEMA_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BakeMode {
@@ -305,6 +305,7 @@ struct BakedComboRowDisk {
     rule_id: Option<String>,
     unit_trade_per_day: Option<f64>,
     unit_gold_per_day: Option<f64>,
+    unit_gold_consumption_per_day: Option<f64>,
     unit_originium_per_day: Option<f64>,
     manufacture_base_efficiency_millis: Option<i32>,
     manufacture_occupancy_efficiency_millis: Option<i32>,
@@ -364,6 +365,7 @@ impl From<&BakedComboRow> for BakedComboRowDisk {
             rule_id: value.rule_id.clone(),
             unit_trade_per_day: value.unit_trade_per_day,
             unit_gold_per_day: value.unit_gold_per_day,
+            unit_gold_consumption_per_day: value.unit_gold_consumption_per_day,
             unit_originium_per_day: value.unit_originium_per_day,
             manufacture_base_efficiency_millis: value
                 .manufacture_base_efficiency
@@ -450,6 +452,7 @@ impl From<BakedComboRowDisk> for BakedComboRow {
             rule_id: value.rule_id,
             unit_trade_per_day: value.unit_trade_per_day,
             unit_gold_per_day: value.unit_gold_per_day,
+            unit_gold_consumption_per_day: value.unit_gold_consumption_per_day,
             unit_originium_per_day: value.unit_originium_per_day,
             manufacture_base_efficiency: value
                 .manufacture_base_efficiency_millis
@@ -537,6 +540,8 @@ struct BakedComboRow {
     unit_trade_per_day: Option<f64>,
     #[serde(rename = "ugd", skip_serializing_if = "Option::is_none")]
     unit_gold_per_day: Option<f64>,
+    #[serde(rename = "ugcd", skip_serializing_if = "Option::is_none")]
+    unit_gold_consumption_per_day: Option<f64>,
     #[serde(rename = "uod", default, skip_serializing_if = "Option::is_none")]
     unit_originium_per_day: Option<f64>,
     #[serde(rename = "mb", skip_serializing_if = "Option::is_none")]
@@ -1024,6 +1029,7 @@ fn trade_combo_row(
         rule_id: result.rule_id.clone(),
         unit_trade_per_day: Some(result.production.unit.unit_trade_per_day),
         unit_gold_per_day: Some(result.production.unit.unit_gold_per_day),
+        unit_gold_consumption_per_day: Some(result.production.unit.gold_consumption_per_day),
         unit_originium_per_day: Some(result.production.unit.unit_originium_per_day),
         manufacture_base_efficiency: None,
         manufacture_occupancy_efficiency: None,
@@ -1167,6 +1173,7 @@ fn manufacture_combo_row(
         rule_id: None,
         unit_trade_per_day: None,
         unit_gold_per_day: None,
+        unit_gold_consumption_per_day: None,
         unit_originium_per_day: None,
         manufacture_base_efficiency: Some(result.base_efficiency),
         manufacture_occupancy_efficiency: Some(result.occupancy_efficiency),
@@ -1551,6 +1558,13 @@ impl CompleteBakedTradeCatalog {
                 combined_output_value: efficiency.combined_output_value,
                 unit_trade_per_day: result.production.unit.unit_trade_per_day,
                 unit_gold_per_day: result.production.unit.unit_gold_per_day,
+                trade_output_per_day: result.production.unit.unit_trade_per_day
+                    * efficiency.total_efficiency.as_f64(),
+                gold_consumption_per_day: result.production.unit.gold_consumption_per_day
+                    * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
+                    * efficiency.total_efficiency.as_f64(),
+                originium_shards_per_day: result.production.unit.unit_originium_per_day
+                    * efficiency.total_efficiency.as_f64(),
                 rule_id: result.rule_id,
                 ..TradeEfficiencyBreakdown::default()
             }),
@@ -1870,6 +1884,7 @@ fn trade_response_fields_present(row: &BakedComboRowDisk) -> bool {
         && row.trade_combined_output_value_millis.is_some()
         && row.unit_trade_per_day.is_some()
         && row.unit_gold_per_day.is_some()
+        && row.unit_gold_consumption_per_day.is_some()
         && row.unit_originium_per_day.is_some()
 }
 
@@ -1894,6 +1909,7 @@ fn any_trade_response_field_present(row: &BakedComboRowDisk) -> bool {
         || row.trade_equivalent_skill_efficiency_millis.is_some()
         || row.unit_trade_per_day.is_some()
         || row.unit_gold_per_day.is_some()
+        || row.unit_gold_consumption_per_day.is_some()
         || row.unit_originium_per_day.is_some()
 }
 
@@ -2348,6 +2364,7 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
     let mechanic_equivalent_efficiency = row.trade_mechanic_equivalent_efficiency?;
     let unit_trade_per_day = row.unit_trade_per_day.unwrap_or(0.0);
     let unit_gold_per_day = row.unit_gold_per_day.unwrap_or(0.0);
+    let unit_gold_consumption_per_day = row.unit_gold_consumption_per_day?;
     let unit_originium_per_day = row.unit_originium_per_day.unwrap_or(0.0);
     let total_efficiency = row.trade_paper_efficiency?;
     Some(TradeSearchHit {
@@ -2384,6 +2401,9 @@ fn row_to_trade_hit(row: &BakedComboRow) -> Option<TradeSearchHit> {
             unit_trade_per_day,
             unit_gold_per_day,
             trade_output_per_day: unit_trade_per_day * total_efficiency.as_f64(),
+            gold_consumption_per_day: unit_gold_consumption_per_day
+                * crate::trade::unit_output::GSL_GOLD_UNIT_SCALE
+                * total_efficiency.as_f64(),
             originium_shards_per_day: unit_originium_per_day * total_efficiency.as_f64(),
             rule_id: row.rule_id.clone(),
             ..TradeEfficiencyBreakdown::default()
@@ -2933,6 +2953,56 @@ mod tests {
             serde_json::to_value(resolved).unwrap(),
             serde_json::to_value(&row.baseline_response).unwrap()
         );
+    }
+
+    #[test]
+    fn baked_trade_hit_restores_special_gold_consumption() {
+        let catalog = complete_trade_catalog();
+        let rows = catalog.rows_for(3, TradeOrderKind::Gold).unwrap();
+        let closure_row =
+            rows.rows
+                .iter()
+                .find(|row| {
+                    row.baseline_response.rule_id.as_deref().is_some_and(|id| {
+                        id.starts_with("gsl_closure") || id == "gsl_blackkey_closure"
+                    })
+                })
+                .expect("complete trade catalog includes a Closure shortcut row");
+        let baked_consumption = closure_row
+            .baseline_response
+            .breakdown
+            .as_ref()
+            .unwrap()
+            .gold_consumption_per_day;
+        assert!(baked_consumption > 0.0);
+
+        let resolved = catalog
+            .resolve_row_live(
+                &closure_row.row_id,
+                3,
+                TradeOrderKind::Gold,
+                Arc::new(LayoutContext::search_baseline()),
+                24.0,
+                24.0,
+            )
+            .unwrap();
+        assert_eq!(
+            baked_consumption,
+            resolved
+                .breakdown
+                .as_ref()
+                .unwrap()
+                .gold_consumption_per_day
+        );
+
+        let ordinary_row = rows
+            .rows
+            .iter()
+            .find(|row| !row.names.iter().any(|name| name == "可露希尔"))
+            .expect("complete trade catalog includes a non-Closure row");
+        let ordinary_breakdown = ordinary_row.baseline_response.breakdown.as_ref().unwrap();
+        assert!(ordinary_breakdown.unit_gold_per_day > 0.0);
+        assert_eq!(ordinary_breakdown.gold_consumption_per_day, 0.0);
     }
 
     #[test]

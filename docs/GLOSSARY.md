@@ -149,8 +149,8 @@
 | 术语 | 短定义 | Owner / 详见 |
 |---|---|---|
 | Bake / 烘焙 | 预先生成单房候选 catalog，以减少兼容上下文中的实时组合求值。 | [质量总则](QUALITY_AND_AUDIT.md#6-bake-安全门禁)、[性能工程](PERFORMANCE_ENGINEERING.md) |
-| baked catalog | `combo_table.bin`、operators、manifest 等本地产物；当前代码要求 schema v13。 | `bake.rs`、[性能工程](PERFORMANCE_ENGINEERING.md) |
-| compatibility gate | 使用 Bake 前对 schema、输入指纹、候选身份和动态上下文进行的安全检查；不兼容走 live。 | [质量总则](QUALITY_AND_AUDIT.md#61-当前-schema-v13-已实现的门禁) |
+| baked catalog | `combo_table.bin`、operators、manifest 等本地产物；当前代码要求 schema v15。 | `bake.rs`、[性能工程](PERFORMANCE_ENGINEERING.md) |
+| compatibility gate | 使用 Bake 前对 schema、输入指纹、候选身份和动态上下文进行的安全检查；不兼容走 live。 | [质量总则](QUALITY_AND_AUDIT.md#61-当前-schema-v15-已实现的门禁) |
 | effect signature | 决定候选结算结果的上下文摘要；只有 owner 明确覆盖的签名才能安全缓存。 | [质量总则](QUALITY_AND_AUDIT.md#6-bake-安全门禁) |
 | A+ Bake | 完整条件响应候选与安全 runtime join 的未来设计；当前不是已实现能力。 | [A+ TODO](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) |
 | fixture / 夹具 | 可重复构造输入的最小或标准数据，如 `data/fixtures/243/` 和 verify 房间。 | [Debug 指南](MAINTENANCE_MODE.md) |

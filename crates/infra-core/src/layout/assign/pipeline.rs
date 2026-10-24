@@ -1239,61 +1239,6 @@ fn prepare_peak_control_candidate<'a>(
                     && requirement.candidates.iter().any(|name| name == "琴柳")
             });
     let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
-    let control_seed = run.assignment.clone();
-    let blueprint = run.blueprint;
-    let instances = run.instances;
-    let work_hours = run.options.control_work_hours;
-    let mood_model = work_hours
-        .map(|_| crate::mood::default_mood_model())
-        .transpose()?;
-    let initial_mood = run.options.mood;
-    let fits_control_work_budget = |names: &[String]| {
-        let (Some(hours), Some(model)) = (work_hours, mood_model.as_ref()) else {
-            return true;
-        };
-        let mut trial = control_seed.clone();
-        let Some(operators) = names
-            .iter()
-            .map(|name| {
-                control_pool.entry(name).map(|entry| {
-                    crate::layout::AssignedOperator::from_progress(name, entry.progress)
-                })
-            })
-            .collect::<Option<Vec<_>>>()
-        else {
-            observe!(
-                "control_eta mask={stable_order} candidate={names:?} rejected=missing_pool_entry"
-            );
-            return false;
-        };
-        trial.set_room("control", operators);
-        let available = initial_mood.min(model.mood_cap);
-        let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
-        let accepted = eta
-            .per_op
-            .iter()
-            .filter(|operator| names.contains(&operator.name))
-            .all(|operator| {
-                let fits = crate::mood::fits_work_budget(
-                    model,
-                    available,
-                    operator.drain_per_hour,
-                    hours,
-                );
-                observe!(
-                    "control_eta_operator mask={stable_order} candidate={names:?} operator={} drain_per_hour={} initial_available_mood={available} work_hours={hours} fits={fits}",
-                    operator.name,
-                    operator.drain_per_hour
-                );
-                fits
-            });
-        observe!("control_eta mask={stable_order} candidate={names:?} initial_available_mood={available} work_hours={hours} accepted={accepted} per_operator={:?}",
-            eta.per_op.iter().map(|operator| (&operator.name, operator.drain_per_hour)).collect::<Vec<_>>());
-        accepted
-    };
-    let control_eligibility = work_hours
-        .is_some()
-        .then_some(&fits_control_work_budget as &(dyn Fn(&[String]) -> bool + Sync));
     if run.assignment.control_operators().len() < 5 {
         if let Some((required, excluded)) = dynamic_set {
             if !assign_control_matching_dynamic_set_with_saileach(
@@ -1308,7 +1253,7 @@ fn prepare_peak_control_candidate<'a>(
                 control_exclusions,
                 saileach_best_office_pct,
                 saileach_required,
-                control_eligibility,
+                None,
                 &mut run.used,
             )? {
                 observe!(
@@ -1327,7 +1272,7 @@ fn prepare_peak_control_candidate<'a>(
                 control_exclusions,
                 saileach_best_office_pct,
                 saileach_required,
-                control_eligibility,
+                None,
                 &mut run.used,
             )?;
         }
@@ -1338,10 +1283,6 @@ fn prepare_peak_control_candidate<'a>(
         .into_iter()
         .map(|operator| operator.name)
         .collect();
-    if !fits_control_work_budget(&selected_names) {
-        observe!("prepare_return_none mask={stable_order} reason=selected_control_work_budget selected={selected_names:?}");
-        return Ok(None);
-    }
     if let Some((required, excluded)) = dynamic_set {
         let control_names: HashSet<String> = run
             .assignment

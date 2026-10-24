@@ -34,9 +34,9 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## Bake
 
-`bake_catalogs` 用 live solver 生成 schema v14 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。旧 catalog 因 schema 不匹配需重建，`data/baked/` 不提交生成表。
+`bake_catalogs` 用 live solver 生成 schema v15 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。旧 catalog 因 schema 不匹配需重建；当前 `data/baked/` 的运行 catalog 是仓库跟踪数据，schema 变更后必须同步重建。
 
-Baked 行复原贸易产出时，`trade_output_per_day = unit_trade_per_day × paper total_efficiency`，`originium_shards_per_day = unit_originium_per_day × paper total_efficiency`；`gold_consumption_per_day` 所需的 scale 未持久化，仍保持默认值而不得伪造。该复原由 `01cbec5` 修正，尚无该提交后的新鲜构建与完整 live-vs-baked 重跑证据。
+Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金产出和单位源石消耗。命中时分别按实时路径用单位值 × `total_efficiency` 复原日产贸易与源石产出；特殊赤金产出再乘 `GSL_GOLD_UNIT_SCALE`，避免把普通订单赤金消耗误报为特殊产金。该恢复不改变候选集合、比较键或排序。
 
 `BakeMode::Auto` 不兼容就回 live，`Disabled` 禁用，`Required` 对 miss 失败。生成物不可手工编辑为规则。
 

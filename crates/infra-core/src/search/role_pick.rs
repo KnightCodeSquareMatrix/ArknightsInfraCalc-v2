@@ -311,6 +311,40 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
+    #[test]
+    fn role_pick_sort_key_prefers_final_efficiency_over_total_efficiency() {
+        let make_hit = |name: &str, total: f64, output_multiplier: f64| {
+            let total_efficiency = Efficiency::from_decimal(total);
+            let unit_output_multiplier = Efficiency::from_decimal(output_multiplier);
+            let final_efficiency = total_efficiency * unit_output_multiplier;
+            TradeSearchHit {
+                names: vec![name.to_string()],
+                gold_names: Vec::new(),
+                originium_names: Vec::new(),
+                final_efficiency,
+                mechanic_equivalent_efficiency: Efficiency::ZERO,
+                rule_id: None,
+                unit_trade_per_day: 0.0,
+                unit_gold_per_day: 0.0,
+                unit_originium_per_day: 0.0,
+                breakdown: Some(TradeEfficiencyBreakdown {
+                    total_efficiency,
+                    unit_output_multiplier,
+                    final_efficiency,
+                    ..TradeEfficiencyBreakdown::default()
+                }),
+            }
+        };
+        let higher_final = make_hit("higher-final", 1.8, 1.25);
+        let higher_total = make_hit("higher-total", 2.1, 1.0);
+
+        assert!(
+            higher_final.breakdown.as_ref().unwrap().total_efficiency
+                < higher_total.breakdown.as_ref().unwrap().total_efficiency
+        );
+        assert!(role_pick_sort_key(&higher_final) > role_pick_sort_key(&higher_total));
+    }
+
     fn fixtures(names: &[(&str, u8)]) -> (TradePool, SkillTable, LayoutContext) {
         let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
         let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();

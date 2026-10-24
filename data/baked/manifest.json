@@ -1,33 +1,33 @@
 {
-  "schema_version": 12,
+  "schema_version": 15,
   "generated_by": "infra-core::bake",
   "model": "binary_single_room_combo_table",
   "generator": {
     "kind": "infra-cli-exe",
-    "path": "/home/knightcode/Projects/ArknightsInfraCalc-check/bin/infra-cli",
-    "bytes": 14334696,
-    "hash64": "4bf708ffa995f3c1"
+    "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/target/release/infra-cli",
+    "bytes": 15875464,
+    "hash64": "e37afe6ee5cac040"
   },
   "inputs": [
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/base_systems.json",
-      "bytes": 7317,
-      "hash64": "5372cf4016df7353"
+      "bytes": 7424,
+      "hash64": "7dc6a813b0990409"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/layout/243_use_this_.json",
-      "bytes": 1896,
-      "hash64": "38a0302e8cd481c0"
+      "bytes": 1792,
+      "hash64": "4b46789a60fa1e88"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/operator_instances.json",
-      "bytes": 159438,
-      "hash64": "348c3260efef88b4"
+      "bytes": 167288,
+      "hash64": "06be67c07c3091c3"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/skill_table.json",
-      "bytes": 165334,
-      "hash64": "c7cb82ba82bf2dc1"
+      "bytes": 168619,
+      "hash64": "4f40c5fcb491aed3"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/standalone_roster.json",
@@ -36,8 +36,8 @@
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/trade_segments.json",
-      "bytes": 3331,
-      "hash64": "ceacf55d6a57f78f"
+      "bytes": 3380,
+      "hash64": "9ae10fe5acc72e79"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/trade_shortcuts.json",
@@ -53,8 +53,8 @@
     "layout_model": "single room signatures; gold trade keeps gold line count in key"
   },
   "combo_table": {
-    "bytes": 17815649,
-    "hash64": "c3fd152dd6c09fb3",
+    "bytes": 20298489,
+    "hash64": "b2eef3a9e7a33b95",
     "rows_by_signature": {
       "manufacture:level1:cap1:recipe_battlerecord": 22,
       "manufacture:level1:cap1:recipe_gold": 15,
@@ -66,9 +66,9 @@
       "manufacture:level3:cap3:recipe_gold": 455,
       "manufacture:level3:cap3:recipe_originium": 455,
       "trade:level1:cap1:order_gold:gold_lines2": 75,
-      "trade:level2:cap2:order_gold:gold_lines2": 2711,
-      "trade:level3:cap3:order_gold:gold_lines2": 64376,
-      "trade:level3:cap3:order_originium": 64376
+      "trade:level2:cap2:order_gold:gold_lines2": 2709,
+      "trade:level3:cap3:order_gold:gold_lines2": 64294,
+      "trade:level3:cap3:order_originium": 64294
     }
   }
 }

@@ -46,6 +46,8 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 
 完整贸易行集合经 catalog 校验后，在查询行时按同一黑键—巫恋禁配过滤，再取前 K 条；该全局产品禁配可在 `Required` 下命中。其他未表示的禁配仍按原有 miss 语义处理；可执行文件或输入指纹不匹配的旧表不能跳过验证。
 
+贸易行还保存单位特殊赤金产出能力；Bake 命中时使用与 live solver 相同的单位换算和总效率还原 `gold_consumption_per_day`，再交给 assignment commit。该隐藏字段不决定候选排序，普通订单的特殊产金值保持为零。
+
 ## 失败传播与排查
 
 | 阶段 | 可见症状 | 首先检查 |

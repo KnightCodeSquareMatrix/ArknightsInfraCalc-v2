@@ -738,6 +738,47 @@ mod tests {
     use crate::roster::{OperatorProgress, Roster};
     use crate::skill_table::{default_skill_table_path, SkillTable};
 
+    fn trade_hit_with_efficiencies(
+        name: &str,
+        total_efficiency: f64,
+        unit_output_multiplier: f64,
+    ) -> TradeSearchHit {
+        let total_efficiency = Efficiency::from_decimal(total_efficiency);
+        let unit_output_multiplier = Efficiency::from_decimal(unit_output_multiplier);
+        let final_efficiency = total_efficiency * unit_output_multiplier;
+        TradeSearchHit {
+            names: vec![name.to_string()],
+            gold_names: Vec::new(),
+            originium_names: Vec::new(),
+            final_efficiency,
+            mechanic_equivalent_efficiency: Efficiency::ZERO,
+            rule_id: None,
+            unit_trade_per_day: 0.0,
+            unit_gold_per_day: 0.0,
+            unit_originium_per_day: 0.0,
+            breakdown: Some(TradeEfficiencyBreakdown {
+                total_efficiency,
+                unit_output_multiplier,
+                final_efficiency,
+                ..TradeEfficiencyBreakdown::default()
+            }),
+        }
+    }
+
+    #[test]
+    fn trade_sort_key_prefers_final_efficiency_over_total_efficiency() {
+        let higher_final = trade_hit_with_efficiencies("higher-final", 1.8, 1.25);
+        let higher_total = trade_hit_with_efficiencies("higher-total", 2.1, 1.0);
+
+        assert!(
+            higher_final.breakdown.as_ref().unwrap().total_efficiency
+                < higher_total.breakdown.as_ref().unwrap().total_efficiency
+        );
+        assert!(
+            trade_efficiency_sort_key(&higher_final) > trade_efficiency_sort_key(&higher_total)
+        );
+    }
+
     #[test]
     fn default_search_options_includes_layout_baseline() {
         let opts = TradeSearchOptions::default();

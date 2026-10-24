@@ -230,8 +230,7 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let mut mood_admission =
-        registry_mood_admission(control_work_hours, blueprint, operbox, instances, mood)?;
+    let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
     let mut admit_all = |_: &crate::layout::system::RegistrySystemClaim, _: &BaseAssignment| true;
     let admission = mood_admission.as_deref_mut().unwrap_or(&mut admit_all);
     let registry_claims = crate::layout::system::select_registry_systems_with_admission(
@@ -467,8 +466,6 @@ fn compile_plan_once(
 
 fn registry_mood_admission<'a>(
     hours: Option<f64>,
-    blueprint: &'a BaseBlueprint,
-    operbox: &'a OperBox,
     instances: &'a OperatorInstances,
     initial_mood: f64,
 ) -> Result<
@@ -481,7 +478,7 @@ fn registry_mood_admission<'a>(
     };
     let model = crate::mood::default_mood_model()?;
     const ABYSSAL_CONTROL_DRAIN_BUFF: &str = "control_mp_aegir2[010]";
-    Ok(Some(Box::new(move |claim, trial| {
+    Ok(Some(Box::new(move |claim, _trial| {
         let control_claims: Vec<_> = claim
             .slots
             .iter()
@@ -499,53 +496,37 @@ fn registry_mood_admission<'a>(
         {
             return true;
         }
-        let control = trial.control_operators();
-        if control.len() != 5 || control.iter().any(|op| op.name.starts_with("__")) {
-            return true;
-        }
-        let mut names: Vec<_> = control.iter().map(|op| op.name.as_str()).collect();
-        names.sort_unstable();
-        names.dedup();
-        if names.len() != 5
-            || control.iter().any(|op| {
-                operbox.progress_of(&op.name).is_none_or(|progress| {
-                    progress.elite != op.elite
-                        || (op.level != 0 && progress.level != op.level)
-                        || (op.rarity != 0 && progress.rarity != op.rarity)
-                })
-            })
-        {
-            return true;
-        }
-        let control_names: std::collections::HashSet<_> = names.into_iter().collect();
-        if control.iter().any(|op| {
-            instances
-                .resolve_control_buff_ids(&op.name, op.tier())
-                .iter()
-                .any(|buff_id| buff_id == ABYSSAL_CONTROL_DRAIN_BUFF)
-        }) {
-            return true;
-        }
         let available = initial_mood.min(model.mood_cap);
-        let control_eta: Vec<_> =
-            crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances)
-                .per_op
-                .into_iter()
-                .filter(|op| op.room_id == "control")
-                .collect();
-        if control_eta.len() != control_names.len() {
-            return true;
-        }
-        let mut eta_names = std::collections::HashSet::new();
-        if control_eta.iter().any(|op| {
-            !control_names.contains(op.name.as_str()) || !eta_names.insert(op.name.as_str())
-        }) || eta_names.len() != control_names.len()
-        {
-            return true;
-        }
-        control_eta
+        control_claims
             .iter()
-            .all(|op| crate::mood::fits_work_budget(&model, available, op.drain_per_hour, hours))
+            .flat_map(|slot| &slot.operators)
+            .all(|op| {
+                // Abyssal drain depends on outside-dorm presence, which is not
+                // a fixed per-operator fact at registry selection time.
+                if instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .any(|buff_id| buff_id == ABYSSAL_CONTROL_DRAIN_BUFF)
+                {
+                    return true;
+                }
+                let room_ops = vec![(op.name.clone(), op.elite)];
+                let inputs = crate::mood::DrainInputs {
+                    name: &op.name,
+                    elite: op.elite,
+                    facility: crate::layout::FacilityKind::ControlCenter,
+                    room_ops: &room_ops,
+                    full_control: true,
+                    control_ops: &[],
+                    recipe: None,
+                };
+                crate::mood::fits_work_budget(
+                    &model,
+                    available,
+                    crate::mood::operator_net_drain(&model, &inputs),
+                    hours,
+                )
+            })
     })))
 }
 

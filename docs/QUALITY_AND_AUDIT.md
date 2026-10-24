@@ -180,7 +180,7 @@ Baseline 是检测回归的工具，不是允许既有错误永久存在的豁�
 
 Bake 是加速载体，不是业务真源。预计算结果只有在候选结构和所有相关上下文与生成模型兼容时才能使用。
 
-### 6.1 当前 schema v13 已实现的门禁
+### 6.1 当前 schema v15 已实现的门禁
 
 - schema、CLI generator 和输入文件 fingerprint 一致；输入覆盖 baseline layout、instances、skill table、standalone roster、segments、shortcuts 和 systems。
 - runtime pool 中的候选名必须被 catalog 覆盖，且当前快速路径要求兼容的 E2 tier 模型。
