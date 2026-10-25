@@ -77,6 +77,7 @@ debug / feature / quality Skill 是任务意图的 primary owner；`arknights-sy
 - 修改候选集合、剪枝、分解、目标、top-K、Bake 或 cache 时，声明它是 hard constraint、safe reduction、heuristic、policy 还是 approximation；无法证明完整时不得声称全局最优。
 - 对 solver/search、Plan admission、Team/Shift、rotation、MAA/export、跨设施机制或大规模运行时数据变更，完成前必须使用 `arknights-invariant-gate`：在 Rust 最终 `assignment` 上注册 `--assert-invariants` 检查，并用 Python 对 `data/fixtures/box-bundles/` 的代表性与 high-owned 集合批量调用该 gate。Python 不得解析文本/MAA 或重写机制语义；它只报告 Rust gate、求解无解、输入错误和超时。实际 assertion diff 必须经 Sol 复审至 `PASS`。
 - 验证按改动风险选择方式：大型重构、solver/search、体系/排班/export、部署和需要长期审计的任务，使用 evidence 工具留痕；普通局部修复和文档调整可直接运行必要命令，并在最终说明结果。
+- 同一写入单元不要把编译、测试或 CLI 验收拆成多轮阶段性试跑：先完成该单元的实现、必要文档/证据记录和自检，再按风险一次性运行一轮完整验证包。验证失败需要改代码时，先收敛本轮修复，再重新运行一次对应的最终验证包；不要用反复编译替代调查、复核或闭环修改。一次验证包仍可包含该风险等级要求的多个类别（如格式、release build、定向测试、CLI、invariant batch 和复审），但每个类别只在闭环后运行，除非用户明确要求中途诊断。
 - 修改 Rust 后运行 `cargo fmt --all`；格式、测试和 CLI 是否通过 evidence 工具记录由任务风险决定。
 - 运行测试、批量 box 求解和 `--assert-invariants` 验收一律使用 release 构建（`cargo test --release`、`cargo build --release -p infra-cli`、`target/release/infra-cli`）。debug 构建下端到端排班用例极慢（全量库测试约 41 分钟），不得作为验收手段。批量脚本默认二进制若指向 `target/debug/infra-cli`，运行时用 `--binary target/release/infra-cli` 覆盖。
 - Agent memory 只能记录可丢弃的检索提示与协作偏好；领域语义、当前实现、架构决策和活动任务必须落在版本化 canonical、ADR 或 change 文档中，memory 不得成为真源。

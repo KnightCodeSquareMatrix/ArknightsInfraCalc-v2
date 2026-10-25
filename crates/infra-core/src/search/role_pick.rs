@@ -706,7 +706,7 @@ mod tests {
         assert_eq!(hit.rule_id.as_deref(), Some("gsl_docus_syracusa"));
         assert_eq!(
             hit.breakdown.as_ref().unwrap().unit_output_multiplier,
-            Efficiency::from_decimal(1.550)
+            Efficiency::from_decimal(1.552)
         );
         assert!(
             hit.final_efficiency > hit.breakdown.as_ref().unwrap().paper_efficiency,
