@@ -3110,20 +3110,73 @@ fn complete_timed_rotation(
     )
 }
 
-fn is_abc_control_mood_rebuild_subject(report: &TeamRotationReport, operator: &str) -> bool {
-    report.profile.is_ordinary_abc()
-        && report.shifts.iter().any(|shift| {
-            shift
-                .assignment
-                .control_operators()
-                .iter()
-                .any(|member| member.name == operator)
-                && shift
-                    .assignment
-                    .control_rotation_admission
-                    .as_ref()
-                    .is_some_and(|admission| admission.is_required_or_group_member(operator))
-        })
+fn is_control_required_or_group_mood_failure(
+    report: &TeamRotationReport,
+    operator: &str,
+) -> Result<bool> {
+    if !(report.profile.is_ordinary_abc() || report.profile.is_ordinary_main_backup()) {
+        return Ok(false);
+    }
+
+    for shift in &report.shifts {
+        if !shift
+            .assignment
+            .control_operators()
+            .iter()
+            .any(|member| member.name == operator)
+        {
+            continue;
+        }
+        if let Some(admission) = &shift.assignment.control_rotation_admission {
+            if admission.is_required_or_group_member(operator) {
+                return Ok(true);
+            }
+            continue;
+        }
+        if report.profile.is_ordinary_abc() {
+            return Err(Error::msg(format!(
+                "control_rotation_mood_attribution: missing Control admission for shift {}",
+                shift.index + 1
+            )));
+        }
+
+        // Main/backup assignments retain their own Plan, not ABC's frozen
+        // Control admission metadata. Use the Plan owned by this exact shift.
+        let plan = report
+            .assignment_plans
+            .get(shift.plan_index)
+            .ok_or_else(|| {
+                Error::msg(format!(
+                    "control_rotation_mood_attribution: missing Plan for shift {}",
+                    shift.index + 1
+                ))
+            })?;
+        let group_sources = plan.control_requirement_sources()?;
+        let is_group_member = group_sources
+            .iter()
+            .zip(&plan.control_candidate_requirements)
+            .any(|(_, group)| group.candidates.iter().any(|name| name == operator));
+        let is_fixed_control_member = plan.anchors.iter().any(|anchor| {
+            anchor.facility == FacilityKind::ControlCenter && anchor.operator == operator
+        }) || plan
+            .activated
+            .iter()
+            .flat_map(|system| &system.slots)
+            .any(|slot| {
+                matches!(
+                    slot,
+                    SlotFill::Fixed {
+                        operator: name,
+                        facility: FacilityKind::ControlCenter,
+                        ..
+                    } if name == operator
+                )
+            });
+        if is_group_member || is_fixed_control_member {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn finalize_timed_rotation(
@@ -3311,18 +3364,18 @@ fn finalize_timed_rotation(
         validate_cycle_mood_for_rotation(blueprint, instances, &report, initial_mood)
     {
         match error {
-            CycleMoodFailure::BudgetExceeded { operators, message }
-                if operators
-                    .iter()
-                    .any(|operator| is_abc_control_mood_rebuild_subject(&report, operator)) =>
-            {
-                let operator = operators
-                    .into_iter()
-                    .find(|operator| is_abc_control_mood_rebuild_subject(&report, operator))
-                    .expect("control mood operator was checked");
-                return Err(Error::ControlRotationMoodRejected { operator, message });
+            CycleMoodFailure::BudgetExceeded { failures, message } => {
+                for failure in failures {
+                    if is_control_required_or_group_mood_failure(&report, &failure.operator)? {
+                        return Err(Error::ControlRotationMoodRejected {
+                            operator: failure.operator,
+                            message: failure.message,
+                        });
+                    }
+                }
+                return Err(Error::with_rotation(&report, message));
             }
-            error => return Err(Error::with_rotation(&report, error)),
+            CycleMoodFailure::Other(error) => return Err(Error::with_rotation(&report, error)),
         }
     }
     stage_after = crate::profile::solver_perf_snapshot();

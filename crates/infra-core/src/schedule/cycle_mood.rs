@@ -10,10 +10,16 @@ use super::rotation_types::TeamRotationReport;
 #[derive(Debug)]
 pub(crate) enum CycleMoodFailure {
     BudgetExceeded {
-        operators: Vec<String>,
+        failures: Vec<CycleMoodOperatorFailure>,
         message: String,
     },
     Other(Error),
+}
+
+#[derive(Debug)]
+pub(crate) struct CycleMoodOperatorFailure {
+    pub(crate) operator: String,
+    pub(crate) message: String,
 }
 
 impl std::fmt::Display for CycleMoodFailure {
@@ -76,8 +82,8 @@ pub(crate) fn validate_cycle_mood_for_rotation(
     ) {
         Ok(()) => Ok(()),
         Err(error) => match budget_failure {
-            Some(operators) => Err(CycleMoodFailure::BudgetExceeded {
-                operators,
+            Some(failures) => Err(CycleMoodFailure::BudgetExceeded {
+                failures,
                 message: error.to_string(),
             }),
             None => Err(CycleMoodFailure::Other(error)),
@@ -109,7 +115,7 @@ fn validate_cycle_mood_scope(
     report: &TeamRotationReport,
     initial_mood: f64,
     operator_scope: Option<&str>,
-    budget_failure: &mut Option<Vec<String>>,
+    budget_failure: &mut Option<Vec<CycleMoodOperatorFailure>>,
 ) -> Result<()> {
     let model = default_mood_model()?;
     let count = report.shifts.len();
@@ -198,7 +204,7 @@ fn validate_cycle_mood_scope(
 
     let capacity = model.workable_mood();
     let mut first_budget_message = None;
-    let mut budget_operators = Vec::new();
+    let mut budget_failures = Vec::new();
     for (name, entries) in work {
         let restores = |index: usize| {
             entries[index].is_none()
@@ -265,14 +271,17 @@ fn validate_cycle_mood_scope(
         }
 
         if let Some(message) = failure {
-            budget_operators.push(name);
+            budget_failures.push(CycleMoodOperatorFailure {
+                operator: name,
+                message: message.clone(),
+            });
             if first_budget_message.is_none() {
                 first_budget_message = Some(message);
             }
         }
     }
     if let Some(message) = first_budget_message {
-        *budget_failure = Some(budget_operators);
+        *budget_failure = Some(budget_failures);
         return Err(Error::msg(message));
     }
     Ok(())
