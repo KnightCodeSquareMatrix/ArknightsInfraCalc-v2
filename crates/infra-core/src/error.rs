@@ -32,6 +32,12 @@ pub enum Error {
         report: Box<crate::schedule::TeamRotationReport>,
         message: String,
     },
+    /// A complete ABC candidate failed its Control required/combination mood budget.
+    #[error("{message}")]
+    ControlRotationMoodRejected { operator: String, message: String },
+    /// All bounded full-roster rebuilds for this ABC candidate failed the same gate.
+    #[error("{message}")]
+    ControlRotationMoodRetriesExhausted { message: String },
     /// A recommended Plan role made its required trade-room fill infeasible.
     #[error("{message}")]
     OptionalTradeRoleInfeasible {

@@ -7,6 +7,33 @@ use crate::mood::{default_mood_model, shift_eta_with_instances};
 
 use super::rotation_types::TeamRotationReport;
 
+#[derive(Debug)]
+pub(crate) enum CycleMoodFailure {
+    BudgetExceeded {
+        operators: Vec<String>,
+        message: String,
+    },
+    Other(Error),
+}
+
+impl std::fmt::Display for CycleMoodFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BudgetExceeded { message, .. } => formatter.write_str(message),
+            Self::Other(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl CycleMoodFailure {
+    fn into_error(self) -> Error {
+        match self {
+            Self::BudgetExceeded { message, .. } => Error::msg(message),
+            Self::Other(error) => error,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct WorkCost {
     room_id: String,
@@ -28,7 +55,34 @@ pub(crate) fn validate_cycle_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
-    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, None)
+    validate_cycle_mood_for_rotation(blueprint, instances, report, initial_mood)
+        .map_err(CycleMoodFailure::into_error)
+}
+
+pub(crate) fn validate_cycle_mood_for_rotation(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    report: &TeamRotationReport,
+    initial_mood: f64,
+) -> std::result::Result<(), CycleMoodFailure> {
+    let mut budget_failure = None;
+    match validate_cycle_mood_scope(
+        blueprint,
+        instances,
+        report,
+        initial_mood,
+        None,
+        &mut budget_failure,
+    ) {
+        Ok(()) => Ok(()),
+        Err(error) => match budget_failure {
+            Some(operators) => Err(CycleMoodFailure::BudgetExceeded {
+                operators,
+                message: error.to_string(),
+            }),
+            None => Err(CycleMoodFailure::Other(error)),
+        },
+    }
 }
 
 pub(crate) fn validate_operator_cycle_mood(
@@ -38,7 +92,15 @@ pub(crate) fn validate_operator_cycle_mood(
     initial_mood: f64,
     name: &str,
 ) -> Result<()> {
-    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, Some(name))
+    let mut budget_failure = None;
+    validate_cycle_mood_scope(
+        blueprint,
+        instances,
+        report,
+        initial_mood,
+        Some(name),
+        &mut budget_failure,
+    )
 }
 
 fn validate_cycle_mood_scope(
@@ -47,6 +109,7 @@ fn validate_cycle_mood_scope(
     report: &TeamRotationReport,
     initial_mood: f64,
     operator_scope: Option<&str>,
+    budget_failure: &mut Option<Vec<String>>,
 ) -> Result<()> {
     let model = default_mood_model()?;
     let count = report.shifts.len();
@@ -134,6 +197,8 @@ fn validate_cycle_mood_scope(
     }
 
     let capacity = model.workable_mood();
+    let mut first_budget_message = None;
+    let mut budget_operators = Vec::new();
     for (name, entries) in work {
         let restores = |index: usize| {
             entries[index].is_none()
@@ -143,53 +208,72 @@ fn validate_cycle_mood_scope(
                     .is_some_and(|action| action.target == name)
         };
         let cycle_cost: f64 = entries.iter().flatten().map(|entry| entry.cost).sum();
-        if !(0..count).any(restores) && cycle_cost > 1e-9 {
-            return Err(Error::msg(format!(
+        let mut failure = if !(0..count).any(restores) && cycle_cost > 1e-9 {
+            Some(format!(
                 "rotation_cycle_mood failed: {name} has no rest or recovery boundary in {}; cycle_cost={cycle_cost:.2}; positions={}",
                 report.profile.cli_name(),
                 positions(&entries, 0, count)
-            )));
-        }
+            ))
+        } else {
+            None
+        };
 
-        // The first execution uses the caller's mood; cycle boundaries never reset it.
-        let mut available = initial_mood.min(model.mood_cap) - model.rest_threshold;
-        for (index, entry) in entries.iter().enumerate() {
-            if restores(index) {
-                available = capacity;
-            }
-            if let Some(entry) = entry {
-                if entry.cost > available + 1e-9 {
-                    return Err(Error::msg(format!(
-                        "rotation_cycle_mood failed: {name} in initial shift {} room {}; cost={:.2} available={available:.2}",
-                        index + 1, entry.room_id, entry.cost
-                    )));
-                }
-                available = (available - entry.cost).max(0.0);
-            }
-        }
-
-        // Every rotation of the array covers a possible tail-to-head work span.
-        for start in 0..count {
-            let mut consumed = 0.0;
-            let mut span_start = start;
-            for offset in 0..count {
-                let index = (start + offset) % count;
+        if failure.is_none() {
+            // The first execution uses the caller's mood; cycle boundaries never reset it.
+            let mut available = initial_mood.min(model.mood_cap) - model.rest_threshold;
+            for (index, entry) in entries.iter().enumerate() {
                 if restores(index) {
-                    consumed = 0.0;
-                    span_start = index;
+                    available = capacity;
                 }
-                if let Some(entry) = &entries[index] {
-                    consumed += entry.cost;
-                    if consumed > capacity + 1e-9 {
-                        return Err(Error::msg(format!(
-                            "rotation_cycle_mood failed: {name} in {}; continuous_cost={consumed:.2} available={capacity:.2}; positions={}",
-                            report.profile.cli_name(),
-                            positions(&entries, span_start, (index + count - span_start) % count + 1)
-                        )));
+                if let Some(entry) = entry {
+                    if entry.cost > available + 1e-9 {
+                        failure = Some(format!(
+                            "rotation_cycle_mood failed: {name} in initial shift {} room {}; cost={:.2} available={available:.2}",
+                            index + 1, entry.room_id, entry.cost
+                        ));
+                        break;
+                    }
+                    available = (available - entry.cost).max(0.0);
+                }
+            }
+        }
+
+        if failure.is_none() {
+            // Every rotation of the array covers a possible tail-to-head work span.
+            'rotation: for start in 0..count {
+                let mut consumed = 0.0;
+                let mut span_start = start;
+                for offset in 0..count {
+                    let index = (start + offset) % count;
+                    if restores(index) {
+                        consumed = 0.0;
+                        span_start = index;
+                    }
+                    if let Some(entry) = &entries[index] {
+                        consumed += entry.cost;
+                        if consumed > capacity + 1e-9 {
+                            failure = Some(format!(
+                                "rotation_cycle_mood failed: {name} in {}; continuous_cost={consumed:.2} available={capacity:.2}; positions={}",
+                                report.profile.cli_name(),
+                                positions(&entries, span_start, (index + count - span_start) % count + 1)
+                            ));
+                            break 'rotation;
+                        }
                     }
                 }
             }
         }
+
+        if let Some(message) = failure {
+            budget_operators.push(name);
+            if first_budget_message.is_none() {
+                first_budget_message = Some(message);
+            }
+        }
+    }
+    if let Some(message) = first_budget_message {
+        *budget_failure = Some(budget_operators);
+        return Err(Error::msg(message));
     }
     Ok(())
 }

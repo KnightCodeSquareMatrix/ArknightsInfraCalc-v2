@@ -47,7 +47,10 @@ use crate::trade::solve_trade_with_shift;
 
 use super::base_rotation::evaluate_base_assignment_efficiencies;
 use super::control_rotation::{assert_final_control_rotation, ControlRotationClosure};
-use super::cycle_mood::{is_budget_rejection, validate_cycle_mood, validate_operator_cycle_mood};
+use super::cycle_mood::{
+    is_budget_rejection, validate_cycle_mood, validate_cycle_mood_for_rotation,
+    validate_operator_cycle_mood, CycleMoodFailure,
+};
 use super::dorm_finalizer;
 use super::fiammetta_events;
 use super::room_admission::{
@@ -3107,6 +3110,22 @@ fn complete_timed_rotation(
     )
 }
 
+fn is_abc_control_mood_rebuild_subject(report: &TeamRotationReport, operator: &str) -> bool {
+    report.profile.is_ordinary_abc()
+        && report.shifts.iter().any(|shift| {
+            shift
+                .assignment
+                .control_operators()
+                .iter()
+                .any(|member| member.name == operator)
+                && shift
+                    .assignment
+                    .control_rotation_admission
+                    .as_ref()
+                    .is_some_and(|admission| admission.is_required_or_group_member(operator))
+        })
+}
+
 fn finalize_timed_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -3288,8 +3307,23 @@ fn finalize_timed_rotation(
             .warnings
             .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
-    if let Err(error) = validate_cycle_mood(blueprint, instances, &report, initial_mood) {
-        return Err(Error::with_rotation(&report, error));
+    if let Err(error) =
+        validate_cycle_mood_for_rotation(blueprint, instances, &report, initial_mood)
+    {
+        match error {
+            CycleMoodFailure::BudgetExceeded { operators, message }
+                if operators
+                    .iter()
+                    .any(|operator| is_abc_control_mood_rebuild_subject(&report, operator)) =>
+            {
+                let operator = operators
+                    .into_iter()
+                    .find(|operator| is_abc_control_mood_rebuild_subject(&report, operator))
+                    .expect("control mood operator was checked");
+                return Err(Error::ControlRotationMoodRejected { operator, message });
+            }
+            error => return Err(Error::with_rotation(&report, error)),
+        }
     }
     stage_after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_solver_stage(
@@ -6718,13 +6752,11 @@ fn fiammetta_a_eligible(blueprint: &BaseBlueprint, operbox: &OperBox) -> bool {
 }
 
 fn reject_fiammetta_candidate(error: Error) -> Result<()> {
-    let message = match &error {
-        Error::Msg(message) | Error::PartialRotation { message, .. } => message.as_str(),
-        _ => return Err(error),
-    };
+    let message = error.to_string();
     // Only known candidate feasibility failures may be skipped. Invalid inputs,
     // unsupported activity and broken internal state retain their failure boundary.
     let candidate_failure = is_budget_rejection(&error)
+        || is_control_rotation_mood_rejection(&error)
         || message == "no ready fiammetta target action"
         || message.starts_with("fiammetta_ready failed")
         || [
@@ -6742,6 +6774,50 @@ fn reject_fiammetta_candidate(error: Error) -> Result<()> {
     } else {
         Err(error)
     }
+}
+
+fn is_control_rotation_mood_rejection(error: &Error) -> bool {
+    matches!(
+        error,
+        Error::ControlRotationMoodRejected { .. }
+            | Error::ControlRotationMoodRetriesExhausted { .. }
+    )
+}
+
+fn finish_abc_candidate_with_control_rebuilds<F, G>(
+    candidate: &str,
+    mut build: F,
+    mut finish: G,
+) -> Result<TeamRotationReport>
+where
+    F: FnMut(usize) -> Result<TeamRotationReport>,
+    G: FnMut(TeamRotationReport) -> Result<TeamRotationReport>,
+{
+    let mut last_failure = None;
+    for control_attempt in 0..=3 {
+        let report = build(control_attempt)?;
+        match finish(report) {
+            Ok(report) => return Ok(report),
+            Err(Error::ControlRotationMoodRejected { operator, message }) => {
+                eprintln!(
+                    "[rotation-mood] reject ABC candidate {candidate} and rebuild Control roster attempt {} for {operator}: {message}",
+                    control_attempt + 1
+                );
+                last_failure = Some((operator, message));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    let Some((operator, message)) = last_failure else {
+        return Err(Error::msg(format!(
+            "control_rotation_mood: candidate {candidate} had no completed roster attempt"
+        )));
+    };
+    Err(Error::ControlRotationMoodRetriesExhausted {
+        message: format!(
+            "control_rotation_mood: ABC candidate {candidate} exhausted full roster rebuilds after {operator}: {message}"
+        ),
+    })
 }
 
 /// ABC 三班菲亚固定策略分支适配层。
@@ -6807,42 +6883,54 @@ fn schedule_abc_rotation_candidates_with_timing(
     if !options.fiammetta_enable || !operbox.owns(FIAMMETTA_NAME) || (!a_eligible && !b_eligible) {
         let mut baseline_options = options.clone();
         baseline_options.fiammetta_enable = false;
-        let report = schedule_abc_rotation(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            &baseline_options,
-            shift_hours,
-            false,
-            AbyssalShortShiftPolicy::default_for(profile),
-            profile,
-            &[],
-            &[],
-            true,
+        let report = finish_abc_candidate_with_control_rebuilds(
+            "N",
+            |control_attempt| {
+                schedule_abc_rotation_from_control_attempt(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &baseline_options,
+                    shift_hours,
+                    false,
+                    AbyssalShortShiftPolicy::default_for(profile),
+                    profile,
+                    &[],
+                    &[],
+                    true,
+                    control_attempt,
+                )
+            },
+            |report| finish_candidate(report, false),
         )?;
-        let report = finish_candidate(report, false)?;
         write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &report);
         return Ok(report);
     }
 
     let mut baseline_options = options.clone();
     baseline_options.fiammetta_enable = false;
-    let baseline_result = schedule_abc_rotation(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        &baseline_options,
-        shift_hours,
-        false,
-        AbyssalShortShiftPolicy::default_for(profile),
-        profile,
-        &[],
-        &[],
-        true,
-    )
-    .and_then(|baseline| finish_candidate(baseline, false));
+    let baseline_result = finish_abc_candidate_with_control_rebuilds(
+        "N",
+        |control_attempt| {
+            schedule_abc_rotation_from_control_attempt(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &baseline_options,
+                shift_hours,
+                false,
+                AbyssalShortShiftPolicy::default_for(profile),
+                profile,
+                &[],
+                &[],
+                true,
+                control_attempt,
+            )
+        },
+        |report| finish_candidate(report, false),
+    );
     let (mut winner, baseline_error) = match baseline_result {
         Ok(baseline) => {
             write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &baseline);
@@ -6856,7 +6944,7 @@ fn schedule_abc_rotation_candidates_with_timing(
             );
             (Some(baseline), None)
         }
-        Err(error) if is_budget_rejection(&error) => {
+        Err(error) if is_budget_rejection(&error) || is_control_rotation_mood_rejection(&error) => {
             eprintln!(
                 "[fiammetta-candidate] N {} rejected reason={error}",
                 profile.cli_name()
@@ -6889,22 +6977,27 @@ fn schedule_abc_rotation_candidates_with_timing(
         } else {
             vec!["可露希尔"]
         };
-        match schedule_abc_rotation(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            &a_options,
-            shift_hours,
-            false,
-            AbyssalShortShiftPolicy::default_for(profile),
-            profile,
-            &relaxed,
-            &[],
-            true,
-        ) {
-            Ok(mut candidate) => {
-                let attached = attach_fiammetta_target_actions(
+        match finish_abc_candidate_with_control_rebuilds(
+            "A",
+            |control_attempt| {
+                schedule_abc_rotation_from_control_attempt(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &a_options,
+                    shift_hours,
+                    false,
+                    AbyssalShortShiftPolicy::default_for(profile),
+                    profile,
+                    &relaxed,
+                    &[],
+                    true,
+                    control_attempt,
+                )
+            },
+            |mut candidate| {
+                attach_fiammetta_target_actions(
                     blueprint,
                     operbox,
                     instances,
@@ -6912,39 +7005,31 @@ fn schedule_abc_rotation_candidates_with_timing(
                     &a_targets,
                     &mut candidate.shifts,
                 )
-                .and_then(|_| finish_candidate(candidate, true));
-                match attached {
-                    Ok(candidate) => {
-                        write_candidate_report(
-                            options.fiammetta_candidates_out.as_deref(),
-                            "A",
-                            &candidate,
-                        );
-                        let value = fiammetta_candidate_value(&candidate);
-                        let targets = candidate_target_names(&candidate);
-                        eprintln!(
-                            "[fiammetta-candidate] A {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
-                            profile.cli_name(),
-                            candidate.daily.trade,
-                            candidate.daily.manufacture,
-                            candidate.daily.production,
-                        );
-                        if value > winner_value + 1e-9 {
-                            winner = Some(candidate);
-                            winner_value = value;
-                            winner_value_tied = false;
-                            winner_targets = targets;
-                        } else if (value - winner_value).abs() <= 1e-9 {
-                            winner_value_tied = true;
-                        }
-                    }
-                    Err(error) => {
-                        eprintln!(
-                            "[fiammetta-candidate] A {} rejected reason={error}",
-                            profile.cli_name()
-                        );
-                        reject_fiammetta_candidate(error)?;
-                    }
+                .and_then(|_| finish_candidate(candidate, true))
+            },
+        ) {
+            Ok(candidate) => {
+                write_candidate_report(
+                    options.fiammetta_candidates_out.as_deref(),
+                    "A",
+                    &candidate,
+                );
+                let value = fiammetta_candidate_value(&candidate);
+                let targets = candidate_target_names(&candidate);
+                eprintln!(
+                    "[fiammetta-candidate] A {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
+                    profile.cli_name(),
+                    candidate.daily.trade,
+                    candidate.daily.manufacture,
+                    candidate.daily.production,
+                );
+                if value > winner_value + 1e-9 {
+                    winner = Some(candidate);
+                    winner_value = value;
+                    winner_value_tied = false;
+                    winner_targets = targets;
+                } else if (value - winner_value).abs() <= 1e-9 {
+                    winner_value_tied = true;
                 }
             }
             Err(error) => {
@@ -6961,22 +7046,27 @@ fn schedule_abc_rotation_candidates_with_timing(
         let mut b_options = options.clone();
         b_options.trade_role_preference = Some(TradeRolePreference::Witch);
         let relaxed: Vec<&str> = vec!["巫恋", "龙舌兰"];
-        match schedule_abc_rotation(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            &b_options,
-            shift_hours,
-            false,
-            AbyssalShortShiftPolicy::default_for(profile),
-            profile,
-            &relaxed,
-            &["trade_core"],
-            true,
-        ) {
-            Ok(mut candidate) => {
-                let attached = attach_fiammetta_target_actions(
+        match finish_abc_candidate_with_control_rebuilds(
+            "B",
+            |control_attempt| {
+                schedule_abc_rotation_from_control_attempt(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    &b_options,
+                    shift_hours,
+                    false,
+                    AbyssalShortShiftPolicy::default_for(profile),
+                    profile,
+                    &relaxed,
+                    &["trade_core"],
+                    true,
+                    control_attempt,
+                )
+            },
+            |mut candidate| {
+                attach_fiammetta_target_actions(
                     blueprint,
                     operbox,
                     instances,
@@ -6984,39 +7074,31 @@ fn schedule_abc_rotation_candidates_with_timing(
                     &relaxed,
                     &mut candidate.shifts,
                 )
-                .and_then(|_| finish_candidate(candidate, true));
-                match attached {
-                    Ok(candidate) => {
-                        write_candidate_report(
-                            options.fiammetta_candidates_out.as_deref(),
-                            "B",
-                            &candidate,
-                        );
-                        let value = fiammetta_candidate_value(&candidate);
-                        let targets = candidate_target_names(&candidate);
-                        eprintln!(
-                            "[fiammetta-candidate] B {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
-                            profile.cli_name(),
-                            candidate.daily.trade,
-                            candidate.daily.manufacture,
-                            candidate.daily.production,
-                        );
-                        if value > winner_value + 1e-9 {
-                            winner = Some(candidate);
-                            winner_value = value;
-                            winner_value_tied = false;
-                            winner_targets = targets;
-                        } else if (value - winner_value).abs() <= 1e-9 {
-                            winner_value_tied = true;
-                        }
-                    }
-                    Err(error) => {
-                        eprintln!(
-                            "[fiammetta-candidate] B {} rejected reason={error}",
-                            profile.cli_name()
-                        );
-                        reject_fiammetta_candidate(error)?;
-                    }
+                .and_then(|_| finish_candidate(candidate, true))
+            },
+        ) {
+            Ok(candidate) => {
+                write_candidate_report(
+                    options.fiammetta_candidates_out.as_deref(),
+                    "B",
+                    &candidate,
+                );
+                let value = fiammetta_candidate_value(&candidate);
+                let targets = candidate_target_names(&candidate);
+                eprintln!(
+                    "[fiammetta-candidate] B {} trade={} manufacture={} production={:?} value={value:.3} targets={targets:?}",
+                    profile.cli_name(),
+                    candidate.daily.trade,
+                    candidate.daily.manufacture,
+                    candidate.daily.production,
+                );
+                if value > winner_value + 1e-9 {
+                    winner = Some(candidate);
+                    winner_value = value;
+                    winner_value_tied = false;
+                    winner_targets = targets;
+                } else if (value - winner_value).abs() <= 1e-9 {
+                    winner_value_tied = true;
                 }
             }
             Err(error) => {
@@ -7570,9 +7652,42 @@ fn schedule_abc_rotation(
     skip_systems: &[&str],
     enable_originium_pair: bool,
 ) -> Result<TeamRotationReport> {
+    schedule_abc_rotation_from_control_attempt(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        shift_hours,
+        enable_fiammetta_return,
+        abyssal_policy,
+        profile,
+        gamma_relaxed,
+        skip_systems,
+        enable_originium_pair,
+        0,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn schedule_abc_rotation_from_control_attempt(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    shift_hours: [f64; 3],
+    enable_fiammetta_return: bool,
+    abyssal_policy: AbyssalShortShiftPolicy,
+    profile: TimedRotationProfile,
+    gamma_relaxed: &[&str],
+    skip_systems: &[&str],
+    enable_originium_pair: bool,
+    initial_control_team_attempt: usize,
+) -> Result<TeamRotationReport> {
     let mut retry_options = options.clone();
     let mut reversed_halves = false;
-    let mut control_team_attempt = 0;
+    let mut control_team_attempt = initial_control_team_attempt;
     loop {
         let mut eta_failure = None;
         let mut originium_pair_active = false;
@@ -7603,7 +7718,7 @@ fn schedule_abc_rotation(
                 eprintln!(
                     "[rotation-fallback] retry ordinary trade Plan after the four-gold core made required control anchors infeasible: {error}"
                 );
-                return schedule_abc_rotation(
+                return schedule_abc_rotation_from_control_attempt(
                     blueprint,
                     operbox,
                     instances,
@@ -7616,6 +7731,7 @@ fn schedule_abc_rotation(
                     gamma_relaxed,
                     &fallback_skip,
                     enable_originium_pair,
+                    control_team_attempt,
                 );
             }
             Err(error) => {
