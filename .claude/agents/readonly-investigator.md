@@ -1,11 +1,11 @@
 ---
 name: readonly-investigator
-description: Read-only repository investigation. Use for workflow fan-out, evidence gathering, and document/code cross-checks.
+description: Deep read-only repository investigation (deepseek). Use for multi-file, long-chain evidence gathering; for simple lookups use simple-query.
 tools: Read, Grep, Glob, Bash
-model: haiku
-effort: medium
+model: codesonline/deepseek-v4.1-flash[1m]
+effort: high
 omitClaudeMd: true
-autoCompactWindow: 272000
+autoCompactWindow: 1000000
 maxTurns: 120
 ---
 
