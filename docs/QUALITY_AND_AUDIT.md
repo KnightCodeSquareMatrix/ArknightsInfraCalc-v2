@@ -12,7 +12,7 @@
 
 ## 1. 入口与适用范围
 
-- 普通 bug 和结果不对：使用项目 Skill `arknights-maintenance`；复现入口不清时再读 [MAINTENANCE_MODE.md](MAINTENANCE_MODE.md) 对应章节。
+- 普通 bug 和结果不对：按根 `AGENTS.md` 处理；复现入口不清时再读 [MAINTENANCE_MODE.md](MAINTENANCE_MODE.md) 对应章节。
 - 体系 / 编排正式审计：只在 `formal-audit` 模式读取 [SYSTEM_AUDIT_WORKFLOW.md](SYSTEM_AUDIT_WORKFLOW.md)。
 - 当前代码与命令事实不清时，定向读取 [PROJECT_MAP.md](PROJECT_MAP.md)；领域文档未知时由 [INDEX.md](INDEX.md) 路由。
 - 命令执行和 manifest：使用 [scripts/codex/README.md](../scripts/codex/README.md)。

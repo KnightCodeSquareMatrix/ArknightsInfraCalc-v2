@@ -1,4 +1,0 @@
-interface:
-  display_name: "Arknights Feature"
-  short_description: "Build validated product capabilities from canonical domain rules"
-  default_prompt: "Use $arknights-feature to design and implement one vertical ArknightsInfraCalc capability."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Arknights Quality"
-  short_description: "Run evidence-driven architecture and solver quality improvements"
-  default_prompt: "Use $arknights-quality to scope and deliver one evidence-backed ArknightsInfraCalc quality improvement."

@@ -1,57 +1,36 @@
 ---
 name: arknights-system-audit
-description: Audit or repair ArknightsInfraCalc systems and conformance boundaries involving hard cores, producers, same-room/cross-station/in-base scope, required admission, Team/Shift binds, orchestration, rotation, or export. Use formal-audit only for a user-requested strict audit or conflicting canonical Markdown.
+description: 改动或审计涉及体系硬核、producer、同房/跨站/基内 scope、required admission、Team/Shift 绑定、编排、排班或导出时使用。目标是让领域不变量由 System/Rule/Plan/搜索/排班在结构上保证，而不是碰巧被当前排序或房间顺序产出。
 ---
 
-# Arknights System and Conformance Audit
+# 体系与一致性审计
 
-Use this Skill when a domain invariant must be structurally guaranteed by System/Rule/Plan/search/schedule rather than accidentally produced by current ranking or room order.
+## 不变量从哪来
 
-## Select the Protocol
+完整读目标 canonical 文档，只看相关的 registry / data 行。按需覆盖：
 
-- **System conformance**: canonical Markdown is clear. Perform the four-item pre-write audit, then implement without two approval waits.
-- **Formal audit**: the user requests strict itemized audit, or current canonical Markdown conflicts. Read `docs/SYSTEM_AUDIT_WORKFLOW.md` completely and obey its two waits.
-- **Read-only audit**: report facts and counterexamples without acquiring write authority.
+- 硬核、档位、最少人数 / 全部可用人数、可选 producer；
+- 同房、跨站、基内、配方、容量、互斥；
+- Team 成员、Shift 上下班、绑定、闭合与降级；
+- 数值 scope、效果原子、用户选择的 policy。
 
-Do not load the formal workflow for ordinary system conformance. Use `docs/INDEX.md` only to locate the target canonical document and `docs/PROJECT_MAP.md` only when the code owner is unclear.
+代码、数据、fixture、测试和当前 top hit 只是实现证据，不是规则来源。用户要求严格逐项审计，或 canonical 互相冲突时，完整读 `docs/SYSTEM_AUDIT_WORKFLOW.md` 并遵守其中两次等待。
 
-## Extract Invariants
+## 追踪时要分开的几对概念
 
-Read the target canonical Markdown completely and inspect only its relevant registry/data rows. Cover as applicable:
+沿 `select -> plan -> execute -> fill -> resolve -> rotation -> export` 只追到必要处：
 
-- hard cores, tiers, minimum/all-available counts, optional producers;
-- same-room, cross-station, in-base, recipe, capacity and mutual exclusion;
-- Team membership, Shift work/rest, binding and closure/degradation;
-- numeric scope, effect atoms and user-selected policy.
+- 准入 vs 激活 / 绑定；
+- 有资格 vs 必须放置；
+- 结算 vs 选型；
+- 最终输出 vs 碰巧的样本。
 
-Code, data, fixtures, tests, and current top hits are implementation evidence, not rule sources.
+用能改变责任归属的反例去挑战：缺核心、最少成员、竞争候选、房间重排、跨站容量、上下班闭合、policy 变化。违规已经确定在某个 owner 内部时，不需要跑完整个反例清单。
 
-## Trace and Challenge
+## 排班 / 导出改动的证明
 
-Trace only as far as necessary through `select -> plan -> execute -> fill -> resolve -> rotation -> export`. Distinguish admission from activation/bind, eligibility from required placement, settlement from selection, and final output from a coincidental sample.
-
-Use the counterexample that can change the owner: missing core, minimum members, competing candidate, reordered room, cross-station capacity, work/rest closure, or policy change. Do not require the complete counterexample catalog when the violation is already owner-local.
-
-## Before Writing
-
-Report:
-
-1. confirmed domain invariants;
-2. exact stage/file/type/function first allowing each invalid state;
-3. the single post-fix owner;
-4. old fallback, special case, comment, or test to delete/rewrite.
-
-Declare one primary invariant, required/consumer/proof paths, and deferred findings. Never encode a repair through room id, Shift index, fixture, current top hit, or a bind/tag/priority/shortcut that cannot guarantee admission.
-
-## Review and Prove
-
-Use independent read-only exploration and invariant extraction by default when both code reality and domain documents are nontrivial. Freeze the responsibility boundary before one writer starts. For rebuilds, use an adversarial reviewer on the actual diff and any captured evidence.
-
-Require invariant-level regression and a real `plan` or `layout team-rotation` entry for scheduling/export changes. Use `arknights-evidence` for formal audits and high-risk changes when durable command evidence is useful; it is not required for every audit command. Report the old illegal path, new owner, deleted conflicts, exact/heuristic impact if search space changed, tests, CLI result, and unresolved risks.
-
-For Team/Shift, work/rest, mood, binds, capacity, producer shutdown, or MAA changes, also request `rotation-maa-reviewer` on the final diff. The proof must include the selected mode/profile, per-shift membership and state assertions, a legal and illegal bind/rest witness, and inspection of the generated MAA artifact. Do not treat a green unit test or an unchanged top schedule as conformance proof.
-
-If the audit owns an active TODO, plan, or change package, apply
-`../_shared/CHANGE_LIFECYCLE.md` after the invariant is proven. Formal
-audit waits govern semantic approval; they do not waive current-document and
-archive closure.
+- 用真实 `plan` 或 `layout team-rotation` 入口，写明 mode / profile。
+- 逐班核对成员和状态；给一个合法、一个最小非法的绑定 / 休息例子。
+- 同一事实在核心轮换、profile / stdout、MAA 三层各核一次；休息班的 producer 要确实停掉。
+- 单元测试全绿或 top 排班没变，不算一致性证明。
+- `auto_rotation`、`mower_dynamic` 除非明确纳入，否则不在范围内。

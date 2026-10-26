@@ -1,50 +1,22 @@
 ---
 name: arknights-evidence
-description: Record and audit reproducible ArknightsInfraCalc build, test, CLI, benchmark, format, structure, generated-artifact, task-scope, and solver-assurance evidence. Use whenever a conclusion depends on a command or artifact; never replace domain or optimality review with a script result.
+description: 大型重构、solver/search、体系/排班/导出、部署或需要长期审计的任务，用仓库脚本留下可复现的构建、测试、CLI、基准和产物证据。普通局部修复和文档改动直接跑命令即可。
 ---
 
-# Arknights Evidence
+# 证据留痕
 
-Use repository evidence tools when a task needs durable, reproducible verification. They are recommended for large refactors, solver/search changes, system/rotation/export work, deployment, and formal audits; ordinary local fixes and documentation changes may use direct commands.
+命令细节见 `scripts/codex/README.md`。脚本只机械记录事实，不裁决领域语义或最优性。
 
-## Record Runs
+- **包装命令**：`scripts/codex/run_evidence.sh --task <slug> --category <类别> --stem <名字> -- <命令>`。类别用 `build`、`targeted-test`、`full-suite`、`cli`、`performance`、`format`、`structure`。产物用重复的 `--artifact kind=path` 登记。每次重跑都保留，不覆盖失败记录。
+- **full suite 对比**：`scripts/codex/compare_test_failures.py --baseline <旧日志> --current <新日志>`，比较的是失败名集合。
+- **汇总**：`scripts/codex/render_evidence.py --manifest <manifest> --output <报告>`。缺的类别会标“未跑”。
+- **文档检查**：`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`、`python3 scripts/codex/generate_agent_index.py --check`。
 
-1. For a large or high-risk task, run `python3 scripts/codex/preflight_harness.py` once before changing files when the harness boundary matters.
-2. For durable task evidence, create metadata from `scripts/codex/task_metadata.example.json`.
-3. Batch related patches before formatting and testing. Use `scripts/codex/run_evidence.sh` for distinct verification purposes when the task needs reproducible logs or artifacts.
-4. Register generated profile, MAA, comparison, or report files with repeated `--artifact kind=path` when using the wrapper.
-5. Keep every rerun when using the wrapper. Do not overwrite failures or use shared output names.
+证据要和风险匹配：
 
-Use categories `build`, `targeted-test`, `full-suite`, `cli`, `performance`, `format`, and `structure`. Include actual layout, operbox, assignment, fixture, policy, output, baseline, seed, and time limit when relevant.
+- 硬约束或资格：激活和拒绝两侧的边界，加最终可行性。
+- 目标或 tie-break：各分量和等价最优的检查。
+- 候选生成、剪枝、分解、Bake / cache 或性能：按 `docs/QUALITY_AND_AUDIT.md` 的求解保证章节，记录保证类别、差分 / oracle 或 fallback 证据和结果状态。改搜索空间的高风险改动，不能只靠一个 golden snapshot 通过。
+- 排班 / 导出：见 `arknights-system-audit` 的证明要求。
 
-For tracked changes and documentation migrations, run the lifecycle adapter in
-`../_shared/CHANGE_LIFECYCLE.md` and the checker required by
-`docs/文档生命周期.md`. If no deterministic checker exists for a claimed
-invariant, mark that part unverified rather than treating manual confidence as
-machine proof.
-
-## Match Evidence to Risk
-
-- Owner-local data/logic fix: minimal reproducer, adjacent counterexample, and affected real entry.
-- Hard constraint or eligibility: activation/rejection boundaries and final feasibility.
-- Objective/tie-break: component and equivalent-optimum checks.
-- Candidate generation, pruning, decomposition, Bake/cache, or performance: read the solver-assurance sections of `docs/QUALITY_AND_AUDIT.md`; record guarantee class, differential/oracle or fallback evidence, candidate/benchmark facts, and result status.
-- Schedule/export: Team/Shift invariants plus real `plan`/MAA fidelity.
-
-Do not impose every global category on a low-risk documentation or owner-local fix. Do not let a high-risk search-space change pass on one golden snapshot.
-
-## Compare and Finish
-
-For full suite, use `scripts/codex/compare_test_failures.py` on complete Cargo logs and compare exact failure-name sets.
-
-Before completion run:
-
-1. `scripts/codex/check_task_scope.py --manifest <manifest>`;
-2. `scripts/codex/render_evidence.py --manifest <manifest> --output <report>`.
-3. `python3 scripts/codex/completion_gate.py --task <slug> --manifest <manifest>` for tasks that opted into the evidence workflow.
-
-When a task closes or supersedes tracked work, inspect the final tree as well as
-the diff and require the lifecycle hard check; scope scripts do
-not replace that proof.
-
-Inspect logs, status files, exit codes, artifacts, changed paths, deferred findings, and renderer “未跑” categories. An extractor may organize complex logs or failure sets, but the main Agent must judge domain semantics, exact/heuristic claims, and final completion.
+没有确定性检查器的结论标“未验证”，不要把人工信心当成机器证明。

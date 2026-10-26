@@ -58,6 +58,6 @@ python3 scripts/sync_solve_failures.py --no-sync --match-build target/release/in
 
 1. 新族出现时在 `evidence/TRACKING.md`「族清单」加一行标 `intake`；先本地回放 `evidence/<族>/replay.sh` 确认复现。
 2. 状态与反馈台账同词表：`intake` / `reproduced` / `localized` / `fixing` / `closed` / `regressed` / `blocked`。
-3. 定位到最小层（CLI / 排班 / 候选 / 机制 / 数据）后把复现命令与结论写进行；指向 solver bug 时转 `arknights-maintenance`，大规模求解/排班改动按 `AGENTS.md` 需要 `arknights-invariant-gate`。
+3. 定位到最小层（CLI / 排班 / 候选 / 机制 / 数据）后把复现命令与结论写进行；指向 solver bug 时按根 `AGENTS.md` 当作普通修复处理，大规模求解/排班改动按 `AGENTS.md` 需要 `arknights-invariant-gate`。
 4. `evidence/` 含真实练度盒与运行日志：保持 untracked 不提交公共仓库；`raw-runs` 材料原始证据不改写。`evidence/TRACKING.md` 本身可提交（与 `feedback/TRACKING.md` 同级）。
 5. 同步只读处理：不编辑 raw 文件；triage 中遇到的异常输入族记录到台账，不直接改代码。

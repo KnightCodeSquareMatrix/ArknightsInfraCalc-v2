@@ -9,7 +9,6 @@
           "plan-reviewer": "allow",
           "terra-explorer": "allow",
           "luna-extractor": "allow",
-          "stage-reviewer": "allow",
           "sol-reviewer": "allow"
         }
       }

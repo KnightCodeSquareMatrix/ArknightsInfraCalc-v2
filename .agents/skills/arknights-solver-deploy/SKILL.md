@@ -72,4 +72,4 @@ release 归档本身不得携带求解器。
   与 `docs/QUALITY_CHECK_CLI_UPDATE.md`。
 - 网站 release 发布由前端仓库 GitHub Actions 驱动；本仓库只负责求解器制品
   与批准摘要，不构建或推送网站代码。
-- 机制/数据语义问题转 `arknights-maintenance`；新功能转 `arknights-feature`。
+- 机制/数据语义问题和新功能不在部署流程内，按根 `AGENTS.md` 另起任务。

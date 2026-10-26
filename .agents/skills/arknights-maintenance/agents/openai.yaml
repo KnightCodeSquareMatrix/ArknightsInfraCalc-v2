@@ -1,4 +1,0 @@
-interface:
-  display_name: "Arknights Maintenance"
-  short_description: "Maintain Arknights code with scoped fixes"
-  default_prompt: "Use $arknights-maintenance to handle this project bug."

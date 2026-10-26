@@ -43,7 +43,7 @@ ssh root@114.66.55.78 'ls -lt /var/lib/arknights-infra-dev/feedback/ | head'
 1. 只读处理 bundle：`issue.json`、`meta.json`、`debug-bundle.json`、`operbox.json` 是原始证据，triage 期间不编辑；调查结论写 `feedback/TRACKING.md`。
 2. 新反馈行记入 `feedback/TRACKING.md`（状态：intake / reproduced / localized / fixing / regressed / closed / blocked / duplicate / duplicate-covered）。
 3. 本地重放命令见 `feedback/README.md`（`infra-cli debug rerun --bundle ...`）。
-4. 若反馈指向 solver/机制 bug，转 `arknights-maintenance`；契约 hash 与前端呈现问题转前端/`arknights-feature`。
+4. 若反馈指向 solver/机制 bug，按根 `AGENTS.md` 当作普通修复处理；契约 hash 与前端呈现问题转前端。
 
 ## 默认丢弃规则（用户裁决 2026-08-31，原话保留）
 

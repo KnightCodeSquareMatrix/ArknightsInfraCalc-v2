@@ -45,6 +45,8 @@ description: 中高风险的选人、排班、导出或跨模块改动在整个�
 - 具体会出什么错：用一个能核对的例子说明（什么输入、原来怎样、现在怎样）。
 - 证据不足时标"未查清"，不要猜。
 
+涉及候选、剪枝、目标或 cache 时，另核对改动声明的保证类别，以及有没有把 heuristic 说成完整搜索（标准见 `docs/QUALITY_AND_AUDIT.md` 求解保证章节）。涉及排班或导出时，按 `arknights-system-audit` 的证明要求核对证据是否齐全。
+
 复审者不重跑构建和测试，不提出替代架构，不审代码风格。
 
 各工具可用的复审者：
@@ -52,7 +54,7 @@ description: 中高风险的选人、排班、导出或跨模块改动在整个�
 | 工具 | 复审者 |
 |---|---|
 | Codex | `sol-blind-reviewer` |
-| opencode | `sol-reviewer`；涉及候选、剪枝、目标时加 `solver-guarantee-reviewer`，涉及班次、心情、绑定、MAA 时加 `rotation-maa-reviewer` |
+| opencode | `sol-reviewer` |
 | Claude Code | 新开一个不继承上下文的强模型 subagent（不用 fork） |
 
 ### 4. 收口（主 agent）

@@ -14,7 +14,6 @@
 <!-- BEGIN GENERATED ACTIVE CHANGES -->
 | 文件 | 状态 | 用途 |
 |---|---|---|
-| [AI 编排 Harness Phase 0A 协议草案](AI编排Harness%20Phase0A协议草案.md) | `proposal` | 冻结 harness-neutral 的任务、事件、结果、证明义务、证据 overlay 和 runtime capability 合同 |
 | [设施无关条件化响应 Bake 实施计划](CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md) | `ready-on-request` | 设施无关条件化响应 Bake 的后续实施任务 |
 | [动态 Producer A+：设施无关候选列 + 精确索引 Join](DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) | `ready-on-request` | 动态 producer 候选列、精确索引 Join 和 winner dependency 任务 |
 | [Worker 内联 JSON 集成与部署验收](Worker内联JSON集成与部署验收.md) | `ready-on-request` | 将已验证的 plan.compute v1 集成到目标分支和部署环境并完成浏览器验收 |
