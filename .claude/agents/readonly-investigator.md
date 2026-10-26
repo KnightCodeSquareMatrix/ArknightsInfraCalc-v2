@@ -1,6 +1,6 @@
 ---
 name: readonly-investigator
-description: Deep read-only repository investigation (deepseek). Use for multi-file, long-chain evidence gathering; for simple lookups use simple-query.
+description: Fallback only. Use solely for a single tightly dependent evidence chain that cannot be split and exceeds simple-query's 250k context. Everything else goes to simple-query.
 tools: Read, Grep, Glob, Bash
 model: codesonline/deepseek-v4.1-flash[1m]
 effort: high

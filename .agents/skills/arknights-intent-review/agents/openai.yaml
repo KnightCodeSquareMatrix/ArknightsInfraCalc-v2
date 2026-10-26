@@ -1,0 +1,4 @@
+interface:
+  display_name: "Arknights Intent Review"
+  short_description: "Review a finished change against the user's intent"
+  default_prompt: "Use $arknights-intent-review to review the finished change."

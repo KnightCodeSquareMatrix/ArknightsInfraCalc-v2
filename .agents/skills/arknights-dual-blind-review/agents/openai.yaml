@@ -1,4 +1,0 @@
-interface:
-  display_name: "Dual Blind Review"
-  short_description: "Compare independent Terra and Sol high-risk review verdicts."
-  default_prompt: "Run a dual blind review on this frozen ArknightsInfraCalc diff and evidence packet."
