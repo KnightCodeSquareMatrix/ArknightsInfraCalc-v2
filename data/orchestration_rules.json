@@ -65,7 +65,7 @@
             { "id": "tuye", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "图耶", "elite": 2 }], "room_group": "pozy_docus" },
             { "id": "closure", "optional_trade_recommendation": true, "facility": "trade_post", "trade_order": "gold", "room_level_preference": "highest_level", "candidates": [{ "name": "可露希尔", "elite": 2 }], "min_count": 0, "room_group": "pozy_closure" },
             { "id": "pozyomka", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "鸿雪", "elite": 2 }], "room_group": "pozy_closure" },
-            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "特克诺" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }], "min_count": 4, "max_count": 4 }
+            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }, { "name": "特克诺" }], "min_count": 4, "max_count": 4 }
           ],
           "relations": [
             { "kind": "forbid_same_room", "a": "绮良", "b": "鸿雪" },
@@ -87,7 +87,7 @@
             { "id": "kirara", "facility": "trade_post", "trade_order": "gold", "min_room_level": 3, "candidates": [{ "name": "绮良", "elite": 2 }], "room_group": "pozy_witch" },
             { "id": "pozyomka", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "鸿雪", "elite": 2 }], "room_group": "pozy_flow" },
             { "id": "tuye", "facility": "trade_post", "trade_order": "gold", "candidates": [{ "name": "图耶", "elite": 2 }], "room_group": "pozy_flow" },
-            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "特克诺" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }], "min_count": 4, "max_count": 4 }
+            { "id": "durin_presence", "facility": "dormitory", "facilities": ["factory", "power_plant", "office", "control_center", "trade_post", "workshop"], "candidates": [{ "name": "杜林" }, { "name": "桃金娘" }, { "name": "褐果" }, { "name": "至简" }, { "name": "特克诺" }], "min_count": 4, "max_count": 4 }
           ],
           "relations": [
             { "kind": "forbid_same_room", "a": "绮良", "b": "鸿雪" },
