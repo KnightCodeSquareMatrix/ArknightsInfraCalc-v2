@@ -7,13 +7,6 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "render_training_recommendations.py"
-SKILL = (
-    Path(__file__).resolve().parents[2]
-    / ".agents"
-    / "skills"
-    / "gongsun-training-review"
-    / "SKILL.md"
-)
 SPEC = importlib.util.spec_from_file_location("render_training_recommendations", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -97,11 +90,6 @@ class RenderTrainingRecommendationsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("error:", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
-
-    def test_review_skill_has_command(self) -> None:
-        text = SKILL.read_text(encoding="utf-8")
-        self.assertIn("python3 scripts/render_training_recommendations.py", text)
-        self.assertIn("gongsun-training-review", text)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Arknights Evidence"
-  short_description: "Collect reproducible validation evidence"
-  default_prompt: "Use $arknights-evidence to collect task evidence."

@@ -63,6 +63,7 @@
 
 - 测试、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo test --release`、`cargo build --release -p infra-cli`、`target/release/infra-cli`。debug 下全量库测试约 41 分钟。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
 - 修改 Rust 后运行 `cargo fmt --all`。
+- 需要长期留痕的证据（命令包装、失败集合对比、汇总报告）：见 `scripts/codex/README.md`。
 - 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。
 - `target/codex-runs/`、兼容日志和 `out/` 里的证据保留到交付，但不提交。
 
@@ -90,12 +91,10 @@
 | 技能、效率、无人机、电力、心情、订单、单位产出或运行时数据映射 | `arknights-mechanics-contract` |
 | 体系、跨设施、required anchor、scope、Team/Shift 绑定、排班或导出 | `arknights-system-audit` |
 | 大型 solver/search、Plan、rotation、MAA/export、跨设施或机制变更的整体自检 | `arknights-invariant-gate` |
-| 需要长期留痕的构建、测试、CLI、基准证据 | `arknights-evidence` |
 | 中高风险改动完成后的复审 | `arknights-intent-review` |
-| 拉取线上反馈 / 求解失败证据 | `arknights-feedback-sync`、`arknights-solve-failure` |
+| 拉取线上反馈 / 求解失败证据、按 CLI 指纹查失败 | `arknights-feedback-sync` |
 | 部署求解器 / 批量质检 API | `arknights-solver-deploy`、`arknights-batch-quality-api` |
 | 建筑技能解锁阶段、`operator_instances` 设施绑定审计 | `arknights-building-skill-audit` |
-| 公孙长乐练卡知识或名单验收 | `gongsun-training-review` |
 
 ## 6. 这份文件怎么改
 

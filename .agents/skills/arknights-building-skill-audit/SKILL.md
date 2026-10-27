@@ -106,7 +106,7 @@ requires manual semantic review.
 7. Re-run the focused real entry. For cross-facility changes, use the actual
    `layout test` or `layout team-rotation` command and verify the final
    assignment, not only the independent candidate benchmark.
-8. Record evidence with `arknights-evidence`; a nonzero full audit is expected
+8. Record evidence with `scripts/codex/run_evidence.sh` when durable logs are needed; a nonzero full audit is expected
    while unresolved completeness or pending-alias findings remain.
 
 ## Guardrails

@@ -1,6 +1,6 @@
 ---
 name: arknights-feedback-sync
-description: 从生产服务器 114.66.55.78 下载明日方舟基建测试反馈（feedback bundle）到本地并按日期/备注整理，同时导入对应 cli-runs 复现包、捕获无用户反馈的求解失败运行证据。用户要求"下载反馈""同步 feedback""查看服务器反馈""拉取最新反馈"时使用。
+description: 从生产服务器 114.66.55.78 下载明日方舟基建测试反馈（feedback bundle）到本地并按日期/备注整理，同时导入对应 cli-runs 复现包、捕获无用户反馈的求解失败运行证据。用户要求"下载反馈""同步 feedback""查看服务器反馈""拉取最新反馈""同步失败案例""按 CLI 指纹查失败"时使用。
 ---
 
 # Arknights 反馈下载与整理
@@ -44,6 +44,15 @@ ssh root@114.66.55.78 'ls -lt /var/lib/arknights-infra-dev/feedback/ | head'
 2. 新反馈行记入 `feedback/TRACKING.md`（状态：intake / reproduced / localized / fixing / regressed / closed / blocked / duplicate / duplicate-covered）。
 3. 本地重放命令见 `feedback/README.md`（`infra-cli debug rerun --bundle ...`）。
 4. 若反馈指向 solver/机制 bug，按根 `AGENTS.md` 当作普通修复处理；契约 hash 与前端呈现问题转前端。
+
+## 求解失败证据（无用户反馈的失败）
+
+- 只同步失败、不拉反馈：`python3 scripts/sync_solve_failures.py`（与上面阶段 3 同一逻辑）。它还会重写 `evidence/TRACKING.md` 的自动索引块，人工维护的「族清单」不动。
+- 按 CLI 指纹查本地已抓案例（指纹是 `debug-bundle.json` 顶层的 `solver_executable_sha256`，不访问远程）：
+  - `python3 scripts/sync_solve_failures.py --no-sync --cli-fingerprint <至少 8 位十六进制>`
+  - `python3 scripts/sync_solve_failures.py --no-sync --match-build target/release/infra-cli`：算本地构建的 SHA，查它对应哪些失败。
+- 新族出现时在 `evidence/TRACKING.md`「族清单」加一行标 `intake`，先跑 `evidence/<族>/replay.sh` 确认复现。状态词表与反馈台账相同。
+- `evidence/` 含真实练度盒，保持 untracked；`raw-runs` 不改写。`evidence/TRACKING.md` 本身可以提交。
 
 ## 默认丢弃规则（用户裁决 2026-08-31，原话保留）
 
