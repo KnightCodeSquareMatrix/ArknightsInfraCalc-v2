@@ -466,7 +466,7 @@ def check_navigation_contract(repo: Path) -> list[str]:
     actual_sections = re.findall(r"^## .+$", index_text, re.MULTILINE)
     if actual_sections != expected_sections:
         errors.append(
-            "INDEX.md top-level sections do not match the six-section reader IA: "
+            "INDEX.md top-level sections do not match the five-section reader IA: "
             f"actual={actual_sections}"
         )
     if "## 按任务意图进入" in index_text:

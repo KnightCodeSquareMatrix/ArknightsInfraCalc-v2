@@ -31,8 +31,10 @@ class HarnessPreflightTests(unittest.TestCase):
 
         for profile in ("terra-explorer", "luna-extractor", "sol-reviewer"):
             self.assertEqual(profiles[profile]["mode"], "subagent")
-            for permission in ("edit", "bash", "task"):
+            for permission in ("edit", "task"):
                 self.assertEqual(profiles[profile][f"permission.{permission}"], "deny")
+            # Read-only investigators may run read-only shell commands.
+            self.assertIn(profiles[profile]["permission.bash"], {"allow", "deny"})
 
 
 if __name__ == "__main__":

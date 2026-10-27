@@ -472,17 +472,17 @@ eprintln!("infra-cli profile layout-full");
         )
         if sections is None:
             sections = [
-                "## 1. 开始",
-                "## 2. 使用与集成",
-                "## 3. 概念与能力",
-                "## 4. 领域规范",
-                "## 5. 技术参考",
-                "## 6. 开发与项目治理",
+                "## 1. 从症状开始",
+                "## 2. 按入口阅读",
+                "## 3. 按模块阅读",
+                "## 4. 接口与验证",
+                "## 5. 外部机制与历史材料",
             ]
         body = "\n\n".join(f"{heading}\n\nReader navigation." for heading in sections)
         retrieval_routes = "\n".join(check_repository_facts.INDEX_RETRIEVAL_FACTS)
         (self.repo / "docs/INDEX.md").write_text(
             "本文不维护第二份分类表；任务路由见 [AGENTS.md](../AGENTS.md)。\n\n"
+            "机器可读注册表：docs/agent-index/routes.json。\n\n"
             f"{body}\n{retrieval_routes}\n{extra}",
             encoding="utf-8",
         )
@@ -506,7 +506,7 @@ eprintln!("infra-cli profile layout-full");
         self._write_navigation_fixture(sections=["## 1. 开始", "## 2. 使用与集成"])
         self.assertTrue(
             any(
-                "six-section reader IA" in error
+                "five-section reader IA" in error
                 for error in check_repository_facts.check_navigation_contract(self.repo)
             )
         )

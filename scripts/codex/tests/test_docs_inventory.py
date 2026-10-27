@@ -89,6 +89,42 @@ class DocsInventoryTests(unittest.TestCase):
         )
         self.assertTrue(any("cannot pass final check" in error for error in errors))
 
+    def test_allow_in_progress_keeps_other_final_checks(self) -> None:
+        self.canonical()
+        write_doc(
+            self.repo,
+            "docs/TODO/X.md",
+            "> 文档角色：active-change\n"
+            "> 生命周期状态：in-progress\n"
+            "> 当前真源：docs/A.md\n"
+            "> 摘要：work fixture",
+        )
+        for path, markers in (
+            ("docs/INDEX.md", ("canonical", "decisions")),
+            ("docs/TODO/README.md", ("active",)),
+        ):
+            body = "\n\n".join(
+                f"{docs_inventory.GENERATED_SECTIONS[name][0]}\n{docs_inventory.GENERATED_SECTIONS[name][1]}"
+                for name in markers
+            )
+            write_doc(
+                self.repo,
+                path,
+                "> 文档角色：current-reference\n"
+                "> 生命周期状态：current\n"
+                "> 当前真源：docs/A.md\n"
+                "> 摘要：index fixture",
+                body + "\n",
+            )
+        root = ["--repo-root", str(self.repo)]
+        self.assertEqual(docs_inventory.main([*root, "--write-indexes"]), 0)
+        self.assertEqual(docs_inventory.main([*root, "--check"]), 1)
+        self.assertEqual(docs_inventory.main([*root, "--check", "--allow-in-progress"]), 0)
+
+        readme = self.repo / "docs/TODO/README.md"
+        readme.write_text(readme.read_text(encoding="utf-8").replace("work fixture", "stale"), encoding="utf-8")
+        self.assertEqual(docs_inventory.main([*root, "--check", "--allow-in-progress"]), 1)
+
     def test_removed_review_metadata_is_rejected(self) -> None:
         target = write_doc(
             self.repo,
@@ -172,13 +208,14 @@ class DocsInventoryTests(unittest.TestCase):
             "docs/R.md",
             "> 文档角色：current-reference\n"
             "> 生命周期状态：current\n"
-            "> 当前真源：plain.txt\n"
-            "> 摘要：reference with an invalid non-document owner",
+            "> 当前真源：docs/Missing.md；plain.txt\n"
+            "> 摘要：reference with a missing document owner and a prose hint",
         )
-        errors = docs_inventory.validate_inventory(
-            self.repo, [canonical, docs_inventory.parse_document(self.repo, reference)], final=False
-        )
-        self.assertTrue(any("governed current document" in error for error in errors))
+        parsed = docs_inventory.parse_document(self.repo, reference)
+        # Non-document text in 当前真源 is a readable hint, not an ownership claim.
+        self.assertEqual(parsed.owners, ["docs/Missing.md"])
+        errors = docs_inventory.validate_inventory(self.repo, [canonical, parsed], final=False)
+        self.assertTrue(any("governed current document" in error and "Missing.md" in error for error in errors))
 
     def test_role_path_matrix_is_bidirectional(self) -> None:
         target = write_doc(

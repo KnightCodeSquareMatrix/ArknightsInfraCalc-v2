@@ -373,10 +373,6 @@ def validate_inventory(repo: Path, documents: list[Document], *, final: bool) ->
         for owner in document.owners:
             if owner == "self":
                 continue
-            # A few older pages used this field for a code hint. Keep those
-            # hints readable while current pages migrate to explicit 代码锚点.
-            if not owner.endswith(".md"):
-                continue
             target = by_path.get(owner)
             if target is None:
                 errors.append(f"current owner must be a governed current document: {document.path}: {owner}")
@@ -460,15 +456,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--check", action="store_true", help="run final hard checks")
     parser.add_argument("--report", action="store_true", help="print inventory violations without final-only rules")
+    parser.add_argument(
+        "--allow-in-progress",
+        action="store_true",
+        help="with --check, accept in-progress active changes; every other final check still runs",
+    )
     parser.add_argument("--write-indexes", action="store_true")
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     repo = args.repo_root.resolve()
     documents, errors = load_inventory(repo)
-    errors.extend(validate_inventory(repo, documents, final=args.check))
+    errors.extend(validate_inventory(repo, documents, final=args.check and not args.allow_in_progress))
     if args.write_indexes and not errors:
         write_generated_sections(repo, documents)
     if args.check:
