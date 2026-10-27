@@ -14,6 +14,7 @@
 <!-- BEGIN GENERATED ACTIVE CHANGES -->
 | 文件 | 状态 | 用途 |
 |---|---|---|
+| [Agent 规则遵守与文档维护方案](Agent规则遵守与文档维护方案.md) | `ready-on-request` | 修掉失效的门禁、让规则在 Claude Code 中可达、让硬约束可被审视和调整；不新增大量机械门禁，规则层级由 agent 判断 |
 | [设施无关条件化响应 Bake 实施计划](CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md) | `ready-on-request` | 设施无关条件化响应 Bake 的后续实施任务 |
 | [动态 Producer A+：设施无关候选列 + 精确索引 Join](DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md) | `ready-on-request` | 动态 producer 候选列、精确索引 Join 和 winner dependency 任务 |
 | [Worker 内联 JSON 集成与部署验收](Worker内联JSON集成与部署验收.md) | `ready-on-request` | 将已验证的 plan.compute v1 集成到目标分支和部署环境并完成浏览器验收 |
