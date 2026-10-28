@@ -390,19 +390,24 @@ fn search_trade_single_order(
     );
     let evaluate_started = Instant::now();
     perf.mark_live_started();
+    let batch_counters = perf.hot_path_batch_counters();
     let mut hits: Vec<TradeSearchHit> = combos
         .par_iter()
-        .filter_map(|combo| {
-            eval_combo_hit(
-                &sub,
-                table,
-                options,
-                order_kind,
-                combo,
-                must_name.as_deref(),
-                override_op.as_ref(),
-            )
-        })
+        .map_init(
+            || crate::profile::start_hot_path_batch(std::sync::Arc::clone(&batch_counters)),
+            |_, combo| {
+                eval_combo_hit(
+                    &sub,
+                    table,
+                    options,
+                    order_kind,
+                    combo,
+                    must_name.as_deref(),
+                    override_op.as_ref(),
+                )
+            },
+        )
+        .flatten()
         .filter(|hit| hit_filter.is_none_or(|f| f(hit)))
         .filter(|hit| {
             forbidden_pairs.iter().all(|(a, b)| {

@@ -1,5 +1,8 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::marker::PhantomData;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 轻量运行时计数器，供 `infra-cli profile` 对比优化前后热路径行为。
@@ -16,7 +19,7 @@ static COUNTERS: HotPathCounters = HotPathCounters {
     trade_solves: AtomicU64::new(0),
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct HotPathSnapshot {
     pub shortcut_json_loads: u64,
     pub exclusive_checks: u64,
@@ -37,16 +40,95 @@ pub fn hot_path_snapshot() -> HotPathSnapshot {
     }
 }
 
+thread_local! {
+    // No atomics, allocation, or request trace borrow at actual solver/check entry.
+    static HOT_PATH_BATCH: Cell<Option<HotPathSnapshot>> = const { Cell::new(None) };
+}
+
+#[inline]
 pub fn record_shortcut_json_load() {
-    COUNTERS.shortcut_json_loads.fetch_add(1, Ordering::Relaxed);
+    HOT_PATH_BATCH.with(|batch| {
+        if let Some(mut counts) = batch.get() {
+            counts.shortcut_json_loads += 1;
+            batch.set(Some(counts));
+        } else {
+            COUNTERS.shortcut_json_loads.fetch_add(1, Ordering::Relaxed);
+        }
+    });
 }
 
+#[inline]
 pub fn record_exclusive_check() {
-    COUNTERS.exclusive_checks.fetch_add(1, Ordering::Relaxed);
+    HOT_PATH_BATCH.with(|batch| {
+        if let Some(mut counts) = batch.get() {
+            counts.exclusive_checks += 1;
+            batch.set(Some(counts));
+        } else {
+            COUNTERS.exclusive_checks.fetch_add(1, Ordering::Relaxed);
+        }
+    });
 }
 
+#[inline]
 pub fn record_trade_solve() {
-    COUNTERS.trade_solves.fetch_add(1, Ordering::Relaxed);
+    HOT_PATH_BATCH.with(|batch| {
+        if let Some(mut counts) = batch.get() {
+            counts.trade_solves += 1;
+            batch.set(Some(counts));
+        } else {
+            COUNTERS.trade_solves.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+}
+
+impl HotPathCounters {
+    fn merge(&self, counts: HotPathSnapshot) {
+        for (counter, value) in [
+            (&self.shortcut_json_loads, counts.shortcut_json_loads),
+            (&self.exclusive_checks, counts.exclusive_checks),
+            (&self.trade_solves, counts.trade_solves),
+        ] {
+            if value != 0 {
+                counter.fetch_add(value, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn snapshot(&self) -> HotPathSnapshot {
+        HotPathSnapshot {
+            shortcut_json_loads: self.shortcut_json_loads.load(Ordering::Relaxed),
+            exclusive_checks: self.exclusive_checks.load(Ordering::Relaxed),
+            trade_solves: self.trade_solves.load(Ordering::Relaxed),
+        }
+    }
+}
+
+/// A Rayon task (or serial search) owns plain TLS counts until its guard drops.
+/// Nested batches restore the outer counts without counting inner entries twice.
+/// The guard must drop on the thread where it installed TLS.
+pub struct HotPathBatchGuard {
+    totals: Arc<HotPathCounters>,
+    previous: Option<HotPathSnapshot>,
+    _thread_bound: PhantomData<Rc<()>>,
+}
+
+pub fn start_hot_path_batch(totals: Arc<HotPathCounters>) -> HotPathBatchGuard {
+    let previous = HOT_PATH_BATCH.with(|batch| batch.replace(Some(HotPathSnapshot::default())));
+    HotPathBatchGuard {
+        totals,
+        previous,
+        _thread_bound: PhantomData,
+    }
+}
+
+impl Drop for HotPathBatchGuard {
+    fn drop(&mut self) {
+        let counts = HOT_PATH_BATCH
+            .with(|batch| batch.replace(self.previous.take()))
+            .unwrap_or_default();
+        self.totals.merge(counts);
+        COUNTERS.merge(counts);
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -76,6 +158,9 @@ pub struct OperationMetrics {
     pub selected_assignments: u64,
     pub bake_hits: u64,
     pub live_calls: u64,
+    pub actual_trade_solves: u64,
+    pub actual_exclusive_checks: u64,
+    pub actual_shortcut_json_loads: u64,
 }
 
 impl OperationMetrics {
@@ -127,6 +212,15 @@ impl OperationMetrics {
             .saturating_add(other.selected_assignments);
         self.bake_hits = self.bake_hits.saturating_add(other.bake_hits);
         self.live_calls = self.live_calls.saturating_add(other.live_calls);
+        self.actual_trade_solves = self
+            .actual_trade_solves
+            .saturating_add(other.actual_trade_solves);
+        self.actual_exclusive_checks = self
+            .actual_exclusive_checks
+            .saturating_add(other.actual_exclusive_checks);
+        self.actual_shortcut_json_loads = self
+            .actual_shortcut_json_loads
+            .saturating_add(other.actual_shortcut_json_loads);
     }
 
     fn delta(self, before: Self) -> Self {
@@ -180,6 +274,15 @@ impl OperationMetrics {
                 .saturating_sub(before.selected_assignments),
             bake_hits: self.bake_hits.saturating_sub(before.bake_hits),
             live_calls: self.live_calls.saturating_sub(before.live_calls),
+            actual_trade_solves: self
+                .actual_trade_solves
+                .saturating_sub(before.actual_trade_solves),
+            actual_exclusive_checks: self
+                .actual_exclusive_checks
+                .saturating_sub(before.actual_exclusive_checks),
+            actual_shortcut_json_loads: self
+                .actual_shortcut_json_loads
+                .saturating_sub(before.actual_shortcut_json_loads),
         }
     }
 }
@@ -240,7 +343,7 @@ pub struct SearchPhaseDurations {
 }
 
 // IDs are stable within diagnostic schema v2; the final slot safely combines unknown labels.
-const STAGE_LABELS: [(&str, &str); 48] = [
+const STAGE_LABELS: [(&str, &str); 61] = [
     ("search", "control"),
     ("search", "trade"),
     ("search", "manufacture"),
@@ -289,6 +392,19 @@ const STAGE_LABELS: [(&str, &str); 48] = [
     ("plan_compute_resolve", "current_probe"),
     ("serve_request", "request_parse"),
     ("serve_request", "request_total"),
+    ("rotation_abc_candidate", "N"),
+    ("rotation_abc_candidate", "A"),
+    ("rotation_abc_candidate", "B"),
+    ("rotation_abc_control_rebuild", "attempt_0"),
+    ("rotation_abc_control_rebuild", "attempt_1"),
+    ("rotation_abc_control_rebuild", "attempt_2"),
+    ("rotation_abc_control_rebuild", "attempt_3"),
+    ("rotation_abc", "gamma_h1"),
+    ("rotation_abc", "gamma_h2"),
+    ("rotation_abc", "abyssal_backup"),
+    ("rotation_abc", "fiammetta_backup"),
+    ("rotation_abc", "originium_pair"),
+    ("rotation_backup", "disjoint"),
 ];
 const OVERFLOW_STAGE_ID: usize = STAGE_LABELS.len();
 const STAGE_SLOT_COUNT: usize = STAGE_LABELS.len() + 1;
@@ -343,6 +459,19 @@ fn stage_id(scope: &str, stage: &str) -> usize {
         ("plan_compute_resolve", "current_probe") => 45,
         ("serve_request", "request_parse") => 46,
         ("serve_request", "request_total") => 47,
+        ("rotation_abc_candidate", "N") => 48,
+        ("rotation_abc_candidate", "A") => 49,
+        ("rotation_abc_candidate", "B") => 50,
+        ("rotation_abc_control_rebuild", "attempt_0") => 51,
+        ("rotation_abc_control_rebuild", "attempt_1") => 52,
+        ("rotation_abc_control_rebuild", "attempt_2") => 53,
+        ("rotation_abc_control_rebuild", "attempt_3") => 54,
+        ("rotation_abc", "gamma_h1") => 55,
+        ("rotation_abc", "gamma_h2") => 56,
+        ("rotation_abc", "abyssal_backup") => 57,
+        ("rotation_abc", "fiammetta_backup") => 58,
+        ("rotation_abc", "originium_pair") => 59,
+        ("rotation_backup", "disjoint") => 60,
         _ => OVERFLOW_STAGE_ID,
     }
 }
@@ -738,9 +867,19 @@ pub struct SearchPerfGuard {
     phases: SearchPhaseDurations,
     live_started: bool,
     finished: bool,
+    hot_path_totals: Option<Arc<HotPathCounters>>,
+    hot_path_batch: Option<HotPathBatchGuard>,
 }
 
 pub fn start_search_perf(operation: SearchOperation) -> SearchPerfGuard {
+    let hot_path_totals = matches!(
+        operation,
+        SearchOperation::Trade | SearchOperation::Manufacture
+    )
+    .then(|| Arc::new(HotPathCounters::default()));
+    let hot_path_batch = hot_path_totals
+        .as_ref()
+        .map(|totals| start_hot_path_batch(Arc::clone(totals)));
     SearchPerfGuard {
         operation,
         started: std::time::Instant::now(),
@@ -753,10 +892,21 @@ pub fn start_search_perf(operation: SearchOperation) -> SearchPerfGuard {
         phases: SearchPhaseDurations::default(),
         live_started: false,
         finished: false,
+        hot_path_totals,
+        hot_path_batch,
     }
 }
 
 impl SearchPerfGuard {
+    /// Share numeric counts explicitly with Rayon tasks; request TLS is not inherited.
+    pub fn hot_path_batch_counters(&self) -> Arc<HotPathCounters> {
+        Arc::clone(
+            self.hot_path_totals
+                .as_ref()
+                .expect("trade/manufacture search batch"),
+        )
+    }
+
     pub fn mark_live_started(&mut self) {
         self.live_started = true;
     }
@@ -802,7 +952,32 @@ impl SearchPerfGuard {
         self.finished = true;
     }
 
-    fn record(&self) {
+    fn record(&mut self) {
+        // Rayon collection has dropped every task guard. Flush serial entries before
+        // sampling totals, including preparation/Bake failures and full materialization.
+        drop(self.hot_path_batch.take());
+        if let Some(totals) = self.hot_path_totals.as_ref() {
+            let counts = totals.snapshot();
+            PERF_TRACE.with(|trace| {
+                if let Some(state) = trace.borrow_mut().as_mut() {
+                    let metrics = match self.operation {
+                        SearchOperation::Trade => &mut state.metrics.trade,
+                        SearchOperation::Manufacture => &mut state.metrics.manufacture,
+                        SearchOperation::Control => &mut state.metrics.control,
+                        SearchOperation::Power => &mut state.metrics.power,
+                    };
+                    metrics.actual_trade_solves = metrics
+                        .actual_trade_solves
+                        .saturating_add(counts.trade_solves);
+                    metrics.actual_exclusive_checks = metrics
+                        .actual_exclusive_checks
+                        .saturating_add(counts.exclusive_checks);
+                    metrics.actual_shortcut_json_loads = metrics
+                        .actual_shortcut_json_loads
+                        .saturating_add(counts.shortcut_json_loads);
+                }
+            });
+        }
         record_search(
             self.operation,
             self.started.elapsed(),
@@ -827,6 +1002,51 @@ impl Drop for SearchPerfGuard {
             "search",
             search_operation_name(self.operation),
             "error",
+            self.started.elapsed(),
+            self.before,
+            solver_perf_snapshot(),
+        );
+    }
+}
+
+/// Main-thread inclusive stage timing and operation delta. Mark successful exit
+/// explicitly; unwinding and early error returns still record the entered stage.
+pub struct SolverStageGuard {
+    scope: &'static str,
+    stage: &'static str,
+    started: Instant,
+    before: SolverPerfSnapshot,
+    status: &'static str,
+}
+
+pub fn start_solver_stage(scope: &'static str, stage: &'static str) -> SolverStageGuard {
+    SolverStageGuard {
+        scope,
+        stage,
+        started: Instant::now(),
+        before: solver_perf_snapshot(),
+        status: "error",
+    }
+}
+
+impl SolverStageGuard {
+    pub fn finish(&mut self) {
+        self.status = "ok";
+    }
+
+    pub fn record_result<T, E>(&mut self, result: &Result<T, E>) {
+        if result.is_ok() {
+            self.finish();
+        }
+    }
+}
+
+impl Drop for SolverStageGuard {
+    fn drop(&mut self) {
+        emit_solver_stage_metrics(
+            self.scope,
+            self.stage,
+            self.status,
             self.started.elapsed(),
             self.before,
             solver_perf_snapshot(),
@@ -955,6 +1175,9 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
         "selected_assignments": metrics.selected_assignments,
         "bake_hits": metrics.bake_hits,
         "live_calls": metrics.live_calls,
+        "actual_trade_solves": metrics.actual_trade_solves,
+        "actual_exclusive_checks": metrics.actual_exclusive_checks,
+        "actual_shortcut_json_loads": metrics.actual_shortcut_json_loads,
     })
 }
 

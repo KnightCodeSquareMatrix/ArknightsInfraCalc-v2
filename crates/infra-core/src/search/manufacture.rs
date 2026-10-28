@@ -361,6 +361,7 @@ fn search_manufacture_single_recipe(
     );
     let evaluate_started = Instant::now();
     perf.mark_live_started();
+    let batch_counters = perf.hot_path_batch_counters();
     struct Light {
         idx: usize,
         eff: Efficiency,
@@ -370,30 +371,34 @@ fn search_manufacture_single_recipe(
     let mut hits: Vec<Light> = flat
         .par_chunks(k)
         .enumerate()
-        .filter_map(|(ci, combo)| {
-            let ops: Vec<_> = combo
-                .iter()
-                .map(|i| sub.entries[*i].to_manu_operator())
-                .collect();
-            if !manufacture_combo_allowed_for_shift(&ops, table, options.shift_hours) {
-                return None;
-            }
-            let layout = manufacture_combo_layout(&options.layout, &ops);
-            let base = ManuRoomInput {
-                level: options.level,
-                operators: ops,
-                active_recipe: recipe,
-                mood: options.mood,
-                layout,
-            };
-            let (eff, storage) =
-                evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
-            Some(Light {
-                idx: ci,
-                eff,
-                storage,
-            })
-        })
+        .map_init(
+            || crate::profile::start_hot_path_batch(std::sync::Arc::clone(&batch_counters)),
+            |_, (ci, combo)| {
+                let ops: Vec<_> = combo
+                    .iter()
+                    .map(|i| sub.entries[*i].to_manu_operator())
+                    .collect();
+                if !manufacture_combo_allowed_for_shift(&ops, table, options.shift_hours) {
+                    return None;
+                }
+                let layout = manufacture_combo_layout(&options.layout, &ops);
+                let base = ManuRoomInput {
+                    level: options.level,
+                    operators: ops,
+                    active_recipe: recipe,
+                    mood: options.mood,
+                    layout,
+                };
+                let (eff, storage) =
+                    evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
+                Some(Light {
+                    idx: ci,
+                    eff,
+                    storage,
+                })
+            },
+        )
+        .flatten()
         .collect();
     let evaluate_elapsed = evaluate_started.elapsed();
 
