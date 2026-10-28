@@ -73,6 +73,19 @@
 - 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。
 - `target/codex-runs/`、兼容日志和 `out/` 里的证据保留到交付，但不提交。
 
+### 定向查询与上下文节省
+
+查询已有产物时，优先用下列入口定位所需事实，再按需展开原文；RTK 负责通用命令输出压缩。详细参数与格式见 [工具说明](scripts/codex/README.md#定向查询与上下文预算)，不必每次通读。
+
+| 需要查什么 | 入口 |
+|---|---|
+| 排班人员、班次、房间、产出及两份结果的变化 | `python3 scripts/codex/query_rotation_report.py --report <rotation.json>`；按需加 `--shift N`、`--room <id>`、`--operator <姓名>`，或单独用 `--compare <旧报告>` |
+| 干员、buff、Rule、体系、shortcut 的原始记录与引用 | `python3 scripts/codex/query_runtime_data.py`，选择 `--operator`、`--buff-id`、`--rule`、`--system`、`--shortcut`；另一工作树用 `--data-dir` 指定 |
+| 多代理报告目录、引用位置或用户原话选段 | `python3 scripts/codex/index_research_reports.py --dir <目录>` 或 `--file <报告>`；按需加 `--source <引用路径>`、`--section <编号>`，Workflow 可加 `--key` |
+| 批量验收进度 | `python3 scripts/assert_rotation_invariants.py --status <运行目录>`；批量运行用 `--output-dir` 生成 `progress.json`，最终错误读 `summary.json` |
+
+三个查询入口默认最多输出 6000 字符；省略内容用 `--full` 或 `--output <完整结果路径>` 回取，不把截断当作完整证据。排班查询只接受完整 rotation 产物，`--shift` 为保存的 `index+1`；profile/MAA 不冒充完整排班。数据查询不解释机制，报告索引不替代原文复审，进度快照不证明进程仍存活。命令留痕与失败集合比较继续复用 `run_evidence.sh`、`render_evidence.py`、`compare_test_failures.py`。
+
 ## 4. 从哪里读
 
 - 按症状找文档：[`docs/INDEX.md`](docs/INDEX.md)。代码 owner 和命令：[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) 的相关段，不需要通读。
