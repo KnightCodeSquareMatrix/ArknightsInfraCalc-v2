@@ -178,31 +178,27 @@ Baseline 是检测回归的工具，不是允许既有错误永久存在的豁�
 
 ## 6. Bake 安全门禁
 
-Bake 是加速载体，不是业务真源。预计算结果只有在候选结构和所有相关上下文与生成模型兼容时才能使用。
+Bake 是加速载体，不是业务真源。预计算结果只有在候选结构和所有相关上下文与生成模型兼容时才能使用；新写的进度文档不能替代领域裁决或作为机制真源。
 
-### 6.1 当前 schema v15 已实现的门禁
+### 6.1 当前 schema17 已实现的门禁
 
-- schema、CLI generator 和输入文件 fingerprint 一致；输入覆盖 baseline layout、instances、skill table、standalone roster、segments、shortcuts 和 systems。
-- runtime pool 中的候选名必须被 catalog 覆盖，且当前快速路径要求兼容的 E2 tier 模型。
-- room level、capacity、recipe / order、mood、shift hours 与 baseline context 必须满足各设施 gate。
-- 动态 inject、候选投影、`OperatorInBase` / `OperatorInTrade`、跨房 workforce 或 `full_pool` 等未被当前表精确表达的上下文会拒绝 Bake。
-- catalog 缺失、schema / generator / input mismatch 时返回实时搜索。
-- manifest 记录 `combo_table.bin` bytes/hash 和每个物理 signature 的行数；loader 对同一份 bytes
-  完成反序列化、结构校验与消费，不在校验后重新读取另一份快照。
-- 完整贸易 row API 会从当前 TradePool 重建每个物理 signature 的全部合法 operator identity
-  集合并与 catalog 精确对照；任何缺行、多行或 identity 变化都拒绝 catalog。
-- 贸易 row 可显式保存首批 room-local 机制观察量：peer count、Vina 的 Glasgow peer presence、
-  Morgan 的 owner-inclusive Glasgow count、推进之王 presence、`snhunt` / `laterano` count；
-  这些字段从实际 row 编译，不改变候选集合或 comparator。
+- schema、CLI generator 和输入文件 fingerprint 必须一致；输入覆盖 baseline layout、instances、skill table、standalone roster、segments、shortcuts 和 systems。运行时技能表原文及预编译 atom 身份也须兼容。
+- catalog 按 `(name, 原始 elite, 有序 buff_ids, tags)` 保存完整技能身份；真实 pool builder 生成练度变体，同名组合互斥。E0/E1 与 full_pool 本身不再必然 miss。冷加载精确核对完整合法组合集合，并按物理 signature 建立 checked dense colex rank 数组；热查询沿 live 子池相对次序直查，保留 live 比较规则及 best/top-K 输出口径。
+- room level、capacity、recipe/order 必须有对应 signature；完整 `LayoutContext::search_baseline()`、注入顺序/聚合结果、active_source_buffs 和浮点有限性/位表示须通过门禁。任意布局、动态贸易注入、制造 count-scaled 注入等未覆盖上下文回 live。
+- 心情必须有限且大于 0，时长必须有限；Mood/OwnerMoodGap 敏感技能和制造 peer-reset 回 live。制造 `Some(h)` 且候选池含任一 `AddEffRamp` 时整个查询回 live；`None` 的表生成和行 verify 保持 20 小时暖机值。制造 peer-reset 外层绕过已删除，CLI 与核心公开门禁同语义。
+- manifest 保存 `combo_table.bin` bytes/hash 和各物理 signature 行数；loader 对同一份 bytes 完成反序列化、结构校验与消费，拒绝缺行、多行和身份变化。row 保存完整结算响应与必要的 room-local 观察量，查询不改变候选集合或 comparator。
+- Auto 缺表/失效时一次使用 Disabled live 生成，完整验证后发布；exe 指纹成功和失败均进程内缓存。独立 generation 目录经验证后由 CURRENT 原子 rename 切换，统一校验、verify、核心/CLI/debug 解析；可用 `ARKNIGHTS_INFRA_BAKED_DIR` 显式隔离生成目录；未设置时沿用 data 根发现顺序。跨进程短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。
+- Required 保持只读，公开统一门禁不兼容即严格报 miss，不生成或静默绕过；Auto 的 typed miss 回同语义 live。query_errors 单独记录，原有 rank/row/物化错误仍保留，不能声称所有错误都无条件 fallback。
+- 固定 BakeMissKind、冷阶段 calls/errors/nanos 与服务启动同步 warm 已接入；warm 失败继续 live 与 ready。生成物已取消跟踪，历史 schema4 目录已清理，不能手改生成物裁决语义。
 
-当前工作区旧 catalog 与代码 schema 的具体状态见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)。当前 loader 已校验 `combo_table.bin` 的 bytes、内容 hash 和每个物理 signature 的行数；非白名单反序列化错误仍可能作为错误返回，而不是无条件 fallback；生成物也尚未采用完整 generation-id 原子切换。因此不能把下面的未来要求写成当前能力。
+当前实现 owner 见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)，本轮范围和冻结证据见 [性能优化调查与Bake重设计](TODO/性能优化调查与Bake重设计.md)。最终全量行/查询差分、四轮换与全精二产物/终态断言和独立复审仍待收口；实现与编译完成不能写成最终验收通过。暖机只是整班窗口逐时平均贡献后进入解释器，心情分段共用该窗口，未做非线性积分。
 
-### 6.2 下一代 catalog 必须补齐
+### 6.2 真实限制与后续边界
 
-- 在已有 bytes、内容 hash 和逐 signature 行数校验之外，补齐 index checksum。
-- 损坏、反序列化失败、未知 signature 与缺行全部安全进入同语义 live 求值。
-- 临时 generation 目录、完整校验和原子切换，避免读取新旧文件混合状态。
-- cache miss 只替代候选生成 / 求值方式，不能改用更小候选集、固定 top-K 或旧 pipeline。
+- combo table 已有 bytes/hash 和逐 signature 行数校验；加载期 rank 索引由完整合法集合重建，index checksum 尚未独立持久化，不能写成已完成。
+- 完整表与加载期索引已获授权；schema17 当前实际规模、生成和冷加载成本尚无最终运行数据，历史估算不作现行事实，也不重新打开体积裁决。
+- 全量行 verify 不能证明所有未覆盖上下文或全部候选子集排序均等价；不兼容查询仍依靠门禁回 live。cache miss 只替代候选生成/求值方式，不缩小候选集，不转用固定 top-K 或旧 pipeline。
+- 最终对拍使用原冻结源码及其基线；原 `/tmp/perf-current-20261028` 已因本地 OOM 后环境重启丢失，按确证的 `3201fa7` 加冻结 U1a 四文件重建和采集，持久恢复证据见交接单 §4.1。只授权暖机房差异；超范围产物、选择或排班差异原样报告，不能降低保证等级。
 
 未来联合候选 Bake 的 winner 仍必须在完整临时 assignment 上统一 resolve；DP、Pareto 和安全上界不是首期前提。详见 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
