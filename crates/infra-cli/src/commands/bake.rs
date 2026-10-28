@@ -84,6 +84,7 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         ));
     }
 
+    let _trace = infra_core::profile::ensure_solver_perf_trace("bake_cli", mode);
     let generator = current_exe_generator_fingerprint()?;
     if validate_only || verify_only {
         validate_baked_catalog(&options.out_dir, &generator)?;

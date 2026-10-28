@@ -97,7 +97,7 @@
 `GlobalResourcePool` 继续使用 HashMap，并保留 `contains`、`iter`、`to_room_state` 和回写接口；中枢、办公室与发电站沿用原快照。新增 `to_fixed_room_state` 仅把现有全局项按键复制到房间槽位，不做浮点运算或归并。该优化不改变候选、phase 应用顺序、输出合同或保证等级。格式化、release 离线编译及差异检查通过仅证明构建与源代码边界；本次未运行求解、Bake、对拍或新增测试，未验证性能幅度和全局机制等价。
 
 
-U4a 提供内部 `ExactKeySerializer`：完整类型/字段/容器边界、原始浮点 bit 和 map 实际迭代顺序进入键，布局与注入的全部业务字段及预编译 atom 可直接编码；该模块尚未接入搜索或 memo，本阶段仅格式化、release 离线编译及差异检查，不能据此证明缓存等价或性能收益。
+内部 `ExactKeySerializer` 已接入请求 memo 的布局、贸易与制造完整键：完整类型/字段/容器边界、原始浮点 bit 和 map 实际迭代顺序进入键，布局与注入的全部业务字段及预编译 atom 可直接编码。当前验证仅含格式化、离线编译及差异检查；真实命中率、缓存等价与性能收益仍待最终统一验收。
 
 ## Bake signature 的固定槽位与目录隔离
 
@@ -106,3 +106,13 @@ U4a 提供内部 `ExactKeySerializer`：完整类型/字段/容器边界、原�
 `ARKNIGHTS_INFRA_BAKED_DIR` 单独指定默认 Bake 目录，设置后直接使用，不参与其他输入文件的 `data_path` 发现。它可将最终验收生成和运行时加载都隔离到临时目录，保持默认 layout/baseline 标签与冻结产物一致；未设置时完全保留原目录发现顺序，CLI 显式 `--out` 继续优先。
 
 本单元仅格式化、workspace 离线编译和源差异检查；未运行 solver、Bake、测量或测试，不能据此证明运行等价或性能幅度。最终全量 Bake 验证、产物差分和终态断言集中执行。
+
+## Bake 查询分类、冷耗时与稀疏日志
+
+两域公开 `try_baked_*` 每次最多累计一个固定 `BakeMissKind`；compatibility 返回 typed 原因并只判断一次，内部 report helper、verify、load 与 warm 不重复记查询 miss。生成中和失效/不可用分别记 `generating` / `unavailable`；Required 按原原因冷格式化错误，Auto 不格式化 miss 诊断。原 rank/row/物化 Err 保留，单独计 query_errors；成功空制造报告和 rank sentinel 不算 miss。
+
+冷阶段 init/generate/validate/verify/index/publish 以线程本地数字 calls/errors/nanos 累积，guard 保留错误或展开路径。真正 OnceLock initializer 才记录 init；CLI bake 的动作 trace 和 serve 启动同步 core warm 的独立 trace 让冷成本可见。serve 不再保留返回 None/false 的空桩，不引入后台生成竞态；warm 失败继续 live 与 ready。核心 Bake 校验、CLI 回归和已有错误不改变。
+
+冷指标与查询分类加入 snapshot 的累计/差分，trace 结束才映射标签和生成 JSON；没有 trace 不计数。operation 与 Bake 指标省略数值零项，schema 2 消费者须将缺字段解释为零。阶段框架字段保持；固定数值收集不向组合热循环引入 format/JSON/I/O。父子冷耗时 inclusive，禁止加总；真实重复验证照次累计。
+
+本单元仅格式化、workspace 离线编译及文档/源差异检查；未运行求解、Bake、测量或测试，不能据此声称性能幅度或最终行为等价。

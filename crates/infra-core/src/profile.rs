@@ -300,6 +300,253 @@ impl OperationMetrics {
     }
 }
 
+/// 固定诊断类别；热路径只传枚举并累计整数，标签映射在输出时执行。
+#[derive(Debug, Clone, Copy)]
+#[repr(usize)]
+pub(crate) enum BakeMissKind {
+    ForbiddenPairs,
+    Override,
+    Predicate,
+    InvalidMood,
+    InvalidShift,
+    Layout,
+    MoodSensitive,
+    PeerReset,
+    Generating,
+    Unavailable,
+    SkillTable,
+    DuplicateNames,
+    StateAbsent,
+    FacilityStateAbsent,
+    NonCanonicalOrder,
+    TradeAtoms,
+    ManufactureAtoms,
+    SignatureAbsent,
+    Capacity,
+    HeapUnavailable,
+    TradeIncomplete,
+    ManufactureIncomplete,
+    NoEligibleTrade,
+}
+
+impl BakeMissKind {
+    const ALL: [Self; 23] = [
+        Self::ForbiddenPairs,
+        Self::Override,
+        Self::Predicate,
+        Self::InvalidMood,
+        Self::InvalidShift,
+        Self::Layout,
+        Self::MoodSensitive,
+        Self::PeerReset,
+        Self::Generating,
+        Self::Unavailable,
+        Self::SkillTable,
+        Self::DuplicateNames,
+        Self::StateAbsent,
+        Self::FacilityStateAbsent,
+        Self::NonCanonicalOrder,
+        Self::TradeAtoms,
+        Self::ManufactureAtoms,
+        Self::SignatureAbsent,
+        Self::Capacity,
+        Self::HeapUnavailable,
+        Self::TradeIncomplete,
+        Self::ManufactureIncomplete,
+        Self::NoEligibleTrade,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::ForbiddenPairs => "forbidden_pairs",
+            Self::Override => "override",
+            Self::Predicate => "predicate",
+            Self::InvalidMood => "invalid_mood",
+            Self::InvalidShift => "invalid_shift",
+            Self::Layout => "layout",
+            Self::MoodSensitive => "mood_sensitive",
+            Self::PeerReset => "peer_reset",
+            Self::Generating => "generating",
+            Self::Unavailable => "unavailable",
+            Self::SkillTable => "skill_table",
+            Self::DuplicateNames => "duplicate_names",
+            Self::StateAbsent => "state_absent",
+            Self::FacilityStateAbsent => "facility_state_absent",
+            Self::NonCanonicalOrder => "noncanonical_order",
+            Self::TradeAtoms => "trade_atoms",
+            Self::ManufactureAtoms => "manufacture_atoms",
+            Self::SignatureAbsent => "signature_absent",
+            Self::Capacity => "capacity",
+            Self::HeapUnavailable => "heap_unavailable",
+            Self::TradeIncomplete => "trade_incomplete",
+            Self::ManufactureIncomplete => "manufacture_incomplete",
+            Self::NoEligibleTrade => "no_eligible_trade",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(usize)]
+pub(crate) enum BakeColdPhase {
+    Init,
+    Generate,
+    Validate,
+    Verify,
+    Index,
+    Publish,
+}
+
+impl BakeColdPhase {
+    const ALL: [Self; 6] = [
+        Self::Init,
+        Self::Generate,
+        Self::Validate,
+        Self::Verify,
+        Self::Index,
+        Self::Publish,
+    ];
+    fn label(self) -> &'static str {
+        match self {
+            Self::Init => "init",
+            Self::Generate => "generate",
+            Self::Validate => "validate",
+            Self::Verify => "verify",
+            Self::Index => "index",
+            Self::Publish => "publish",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BakeColdMetrics {
+    pub calls: u64,
+    pub errors: u64,
+    pub nanos: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BakeMetrics {
+    pub trade_misses: [u64; 23],
+    pub manufacture_misses: [u64; 23],
+    pub trade_errors: u64,
+    pub manufacture_errors: u64,
+    pub cold: [BakeColdMetrics; 6],
+}
+
+impl BakeMetrics {
+    fn accumulate(&mut self, other: Self) {
+        for (a, b) in self.trade_misses.iter_mut().zip(other.trade_misses) {
+            *a = a.saturating_add(b);
+        }
+        for (a, b) in self
+            .manufacture_misses
+            .iter_mut()
+            .zip(other.manufacture_misses)
+        {
+            *a = a.saturating_add(b);
+        }
+        self.trade_errors = self.trade_errors.saturating_add(other.trade_errors);
+        self.manufacture_errors = self
+            .manufacture_errors
+            .saturating_add(other.manufacture_errors);
+        for (a, b) in self.cold.iter_mut().zip(other.cold) {
+            a.calls = a.calls.saturating_add(b.calls);
+            a.errors = a.errors.saturating_add(b.errors);
+            a.nanos = a.nanos.saturating_add(b.nanos);
+        }
+    }
+    fn delta(self, before: Self) -> Self {
+        let mut result = Self::default();
+        for i in 0..23 {
+            result.trade_misses[i] = self.trade_misses[i].saturating_sub(before.trade_misses[i]);
+            result.manufacture_misses[i] =
+                self.manufacture_misses[i].saturating_sub(before.manufacture_misses[i]);
+        }
+        result.trade_errors = self.trade_errors.saturating_sub(before.trade_errors);
+        result.manufacture_errors = self
+            .manufacture_errors
+            .saturating_sub(before.manufacture_errors);
+        for i in 0..6 {
+            result.cold[i] = BakeColdMetrics {
+                calls: self.cold[i].calls.saturating_sub(before.cold[i].calls),
+                errors: self.cold[i].errors.saturating_sub(before.cold[i].errors),
+                nanos: self.cold[i].nanos.saturating_sub(before.cold[i].nanos),
+            };
+        }
+        result
+    }
+}
+
+pub(crate) fn record_bake_query(
+    operation: SearchOperation,
+    miss: Option<BakeMissKind>,
+    error: bool,
+) {
+    PERF_TRACE.with(|trace| {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
+            return;
+        };
+        let (misses, errors) = match operation {
+            SearchOperation::Trade => (
+                &mut state.metrics.bake.trade_misses,
+                &mut state.metrics.bake.trade_errors,
+            ),
+            SearchOperation::Manufacture => (
+                &mut state.metrics.bake.manufacture_misses,
+                &mut state.metrics.bake.manufacture_errors,
+            ),
+            _ => return,
+        };
+        if let Some(kind) = miss {
+            misses[kind as usize] = misses[kind as usize].saturating_add(1);
+        }
+        if error && miss.is_none() {
+            *errors = errors.saturating_add(1);
+        }
+    });
+}
+
+pub(crate) struct BakeColdGuard {
+    phase: BakeColdPhase,
+    started: Option<Instant>,
+    succeeded: bool,
+    _thread_bound: PhantomData<Rc<()>>,
+}
+
+pub(crate) fn start_bake_cold(phase: BakeColdPhase) -> BakeColdGuard {
+    let active = PERF_TRACE.with(|trace| trace.borrow().is_some());
+    BakeColdGuard {
+        phase,
+        started: active.then(Instant::now),
+        succeeded: false,
+        _thread_bound: PhantomData,
+    }
+}
+
+impl BakeColdGuard {
+    pub(crate) fn finish<T>(&mut self, result: &crate::error::Result<T>) {
+        self.succeeded = result.is_ok();
+    }
+}
+
+impl Drop for BakeColdGuard {
+    fn drop(&mut self) {
+        let Some(started) = self.started else {
+            return;
+        };
+        let nanos = duration_nanos(started.elapsed());
+        PERF_TRACE.with(|trace| {
+            if let Some(state) = trace.borrow_mut().as_mut() {
+                let metrics = &mut state.metrics.bake.cold[self.phase as usize];
+                metrics.calls = metrics.calls.saturating_add(1);
+                metrics.errors = metrics.errors.saturating_add(u64::from(!self.succeeded));
+                metrics.nanos = metrics.nanos.saturating_add(nanos);
+            }
+        });
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SolverPerfSnapshot {
     pub resolve: OperationMetrics,
@@ -307,6 +554,7 @@ pub struct SolverPerfSnapshot {
     pub trade: OperationMetrics,
     pub manufacture: OperationMetrics,
     pub power: OperationMetrics,
+    pub bake: BakeMetrics,
 }
 
 impl SolverPerfSnapshot {
@@ -316,6 +564,7 @@ impl SolverPerfSnapshot {
         self.trade.accumulate(other.trade);
         self.manufacture.accumulate(other.manufacture);
         self.power.accumulate(other.power);
+        self.bake.accumulate(other.bake);
     }
 
     pub fn delta(self, before: Self) -> Self {
@@ -325,6 +574,7 @@ impl SolverPerfSnapshot {
             trade: self.trade.delta(before.trade),
             manufacture: self.manufacture.delta(before.manufacture),
             power: self.power.delta(before.power),
+            bake: self.bake.delta(before.bake),
         }
     }
 }
@@ -1177,7 +1427,54 @@ fn snapshot_json(metrics: SolverPerfSnapshot) -> serde_json::Value {
             operations.insert(name.to_string(), operation_json(operation));
         }
     }
+    if metrics.bake != BakeMetrics::default() {
+        operations.insert("bake".to_string(), bake_metrics_json(metrics.bake));
+    }
     serde_json::Value::Object(operations)
+}
+
+fn bake_metrics_json(metrics: BakeMetrics) -> serde_json::Value {
+    let mut result = serde_json::Map::new();
+    for (label, misses, errors) in [
+        ("trade", metrics.trade_misses, metrics.trade_errors),
+        (
+            "manufacture",
+            metrics.manufacture_misses,
+            metrics.manufacture_errors,
+        ),
+    ] {
+        let mut values = serde_json::Map::new();
+        for kind in BakeMissKind::ALL {
+            if misses[kind as usize] != 0 {
+                values.insert(kind.label().to_string(), misses[kind as usize].into());
+            }
+        }
+        if errors != 0 {
+            values.insert("query_errors".to_string(), errors.into());
+        }
+        if !values.is_empty() {
+            result.insert(label.to_string(), serde_json::Value::Object(values));
+        }
+    }
+    let mut phases = serde_json::Map::new();
+    for phase in BakeColdPhase::ALL {
+        let value = metrics.cold[phase as usize];
+        if value.calls != 0 {
+            let mut json = serde_json::json!({"calls": value.calls, "errors": value.errors, "elapsed_ms": nanos_ms(value.nanos)});
+            retain_nonzero_metrics(&mut json);
+            phases.insert(phase.label().to_string(), json);
+        }
+    }
+    if !phases.is_empty() {
+        result.insert("cold".to_string(), serde_json::Value::Object(phases));
+    }
+    serde_json::Value::Object(result)
+}
+
+fn retain_nonzero_metrics(value: &mut serde_json::Value) {
+    if let Some(object) = value.as_object_mut() {
+        object.retain(|_, value| value.as_f64() != Some(0.0));
+    }
 }
 
 fn search_operation_name(operation: SearchOperation) -> &'static str {
@@ -1190,7 +1487,7 @@ fn search_operation_name(operation: SearchOperation) -> &'static str {
 }
 
 fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
-    serde_json::json!({
+    let mut result = serde_json::json!({
         "calls": metrics.calls,
         "wall_ms": nanos_ms(metrics.wall_nanos),
         "workforce_ms": nanos_ms(metrics.workforce_nanos),
@@ -1222,7 +1519,9 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
         "actual_trade_solves": metrics.actual_trade_solves,
         "actual_exclusive_checks": metrics.actual_exclusive_checks,
         "actual_shortcut_json_loads": metrics.actual_shortcut_json_loads,
-    })
+    });
+    retain_nonzero_metrics(&mut result);
+    result
 }
 
 fn duration_nanos(duration: Duration) -> u64 {

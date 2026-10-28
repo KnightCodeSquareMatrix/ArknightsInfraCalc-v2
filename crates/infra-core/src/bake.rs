@@ -26,6 +26,7 @@ use crate::pool::{
 };
 use crate::pool::{filter_standalone_exact_with, StandaloneFilter};
 use crate::pool::{HasName, ManuPool, PoolCore, TradePool};
+use crate::profile::{BakeColdPhase, BakeMissKind};
 use crate::search::{
     ManuEfficiencyBreakdown, ManuSearchHit, ManuSearchOptions, ManuSearchReport,
     SearchTripleFilter, TradeEfficiencyBreakdown, TradeSearchHit, TradeSearchOptions,
@@ -48,17 +49,53 @@ pub enum BakeMode {
     Required,
 }
 
-fn baked_miss<T>(mode: BakeMode, reason: impl Into<String>) -> Result<Option<T>> {
-    if mode == BakeMode::Required {
-        Err(Error::msg(format!("required Bake miss: {}", reason.into())))
-    } else {
-        Ok(None)
+impl BakeMissKind {
+    fn reason(self) -> &'static str {
+        match self {
+            Self::ForbiddenPairs => "trade forbidden-pair constraints are not represented",
+            Self::Override => "operator override is not represented",
+            Self::Predicate => "hit predicate requires live evaluation",
+            Self::InvalidMood => "mood must be finite and positive",
+            Self::InvalidShift => "shift duration must be finite",
+            Self::Layout => "complete layout differs from the baked baseline",
+            Self::MoodSensitive => "mood-sensitive skills require live settlement",
+            Self::PeerReset => "peer-reset skills require live settlement",
+            Self::Generating => "catalog is currently being generated",
+            Self::Unavailable => "catalog is missing, stale, or unavailable",
+            Self::SkillTable => "skill table source differs from the catalog",
+            Self::DuplicateNames => "query contains duplicate operator names",
+            Self::StateAbsent => "complete operator state is not represented",
+            Self::FacilityStateAbsent => "operator state is not represented for this facility",
+            Self::NonCanonicalOrder => "query operator order is not canonical",
+            Self::TradeAtoms => "compiled trade atoms differ from the canonical state",
+            Self::ManufactureAtoms => "compiled manufacture atoms differ from the canonical state",
+            Self::SignatureAbsent => "signature is absent",
+            Self::Capacity => "rank capacity is not represented",
+            Self::HeapUnavailable => "Bake top-K heap is unavailable",
+            Self::TradeIncomplete => "ranked trade response is incomplete",
+            Self::ManufactureIncomplete => "ranked manufacture response is incomplete",
+            Self::NoEligibleTrade => "signature has no eligible trade combo",
+        }
     }
 }
 
-fn baked_miss_lazy<T>(mode: BakeMode, reason: impl FnOnce() -> String) -> Result<Option<T>> {
+fn baked_miss<T>(
+    mode: BakeMode,
+    kind: BakeMissKind,
+    miss: &mut Option<BakeMissKind>,
+) -> Result<Option<T>> {
+    baked_miss_lazy(mode, kind, miss, || kind.reason().to_string())
+}
+
+fn baked_miss_lazy<T>(
+    mode: BakeMode,
+    kind: BakeMissKind,
+    miss: &mut Option<BakeMissKind>,
+    reason: impl FnOnce() -> String,
+) -> Result<Option<T>> {
+    *miss = Some(kind);
     if mode == BakeMode::Required {
-        baked_miss(mode, reason())
+        Err(Error::msg(format!("required Bake miss: {}", reason())))
     } else {
         Ok(None)
     }
@@ -716,6 +753,13 @@ fn trade_room_mechanism_signature(
 }
 
 pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Generate);
+    let result = bake_catalogs_measured(options);
+    cold.finish(&result);
+    result
+}
+
+fn bake_catalogs_measured(options: &BakeOptions) -> Result<BakeReport> {
     let start = Instant::now();
     if options.out_dir.join("CURRENT").exists() {
         return Err(Error::msg(
@@ -960,6 +1004,16 @@ fn set_generation_readonly(path: &Path, readonly: bool) -> Result<()> {
 }
 
 fn publish_baked_catalogs(options: &BakeOptions, prefer_existing: bool) -> Result<BakeReport> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Publish);
+    let result = publish_baked_catalogs_measured(options, prefer_existing);
+    cold.finish(&result);
+    result
+}
+
+fn publish_baked_catalogs_measured(
+    options: &BakeOptions,
+    prefer_existing: bool,
+) -> Result<BakeReport> {
     if options.limit_per_signature.is_some() {
         return Err(Error::msg("limited catalogs cannot be published"));
     }
@@ -1439,6 +1493,16 @@ fn load_validated_baked_catalog(
     out_dir: &Path,
     generator: &BakeGeneratorFingerprint,
 ) -> Result<ValidatedBakedCatalog> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Validate);
+    let result = load_validated_baked_catalog_measured(out_dir, generator);
+    cold.finish(&result);
+    result
+}
+
+fn load_validated_baked_catalog_measured(
+    out_dir: &Path,
+    generator: &BakeGeneratorFingerprint,
+) -> Result<ValidatedBakedCatalog> {
     let resolved_dir = resolved_baked_catalog_dir(out_dir)?;
     let out_dir = resolved_dir.as_path();
     let manifest_path = out_dir.join("manifest.json");
@@ -1471,13 +1535,13 @@ fn load_validated_baked_catalog(
         || baked_generator.kind != generator.kind
     {
         return Err(Error::msg(format!(
-            "baked generator mismatch: baked hash={} bytes={}, current hash={} bytes={}; rerun `infra-cli bake --out {}`",
-            baked_generator.hash64,
-            baked_generator.bytes,
-            generator.hash64,
-            generator.bytes,
-            out_dir.display()
-        )));
+        "baked generator mismatch: baked hash={} bytes={}, current hash={} bytes={}; rerun `infra-cli bake --out {}`",
+        baked_generator.hash64,
+        baked_generator.bytes,
+        generator.hash64,
+        generator.bytes,
+        out_dir.display()
+    )));
     }
     validate_baked_input_fingerprints(&manifest, out_dir)?;
     let combo_path = out_dir.join("combo_table.bin");
@@ -1934,6 +1998,16 @@ pub fn verify_baked_catalog_responses(
     out_dir: &Path,
     generator: &BakeGeneratorFingerprint,
 ) -> Result<BakeVerifyReport> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Verify);
+    let result = verify_baked_catalog_responses_measured(out_dir, generator);
+    cold.finish(&result);
+    result
+}
+
+fn verify_baked_catalog_responses_measured(
+    out_dir: &Path,
+    generator: &BakeGeneratorFingerprint,
+) -> Result<BakeVerifyReport> {
     let validated = load_validated_baked_catalog(out_dir, generator)?;
     let disk = validated.disk;
     let instances = OperatorInstances::load(&default_instances_path()?)?;
@@ -2164,7 +2238,7 @@ pub fn verify_baked_catalog_responses(
                 };
                 let mut bake_options = live_options;
                 bake_options.bake_mode = BakeMode::Required;
-                if !baked_manufacture_compatible(&pool, &bake_options, &table)
+                if baked_manufacture_compatible(&pool, &bake_options, &table).is_some()
                     || canonical_manu_query_ids(&runtime_table, &pool).is_err()
                 {
                     report.skipped_queries += 1;
@@ -2184,6 +2258,7 @@ pub fn verify_baked_catalog_responses(
                         n_choose_k_u64(pool.entries.len(), capacity)
                     },
                     StdInstant::now(),
+                    &mut None,
                 );
                 report.queries_checked += 1;
                 let failure = compare_manufacture_query(
@@ -2208,14 +2283,14 @@ pub fn verify_baked_catalog_responses(
 
     if report.row_mismatches > 0 || report.query_mismatches > 0 {
         let mut message = format!(
-            "bake verify failed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={} skipped_queries={}",
-            report.rows_checked,
-            report.row_mismatches,
-            report.queries_checked,
-            report.query_mismatches,
-            report.skipped_signatures,
-            report.skipped_queries
-        );
+        "bake verify failed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={} skipped_queries={}",
+        report.rows_checked,
+        report.row_mismatches,
+        report.queries_checked,
+        report.query_mismatches,
+        report.skipped_signatures,
+        report.skipped_queries
+    );
         for failure in &failures {
             message.push_str("\n  - ");
             message.push_str(failure);
@@ -2292,7 +2367,7 @@ fn run_trade_query_samples(
         }
         let mut bake_options = live_options;
         bake_options.bake_mode = BakeMode::Required;
-        let compatible = baked_trade_compatible(&pool, &bake_options, &filter, table);
+        let compatible = baked_trade_compatible(&pool, &bake_options, &filter, table).is_none();
         let mut bake_filter = filter;
         bake_filter.forbidden_pairs = crate::trade::legality::GLOBAL_FORBIDDEN_TRADE_PAIRS
             .iter()
@@ -2322,6 +2397,7 @@ fn run_trade_query_samples(
                 n_choose_k_u64(pool.entries.len(), capacity)
             },
             StdInstant::now(),
+            &mut None,
         );
         report.queries_checked += 1;
         if let Some(failure) =
@@ -3040,37 +3116,41 @@ pub fn try_baked_trade_search(
     if mode == BakeMode::Disabled {
         return Ok(None);
     }
-    if filter
-        .forbidden_pairs
-        .iter()
-        .any(|(a, b)| !crate::search::is_global_trade_forbidden_pair(a, b))
-    {
-        return baked_miss(mode, "trade forbidden-pair constraints are not represented");
-    }
-    if !baked_trade_compatible(pool, options, filter, skill_table) {
-        return baked_miss(
-            mode,
-            trade_incompatibility_reason(pool, options, filter, skill_table),
-        );
-    }
-    let Some(table) = load_runtime_baked_table(mode)? else {
-        return baked_miss(
-            mode,
-            "catalog is missing, stale, or currently being generated",
-        );
-    };
-    if !runtime_skill_table_matches(table, skill_table) {
-        return baked_miss(mode, "skill table source differs from the catalog");
-    }
-    baked_trade_report(
-        table,
-        pool,
-        options,
-        order_kind,
-        filter,
-        combinations,
-        start,
-    )
+    let mut miss = None;
+    let result = (|| {
+        if filter
+            .forbidden_pairs
+            .iter()
+            .any(|(a, b)| !crate::search::is_global_trade_forbidden_pair(a, b))
+        {
+            return baked_miss(mode, BakeMissKind::ForbiddenPairs, &mut miss);
+        }
+        if let Some(kind) = baked_trade_compatible(pool, options, filter, skill_table) {
+            return baked_miss(mode, kind, &mut miss);
+        }
+        let Some(table) = load_runtime_baked_table(mode, &mut miss)? else {
+            return Ok(None);
+        };
+        if !runtime_skill_table_matches(table, skill_table) {
+            return baked_miss(mode, BakeMissKind::SkillTable, &mut miss);
+        }
+        baked_trade_report(
+            table,
+            pool,
+            options,
+            order_kind,
+            filter,
+            combinations,
+            start,
+            &mut miss,
+        )
+    })();
+    crate::profile::record_bake_query(
+        crate::profile::SearchOperation::Trade,
+        miss,
+        result.is_err(),
+    );
+    result
 }
 
 /// 原查询组合逐个 rank lookup；只保留前 K 轻量项，最后物化输出。
@@ -3082,14 +3162,15 @@ fn baked_trade_report(
     filter: &SearchTripleFilter,
     combinations: u64,
     start: StdInstant,
+    miss: &mut Option<BakeMissKind>,
 ) -> Result<Option<TradeSearchReport>> {
     let mode = options.bake_mode;
     if filter.hit_filter.is_some() {
-        return baked_miss(mode, "hit predicate requires live evaluation");
+        return baked_miss(mode, BakeMissKind::Predicate, miss);
     }
     let ids = match canonical_trade_query_ids(table, pool) {
         Ok(ids) => ids,
-        Err(reason) => return baked_miss(mode, reason),
+        Err(reason) => return baked_miss(mode, reason, miss),
     };
     let gold_lines = if options.layout.gold_manu_line_count > 0 {
         options.layout.gold_manu_line_count
@@ -3101,7 +3182,7 @@ fn baked_trade_report(
             .filter(|_| !order_kind.is_gold() || gold_lines == table.trade_gold_lines);
     let Some(ranks) = signature_slot.and_then(|slot| table.rank_rows_by_signature[slot].as_ref())
     else {
-        return baked_miss_lazy(mode, || {
+        return baked_miss_lazy(mode, BakeMissKind::SignatureAbsent, miss, || {
             let key = trade_lookup_key(
                 options.trade_level,
                 options.operator_capacity,
@@ -3113,11 +3194,15 @@ fn baked_trade_report(
     };
     let k = options.operator_capacity;
     if !(1..=3).contains(&k) {
-        return baked_miss(mode, "rank capacity is not represented");
+        return baked_miss(mode, BakeMissKind::Capacity, miss);
     }
     let mut top = match light_heap(pool.entries.len(), k, options.top_k.max(1)) {
         Ok(top) => top,
-        Err(error) => return baked_miss(mode, error.to_string()),
+        Err(error) => {
+            return baked_miss_lazy(mode, BakeMissKind::HeapUnavailable, miss, || {
+                error.to_string()
+            })
+        }
     };
     let must = filter.must_include_names();
     let mut evaluated = 0u64;
@@ -3140,7 +3225,7 @@ fn baked_trade_report(
             continue;
         };
         let Some(eff) = row.trade_final_efficiency else {
-            return baked_miss(mode, "ranked trade response is incomplete");
+            return baked_miss(mode, BakeMissKind::TradeIncomplete, miss);
         };
         evaluated += 1;
         retain_light(
@@ -3158,7 +3243,7 @@ fn baked_trade_report(
     }
     let selected = sorted_light(top);
     if selected.is_empty() {
-        return baked_miss(mode, "signature has no eligible trade combo");
+        return baked_miss(mode, BakeMissKind::NoEligibleTrade, miss);
     }
     let mut hits = selected
         .iter()
@@ -3193,22 +3278,25 @@ pub fn try_baked_manufacture_search(
     if mode == BakeMode::Disabled {
         return Ok(None);
     }
-    if !baked_manufacture_compatible(pool, options, skill_table) {
-        return baked_miss(
-            mode,
-            manufacture_incompatibility_reason(pool, options, skill_table),
-        );
-    }
-    let Some(table) = load_runtime_baked_table(mode)? else {
-        return baked_miss(
-            mode,
-            "catalog is missing, stale, or currently being generated",
-        );
-    };
-    if !runtime_skill_table_matches(table, skill_table) {
-        return baked_miss(mode, "skill table source differs from the catalog");
-    }
-    baked_manufacture_report(table, pool, options, recipe, combinations, start)
+    let mut miss = None;
+    let result = (|| {
+        if let Some(kind) = baked_manufacture_compatible(pool, options, skill_table) {
+            return baked_miss(mode, kind, &mut miss);
+        }
+        let Some(table) = load_runtime_baked_table(mode, &mut miss)? else {
+            return Ok(None);
+        };
+        if !runtime_skill_table_matches(table, skill_table) {
+            return baked_miss(mode, BakeMissKind::SkillTable, &mut miss);
+        }
+        baked_manufacture_report(table, pool, options, recipe, combinations, start, &mut miss)
+    })();
+    crate::profile::record_bake_query(
+        crate::profile::SearchOperation::Manufacture,
+        miss,
+        result.is_err(),
+    );
+    result
 }
 
 /// 制造沿 live 效率、仓库、组合姓名序列比较；零命中保留成功空报告。
@@ -3219,27 +3307,32 @@ fn baked_manufacture_report(
     recipe: RecipeKind,
     combinations: u64,
     start: StdInstant,
+    miss: &mut Option<BakeMissKind>,
 ) -> Result<Option<ManuSearchReport>> {
     let mode = options.bake_mode;
     let ids = match canonical_manu_query_ids(table, pool) {
         Ok(ids) => ids,
-        Err(reason) => return baked_miss(mode, reason),
+        Err(reason) => return baked_miss(mode, reason, miss),
     };
     let Some(ranks) = manufacture_signature_slot(options.level, options.operator_capacity, recipe)
         .and_then(|slot| table.rank_rows_by_signature[slot].as_ref())
     else {
-        return baked_miss_lazy(mode, || {
+        return baked_miss_lazy(mode, BakeMissKind::SignatureAbsent, miss, || {
             let key = manufacture_lookup_key(options.level, options.operator_capacity, recipe);
             format!("signature {key:?} is absent")
         });
     };
     let k = options.operator_capacity;
     if !(1..=3).contains(&k) {
-        return baked_miss(mode, "rank capacity is not represented");
+        return baked_miss(mode, BakeMissKind::Capacity, miss);
     }
     let mut top = match light_heap(pool.entries.len(), k, options.top_k.max(1)) {
         Ok(top) => top,
-        Err(error) => return baked_miss(mode, error.to_string()),
+        Err(error) => {
+            return baked_miss_lazy(mode, BakeMissKind::HeapUnavailable, miss, || {
+                error.to_string()
+            })
+        }
     };
     let mut evaluated = 0u64;
     for (ordinal, positions) in rank::combinations(pool.entries.len(), k).enumerate() {
@@ -3258,7 +3351,7 @@ fn baked_manufacture_report(
             continue;
         };
         let Some(eff) = row.manufacture_final_efficiency else {
-            return baked_miss(mode, "ranked manufacture response is incomplete");
+            return baked_miss(mode, BakeMissKind::ManufactureIncomplete, miss);
         };
         let storage = match recipe {
             RecipeKind::Gold | RecipeKind::BattleRecord => {
@@ -3391,22 +3484,22 @@ fn canonical_query_ids(
     table: &RuntimeBakedComboTable,
     states: impl IntoIterator<Item = OperatorState>,
     canonical: &HashMap<usize, usize>,
-) -> std::result::Result<Vec<usize>, &'static str> {
+) -> std::result::Result<Vec<usize>, BakeMissKind> {
     let states = states.into_iter().collect::<Vec<_>>();
     if !distinct_names(states.iter().map(|state| state.name.as_str())) {
-        return Err("query contains duplicate operator names");
+        return Err(BakeMissKind::DuplicateNames);
     }
     let mut ids = Vec::with_capacity(states.len());
     let mut previous = None;
     for state in states {
         let Some(id) = table.operator_index_by_state.get(&state).copied() else {
-            return Err("complete operator state is not represented");
+            return Err(BakeMissKind::StateAbsent);
         };
         let Some(position) = canonical.get(&id).copied() else {
-            return Err("operator state is not represented for this facility");
+            return Err(BakeMissKind::FacilityStateAbsent);
         };
         if previous.is_some_and(|prev| position <= prev) {
-            return Err("query operator order is not canonical");
+            return Err(BakeMissKind::NonCanonicalOrder);
         }
         previous = Some(position);
         ids.push(id);
@@ -3417,7 +3510,7 @@ fn canonical_query_ids(
 fn canonical_trade_query_ids(
     table: &RuntimeBakedComboTable,
     pool: &TradePool,
-) -> std::result::Result<Vec<usize>, &'static str> {
+) -> std::result::Result<Vec<usize>, BakeMissKind> {
     let ids = canonical_query_ids(
         table,
         pool.entries.iter().map(OperatorState::from_trade_entry),
@@ -3425,7 +3518,7 @@ fn canonical_trade_query_ids(
     )?;
     for (id, entry) in ids.iter().zip(&pool.entries) {
         if !runtime_atoms_match(table, false, *id, &entry.compiled_atoms) {
-            return Err("compiled trade atoms differ from the canonical state");
+            return Err(BakeMissKind::TradeAtoms);
         }
     }
     Ok(ids)
@@ -3434,7 +3527,7 @@ fn canonical_trade_query_ids(
 fn canonical_manu_query_ids(
     table: &RuntimeBakedComboTable,
     pool: &ManuPool,
-) -> std::result::Result<Vec<usize>, &'static str> {
+) -> std::result::Result<Vec<usize>, BakeMissKind> {
     let ids = canonical_query_ids(
         table,
         pool.entries.iter().map(OperatorState::from_manu_entry),
@@ -3447,7 +3540,7 @@ fn canonical_manu_query_ids(
             .as_ref()
             .is_some_and(|atoms| !runtime_atoms_match(table, true, *id, atoms))
         {
-            return Err("compiled manufacture atoms differ from the canonical state");
+            return Err(BakeMissKind::ManufactureAtoms);
         }
     }
     Ok(ids)
@@ -3492,7 +3585,7 @@ fn runtime_atoms_match(
 }
 
 pub fn warm_runtime_baked_table() -> Result<bool> {
-    Ok(load_runtime_baked_table(BakeMode::Auto)?.is_some())
+    Ok(load_runtime_baked_table(BakeMode::Auto, &mut None)?.is_some())
 }
 
 static RUNTIME_BAKE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
@@ -3518,9 +3611,12 @@ impl Drop for RuntimeBakeGuard {
     }
 }
 
-fn load_runtime_baked_table(mode: BakeMode) -> Result<Option<&'static RuntimeBakedComboTable>> {
+fn load_runtime_baked_table(
+    mode: BakeMode,
+    miss: &mut Option<BakeMissKind>,
+) -> Result<Option<&'static RuntimeBakedComboTable>> {
     if RUNTIME_BAKE_IN_PROGRESS.load(Ordering::Acquire) {
-        return baked_miss(mode, "catalog is currently being generated");
+        return baked_miss(mode, BakeMissKind::Generating, miss);
     }
     if let Some(Ok(table)) = RUNTIME_AUTO_CACHE.get() {
         return Ok(Some(table));
@@ -3543,11 +3639,18 @@ fn load_runtime_baked_table(mode: BakeMode) -> Result<Option<&'static RuntimeBak
     };
     match cached {
         Ok(table) => Ok(Some(table)),
-        Err(reason) => baked_miss(mode, reason.as_str()),
+        Err(reason) => baked_miss_lazy(mode, BakeMissKind::Unavailable, miss, || reason.clone()),
     }
 }
 
 fn load_runtime_baked_table_inner(regenerate: bool) -> Result<RuntimeBakedComboTable> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Init);
+    let result = load_runtime_baked_table_inner_measured(regenerate);
+    cold.finish(&result);
+    result
+}
+
+fn load_runtime_baked_table_inner_measured(regenerate: bool) -> Result<RuntimeBakedComboTable> {
     let out_dir = default_baked_out_dir()?;
     let generator = current_exe_generator_fingerprint()?;
     match load_validated_baked_catalog(&out_dir, &generator) {
@@ -3567,6 +3670,15 @@ fn load_runtime_baked_table_inner(regenerate: bool) -> Result<RuntimeBakedComboT
 }
 
 fn runtime_baked_table_from_disk(disk: BakedComboTableDisk) -> Result<RuntimeBakedComboTable> {
+    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Index);
+    let result = runtime_baked_table_from_disk_measured(disk);
+    cold.finish(&result);
+    result
+}
+
+fn runtime_baked_table_from_disk_measured(
+    disk: BakedComboTableDisk,
+) -> Result<RuntimeBakedComboTable> {
     let mut table = BakedComboTable::from(disk);
     for index in &table.indexes {
         for row in &mut table.rows[index.start..index.start + index.len] {
@@ -3845,29 +3957,21 @@ fn baked_trade_compatible(
     options: &TradeSearchOptions,
     filter: &SearchTripleFilter,
     table: &SkillTable,
-) -> bool {
-    trade_incompatibility_reason(pool, options, filter, table).is_empty()
-}
-fn trade_incompatibility_reason(
-    pool: &TradePool,
-    options: &TradeSearchOptions,
-    filter: &SearchTripleFilter,
-    table: &SkillTable,
-) -> &'static str {
+) -> Option<BakeMissKind> {
     if filter.must_operator_override.is_some() {
-        "operator override is not represented"
+        Some(BakeMissKind::Override)
     } else if filter.hit_filter.is_some() {
-        "hit predicate requires live evaluation"
+        Some(BakeMissKind::Predicate)
     } else if !options.mood.is_finite() || options.mood <= 0.0 {
-        "mood must be finite and positive"
+        Some(BakeMissKind::InvalidMood)
     } else if !options.shift_hours.is_finite() {
-        "shift duration must be finite"
+        Some(BakeMissKind::InvalidShift)
     } else if !baked_layout_compatible(&options.layout) {
-        "complete layout differs from the baked baseline"
+        Some(BakeMissKind::Layout)
     } else if mood_sensitive_pool(pool, |entry| &entry.buff_ids, table) {
-        "mood-sensitive skills require live settlement"
+        Some(BakeMissKind::MoodSensitive)
     } else {
-        ""
+        None
     }
 }
 
@@ -3875,26 +3979,19 @@ fn baked_manufacture_compatible(
     pool: &ManuPool,
     options: &ManuSearchOptions,
     table: &SkillTable,
-) -> bool {
-    manufacture_incompatibility_reason(pool, options, table).is_empty()
-}
-fn manufacture_incompatibility_reason(
-    pool: &ManuPool,
-    options: &ManuSearchOptions,
-    table: &SkillTable,
-) -> &'static str {
+) -> Option<BakeMissKind> {
     if !options.mood.is_finite() || options.mood <= 0.0 {
-        "mood must be finite and positive"
+        Some(BakeMissKind::InvalidMood)
     } else if options.shift_hours.is_some_and(|hours| !hours.is_finite()) {
-        "shift duration must be finite"
+        Some(BakeMissKind::InvalidShift)
     } else if !baked_layout_compatible(&options.layout) {
-        "complete layout differs from the baked baseline"
+        Some(BakeMissKind::Layout)
     } else if mood_sensitive_pool(pool, |entry| &entry.buff_ids, table) {
-        "mood-sensitive skills require live settlement"
+        Some(BakeMissKind::MoodSensitive)
     } else if options.pool_has_peer_reset(pool, table) {
-        "peer-reset skills require live settlement"
+        Some(BakeMissKind::PeerReset)
     } else {
-        ""
+        None
     }
 }
 

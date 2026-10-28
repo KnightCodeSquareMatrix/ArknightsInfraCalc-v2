@@ -60,7 +60,7 @@ E0/E1 状态、full_pool 和有限班次可命中，不再固定 E2、24 心情�
 
 Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金产出和单位源石消耗。命中时分别按实时路径用单位值 × `total_efficiency` 复原日产贸易与源石产出；特殊赤金产出再乘 `GSL_GOLD_UNIT_SCALE`，避免把普通订单赤金消耗误报为特殊产金。该恢复不改变候选集合、比较键或排序。
 
-`BakeMode::Auto` 对不兼容查询回 live；首次兼容查询（或 `warm_runtime_baked_table`）加载缺失/失效表时，用显式 `Disabled` 的 live 路径生成完整 catalog 并做核心全量行校验与查询差分。该过程不调用 CLI 的 `run_all_regressions`。生成期间 RAII 标记禁止递归自读；同进程初始化与失败原因由 `OnceLock` 缓存，失败只在 stderr 简短报告一次后回 live。`Disabled` 禁用；`Required` 只加载有效表、对任何 miss 失败，自身不生成。可执行文件 hash（含读取失败）在进程内只计算一次，继续保留输入文件指纹；进程已加载成功的内存表不会随运行中数据替换自动重载，新加载和显式校验仍会验证输入指纹。生成物不可手工编辑为规则。
+`BakeMode::Auto` 对不兼容查询回 live；首次兼容查询（或 `warm_runtime_baked_table`）加载缺失/失效表时，用显式 `Disabled` 的 live 路径生成完整 catalog 并做核心全量行校验与查询差分。该过程不调用 CLI 的 `run_all_regressions`。serve 启动阶段直接同步调用核心 warm，独立 trace 记录加载或生成；完成或失败后仍进入原 ready 流程，失败继续 live，不创建后台生成线程。生成期间 RAII 标记禁止递归自读；同进程初始化与失败原因由 `OnceLock` 缓存，失败只在 stderr 简短报告一次后回 live。`Disabled` 禁用；`Required` 只加载有效表、对任何 miss 失败，自身不生成。可执行文件 hash（含读取失败）在进程内只计算一次，继续保留输入文件指纹；进程已加载成功的内存表不会随运行中数据替换自动重载，新加载和显式校验仍会验证输入指纹。生成物不可手工编辑为规则。
 
 生成写入 `baked/gen-<unique-id>/`，全部核心校验通过后冻结该目录及文件，再在短发布锁下复核目标，把临时指针文件原子 rename 成 `baked/CURRENT`。既有非空 `baked/` 和旧 generation 都不被原地替换。并发输方发现目标已有效就丢弃自己的 generation；锁不可取时不等待，尝试加载已完成的胜方，否则本进程回 live。失败/不可写不改变求解结果，不发布 limited catalog。已发布的 generation 保留给读取者；进程异常终止可能留下未引用 generation 或发布锁，仍可读取有效 CURRENT，未有有效表时保守回 live。
 
@@ -71,3 +71,13 @@ runtime、CLI 默认输出和 debug 的 manifest 发现共用 `default_baked_out
 核验：`bake validate`、`bake verify`、`infra-cli verify`，并记录输入、组合数、evaluated 和命中模式。候选/剪枝/Bake 改动还要运行最终 assignment invariant gate。
 
 请求scope覆盖整个 `schedule_timed_rotation_request`、ABC候选共同入口、独立assignment入口以及CLI单次plan/profile run；嵌套搜索只复用外层scope。因此N/A/B候选、控制中枢重建和各房间搜索可复用完整输入一致的叶报告，请求结束即释放；不传播到Rayon组合评估线程，不跨请求缓存。此阶段仅编译，真实命中率及性能留最终统一包。
+
+## Bake 诊断计数
+
+query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compatibility 一次返回 typed 原因，Required 才延迟格式化原错误，Auto 不构造 miss 诊断字符串。内部 report helper 的 verify 调用、load 和 warm 不再计 query miss；加载中的 `generating` 与缓存失效/不可用的 `unavailable` 分开。rank sentinel 跳过和制造成功空报告不计 miss，rank/row 越界或物化等原 Err 继续传播，另记 `query_errors`，不能改成成功回退。
+
+`metrics.bake.trade` / `manufacture` 输出非零类别：`forbidden_pairs`、`override`、`predicate`、`invalid_mood`、`invalid_shift`、`layout`、`mood_sensitive`、`peer_reset`、`generating`、`unavailable`、`skill_table`、`duplicate_names`、`state_absent`、`facility_state_absent`、`noncanonical_order`、`trade_atoms`、`manufacture_atoms`、`signature_absent`、`capacity`、`heap_unavailable`、`trade_incomplete`、`manufacture_incomplete`、`no_eligible_trade`。
+
+冷阶段 `metrics.bake.cold` 按 `init`、`generate`、`validate`、`verify`、`index`、`publish` 保存 calls/errors/elapsed_ms；init 只覆盖真正 OnceLock 初始化，缓存访问不冒充冷加载。实际重复验证照次数记；父子阶段 inclusive，不能相加作总耗时。CLI bake 在动作体包 trace，保留核心全量校验与既有 CLI 回归失败；serve 的启动 warm 单独输出 trace。
+
+所有计数在当前 trace 的固定数值数组累积，没有 trace 时不统计。JSON 与标签只在 trace 结束生成；schema 2 的 operation 和 Bake 数值指标省略零值，缺字段按零解释，顶层 event/schema 与阶段结构保留。本阶段仅格式化、workspace 离线编译和文档/源差异检查，未运行 solver、Bake、性能或对拍。

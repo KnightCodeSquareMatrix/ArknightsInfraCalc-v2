@@ -1,7 +1,6 @@
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time::Instant;
 
 use super::plan_compute::{
@@ -87,11 +86,13 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         solver: SolverBuildInfo::current(),
     };
 
-    let _bake_handle = spawn_background_bake();
-    match warm_runtime_baked_table() {
-        Ok(true) => eprintln!("infra-cli serve: baked combo table warmed"),
-        Ok(false) => {}
-        Err(err) => eprintln!("infra-cli serve: baked combo table warm failed: {err}"),
+    {
+        let _trace = infra_core::profile::start_solver_perf_trace("serve_startup", "bake_warm");
+        match infra_core::bake::warm_runtime_baked_table() {
+            Ok(true) => eprintln!("infra-cli serve: baked combo table warmed"),
+            Ok(false) => {}
+            Err(err) => eprintln!("infra-cli serve: baked combo table warm failed: {err}"),
+        }
     }
 
     eprintln!("infra-cli serve ready: line-delimited JSON on stdin/stdout");
@@ -320,14 +321,6 @@ pub(super) fn validate_recorded_plan_compute_params(
     };
     let schema = compile_plan_compute_schema(schema_json)?;
     validate_plan_compute_params(&schema, params, schema_version)
-}
-
-fn spawn_background_bake() -> Option<thread::JoinHandle<()>> {
-    None
-}
-
-fn warm_runtime_baked_table() -> Result<bool, Error> {
-    Ok(false)
 }
 
 #[derive(Debug, Deserialize)]
