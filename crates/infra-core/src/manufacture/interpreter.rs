@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use smallvec::SmallVec;
 
-use crate::eff_ramp::{eff_ramp_avg_over_hours, MANU_RAMP_HOURS};
+use crate::eff_ramp::{manufacture_eff_ramp_at, manufacture_eff_ramp_avg, MANU_RAMP_HOURS};
 use crate::global_resource::RoomState;
 use crate::layout::SharedLayout;
 use crate::manufacture::input::{ManuRoomInput, ManuRoomView};
@@ -108,8 +108,8 @@ pub struct ManuContext<'a> {
     pub layout: SharedLayout,
     pub facility_base_storage: i32,
     pub mood: f64,
-    /// 整班暖机逐时平均窗口；无班长的静态结算保持 20 小时。
-    pub ramp_hours: u32,
+    /// 定时制造入口的真实进驻时间或解析平均区间。
+    pub(crate) ramp_sample: ManuRampSample,
     pub state_pool: RoomState,
 }
 
@@ -140,7 +140,7 @@ impl<'a> ManuContext<'a> {
             layout: Arc::clone(input.layout),
             facility_base_storage: facility_base_storage(input.level),
             mood: input.mood,
-            ramp_hours: MANU_RAMP_HOURS,
+            ramp_sample: ManuRampSample::Average(0.0, f64::from(MANU_RAMP_HOURS)),
             state_pool: input.layout.global.to_fixed_room_state(),
         }
     }
@@ -209,7 +209,60 @@ pub fn facility_base_storage(level: u8) -> i32 {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ManuRampSample {
+    At(f64),
+    Average(f64, f64),
+}
+
+/// 键来自输入 owner 和其排序 atom 下标，不依赖可能饱和的 seq。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManuAtomKey {
+    pub owner: usize,
+    pub atom: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ManuBucketTrace {
+    pub key: ManuAtomKey,
+    pub base: f64,
+    pub step: f64,
+}
+
+pub(crate) trait ManuObserver {
+    fn bucket(&mut self, key: ManuAtomKey, base: f64, step: f64);
+}
+
+pub(crate) struct NoManuObserver;
+
+impl ManuObserver for NoManuObserver {
+    #[inline(always)]
+    fn bucket(&mut self, _: ManuAtomKey, _: f64, _: f64) {}
+}
+
+impl ManuObserver for Vec<ManuBucketTrace> {
+    fn bucket(&mut self, key: ManuAtomKey, base: f64, step: f64) {
+        self.push(ManuBucketTrace { key, base, step });
+    }
+}
+
 pub fn apply_manu_phases(ctx: &mut ManuContext<'_>, table: &SkillTable) {
+    apply_manu_phases_inner::<false, _>(ctx, table, &mut NoManuObserver);
+}
+
+pub(crate) fn apply_manu_phases_timed<O: ManuObserver>(
+    ctx: &mut ManuContext<'_>,
+    table: &SkillTable,
+    observer: &mut O,
+) {
+    apply_manu_phases_inner::<true, _>(ctx, table, observer);
+}
+
+fn apply_manu_phases_inner<const TIMED: bool, O: ManuObserver>(
+    ctx: &mut ManuContext<'_>,
+    table: &SkillTable,
+    observer: &mut O,
+) {
     // 仅缺少预备结果的输入持有临时 Arc；已预备的空技能无需再次访问缓存。
     let missing: SmallVec<[(usize, Arc<[CompiledAtom]>); 5]> = ctx
         .operators
@@ -262,10 +315,20 @@ pub fn apply_manu_phases(ctx: &mut ManuContext<'_>, table: &SkillTable) {
         }
         let Some(owner_idx) = pick else { break };
         let (owner, atoms) = sources[owner_idx];
-        let atom = &atoms[heads[owner_idx]].atom;
+        let atom_idx = heads[owner_idx];
+        let atom = &atoms[atom_idx].atom;
         heads[owner_idx] += 1;
         if condition_met(&atom.condition, ctx, owner) {
-            apply_atom(ctx, atom, owner);
+            apply_atom::<TIMED, _>(
+                ctx,
+                atom,
+                owner,
+                ManuAtomKey {
+                    owner: owner_idx,
+                    atom: atom_idx,
+                },
+                observer,
+            );
         }
     }
     apply_tagged_control_injects(ctx);
@@ -389,7 +452,13 @@ fn room_has_buff(ctx: &ManuContext<'_>, buff_id: &str) -> bool {
         .any(|o| o.buff_ids.iter().any(|b| b == buff_id))
 }
 
-fn apply_atom(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
+fn apply_atom<const TIMED: bool, O: ManuObserver>(
+    ctx: &mut ManuContext<'_>,
+    atom: &EffectAtom,
+    owner: &str,
+    key: ManuAtomKey,
+    observer: &mut O,
+) {
     if matches!(&atom.action, Action::AddEffFromLimitContribSum { .. })
         && room_has_buff(ctx, BUFF_PAOPAO_LIMIT_VAR)
     {
@@ -397,7 +466,7 @@ fn apply_atom(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     }
     match atom.phase {
         Phase::Constant | Phase::EffVar | Phase::LimitVar | Phase::OrderVar => {
-            apply_eff_action(ctx, atom, owner);
+            apply_eff_action::<TIMED, _>(ctx, atom, owner, key, observer);
         }
         Phase::Limit => apply_limit_action(ctx, atom, owner),
         Phase::Mood => apply_mood_action(ctx, &atom.action, owner),
@@ -436,11 +505,17 @@ fn apply_peer_absorb(ctx: &mut ManuContext<'_>, action: &Action, owner: &str) {
     }
 }
 
-fn apply_eff_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
+fn apply_eff_action<const TIMED: bool, O: ManuObserver>(
+    ctx: &mut ManuContext<'_>,
+    atom: &EffectAtom,
+    owner: &str,
+    key: ManuAtomKey,
+    observer: &mut O,
+) {
     let Some(idx) = ctx.operators.iter().position(|o| o.name == owner) else {
         return;
     };
-    let value = resolve_eff_value(ctx, atom, owner);
+    let value = resolve_eff_value::<TIMED, _>(ctx, atom, owner, key, observer);
     let recipe = match &atom.action {
         Action::AddFlatEff { recipe, .. } => *recipe,
         Action::AddFlatEffFromSelector { recipe, .. } => *recipe,
@@ -577,7 +652,13 @@ fn eff_from_limit_contrib_tiered(
     }
 }
 
-fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f64 {
+fn resolve_eff_value<const TIMED: bool, O: ManuObserver>(
+    ctx: &ManuContext<'_>,
+    atom: &EffectAtom,
+    owner: &str,
+    key: ManuAtomKey,
+    observer: &mut O,
+) -> f64 {
     match &atom.action {
         Action::AddEffFromLimitContribSum { rate } => {
             ctx.operators
@@ -602,7 +683,21 @@ fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f
             per_hour,
             cap,
             style,
-        } => eff_ramp_avg_over_hours(*style, *initial, *per_hour, *cap, ctx.ramp_hours),
+        } => {
+            let sample = if TIMED {
+                ctx.ramp_sample
+            } else {
+                ManuRampSample::Average(0.0, f64::from(MANU_RAMP_HOURS))
+            };
+            match sample {
+                ManuRampSample::At(elapsed) => {
+                    manufacture_eff_ramp_at(*style, *initial, *per_hour, *cap, elapsed)
+                }
+                ManuRampSample::Average(start, end) => {
+                    manufacture_eff_ramp_avg(*style, *initial, *per_hour, *cap, start, end)
+                }
+            }
+        }
         Action::AddFlatEff { value, .. } => *value,
         Action::AddFlatEffFromSelector {
             multiplier, cap, ..
@@ -620,6 +715,7 @@ fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f
             cap,
         } => {
             let base = resolve_selector_value(ctx, atom.selector.as_ref(), owner);
+            observer.bucket(key, base, *step);
             if *step <= 0.0 {
                 0.0
             } else {

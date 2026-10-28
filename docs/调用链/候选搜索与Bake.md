@@ -42,7 +42,7 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 
 ## Bake 分支
 
-`bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 对查询不兼容回 live，首次加载缺表或失效时先生成并校验，成功后查表，失败才回 live。`Disabled` 直接 live，`Required` 只读有效表并对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。制造带班长且池含暖机 atom 时整体回 live，按整班逐时平均结算；无班长仍保留 20 小时。
+`bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 对查询不兼容回 live，首次加载缺表或失效时先生成并校验，成功后查表，失败才回 live。`Disabled` 直接 live，`Required` 只读有效表并对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。制造带班长且池含暖机 atom 时整体回 live，Some(h)按真实连续时长、不round/clamp；无班长默认20小时采用新连续暖机语义，表须由最终binary隔离再生并全量verify。新冻结连续暖机局部数值验收及指定P1/P2静态闭合已完成：1122full含72预期非有限错误，1050search中798获准精确一致、252由既有>=12h负心情扣减政策排除；数学千分及公开f64合同零差异，不能称所有搜索获准。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 普通段分段积分与f64微段求值边界保留，不能泛称所有实数精确。 不以旧表或首轮冻结证据替代最终验收。
 
 完整贸易行集合经 catalog 校验后，在查询行时按同一黑键—巫恋禁配过滤，再取前 K 条；该全局产品禁配可在 `Required` 下命中。其他未表示的禁配仍按原有 miss 语义处理；可执行文件或输入指纹不匹配的旧表不能跳过验证。
 

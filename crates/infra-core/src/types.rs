@@ -383,7 +383,7 @@ pub enum Action {
     ClearMoodDrain {
         scope: MoodDrainScope,
     },
-    /// 进驻后逐时爬升；制造纸面取 20h 效率算术平均（芬/阿罗玛等）。
+    /// 进驻后连续暖机；制造按真实班长积分，未提供班长默认 20h（芬/阿罗玛等）。
     AddEffRamp {
         initial: f64,
         per_hour: f64,

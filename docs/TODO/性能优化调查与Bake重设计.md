@@ -3,27 +3,39 @@
 > 文档角色：active-change
 > 生命周期状态：proposal
 > 当前真源：docs/PERFORMANCE_ENGINEERING.md；docs/QUALITY_AND_AUDIT.md
-> 摘要：2026-10-28 性能优化 U1～U6 已提交实现、历史调查、冻结基线与最终验收和复审收口入口
+> 摘要：性能与连续暖机实现、局部数值和最终全表/152盒验收完成；五既有预算失败保留，最终差异归因闭合
 
-本页是 [性能优化交接](性能优化交接.md) 的展开。交接单记录方向、对拍基线和测量；本页记录**优化前 Bake 阻塞与数据表示调查、当前实现边界和最终验收剩余工作**。性能工程的现行规则在 [PERFORMANCE_ENGINEERING](../PERFORMANCE_ENGINEERING.md)。读完本页不需要再去读 `bake.rs` 全文。
+当前入口：[最终新语义实测结果](性能优化交接.md#49-最终新语义实测结果2026-10-29)。实现、最终全量/批量验证和覆盖内归因均已完成；下文第一轮未通过与旧语义记录只作历史，不作为重复开工的TODO。
 
-## 0. 当前进度与接手入口（2026-10-28）
+本页是 [性能优化交接](性能优化交接.md) 的展开。交接单记录方向、对拍基线和测量；本页记录**优化前 Bake 阻塞与数据表示调查、当前实现边界和最终验收证据**。性能工程的现行规则在 [PERFORMANCE_ENGINEERING](../PERFORMANCE_ENGINEERING.md)。读完本页不需要再去读 `bake.rs` 全文。
 
-> **恢复基线现已完成（23:12）**：独立 release 编译成功，四源码 blob 在采集后仍精确匹配；新二进制 SHA256 为 `6beff764d155986d5daf4989019e211c817d7c87d37a579359bc4de76768340e`，与原 SHA 不同，只声明源码恢复。四轮换共 152 次执行：3、2、12/12/12 各 38/38；24/24 为 33/38，五个失败 box、shift 和涤火杰西卡断言原因与原记录一致。全精二无断言三份产物成功；带断言在 shift2 同一既有失败。证据 `target/codex-runs/perf-final-20261028/baseline-recovered/{report.md,result-summary.json,runs,full-e2-output,full-e2}`。后续比较使用这里的恢复基线，不能把仍未完成的最终版本验收写成通过。
+## 0. 当前进度与接手入口（2026-10-29）
 
-> **2026-10-28 23:00 后的验收状态**：本地 WSL 全表生成触发 OOM（内核记录杀死 infra-cli），随后执行环境重启，`/tmp` 冻结基线和临时验收记录丢失，尚无全量对账或最终对拍通过证据。SSH 只读资源查询被沙箱以 `socket: Operation not permitted` 拒绝。没有缩表、缩输入或降低验收；继续路径待用户选择大内存服务器执行入口或本地冷路径分块。
+> **恢复基线现已完成（23:12）**：独立 release 编译成功，四源码 blob 在采集后仍精确匹配；新二进制 SHA256 为 `6beff764d155986d5daf4989019e211c817d7c87d37a579359bc4de76768340e`，与原 SHA 不同，只声明源码恢复。四轮换共 152 次执行：3、2、12/12/12 各 38/38；24/24 为 33/38，五个失败 box、shift 和涤火杰西卡断言原因与原记录一致。全精二无断言三份产物成功；带断言在 shift2 同一既有失败。证据 `target/codex-runs/perf-final-20261028/baseline-recovered/{report.md,result-summary.json,runs,full-e2-output,full-e2}`。后续比较使用这里的恢复基线；恢复基线不替代最终验收，最终证据见交接单§4.9。
+
+> **2026-10-28 23:00 的历史事故**：本地 WSL 全表生成触发 OOM（内核记录杀死 infra-cli），环境重启后 `/tmp` 冻结基线和临时验收记录丢失；当时 SSH 资源查询被沙箱拒绝。后续已恢复冻结源码与产物、核实实际硬件并按用户授权降低内存继续本地验收，当前状态见下方内存进度；本条不再表示等待执行入口选择。
 > 冻结源码已由原会话日志确证：基底 `3201fa7`，仅替换为 `47cbf62` 中四个 U1a 源码 blob；原提交成功 `git apply --cached` 的正是冻结 patch。原基线 SHA256 `315c1954fd3d8c75c10152ec353398734aa0c79ee8397656099833a22b1def07`，与阶段测量 `168a12...` 分开。原二进制及原产物仍丢失，当前精确源码的 release 重建/再采集已完成（见上方最新记录），不把源码恢复写成二进制字节复刻。
 > 持久证据改存 `target/codex-runs/perf-final-20261028`：`baseline-recovery/` 保存源码恢复和原会话证据，`baseline-recovered/` 保存重建与采集，`intent-review/report.md` 为独立静态复审（未发现实质问题，不能代替运行验收），`bake-foreground/kernel-oom-session-evidence.json` 保存内核 OOM 原工具输出。此处后续状态优先于本页历史 `/tmp` 路径。
 
-- **U1～U6 均已实现并提交，代码 HEAD 为 509ad44；最终运行验收与独立复审仍待收口。** 格式化/编译证据不能替代全量对账、输出等价或性能收益证据。
+- **U1～U6 已在此前阶段实现并提交；本轮内存及暖机最终实现已完成，任务起点 HEAD 为 e40900f，当前 release 与运行状态见 §0.1。** 格式化/编译证据不能替代全量对账、输出等价或性能收益证据。
 - **U1/U2/U3**：U1a 命中字段补全和全量行/查询差分入口（47cbf62）、U1b Auto 首次再生、exe 指纹及失败缓存、generation/CURRENT 原子发布（3ef5f6c）已完成；生成物取消跟踪和 schema4 旧目录清理（dc2af4c）已完成。加载期编号/原子复用（af86268）、贸易/制造借用归并（20fc4d2/e127b28）、房间资源 16 槽数组（458fb33）已完成。完整技能身份（e42f9d0）、真实 pool builder 生成完整变体并全覆盖核对（528b9ea）、schema17 colex rank 直查和 live top-K 比较（2caf24d）已完成。
 - **U4 memo 生产接入完成**：Exact 编码（5be9614）、请求 scope/完整叶键/精确 intern/Arc 保活（19c9d1a）、贸易制造搜索接入与命中成本汇总（c29b2b2）、完整排班请求复用（5b165f1）均已提交。命中和减少结算的实际情况由最终日志确认。
 - **U5 完成**：制造组合借用和轻量结算（fe53d02）、配方注入缓存（c413336）、贸易借用视图/身份判定/生产搜索贯通（022563c/e421877/9f5fde1）、共用平铺枚举与泛型评估闭包（45dc1fe）已提交。Bake 固定签名槽与生成目录隔离（6a22e21）、miss 分类/冷阶段日志和服务同步预热（2880cc6）也已完成。
-- **U6 完成（509ad44）**：制造暖机按整班时长的逐时平均贡献进入解释器，None 保持 20 小时；心情分段共用整班窗口，未实现非线性积分。含 AddEffRamp 的制造查询池在 Some(h) 下整体回 live，None 仍用固定表；Required 经统一公开门禁严格报 miss，制造 peer-reset 外层绕过路径已删除，CLI 同语义。详见 §4.3。
-- **唯一冻结 baseline**：`/tmp/perf-current-20261028` 保存冻结二进制、工作树差异与指纹；四轮换均 38 盒，rot3/rot2/rot12_12_12 成功，rot24_24 保留 5 个已知断言失败。全精二 `full-e2-output` 无断言产物成功，`full-e2` 带断言保留同类失败。详见交接单 §4.1；不在 U6 前另建基线，旧 e976b1a 仅历史参考。
-- **必要剩余工作**：汇总最终 release/格式证据、Bake 全量行和查询差分、四轮换与全精二产物/终态断言，处理差异并完成独立复审收口。最终验收和复审进行中，不能写通过；只授权暖机房差异，若连带选人或排班差异超出授权范围，原样报告，不放宽验收。
+- **U6 既有实现（509ad44；后续连续积分修正见§8.1）**：制造暖机按整班时长的逐时平均贡献进入解释器，None 保持 20 小时；心情分段共用整班窗口，未实现非线性积分。含 AddEffRamp 的制造查询池在 Some(h) 下整体回 live，None 仍用固定表；Required 经统一公开门禁严格报 miss，制造 peer-reset 外层绕过路径已删除，CLI 同语义。详见 §4.3。
+- **唯一冻结 baseline**：原 `/tmp/perf-current-20261028` 已丢，现使用 `target/codex-runs/perf-final-20261028/baseline-recovered/` 的精确源码恢复与采集产物；四轮换均 38 盒，rot3/rot2/rot12_12_12 成功，rot24_24 保留 5 个已知断言失败。全精二 `full-e2-output` 无断言产物成功，`full-e2` 带断言保留同类失败。详见交接单 §4.1；不在 U6 前另建基线，旧 e976b1a 仅历史参考。
+- **当前实现与最终运行已完成**：旧语义消融覆盖内纯性能归因关闭；新连续暖机局部数值/P1P2静态闭合、最终完整Bake及152盒/full-e2统一包完成。但书PASS，原五例24/24预算失败逐字保留，无新增/移除；不扩大排班policy、不把正常warning fallback写成预算通过。最终5949叶差异归因已闭合，文档/索引按交付收口，不重新生成Bake或重复旧实现TODO。
 - 基础汇总日志（4d057a3）和批次/阶段归因（65355b2）已完成；冻结版本单 box 三次测量只作历史归因证据。用户不要求实际性能指标，日志可随最终运行留存，不额外开启性能测量任务。
 - 删除源码/Python 测试及无引用 fixture、CI 和文档清理（0d8b935）、泛型轮换入口及相关文案已完成。CRLF/LF、default_dorm_beds 和两条可见性 warning 不处理；box-bundles 已复制但不入库。1+1 和四赤金本轮不开工；共享工作区单 writer，git 操作由主代理负责。
+
+### 0.1 本轮内存降低与最终验收（2026-10-29）
+
+> 第一轮历史运行事实：`memory-reduction/bake-all-final` 已真实结束。schema17 共 29,783,417 行、13 个非空 signature、674 个完整状态，文件 3,843,098,117 字节；`rows_checked=29783417 row_mismatches=0 queries_checked=3292 query_mismatches=0 skipped_signatures=0 skipped_queries=2148`，CURRENT/磁盘 header/manifest/summary 一致。systemd 记录内存峰值 9.2G、swap 0B。该次 CLI exit 1 唯一失败为 `reg_gsl_docus_solo` 的过期期望1.907，实际1.909与固定单位产出锚和千分结算一致；当轮CLI仍为历史exit1；后续最终7695096fd回归exit0/但书PASS，见§4.9。第一轮四轮换对拍也已结束，历史输出差异与失败集合见下方，当前正确性结论见§8.1。
+
+- **已完成并验证**：signature 独立完整排序/落盘、组合迭代 `par_bridge`、schema17 流式拼接与原 bytes hash 合同、typed compact 常驻行、同一 File 流式冷校验、rank bitset 完整 universe 核对、4096 行全字段 verify 与实际 compact 命中对账入口已实现。数值保持原 `i32`/`f64`，热查询保留 rank 数组直接查找及原比较规则，完整贸易 API 保留 signature+offset 并按需 owned 输出；320 查询覆盖不减少。格式化、release 编译与两项静态契约审查已完成，任务起点HEAD为`e40900f`，当前最终结果见交接单§4.9。
+- **运行反证与纠正**：此前静态把“尝试六个贸易 signature”误认为“保存六个非空 signature”，曾扩成 15 槽。真实全量生成中 lv1/lv2 源石均为零行，原四个贸易+九个制造/13 槽正确；已恢复原 expected 集合与槽位，保留全部内存改造。前轮主动 TERM 停止，`systemd-run` 外层返回 0 不表示 Bake 成功，主进程是 `code=killed/status=TERM`，未完成生成或验证；证据 `memory-reduction/bake-all/observed-stop.json` 保留，不复用其表作为最终有效表。
+- **第一轮历史运行已结束**：当轮 release SHA256 为 `8f9b7a40c2eade5e3a5c972cf7396c3ff20894d0c724f54cc14da549bef1c8e5`，完整 Bake 和最终包起止哈希一致。Bake 在本地 WSL 以 `MemoryMax=14G`、`MemorySwapMax=2G`、`RAYON_NUM_THREADS=8` 完成；原命令/日志在 `memory-reduction/bake-all-final/`，隔离表为 `memory-reduction/baked-final/`，未写 `data/baked/`。机器摘要 `memory-reduction/bake-validation.json`；原 `next-validation.json` 是执行前计划，旧服务器包仅阶段历史。核心对账通过不等于 CLI 回归或最终输出等价通过。
+- **已授权的环境处理**：Windows 32GiB，本地 WSL 16GiB+4GiB swap；服务器 `114.66.55.78` 已连通，但只有 16GiB、约 11GiB 可用且无 swap，不能作为更大内存入口。用户已授权内存降低和无关进程清理无人值守推进；QQ/Steam/Everything 用户进程已停，系统、代理、远程连接、当前 Codex 与 WPS 项目文档保留。执行入口选择已结束，不再等待用户选择服务器或本地分块。
+- **第一轮历史包实证（当时未通过）**：四轮换各 38 盒，共 152 次、147 完成、5 断言失败；`jobs1` 仅降并发，覆盖与冻结基线完全相同。3、2、12/12/12 各 `same=0 changed=38`，24/24 为 `same=4 changed=34`，四命令均 exit1。前三轮无断言失败；24/24 移除 b-101-424 的既有失败、新增 b-112-404 同类 shift2 涤火杰西卡失败，另四条完全一致。全精二无断言三产物均变化；带断言旧 exit1、新 exit0，不能算旧新状态相同。原始差异、全部子命令元数据与失败集合在 `memory-reduction/final-batch/`；不得剔除新增差异或更换基线。第一轮按当时仅允许暖机房变化的限制未通过；最新用户已要求按正确机制处理暖机，不以旧名单不变限制正确重选，仍须核对连带变化来源。五例失败断言已证实无误报；正常warning fallback不代表预算合格。未提交源码、未宣称性能收益。
 
 ## 1. 用户裁决（2026-10-28，原意）
 
@@ -54,9 +66,9 @@
 
 详见交接单 §4.1。要点：
 
-- 本轮 baseline：`/tmp/perf-current-20261028` 的冻结二进制与采集产物（冻结时含未提交U1a）；四轮换及全精二产物/断言状态见交接单§4.1，不用后续HEAD代替。旧 `/tmp/perf-baseline/infra-cli-baseline`（e976b1a）仅保留历史参考，不用于本轮最终验收。`/tmp` 重启会丢，需保留冻结版本与构建/输入指纹才能重建。
+- 本轮 baseline：`target/codex-runs/perf-final-20261028/baseline-recovered/` 的精确冻结源码重建与采集产物（原冻结含未提交U1a）；四轮换及全精二产物/断言状态见交接单§4.1，不用后续HEAD代替。旧 `/tmp/perf-baseline/infra-cli-baseline`（e976b1a）仅保留历史参考，不用于本轮最终验收。`/tmp` 重启会丢，需保留冻结版本与构建/输入指纹才能重建。
 - box 集合 `data/fixtures/box-bundles/`（`.gitignore` 忽略，已复制进 main 工作树；38 个）。
-- 最终对拍命令形态：`python3 scripts/assert_rotation_invariants.py --group all --rotation 3 --binary target/release/infra-cli --skip-build --jobs 8 --output-dir /tmp/perf-new/rot3 --compare-to <当前冻结baseline的rot3目录>`；`--rotation` 依次用 `3`、`2`、`12/12/12`、`24/24`，对应 `/tmp/perf-current-20261028` 实际生成的四种轮换目录。只在当前版本与最终版本各跑一轮完整包。
+- 最终对拍命令形态：`python3 scripts/assert_rotation_invariants.py --group all --rotation 3 --binary target/release/infra-cli --skip-build --jobs 1 --output-dir target/codex-runs/perf-final-20261028/memory-reduction/final-runs/rot3 --compare-to target/codex-runs/perf-final-20261028/baseline-recovered/runs/rot3`；`--rotation` 依次用 `3`、`2`、`12/12/12`、`24/24`，对应 `baseline-recovered/runs/` 已采集的四种轮换目录；在同一仓库 cwd 执行，降低并发不减覆盖。只在当前版本与最终版本各跑一轮完整包。
 - 旧 e976b1a 基线里 `24/24` 有 5 个 box 因涤火杰西卡的 `main_backup_24_24_work_budget` 断言失败。这是历史事实；本轮以当前冻结 baseline 的实际失败集合和原因作比较，超范围差异原样报告，不放宽验收。
 - 最终包继续覆盖38盒及 `data/fixtures/243/operbox_full_e2.json` 的 `24/24`；全精二无断言产物与带断言失败分开比较。U3已支持合法E0/E1状态，不再从“存在非精二干员”推断普通box必miss，实际命中以最终日志确认。
 - 单 box 耗时：`target/release/infra-cli profile layout-full --operbox <box> --runs 1`。
@@ -170,10 +182,10 @@
 - Bake存储域使用完整技能身份 `(name, 原始elite, ordered buff_ids, tags)`；等级/稀有度通过真实pool builder的五类代表练度影响实际解锁，按完整身份去重，组合禁止同名。schema17每signature在冷加载建立dense colex rank索引；热查询沿live子池相对顺序枚举，rank直查和轻量top-K比较保留live顺序，缺状态或非canonical顺序回live。
 - 查询上下文须通过完整 `LayoutContext::search_baseline()` 门禁（含active_source_buffs、浮点有限性与bit、注入顺序与聚合结果），不是任意layout都编码进Bake表。未覆盖动态贸易注入、制造count-scaled注入、Mood/OwnerMoodGap相关技能或制造 peer-reset 继续 live，并经统一公开门禁产生 typed miss；Required 严格报错。心情须有限且>0，班时长须有限；full_pool与E0/E1本身不再导致miss。
 - 指纹保留可执行文件与输入数据，成功/失败在进程内缓存；Auto首次缺表/失效以Disabled live生成，全量核心校验通过才原子发布，Required严格只读。`data/baked/`已忽略并取消跟踪，schema4旧目录已删除。
-- 解释器保留 v2 的 EffectAtom 语义；U2/U5 复用编号、借用组合数据、轻量结算与平铺枚举。U4 Exact 编码和完整叶键已接贸易/制造及完整排班请求 scope，memo 已在生产调用中生效；实际复用和输出等价仍待最终包确认。
-- 贸易hit的日产字段用单位值与total_efficiency按24小时恢复，**不得按shift_hours/24再缩放**；只有`TradeResult.daily_at_shift`表示实际班次量并缩放。制造暖机 Some(h) 已按整班窗口计算平均贡献，None 保持 20 小时；仅授权暖机房差异，见 §4.3。
+- 解释器保留 v2 的 EffectAtom 语义；U2/U5 复用编号、借用组合数据、轻量结算与平铺枚举。U4 Exact 编码和完整叶键已接贸易/制造及完整排班请求 scope，memo已在生产调用中生效，最终统一包和旧语义消融已完成覆盖内输出对照；不外推任意输入或实际性能收益。
+- 贸易hit的日产字段用单位值与total_efficiency按24小时恢复，**不得按shift_hours/24再缩放**；只有`TradeResult.daily_at_shift`表示实际班次量并缩放。制造暖机 Some(h) 使用真实连续时间积分，None 默认 20 小时；用户授权正确暖机以及可证实的连带重选，见 §4.3。
 
-Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚举、合法过滤、比较与输出合同。尚未完成最终全量对账与查询差分，不提前把静态判断或编译通过声明成普遍等价。
+Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚举、合法过滤、比较与输出合同。旧语义全量对账及消融已完成，最终连续暖机新表verify及CLI回归已完成；验证只约束实际表/查询/输入覆盖，不提前声明任意查询普遍等价。
 
 ### 4.2 保证等级声明
 
@@ -185,15 +197,15 @@ Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚
 
 各单元可独立提交，由主代理负责 git 写操作；中途不逐单元对拍或验收，必要编译允许。代码已完成，最终统一包按 §6 验收。U1～U5 必须保持结果，U6 仅允许授权暖机行为差异。
 
-- **U1a 已实现：命中补全与全量对账入口**：持久化/恢复完整命中数值，行verify重算完整响应并做确定性查询差分；制造产出字段和live排序口径已补齐。最终运行校验未做，schema16旧结果由schema17重建。
+- **U1a 已实现：命中补全与全量对账入口**：持久化/恢复完整命中数值，行verify重算完整响应并做确定性查询差分；制造产出字段和live排序口径已补齐。最终新语义schema17完整表29,783,417行与3,292兼容查询对账零差异，跳过2,148查询；最终CLI exit0，但书期望修正后回归PASS。
 - **U1b 已实现：运行时再生与发布**：Auto缺表/失效一次Disabled live生成，exe指纹及失败缓存，验证后独立generation与CURRENT原子发布；Required严格只读，CLI/debug共用解析。目录清理已完成；固定 BakeMissKind 分类、query_errors 与冷阶段 calls/errors/nanos 汇总及 serve 同步预热均已提交（2880cc6），Required 严格只读。
 - **U2 已实现：加载期编号、借用与定长资源槽**：干员/buff稠密编号，建池预编译复用，贸易/制造借用输入与稳定归并，贸易/制造房间资源16槽数组。GlobalResourcePool与中枢/办公室/发电快照保留现有owner边界；不扩展候选准入与规则语义。
 - **U3 已实现：完整变体存储与rank直查**：身份为name/原始elite/ordered buff_ids/tags；全部实例设施绑定经真实pool builder生成E0/E1 tier_0、低星等级解锁、E1/E2 tier_up五类代表练度，按完整身份去重，制造各配方使用同一完整变体池，同名组合互斥。完整legal combo集合冷校验，每signature建立checked dense colex rank数组；热查询沿live原枚举次序直查，有界堆按贸易效率/枚举序与制造效率/仓库/组合姓名比较，只物化best/top，evaluated保留全部合法过滤组合。完整layoutbaseline及技能原文/compiled atom身份门禁仍在，未覆盖动态或心情敏感条件回live。贸易 hit 日产不按 shift 再缩放；制造表生成和行 verify 均以 None 的 20 小时暖机值重算，Some(h) 且池含 AddEffRamp 时整体回 live。Bake 物理 signature 使用固定槽，不在热路径拼字符串；可用 `ARKNIGHTS_INFRA_BAKED_DIR` 显式隔离生成目录（6a22e21），默认目录发现顺序保持原规则。完整表和加载期索引已裁决，不因体积/冷启动重新请求选择。
 - **U4a/U4b 已实现并接生产**：Exact 编码（5be9614）、TLS 请求 scope/完整叶键/精确字节 intern/Arc 保活（19c9d1a）、贸易制造叶搜索及成本汇总（c29b2b2）、完整排班请求复用（5b165f1）已提交。键覆盖、嵌套生命周期、返回顺序和输出等价由最终包验证；不把“trade_solves 接近组合数”写成保证。
 - **U5 已实现：搜索与结算解耦**：共用平铺组合枚举接受泛型评估闭包（45dc1fe）；制造借用池数据与轻量结算（fe53d02）和配方注入缓存（c413336）、贸易房间借用视图及 shortcut/链段/搜索贯通（022563c/e421877/9f5fde1）均已提交。枚举顺序、合法过滤与 live 比较口径保留；本单元未增加不安全剪枝。
-- **U6 已实现：暖机随整班时长变化（509ad44）**：有限的 `Some(h)` 先 `round` 再 `clamp(1, 24)`，暖机贡献取该窗口内逐时加成的算术平均，然后进入现有阶段解释器；`None` 保持 20 小时。非有限时长拒绝；`layout/assign` 默认 24 小时也会使用 24 小时平均。心情分段重解共用整班暖机窗口，未做逐时非线性积分，不能据此声称精确积分语义。
+- **U6 既有实现：暖机随整班时长变化（509ad44；最新线性修正已完成，旧实现记录保留；当前见§8.1）**：有限的 `Some(h)` 先 `round` 再 `clamp(1, 24)`，暖机贡献取该窗口内逐时加成的算术平均，然后进入现有阶段解释器；`None` 保持 20 小时。非有限时长拒绝；`layout/assign` 默认 24 小时也会使用 24 小时平均。心情分段重解共用整班暖机窗口，未做逐时非线性积分，不能据此声称精确积分语义。
 - **U6 Bake 门禁**：`Some(h)` 且整个制造候选池含任一 `AddEffRamp` 时，查询整体回 live；`None` 固定表仍按 20 小时生成/verify。公开 `try_baked_*` 统一判定；Required 对暖机、peer-reset 等 miss 严格报错，制造 peer-reset 外层绕过路径已删除；CLI 使用同一语义。
-- **最终差异边界**：最终版本统一与 `/tmp/perf-current-20261028` 比较，不在 U6 前另建 baseline。只允许含这五个暖机技能（急性子、“等不及”、慢性子、延时摄影、例行清扫）的房间产生授权差异，并逐项解释；若引起其他选择或排班差异，按超范围差异原样报告，不自行放宽。
+- **最终差异边界**：最终版本统一与 `target/codex-runs/perf-final-20261028/baseline-recovered/` 比较，不在 U6 前另建 baseline。第一轮“仅含五暖机技能的房间可变化”限制及实际超范围差异保留作历史；用户最新要求按正确暖机机制实现，不以旧名单限制正确重选。直接效率变化和连带选择仍分别核因，纯性能等价、实际超预算与未归因偏差不因此豁免，详见§8.1。
 
 ### 4.4 移植 v3 时的取舍
 
@@ -209,8 +221,8 @@ Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚
 
 ## 6. 验收与基础性能日志
 
-- **当前版本与最终版本一次统一对拍**：使用 `/tmp/perf-current-20261028` 的冻结二进制与产物（冻结时含未提交U1a）作为 baseline；U1a～U6 已实现，最终统一跑 §2 四种轮换全量对拍、全精二产物与已知断言失败样本、Bake 全量对账、终态断言和复审。中途不运行源码测试、不逐单元验收；必要编译允许，最终 Rust 格式与 release 构建仍须有证据。
-- Bake **全量对账**：最终对每个 signature 的每一行用 live solver 重算并逐字段比较，另做确定性查询差分，比较 best 与 top_k 顺序。旧首/中/尾抽样不足以支撑 safe reduction；全量入口已实现但最终运行尚未完成，全量覆盖与实际开销须以运行证据确认，不用旧生成耗时推断对账便宜。
+- **当前版本与最终版本一次统一对拍**：使用 `target/codex-runs/perf-final-20261028/baseline-recovered/` 的精确冻结源码恢复及产物作为 baseline；U1a～U6 已实现，最终统一跑 §2 四种轮换全量对拍、全精二产物与已知断言失败样本、Bake 全量对账、终态断言和复审。中途不运行源码测试、不逐单元验收；必要编译允许，最终 Rust 格式与 release 构建仍须有证据。
+- Bake **全量对账**：最终每signature每行由live重算并逐字段比较，另做确定性查询差分及best/top顺序对照。最终新语义29,783,417行/3,292兼容查询零差异、2,148按门禁跳过，CLI exit0；不把跳过算通过。旧完整表和第一轮对账仍为历史证据，最终认证来自7695096fd的隔离新表。
 - 终态断言：最终用 `--assert-invariants` 批量跑（`assert_rotation_invariants.py` 已含），按 `arknights-invariant-gate` 做整体自检，再用 `arknights-intent-review` 复审。U6 的授权暖机差异逐项解释，其他差异视为未完成；旧失败与新增失败分开报告。
 - **基础性能日志已实现**：在阶段边界记录计时，按批次统计次数，结束集中输出；细粒度调用标签按需开启。日志用于确认耗时分布与重复结算来源，不将实现中的计时当作逐单元验收。未实测的日志开销不声称零成本，不额外开启测量任务。
 - 性能：最终运行可留存现有耗时、阶段和批次日志，区分冷启动/生成/加载与热运行。用户不要求实际性能指标，不额外开测量任务；历史单 box 测量不能代表最终收益，未测的收益与日志开销不预先声明。
@@ -221,11 +233,11 @@ Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚
 
 ## 7. 尚未验证与非阻塞项
 
-- U4b 生产接入、U5、U6、miss 分类和服务预热均已实现并提交；键覆盖、嵌套/请求生命周期、返回顺序、实际计数与输出等价仍须由最终包确认。必要剩余项是运行验收、差异处理和独立复审收口。
+- U4b生产接入、U5、U6、miss分类/服务预热已实现；本轮内存和连续暖机实现、局部数值、静态闭合与最终全量/152盒包均完成，五既有预算失败保留。最终5949叶差异归因已闭合，见§8.1；历史调查和旧未完成状态不重复开工，源码提交由主代理收口。
 - 冻结版本阶段归因已覆盖N/A/B、attempt、peak/γ；单box只有attempt_0，没有实际中枢重建。搜索归属15297与全局15379相差82，具体来源未归因；不能混用两个计数边界。其他box和轮换的阶段分布、最终版本收益尚未测。
 - Worker是否依赖外部data运行期替换，仍是将来采用build.rs前的条件；当前已选加载期编号，**不阻塞本轮**。运行目录可写性/并发发布/失败回live仍需最终验证；无参预热、Auto 与 serve 同步 warm 均已实现，不再把旧空桩当剩余实现。
-- schema17实际合法行数、文件体积、生成和冷加载开销可以记录，但不作为可接受体积裁决或推进阻塞项；用户已授权内存/冷路径无限制、完整表与加载期索引。
-- 最终统一四轮换与全精二包、Bake 全量行/查询差分、终态断言和独立复审正在进行，结果尚未收口。全精二无断言产物成功与带断言已知失败分开报告；暖机授权差异逐项解释，其他差异不放宽。
+- schema17实际合法行数、文件体积、生成和冷加载开销可以记录，但不作为可接受体积裁决或推进阻塞项；完整表与加载期索引裁决保持；实际机器内存有限，现按授权降低表示与峰值内存继续，见 §0.1。
+- 第一轮四轮换/full-e2、Bake对账、断言和独立复审的真实未通过结果保留在交接单§4.7；当前最终新语义包已完成，真实结果见§4.9。五预算失败没有新增/移除，raw输出仍变化；最后归因已闭合，不以缺失输出same或脚本exit替代断言/产物的真实状态。
 - 控制中枢、发电、宿舍没有独立普遍热路径测量；本轮不为覆盖更多设施另起外围改造。
 
 ## 8. 已裁决事项与历史估算
@@ -243,3 +255,32 @@ Bake层拥有存储完整性、上下文准入与live回退；搜索层拥有枚
 
 5. U3已裁决使用完整表和加载期索引，内存与冷路径不作为顾虑，热查询速度优先；“先量规模再决定全表还是上界/现场结算”的选择已关闭，不再问。
 6. **历史估算，非现行事实**：早期枚举上限143693→482342（3.3568倍），按当时schema16行大小粗估约72.86MiB；该估算尚未包含后来保留原始elite的完整身份维度，不能代表schema17合法行数、文件体积或加载成本。最终可记录实际规模，不改变完整表裁决。
+
+
+### 8.1 最终差异与暖机正确性（2026-10-29，用户已裁决继续）
+
+用户已裁决暖机随班长变化，但原验收只允许含五暖机技能的房间差异。最终包不满足该限制：前三轮同成员132个效率变化中129含暖机，3个b-112-404无暖机房的全局/站级效率也变，实际中枢名单改变；三轮MAA变化10/3/3盒。24/24失败集合移除b-101-424、新增b-112-404（均涤火杰西卡shift2），完整输入和原比较未改。full-e2两班7处房间换人、菲亚从禁用变但书/巫恋，制造日产9.078→8.947，旧断言失败而新通过。完整原始diff见交接单§4.7的证据入口。
+
+第一轮历史核实：公孙固定baseline 9.084→9.039是旧U6暖机差额；上述三个同成员非暖机房的房内技能效率不变，中枢改变影响全局项。后续完整旧语义消融已确认本覆盖内未发现纯性能数值、选人或MAA偏差，详见下方；最终连续暖机结果与归因已完成，详见下方；旧完整表或静态复审不替代最终验证。
+
+用户后续明确：“暖机按正确做法来做，如果说断言有问题的话，就修改掉它。”此前保留暖机/拆开验收的二选一已关闭；不回退20小时，也不把旧名单不变当作正确性的要求。只有断言偏离真实预算/机制时才修改，真实违规仍由正确gate拒绝。
+
+最新时间函数裁决原话：“线性增长，第1个小时加成为0。”原会话问题第二项仅问阿罗玛首小时，因此首小时0仅适用于阿罗玛；其他四技能保留首小时20%（芬/刻俄柏）或15%（克洛丝/稀音），之后按+1%或+2%每小时线性至25%。阿罗玛整个首小时0，之后+2%每小时至20%。该裁决覆盖旧阶跃和round/clamp时间口径；当前新冻结局部数值验收及指定P1/P2静态闭合已完成，最终新表与统一包已完成，归因已闭合，详见下方。
+
+已核实的正确性事实及范围：
+
+- **纯性能归因已在覆盖内关闭**：固定旧20h的消融二进制`2750e3ec874bdc5afb8789990886d6f85624b45e3ef313b59b1ccce5d947a08d`真实完成152盒及full-e2无断言/带断言两次执行。原比较仅剔顶层elapsed，仍为`same=5 changed=147`，不改比较规则、不声称JSON字节相同；147个batch成功输出加1个full-e2输出共296个叶差异，全部是profile的`baseline_label`/`layout_label`绝对数据路径标签，同一输入文件在main、snapshot及冻结输入的SHA256一致。成员、效率、单位产出浮点、rotation及MAA字段零差异；五例断言失败集合/原因逐字一致，full-e2无断言仅标签变化、带断言仍在shift2为涤火杰西卡失败。旧完整表29,783,417行、3,435兼容查询零差异，2,005查询跳过，CLI exit1仅消融snapshot中旧但书CSV期望。证据`correctness-attribution/ablation/verification/{report.md,summary.json,label-attribution-summary.json,nonlabel-leaf-differences.json}`。这证明本覆盖内未发现纯性能数值或选择偏差，不推广任意输入或独立Required+peer-reset行为。
+- **首轮连续暖机历史数值记录**：首轮CLI `592270b93b3cf693eebd51563827e7f4d0e4ecaea01291a6dc15d89a1c00f8d9`的55×3解析、360full（288成功、72预期非有限错误）、288search及135顺序比较在点名ramp/bucket与指定心情输入下零语义差异，原50条数学日产尾差及完整证据`correctness-warm/numeric-validation.{md,json}`保留。该轮未执行后来追加的P1/P2完整技能/极短段反例；不能沿用首轮通过认证最终源码。
+- **新冻结连续暖机局部验收已完成，搜索覆盖按既有政策分开**：CLI `7695096fd53c33dba66a4368c83061fa73a1676210bc28ec70c5418b8446d405`与对应core rlib起止指纹稳定。保留并重跑55×3独立解析原oracle、225原输入及首轮证据，新增129输入；总1122次full（1050成功、72预期非有限错误）与数学千分整数及公开f64合同零差异，无panic或非预期solver错误。总1050次search中798获准，经真实light→full效率断言及best/top完整字段精确比较通过；252次20/30h输入由原有`>=12h`负心情扣减技能准入政策排除，evaluated=0，不能称这些组合full/light/search一致。门禁常量在e40900f与当前均为12.0。P1阿罗玛+槐琥+铅踝mood20/shift0/Gold六序均技能50pp、final1.530；20h full为1.620，而search空结果。P2芬+槐琥`nextafter(1,+∞)`三配方/两序均full/search一致，final1.420，不再拒绝或丢组合。指定P1/P2静态复审闭合；普通段按阈值分段积分，不足两个可表示内点的微段保留完整权重、暖机解析平均及原解释器代表点求值，仍受f64分辨率与舍入约束，不能称所有实数积分精确。原50及新增120条数学日产二进制尾差另存，验收按公开f64合同精确相等、不用容差。证据`correctness-warm/p1p2-final/{report.md,summary.json,search-policy-source.json}`、`correctness-warm/p1p2-closure-review.md`；不能证明全技能/全局注入、游戏个体耗尽语义、全部微段、排班或全局最优。
+- **消融到最终源码归因已核对**：main与消融snapshot按真实文件路径比对274个crates/data文件，只有7处差异：暖机函数/解释器/solver、types时长注释、Bake暖机门禁、技能表五暖机及槐琥phase顺序、但书CSV期望；没有缺失文件。内存与其他性能实现相同，证明本轮最终实现与旧语义消融的来源边界，不替代最终输出差分。证据`correctness-warm/{ablation-final-provenance.json,ablation-final-source.diff}`。
+- **最终统一运行及归因已完成**：冻结CLI `7695096fd53c33dba66a4368c83061fa73a1676210bc28ec70c5418b8446d405`在`linear-warm-final/`真实完成隔离完整Bake及统一包。Bake CLI exit0，29,783,417行/3,292兼容查询差异0，skipped signatures0、queries2,148；13非空signature、674状态，CURRENT=`gen-28818-1793208859780185706-0`，header/manifest/summary核对通过，但书回归PASS。3/2/12_12_12各38完成且Rust断言/solver/input/timeout错误0；24_24为38检查/33完成/5既有预算失败，完整失败tuple逐字同基线，新增/移除0。原比较仅剔顶层elapsed，仍为same5/changed147，脚本exit1包含输出变化，不能冒充所有gate全绿。全精二无断言exit0，profile11叶/rotation10叶变化，MAA完全相同；带断言旧新均exit1，在shift2同一涤火杰西卡预算失败，均无输出。152子命令起止binary/input SHA与显式环境一致。5949叶原差分全部保留，原621机器unknown另附闭合解释；覆盖内未归因数值0、导出不一致0、新增/移除失败0。直接暖机、排序/积分机制集合及连带重选已归因闭合，不证明每次重选独立因果或任意输入，五既有预算gate仍失败。证据`linear-warm-final/{report.md,summary.json,verification}`；本轮冷路径覆盖来自完整verify/Required兼容查询及Auto加载，未新开重生成或性能测量任务。
+
+- **最终差异归因已闭合**：5949条原叶差分与621条初始unknown原样保留，另存闭合解释，覆盖内未归因数值0、export不一致0、新增/移除失败0。115个同成员暖机制造班房（690叶）为直接数值变化，195个房间班次重选、10个同成员跨房上下文变化。批量选中组合没有槐琥分桶+铅踝扣减实际buff共同例，不能冒充批量排序覆盖；该P1由新增129输入数值包验证。唯一6叶同成员无暖机变化为17-256第一班娜斯提房：办公室宴→E0淬羽赫默，莱茵tag人数2→3，造价高昂`min(15,3×n)`正好+3pp，房间1阶技能0.96→0.99/总2.01→2.04，非匿名全局补偿。公孙profile固定baseline 9.084→9.017由独立连续暖机差额−66.5millis及既有逐班整数舍入到−67解释；该证据是暖机delta/舍入边界，不从零重算全部历史总值。全精二名单/MAA相同，仅第二班manu3阿罗玛24h平均15pp替代旧15.5pp，房间2.215→2.210、日产9.078→9.075。296个旧新rotation、744班的小计/权重/日产千分合同精确核对通过，2976制造班房扫描无槐铅实际buff对。控制消融及274文件源码差异约束把本覆盖变化归入暖机/排序/门禁机制集合，连带重选逐步因果仍为有控制证据的推断，不认证全局最优、任意输入或所有f64微段。证据`linear-warm-final/attribution-audit/{closure-report.md,closure-summary.json,closed-leaf-attribution.json}`。
+
+- **独立终审已封口**：`correctness-warm/final-intent-review.md`对用户原话、实现边界及最终证据独立复核，未发现实质代码bug；此前证据缺项在覆盖内已闭合。联合暖机/排序/门禁机制集合归因有控制证据，不把每次重选写成独立局部因果证明；原5949严格全叶口径和621机器分类原记录均保留。
+
+- **但书**：`reg_gsl_docus_solo`的1.907来自旧锚15910.75；当前固定来源锚15929.2对应倍率`round(15929.2/10265,3)=1.552`，纸面1.230结算得到`round(1.230×1.552,3)=1.909`。CSV期望已改为1.909，机制解释0.550、容差0.001、公式与fixture保持；旧完整Bake的exit1是历史实测，最终7695096fd回归已exit0/但书PASS。暖机源码修改会改变`None`的20h表数值和exe指纹；原binary与旧表/对账证据保留，仅证明内存实现按旧暖机语义等价。最终binary已在隔离目录重新生成完整Bake并verify，CLI exit0；不手改指纹，也不能用旧完整表验收替代新语义验收。证据`correctness-docus/report.md`。
+- **24/24预算**：五例移除断言后的正常完整assignment均exit0，按终态逐班重算涤火杰西卡24h消耗分别28.80、28.80、28.80、30.00、27.60，available均24。含灵知四例即使补计固定来源恢复0.05/h，仍为27.60、27.60、27.60、28.80，第五例保持27.60，故断言均未误报，保留gate。canonical既定的正常warning fallback可以输出超预算排班，显式终态gate仍拒绝；本轮未修排班，也未证明其他账号或全局无解。证据`correctness-budget/{report.md,budget-breakdown.json}`。
+- **暖机**：固定知识库没有明确阶跃/连续及阿罗玛首小时，直接PRTS来源HTTP403；旧小时段手算仅为条件性反例。最新用户裁决已补齐时间函数：阿罗玛首小时整个0，之后`min(2×(t−1),20)%`；其余四技能首小时initial 20/15%，之后+1/2%每小时、cap25%。None默认20h采用新连续语义，Some(h)使用真实时长，不round/clamp；发电不改。先平均暖机再做槐琥floor/cap与按时间先结算后平均不交换；连续积分首轮验证及尚待修正的两项复审边界见上方。证据`correctness-warm/{report.md,temporal-source.md,numeric-validation.md,numeric-validation.json}`。
+
+上述证据根均为`target/codex-runs/perf-final-20261028/`。实现、最终隔离Bake/CLI回归、152盒/full-e2及指定P1/P2闭合均完成；最终5949叶归因已闭合，按交付状态收口，无需重新实施暖机或重复旧验证。保留普通段积分/f64微段边界、五既有预算失败、旧binary/表、第一轮全部差异与唯一恢复baseline，不手改指纹、不重开1+1/四赤金/Mower。最终版本提交由主代理记录。

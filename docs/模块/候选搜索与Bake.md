@@ -50,7 +50,11 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 v17 的 `operator_states` 保存姓名、entry 的精英阶段、有序 buff ID 与标签；`operator_count` 统计状态数，`operator_names` 可以出现重复姓名。全表池从全部实例的贸易/制造设施绑定取姓名，用 E0/E1 tier_0、低星等级解锁以及 E1/E2 tier_up 的五类代表练度逐姓名走真实 pool builder，按完整身份去重；制造所有配方用同一完整变体池。此处扩大的是预计算存储域，生产池准入、standalone 策略和候选集合不变。组合只允许互异姓名；全表 canonical 顺序沿真实 pool 的效率提示降序、姓名升序，再以完整身份确定同名变体次序。行记录该顺序解算的数值；贸易赤金链 helper 重排时，行索引记录实际执行顺序，不能把同一状态集合默认视作可交换输入。
 
-冷加载以完整身份建立 state→entry 索引，核对 canonical 状态集合；两域每个 signature 的存储行集合必须与同名互异且满足实际 legality 的组合身份 tuple 完全相同，signature 的 OR 位图只做 verify 样本域快筛，不证明完整组合覆盖。行级 verify 和完整贸易 API 都按行的完整身份及执行顺序还原，避免逐行按姓名取首项。
+生成尝试三级 × 两种贸易订单，其中 lv1/lv2 源石实际为空；空行块不进入索引，完整表仍为四个贸易与九个制造 signature。生成改为固定组合迭代器 `par_bridge`，每 signature 完整排序后独立落盘并释放行块，再按原顺序拼接 schema17 header/行；流式 hash 保留整段 bytes 的长度前缀与 `DefaultHasher` 合同，临时块由 RAII 清理。
+
+冷加载以完整身份建立 state→entry 索引，核对 canonical 状态集合；对同一打开 File 分块 hash、rewind 后流式读取 metadata 和单行。两域每个 signature 的存储行集合必须与同名互异且满足实际 legality 的完整合法 universe 相同，用 checked colex rank bitset 枚举清位核对缺行、多行及数量，避免同时保留 expected/actual 两套 BTreeSet。仍按 canonical 顺序重建有序 IDs 并核对实际贸易链重排；signature 的 OR 位图只做 verify 样本域快筛，不证明完整组合覆盖。
+
+常驻表按 signature 保存 typed compact 行、有序 `u16` 状态 IDs、checked `u32` rank/规则字典，全部原始 `i32`/`f64` 保留；不逐行常驻姓名、mask、facility。贸易 96B/制造 48B 仅静态类型大小估计，不能代表 RSS。热查询只物化选中行的完整 owned 命中，不做 I/O；完整贸易 API 保留 signature+offset 标识与原签名，按需还原 owned 行及执行顺序，显式请求全行 Vec 仍有分配成本。全量 verify 按 offset 从同一 File 每批读取 4096 行，保留全部 Disk 字段/live 对账，并比较实际 compact 物化命中；320 查询差分覆盖不减少。内存改动已 release 编译、静态审查及完整 29,783,417 行/3,292 兼容查询零差异对账，2,148 查询按原门禁跳过；最终实现与实测已完成。第一轮轮换包包含选人/MAA/失败集合变化，历史差异保留；后续固定旧语义消融的152盒及full-e2两入口已确认成员/产出/rotation/MAA零差异，仅296叶为输入绝对路径标签，原same5/changed147保留，覆盖内纯性能归因可关闭。消融完整表3,435兼容查询零差异、2,005跳过；不推广任意上下文或独立Required+peer-reset，也不证明热性能收益。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 冷路径生命周期算法本轮未改，覆盖限制随最终包报告，不另开重生成或性能测量任务。
 
 热查询要求每个真人只出现一次，完整状态在相应设施 canonical 池中，且输入保留该池相对顺序。生产 signature 查找使用固定 13 个可空槽：贸易 level1/2/3 赤金及 level3 源石占四槽，制造三级 × 三配方占九槽；先严格核对 level 1–3 与 capacity 等于等级，赤金另核对实际金线数等于冷加载基准，源石沿原 key 不限制金线数。冷加载按每个 index 首行恢复原字符串 key 并完整核对、拒绝重复槽；磁盘 v17、manifest 与逐行验证仍保留原字符串协议，热查询不再格式化 signature 或查字符串 HashMap。每个 signature 建立长度 `C(状态数, 容量)` 的 dense colex rank 数组，未存储组合用 sentinel 表示；容量只支持 1–3，组合数、rank 与数组分配均 checked，溢出或分配失败给出可读原因。查询沿 live 的原组合字典序枚举，固定三槽仅复制状态 ID 后排序计算 rank，不改变解算或输出顺序；直接 lookup 取代扫描和排序整张表。最大堆只保留 `top_k.max(1)` 个轻量候选，按贸易效率与原枚举次序、制造效率/仓库/组合姓名次序比较，最后物化 best/top。`evaluated` 仍统计全部通过合法性和必选过滤的组合，`combinations` 保留调用方枚举口径；贸易零命中 miss 回 live，制造保留成功空报告。
 
@@ -78,7 +82,7 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 `metrics.bake.trade` / `manufacture` 输出非零类别：`forbidden_pairs`、`override`、`predicate`、`invalid_mood`、`invalid_shift`、`layout`、`mood_sensitive`、`ramp`、`peer_reset`、`generating`、`unavailable`、`skill_table`、`duplicate_names`、`state_absent`、`facility_state_absent`、`noncanonical_order`、`trade_atoms`、`manufacture_atoms`、`signature_absent`、`capacity`、`heap_unavailable`、`trade_incomplete`、`manufacture_incomplete`、`no_eligible_trade`。
 
-制造有班长且池内技能包含 `AddEffRamp` 时，以 `ramp` 原因整体回 live；Required 严格报 miss。live 先按整班的逐时加成平均，再执行原解释器，心情分段共用该窗口。无班长仍按 20 小时，固定 Bake 行及其全量校验保持此口径；带班长且含暖机的查询差分明确计 skipped，不计 checked。此门禁不删候选，也不把 20 小时表当作新班长结果。
+制造有班长且池内技能包含 `AddEffRamp` 时，以 `ramp` 原因整体回 live；Required 严格报 miss。live连续积分实现用解析平均与阈值分段加权，心情区间不重启暖机；Some(h)使用真实时长，不round/clamp。首轮冻结记录保留，新冻结局部数值验收及指定P1/P2静态闭合完成；1122full含72预期非有限错误、1050search中798获准精确一致、252既有>=12h负心情扣减政策排除，不能认证所有搜索组合；最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 槐琥分桶修正为全部EffVar直接贡献后读取（order10→30，五ramp order9保持），普通段按阈值分段积分；极短段保留真实权重，暖机解析平均、非线性按原解释器可表示点求值，保留f64分辨率和舍入边界。无班长默认 20 小时，固定 Bake 行须按新连续积分口径重新生成与全量校验；带班长且含暖机的查询差分明确计 skipped，不计 checked。此门禁不删候选，也不把 20 小时表当作新班长结果。
 
 冷阶段 `metrics.bake.cold` 按 `init`、`generate`、`validate`、`verify`、`index`、`publish` 保存 calls/errors/elapsed_ms；init 只覆盖真正 OnceLock 初始化，缓存访问不冒充冷加载。实际重复验证照次数记；父子阶段 inclusive，不能相加作总耗时。CLI bake 在动作体包 trace，保留核心全量校验与既有 CLI 回归失败；serve 的启动 warm 单独输出 trace。
 

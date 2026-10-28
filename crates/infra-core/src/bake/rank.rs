@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 
-pub(super) const INVALID_ROW: usize = usize::MAX;
+pub(super) const INVALID_ROW: u32 = u32::MAX;
 
 pub(super) fn choose(n: usize, k: usize) -> Result<usize> {
     if k > 3 || k == 0 {
@@ -43,7 +43,7 @@ pub(super) fn colex(ids: &[usize]) -> Result<usize> {
     Ok(rank)
 }
 
-pub(super) fn empty_rows(state_count: usize, capacity: usize) -> Result<Vec<usize>> {
+pub(super) fn empty_rows(state_count: usize, capacity: usize) -> Result<Vec<u32>> {
     let len = choose(state_count, capacity)?;
     let mut rows = Vec::new();
     rows.try_reserve_exact(len).map_err(|error| {

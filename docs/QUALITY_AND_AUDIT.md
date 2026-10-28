@@ -186,19 +186,19 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
 - catalog 按 `(name, 原始 elite, 有序 buff_ids, tags)` 保存完整技能身份；真实 pool builder 生成练度变体，同名组合互斥。E0/E1 与 full_pool 本身不再必然 miss。冷加载精确核对完整合法组合集合，并按物理 signature 建立 checked dense colex rank 数组；热查询沿 live 子池相对次序直查，保留 live 比较规则及 best/top-K 输出口径。
 - room level、capacity、recipe/order 必须有对应 signature；完整 `LayoutContext::search_baseline()`、注入顺序/聚合结果、active_source_buffs 和浮点有限性/位表示须通过门禁。任意布局、动态贸易注入、制造 count-scaled 注入等未覆盖上下文回 live。
 - 心情必须有限且大于 0，时长必须有限；Mood/OwnerMoodGap 敏感技能和制造 peer-reset 回 live。制造 `Some(h)` 且候选池含任一 `AddEffRamp` 时整个查询回 live；`None` 的表生成和行 verify 保持 20 小时暖机值。制造 peer-reset 外层绕过已删除，CLI 与核心公开门禁同语义。
-- manifest 保存 `combo_table.bin` bytes/hash 和各物理 signature 行数；loader 对同一份 bytes 完成反序列化、结构校验与消费，拒绝缺行、多行和身份变化。row 保存完整结算响应与必要的 room-local 观察量，查询不改变候选集合或 comparator。
+- manifest 保存 `combo_table.bin` bytes/hash 和各物理 signature 行数；loader 对同一已打开 File 分块 hash 后 rewind 流式解码并消费，按完整合法 universe bitset 核对缺行、多行、有序身份及贸易链重排。row 保存完整结算响应与必要的 room-local 观察量，查询不改变候选集合或 comparator。
 - Auto 缺表/失效时一次使用 Disabled live 生成，完整验证后发布；exe 指纹成功和失败均进程内缓存。独立 generation 目录经验证后由 CURRENT 原子 rename 切换，统一校验、verify、核心/CLI/debug 解析；可用 `ARKNIGHTS_INFRA_BAKED_DIR` 显式隔离生成目录；未设置时沿用 data 根发现顺序。跨进程短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。
 - Required 保持只读，公开统一门禁不兼容即严格报 miss，不生成或静默绕过；Auto 的 typed miss 回同语义 live。query_errors 单独记录，原有 rank/row/物化错误仍保留，不能声称所有错误都无条件 fallback。
 - 固定 BakeMissKind、冷阶段 calls/errors/nanos 与服务启动同步 warm 已接入；warm 失败继续 live 与 ready。生成物已取消跟踪，历史 schema4 目录已清理，不能手改生成物裁决语义。
 
-当前实现 owner 见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)，本轮范围和冻结证据见 [性能优化调查与Bake重设计](TODO/性能优化调查与Bake重设计.md)。最终全量行/查询差分、四轮换与全精二产物/终态断言和独立复审仍待收口；实现与编译完成不能写成最终验收通过。暖机只是整班窗口逐时平均贡献后进入解释器，心情分段共用该窗口，未做非线性积分。
+当前实现 owner 见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)，冻结证据和详细范围见 [性能优化调查与Bake重设计](TODO/性能优化调查与Bake重设计.md) §8.1。第一轮旧表29,783,417行/3,292查询零差异、2,148跳过以及原选人/MAA/失败差异均保留；后续旧语义消融同样完整表29,783,417行/3,435查询零差异、2,005跳过，152盒及full-e2两入口中实际产出/成员/rotation/MAA零差异，296叶仅同文件输入绝对路径标签，原same5/changed147和逐字相同既有断言失败保留。覆盖内纯性能归因可关闭，不能宣称raw字节相同或推广全部输入/Required+peer-reset。首轮592270b历史证据保留；最终7695096fd新冻结重复原55×3解析及225输入，并新增129输入，总1122full（1050成功、72预期非有限错误）、1050search（798获准精确一致、252既有>=12h负心情扣减政策排除），数学千分与公开f64合同零差异，指定P1/P2静态闭合；不能将252排除写成light/full一致或认证所有实数微段/全技能/全局排班。P1铅踝扣减后槐琥漏读、P2合法极短浮点段拒绝已局部修复并完成新release编译：槐琥分桶在全部EffVar直接贡献后读取（order10→30，五ramp order9保持），极短段保留权重和可表示求值。普通段分段积分，微段保留权重但非线性代表点求值仍受f64舍入约束；新数值和反例已完成，最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 旧完整表不能替代新语义验收。None20h使用新连续暖机，Some(h)真实时长不round/clamp，发电不改。五例24/24预算确实超限，保持正确gate与canonical既定正常warning fallback，不新增排班policy。
 
 ### 6.2 真实限制与后续边界
 
 - combo table 已有 bytes/hash 和逐 signature 行数校验；加载期 rank 索引由完整合法集合重建，index checksum 尚未独立持久化，不能写成已完成。
-- 完整表与加载期索引已获授权；schema17 当前实际规模、生成和冷加载成本尚无最终运行数据，历史估算不作现行事实，也不重新打开体积裁决。
+- 完整表与加载期索引已获授权；schema17实际完整表为29,783,417行/3,843,098,117字节，最终WSL已完成新表生成/核心对账及CLI回归。第一轮9.2G/无swap是历史观测；最终cgroup采样和systemd终止摘要不同口径，不拼为单一RSS结论。历史估算不作现行事实，也不重新打开体积裁决；批量 systemd 的小峰值未覆盖实际 solver，不能作为运行时测量。
 - 全量行 verify 不能证明所有未覆盖上下文或全部候选子集排序均等价；不兼容查询仍依靠门禁回 live。cache miss 只替代候选生成/求值方式，不缩小候选集，不转用固定 top-K 或旧 pipeline。
-- 最终对拍使用原冻结源码及其基线；原 `/tmp/perf-current-20261028` 已因本地 OOM 后环境重启丢失，按确证的 `3201fa7` 加冻结 U1a 四文件重建和采集，持久恢复证据见交接单 §4.1。只授权暖机房差异；超范围产物、选择或排班差异原样报告，不能降低保证等级。
+- 最终对拍使用原冻结源码及其基线；原 `/tmp/perf-current-20261028` 已因本地 OOM 后环境重启丢失，按确证的 `3201fa7` 加冻结 U1a 四文件重建和采集，持久恢复证据见交接单 §4.1。用户已裁决按正确暖机实现，允许证实由暖机重评分引起的连带选人、排班与聚合变化；纯性能偏差与未归因差异仍须原样报告，不能降低保证等级。
 
 未来联合候选 Bake 的 winner 仍必须在完整临时 assignment 上统一 resolve；DP、Pareto 和安全上界不是首期前提。详见 [DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
