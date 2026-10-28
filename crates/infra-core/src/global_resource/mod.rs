@@ -15,7 +15,7 @@ pub use inject::{
     INJECT_FAMILY_MANU_GLOBAL_ALL, INJECT_FAMILY_TRADE_GLOBAL_FLAT,
 };
 pub use key::GlobalResourceKey;
-pub use pool::GlobalResourcePool;
+pub use pool::{GlobalResourcePool, RoomState};
 pub use registry::{
     GlobalResourceConversion, GlobalResourceEntry, GlobalResourceTier, CONVERSIONS, REGISTRY,
 };

@@ -1,7 +1,27 @@
 use std::collections::{HashMap, HashSet};
+use std::ops::{Index, IndexMut};
 
 use super::key::GlobalResourceKey;
 use super::registry::CONVERSIONS;
+
+/// 贸易/制造房间的可变数值快照；未提供的资源从正零开始。
+/// 不表达键存在性，不改变全局资源池的 HashMap 接口。
+#[derive(Debug, Clone, Default)]
+pub struct RoomState([f64; GlobalResourceKey::ALL.len()]);
+
+impl Index<GlobalResourceKey> for RoomState {
+    type Output = f64;
+
+    fn index(&self, key: GlobalResourceKey) -> &Self::Output {
+        &self.0[key.room_state_index()]
+    }
+}
+
+impl IndexMut<GlobalResourceKey> for RoomState {
+    fn index_mut(&mut self, key: GlobalResourceKey) -> &mut Self::Output {
+        &mut self.0[key.room_state_index()]
+    }
+}
 
 /// 全基建全局资源池：producer 写入、consumer 读取、同房 StateWrite 可在快照上叠加。
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -83,6 +103,15 @@ impl GlobalResourcePool {
     /// 同房求解用的可变快照（StateWrite / StateConvert 在此 HashMap 上操作）。
     pub fn to_room_state(&self) -> HashMap<GlobalResourceKey, f64> {
         self.values.clone()
+    }
+
+    /// 贸易/制造专用固定快照：按键直接复制，保留数值，不做归并或浮点运算。
+    pub fn to_fixed_room_state(&self) -> RoomState {
+        let mut room = RoomState::default();
+        for (&key, &value) in &self.values {
+            room[key] = value;
+        }
+        room
     }
 
     /// 物理发电站数 + 虚拟发电站资源。

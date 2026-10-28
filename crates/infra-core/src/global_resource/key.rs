@@ -62,6 +62,28 @@ impl GlobalResourceKey {
         Self::EngineeringRobot,
     ];
 
+    /// 房间内固定状态槽位；穷尽匹配使新增资源必须显式分配槽位。
+    pub(crate) const fn room_state_index(self) -> usize {
+        match self {
+            Self::Matatabi => 0,
+            Self::Perception => 1,
+            Self::VirtualPower => 2,
+            Self::VirtualGoldLines => 3,
+            Self::HumanFireworks => 4,
+            Self::SilentEcho => 5,
+            Self::MonsterCuisine => 6,
+            Self::Dream => 7,
+            Self::MusicalSection => 8,
+            Self::MemoryFragment => 9,
+            Self::WitchcraftCrystal => 10,
+            Self::ThoughtChainRing => 11,
+            Self::IntelligenceReserve => 12,
+            Self::UsautDrink => 13,
+            Self::Passion => 14,
+            Self::EngineeringRobot => 15,
+        }
+    }
+
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "Matatabi" | "matatabi" | "木天蓼" => Some(Self::Matatabi),

@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use smallvec::SmallVec;
 
-use crate::global_resource::GlobalResourceKey;
+use crate::global_resource::{GlobalResourceKey, RoomState};
 use crate::layout::SharedLayout;
 use crate::skill_table::SkillTable;
 use crate::trade::gold_flow::apply_gold_flow_chain;
@@ -34,7 +33,7 @@ pub struct TradeContext<'a> {
     pub final_order_limit: i32,
     pub order_count: i32,
     pub mood: f64,
-    pub state_pool: HashMap<StateKey, f64>,
+    pub state_pool: RoomState,
     pub order_tags: Vec<String>,
     pub breach_gold_add: i32,
     pub law_active: bool,
@@ -88,11 +87,11 @@ impl<'a> TradeContext<'a> {
                 .durin_virtual_lines
                 .unwrap_or_else(|| input.layout.durin_virtual_lines()),
             active_order_kind: input.active_order_kind,
-            state_pool: input.layout.global.to_room_state(),
+            state_pool: input.layout.global.to_fixed_room_state(),
             ..Default::default()
         };
         if let Some(fw) = input.human_fireworks {
-            ctx.state_pool.insert(StateKey::HumanFireworks, fw);
+            ctx.state_pool[StateKey::HumanFireworks] = fw;
         }
         ctx.seed_karlan_precision();
         ctx
@@ -450,7 +449,7 @@ fn apply_mood_action(ctx: &mut TradeContext<'_>, action: &Action, owner: &str) {
             let Some(sk) = StateKey::parse(key) else {
                 return;
             };
-            let state = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let state = ctx.state_pool[sk];
             if *step_size <= 0.0 {
                 return;
             }
@@ -483,15 +482,15 @@ fn apply_state_write(ctx: &mut TradeContext<'_>, atom: &EffectAtom, _owner: &str
                 } else {
                     *amount
                 };
-                *ctx.state_pool.entry(sk).or_insert(0.0) += add;
+                ctx.state_pool[sk] += add;
             }
         }
         Action::StateConvert { from, to, ratio } => {
             let (Some(from_k), Some(to_k)) = (StateKey::parse(from), StateKey::parse(to)) else {
                 return;
             };
-            let src = ctx.state_pool.get(&from_k).copied().unwrap_or(0.0);
-            *ctx.state_pool.entry(to_k).or_insert(0.0) += src * ratio;
+            let src = ctx.state_pool[from_k];
+            ctx.state_pool[to_k] += src * ratio;
         }
         _ => {}
     }
@@ -560,7 +559,7 @@ fn resolve_eff_value(ctx: &TradeContext<'_>, atom: &EffectAtom, owner: &str) -> 
             let Some(sk) = StateKey::parse(key) else {
                 return 0.0;
             };
-            let state = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let state = ctx.state_pool[sk];
             if *div <= 0.0 {
                 0.0
             } else {

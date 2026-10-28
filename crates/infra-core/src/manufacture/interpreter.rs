@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use smallvec::SmallVec;
 
 use crate::eff_ramp::eff_ramp_avg_20h;
+use crate::global_resource::RoomState;
 use crate::layout::SharedLayout;
 use crate::manufacture::input::ManuRoomInput;
 use crate::skill_table::SkillTable;
@@ -108,7 +108,7 @@ pub struct ManuContext<'a> {
     pub layout: SharedLayout,
     pub facility_base_storage: i32,
     pub mood: f64,
-    pub state_pool: HashMap<StateKey, f64>,
+    pub state_pool: RoomState,
 }
 
 impl<'a> ManuContext<'a> {
@@ -134,7 +134,7 @@ impl<'a> ManuContext<'a> {
             layout: input.layout.clone(),
             facility_base_storage: facility_base_storage(input.level),
             mood: input.mood,
-            state_pool: input.layout.global.to_room_state(),
+            state_pool: input.layout.global.to_fixed_room_state(),
         }
     }
 
@@ -476,7 +476,7 @@ fn apply_limit_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str)
             let Some(sk) = StateKey::parse(key) else {
                 return;
             };
-            let state = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let state = ctx.state_pool[sk];
             let add = (state.floor() * multiplier).round() as i32;
             ctx.operators[idx].limit.add(None, add);
             ctx.operators[idx].limit_contrib += add;
@@ -508,7 +508,7 @@ fn apply_mood_action(ctx: &mut ManuContext<'_>, action: &Action, owner: &str) {
             let Some(sk) = StateKey::parse(key) else {
                 return;
             };
-            let state = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let state = ctx.state_pool[sk];
             if *step_size <= 0.0 {
                 return;
             }
@@ -541,15 +541,15 @@ fn apply_state_write(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) 
                 } else {
                     *amount
                 };
-                *ctx.state_pool.entry(sk).or_insert(0.0) += add;
+                ctx.state_pool[sk] += add;
             }
         }
         Action::StateConvert { from, to, ratio } => {
             let (Some(from_k), Some(to_k)) = (StateKey::parse(from), StateKey::parse(to)) else {
                 return;
             };
-            let src = ctx.state_pool.get(&from_k).copied().unwrap_or(0.0);
-            *ctx.state_pool.entry(to_k).or_insert(0.0) += src * ratio;
+            let src = ctx.state_pool[from_k];
+            ctx.state_pool[to_k] += src * ratio;
         }
         _ => {}
     }
@@ -628,7 +628,7 @@ fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f
             let Some(sk) = StateKey::parse(key) else {
                 return 0.0;
             };
-            let state = ctx.state_pool.get(&sk).copied().unwrap_or(0.0);
+            let state = ctx.state_pool[sk];
             if *div <= 0.0 {
                 0.0
             } else {
