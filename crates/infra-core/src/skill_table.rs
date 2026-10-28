@@ -18,6 +18,7 @@ pub struct SkillTableFile {
 #[derive(Debug, Clone)]
 pub struct SkillTable {
     identity: u64,
+    source_json: Arc<str>,
     by_id: HashMap<String, BuffDenseId>,
     skills: Vec<SkillDef>,
     compiled_atoms: Vec<Arc<[CompiledAtom]>>,
@@ -83,6 +84,7 @@ impl SkillTable {
                 )
                 .map_err(|_| Error::msg("skill_table identity capacity exhausted"))?,
             by_id,
+            source_json: raw.into(),
             skills: file.skills,
             compiled_atoms,
             operator_atoms: Arc::new(Mutex::new(HashMap::new())),
@@ -100,6 +102,11 @@ impl SkillTable {
 
     pub(crate) fn identity(&self) -> u64 {
         self.identity
+    }
+
+    /// 加载时的原文字节；Bake 保守地要求完全相同，不以 hash 代替相等。
+    pub(crate) fn source_json(&self) -> &Arc<str> {
+        &self.source_json
     }
 
     pub fn get_by_dense_id(&self, id: BuffDenseId) -> Option<&SkillDef> {

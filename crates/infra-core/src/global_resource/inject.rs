@@ -107,6 +107,51 @@ enum ManuInjectSlot {
 }
 
 impl GlobalInjectManifest {
+    /// Bake 的静态基线门禁：保留全部业务字段、浮点 bit 和实际求和遍历顺序。
+    /// 这里只比较输入，不改变注入合并或求和机制。
+    pub(crate) fn exact_bake_compatible(&self, other: &Self) -> bool {
+        let same_float =
+            |a: f64, b: f64| a.is_finite() && b.is_finite() && a.to_bits() == b.to_bits();
+        let same_map = |a: &HashMap<String, f64>, b: &HashMap<String, f64>| {
+            a.len() == b.len()
+                && a.iter()
+                    .zip(b.iter())
+                    .all(|((ak, av), (bk, bv))| ak == bk && same_float(*av, *bv))
+        };
+        self == other
+            && same_map(&self.trade_by_family, &other.trade_by_family)
+            && same_map(&self.manu_all_by_family, &other.manu_all_by_family)
+            && same_map(&self.manu_gold_by_family, &other.manu_gold_by_family)
+            && same_map(
+                &self.manu_battle_record_by_family,
+                &other.manu_battle_record_by_family,
+            )
+            && same_map(
+                &self.manu_originium_by_family,
+                &other.manu_originium_by_family,
+            )
+            && self
+                .trade_tagged
+                .iter()
+                .zip(&other.trade_tagged)
+                .all(|(a, b)| same_float(a.value_per_operator, b.value_per_operator))
+            && self
+                .manu_tagged
+                .iter()
+                .zip(&other.manu_tagged)
+                .all(|(a, b)| same_float(a.value, b.value))
+            && self
+                .manu_count_scaled
+                .iter()
+                .zip(&other.manu_count_scaled)
+                .all(|(a, b)| same_float(a.value_per_operator, b.value_per_operator))
+            && match (self.karlan_precision, other.karlan_precision) {
+                (Some(a), Some(b)) => same_float(a.eff_per_karlan, b.eff_per_karlan),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+
     pub fn trade_eff_pct(&self) -> f64 {
         self.trade_eff_pct_by(|rule| rule.resolved_count)
     }

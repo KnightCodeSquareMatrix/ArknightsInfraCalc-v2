@@ -34,11 +34,17 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## Bake
 
-`bake_catalogs` 用 live solver 生成 schema v17 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。行保留贸易 total_efficiency、制造单位与每日产出；v17 以完整运行时身份索引行，不再把同名状态合并。查询按 live 子池顺序与制造仓库比较键重排，signature 状态域未覆盖整个查询池时回退。`bake verify` 对存储行全量重算并比较完整命中，另做确定性子集查询差分；本轮运行验收集中在全部优化完成后。旧 catalog 因 schema 不匹配需重建。`data/baked/` 是首次运行生成的可丢弃数据，已加入 `.gitignore`；取消历史跟踪和删除旧 `aic-baked-save/` 由主代理完成，不以仓库里的旧表作为当前构建的有效依据。
+`bake_catalogs` 用 live solver 生成 schema v17 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。行保留贸易 total_efficiency、制造单位与每日产出；v17 以完整运行时身份索引行，不再把同名状态合并。查询沿 live 子池相对顺序枚举并使用制造仓库比较键，未表示的完整状态或非 canonical 顺序回退。`bake verify` 对存储行全量重算并比较完整命中，另做确定性子集查询差分；本轮运行验收集中在全部优化完成后。旧 catalog 因 schema 不匹配需重建。`data/baked/` 是首次运行生成的可丢弃数据，已加入 `.gitignore`；历史跟踪和旧 `aic-baked-save/` 已移除，不以仓库里的旧表作为当前构建的有效依据。
 
 v17 的 `operator_states` 保存姓名、entry 的精英阶段、有序 buff ID 与标签；`operator_count` 统计状态数，`operator_names` 可以出现重复姓名。全表池从全部实例的贸易/制造设施绑定取姓名，用 E0/E1 tier_0、低星等级解锁以及 E1/E2 tier_up 的五类代表练度逐姓名走真实 pool builder，按完整身份去重；制造所有配方用同一完整变体池。此处扩大的是预计算存储域，生产池准入、standalone 策略和候选集合不变。组合只允许互异姓名；全表 canonical 顺序沿真实 pool 的效率提示降序、姓名升序，再以完整身份确定同名变体次序。行记录该顺序解算的数值；贸易赤金链 helper 重排时，行索引记录实际执行顺序，不能把同一状态集合默认视作可交换输入。
 
-冷加载以完整身份建立 state→entry 索引，核对 canonical 状态集合；两域每个 signature 的存储行集合必须与同名互异且满足实际 legality 的组合身份 tuple 完全相同，signature 的 OR 位图只做覆盖快筛，不证明完整组合覆盖。行级 verify 和完整贸易 API 都按行的完整身份及执行顺序还原，避免逐行按姓名取首项。确定性查询样本每个真人最多抽一个状态，并保留原池相对顺序。本阶段旧热查询仍保守限制原有 E2/心情/班次/layout 边界，另严格匹配完整状态并检查实际执行序；重复真人和未覆盖状态 miss，执行序不同 miss 回 live，不解释为交换等价。低阶及暂未支持执行序的查询差分记入 `BakeVerifyReport.skipped_queries`，其它错误仍报告差分失败；最终完整热查询与传入自定义 SkillTable 的语义匹配还需下一单元接入，本阶段编译不能证明这一闭环。
+冷加载以完整身份建立 state→entry 索引，核对 canonical 状态集合；两域每个 signature 的存储行集合必须与同名互异且满足实际 legality 的组合身份 tuple 完全相同，signature 的 OR 位图只做 verify 样本域快筛，不证明完整组合覆盖。行级 verify 和完整贸易 API 都按行的完整身份及执行顺序还原，避免逐行按姓名取首项。
+
+热查询要求每个真人只出现一次，完整状态在相应设施 canonical 池中，且输入保留该池相对顺序。每个 signature 建立长度 `C(状态数, 容量)` 的 dense colex rank 数组，未存储组合用 sentinel 表示；容量只支持 1–3，组合数、rank 与数组分配均 checked，溢出或分配失败给出可读原因。查询沿 live 的原组合字典序枚举，固定三槽仅复制状态 ID 后排序计算 rank，不改变解算或输出顺序；直接 lookup 取代扫描和排序整张表。最大堆只保留 `top_k.max(1)` 个轻量候选，按贸易效率与原枚举次序、制造效率/仓库/组合姓名次序比较，最后物化 best/top。`evaluated` 仍统计全部通过合法性和必选过滤的组合，`combinations` 保留调用方枚举口径；贸易零命中 miss 回 live，制造保留成功空报告。
+
+E0/E1 状态、full_pool 和有限班次可命中，不再固定 E2、24 心情或 24 小时；心情必须有限且大于零。实际技能中读取 Mood/OwnerMoodGap 或相关条件的池、制造 peer reset 继续 live，包括制造没有指定班次的情形。完整 LayoutContext 必须与 search baseline 相同，含 active_source_buffs；所有可参与计算的浮点值还核对有限性与 bit，静态注入 family map 核对实际遍历顺序和两域聚合结果，动态贸易注入与制造 count-scaled 注入回 live。传入 SkillTable 与 runtime 标准表的原始 JSON 文本逐字节匹配，结果按加载身份缓存；每个 entry 的预编译 atom 还按完整 seq、sort_key、atom 结构及浮点文本比较并缓存，持有 Arc 防止指针复用。制造 `None` 采用已匹配表的正常补编译语义，显式 `Some`（含空）必须与标准状态一致；贸易 legacy 空编译数组即使 live 可补编译，也会保守 miss。该临时 Debug 浮点比较只作表内门禁，不是持久化格式或通用 memo key。
+
+确定性查询样本每个真人最多抽一个状态，并保留原池相对顺序；每批 320 个样本覆盖低阶变体、standalone/full_pool、top-K/必选及有限心情/班次。只对上述已明确不支持的边界计 `BakeVerifyReport.skipped_queries`，CLI 显示该计数；best、top、evaluated、combinations 或实际错误不一致都计差分失败。此阶段完成 fmt 与 release offline 编译，行/查询差分和最终运行验收集中在全部优化完成后；编译不能证明运行等价或性能收益。
 
 Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金产出和单位源石消耗。命中时分别按实时路径用单位值 × `total_efficiency` 复原日产贸易与源石产出；特殊赤金产出再乘 `GSL_GOLD_UNIT_SCALE`，避免把普通订单赤金消耗误报为特殊产金。该恢复不改变候选集合、比较键或排序。
 
