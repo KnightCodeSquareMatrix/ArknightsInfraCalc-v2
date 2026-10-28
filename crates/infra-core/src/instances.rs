@@ -3,8 +3,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::tier::PromotionTier;
+use crate::types::OperatorId;
 
 /// Whether an elite-2 / tier_up binding **upgrades** the tier_0 buffs (stem-matched merge),
 /// or **replaces** them entirely.
@@ -41,7 +42,11 @@ pub struct OperatorInstancesFile {
 
 #[derive(Debug, Clone)]
 pub struct OperatorInstances {
-    instances: HashMap<String, OperatorInstance>,
+    keys: Vec<String>,
+    instances: Vec<OperatorInstance>,
+    by_name: HashMap<String, OperatorId>,
+    names: Vec<String>,
+    by_operator: Vec<[Option<usize>; 2]>,
 }
 
 /// Stem of a buff id before the `[` index suffix, e.g. `trade_ord_spd[010]` → `trade_ord_spd`.
@@ -89,14 +94,68 @@ impl OperatorInstances {
     pub fn load(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path)?;
         let file: OperatorInstancesFile = serde_json::from_str(&raw)?;
+        // Index exact legacy keys rather than trusting the payload's name/tier fields.
+        // This keeps get(name, tier) equivalent to its former name@tier lookup.
+        let mut entries: Vec<_> = file.instances.into_iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut keys = Vec::with_capacity(entries.len());
+        let mut instances = Vec::with_capacity(entries.len());
+        let mut by_name = HashMap::new();
+        let mut names = Vec::new();
+        let mut by_operator: Vec<[Option<usize>; 2]> = Vec::new();
+        for (key, instance) in entries {
+            if let Some((name, tier)) = key.rsplit_once('@') {
+                let tier_index = match tier {
+                    "tier_0" => Some(0),
+                    "tier_up" => Some(1),
+                    _ => None,
+                };
+                if let Some(tier_index) = tier_index {
+                    let id = if let Some(id) = by_name.get(name) {
+                        *id
+                    } else {
+                        let id = OperatorId::try_from(names.len()).map_err(|_| {
+                            Error::msg("operator_instances exceeds u16 operator id capacity")
+                        })?;
+                        by_name.insert(name.to_string(), id);
+                        names.push(name.to_string());
+                        by_operator.push([None, None]);
+                        id
+                    };
+                    by_operator[usize::from(id)][tier_index] = Some(instances.len());
+                }
+            }
+            keys.push(key);
+            instances.push(instance);
+        }
         Ok(Self {
-            instances: file.instances,
+            keys,
+            instances,
+            by_name,
+            names,
+            by_operator,
         })
     }
 
     pub fn get(&self, name: &str, tier: PromotionTier) -> Option<&OperatorInstance> {
-        let key = format!("{}@{}", name, tier.as_str());
-        self.instances.get(&key)
+        self.get_by_id(self.id_of(name)?, tier)
+    }
+
+    pub fn id_of(&self, name: &str) -> Option<OperatorId> {
+        self.by_name.get(name).copied()
+    }
+
+    pub fn name_of(&self, id: OperatorId) -> Option<&str> {
+        self.names.get(usize::from(id)).map(String::as_str)
+    }
+
+    pub fn get_by_id(&self, id: OperatorId, tier: PromotionTier) -> Option<&OperatorInstance> {
+        let tier_index = match tier {
+            PromotionTier::Tier0 => 0,
+            PromotionTier::TierUp => 1,
+        };
+        let index = self.by_operator.get(usize::from(id))?[tier_index]?;
+        self.instances.get(index)
     }
 
     pub fn tags_for(&self, name: &str, tier: PromotionTier) -> Vec<String> {
@@ -108,7 +167,7 @@ impl OperatorInstances {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &OperatorInstance)> {
-        self.instances.iter()
+        self.keys.iter().zip(&self.instances)
     }
 
     pub fn resolve_trade_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {

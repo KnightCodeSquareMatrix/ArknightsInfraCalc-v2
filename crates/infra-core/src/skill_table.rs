@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
-use crate::types::SkillDef;
+use crate::types::{BuffDenseId, CompiledAtom, SkillDef};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SkillTableFile {
@@ -16,16 +17,23 @@ pub struct SkillTableFile {
 
 #[derive(Debug, Clone)]
 pub struct SkillTable {
-    by_id: HashMap<String, SkillDef>,
+    identity: u64,
+    by_id: HashMap<String, BuffDenseId>,
     skills: Vec<SkillDef>,
+    compiled_atoms: Vec<Arc<[CompiledAtom]>>,
+    operator_atoms: Arc<Mutex<HashMap<Vec<String>, Arc<[CompiledAtom]>>>>,
 }
 
 impl SkillTable {
     pub fn load(path: &Path) -> Result<Self> {
+        static NEXT_IDENTITY: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let raw = std::fs::read_to_string(path)?;
         let file: SkillTableFile = serde_json::from_str(&raw)?;
         let mut by_id = HashMap::new();
-        for skill in &file.skills {
+        let mut compiled_atoms = Vec::with_capacity(file.skills.len());
+        for (index, skill) in file.skills.iter().enumerate() {
+            let dense_id = BuffDenseId::try_from(index)
+                .map_err(|_| Error::msg("skill_table exceeds u16 dense id capacity"))?;
             if skill.id.starts_with("skill_") {
                 return Err(Error::msg(format!(
                     "skill_table id {} uses legacy skill_* namespace; use unpack buff_id",
@@ -48,18 +56,92 @@ impl SkillTable {
                     )));
                 }
             }
-            if by_id.insert(skill.id.clone(), skill.clone()).is_some() {
+            if by_id.insert(skill.id.clone(), dense_id).is_some() {
                 return Err(Error::msg(format!("duplicate skill id {}", skill.id)));
             }
+            let mut atoms: Vec<_> = skill
+                .atoms
+                .iter()
+                .enumerate()
+                .map(|(seq, atom)| CompiledAtom {
+                    atom: atom.clone(),
+                    sort_key: (atom.phase.sort_key(), atom.phase_order),
+                    // Preserve the existing compiler's saturating sequence ordering.
+                    seq: u16::try_from(seq).unwrap_or(u16::MAX),
+                })
+                .collect();
+            atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
+            compiled_atoms.push(atoms.into());
         }
         Ok(Self {
+            identity: NEXT_IDENTITY
+                .fetch_update(
+                    std::sync::atomic::Ordering::Relaxed,
+                    std::sync::atomic::Ordering::Relaxed,
+                    |id| id.checked_add(1),
+                )
+                .map_err(|_| Error::msg("skill_table identity capacity exhausted"))?,
             by_id,
             skills: file.skills,
+            compiled_atoms,
+            operator_atoms: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
     pub fn get(&self, id: &str) -> Option<&SkillDef> {
-        self.by_id.get(id)
+        self.get_by_dense_id(self.dense_id_of(id)?)
+    }
+
+    pub fn dense_id_of(&self, id: &str) -> Option<BuffDenseId> {
+        self.by_id.get(id).copied()
+    }
+
+    pub(crate) fn identity(&self) -> u64 {
+        self.identity
+    }
+
+    pub fn get_by_dense_id(&self, id: BuffDenseId) -> Option<&SkillDef> {
+        self.skills.get(usize::from(id))
+    }
+
+    pub fn compiled_atoms_by_dense_id(&self, id: BuffDenseId) -> Option<&Arc<[CompiledAtom]>> {
+        self.compiled_atoms.get(usize::from(id))
+    }
+
+    /// Compile each ordered buff sequence once per loaded table. Unknown ids remain skipped.
+    pub fn compile_operator_atoms(&self, buff_ids: &[String]) -> Arc<[CompiledAtom]> {
+        let mut cache = self
+            .operator_atoms
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(atoms) = cache.get(buff_ids) {
+            return Arc::clone(atoms);
+        }
+        let atoms = if let [id] = buff_ids {
+            self.dense_id_of(id)
+                .and_then(|id| self.compiled_atoms_by_dense_id(id))
+                .cloned()
+                .unwrap_or_else(|| Arc::from([]))
+        } else {
+            let mut atoms = Vec::new();
+            let mut offset = 0usize;
+            for id in buff_ids {
+                let Some(id) = self.dense_id_of(id) else {
+                    continue;
+                };
+                for compiled in self.compiled_atoms[usize::from(id)].iter() {
+                    let mut compiled = compiled.clone();
+                    compiled.seq = u16::try_from(offset.saturating_add(usize::from(compiled.seq)))
+                        .unwrap_or(u16::MAX);
+                    atoms.push(compiled);
+                }
+                offset = offset.saturating_add(self.skills[usize::from(id)].atoms.len());
+            }
+            atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
+            atoms.into()
+        };
+        cache.insert(buff_ids.to_vec(), Arc::clone(&atoms));
+        atoms
     }
 
     pub fn skills(&self) -> &[SkillDef] {
@@ -67,7 +149,7 @@ impl SkillTable {
     }
 
     pub fn index_of(&self, id: &str) -> Option<usize> {
-        self.skills.iter().position(|s| s.id == id)
+        self.dense_id_of(id).map(usize::from)
     }
 
     pub fn resolve_indices(&self, ids: &[String]) -> Result<Vec<usize>> {

@@ -13,25 +13,9 @@ use crate::layout::tier::OperatorTier;
 
 use super::base::{build_roster_pool, filter_pool, HasName, HasProgress, PoolCore, TierTagged};
 
-/// 建池时按 buff 展开并排序 atom，供 solve 热路径归并。
+/// 从当前技能表的加载期缓存取得按 buff 顺序编译的 atoms。
 pub fn compile_operator_atoms(buff_ids: &[String], table: &SkillTable) -> Arc<[CompiledAtom]> {
-    let mut atoms = Vec::new();
-    let mut seq = 0u16;
-    for bid in buff_ids {
-        let Some(skill) = table.get(bid) else {
-            continue;
-        };
-        for atom in &skill.atoms {
-            atoms.push(CompiledAtom {
-                atom: atom.clone(),
-                sort_key: (atom.phase.sort_key(), atom.phase_order),
-                seq,
-            });
-            seq = seq.saturating_add(1);
-        }
-    }
-    atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
-    atoms.into()
+    table.compile_operator_atoms(buff_ids)
 }
 
 /// 贸易站精0 孑（摊贩）；轮换余量班强制用此带队，无视 operbox 更高练度。
@@ -318,7 +302,10 @@ fn try_entry(
     let mut flat_eff_hint = 0.0;
     let mut is_mechanic = false;
     for bid in &buff_ids {
-        let Some(skill) = table.get(bid) else {
+        let Some(skill) = table
+            .dense_id_of(bid)
+            .and_then(|id| table.get_by_dense_id(id))
+        else {
             return Err(PoolSkip::UnmodeledBuff(bid.clone()));
         };
         if is_excluded_trade_search_mechanic(skill) {

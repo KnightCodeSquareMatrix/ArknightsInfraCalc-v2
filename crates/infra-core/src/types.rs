@@ -431,7 +431,13 @@ pub struct EffectAtom {
     pub scope: AtomScope,
 }
 
-/// 建池时预编译的单条 atom（含排序键，供 solve 时 k 路归并）。
+/// 当前加载的技能表内编号；随运行时数据重新加载，不是持久化标识。
+pub type BuffDenseId = u16;
+
+/// 当前加载的干员表内姓名编号；档位由调用方单独提供。
+pub type OperatorId = u16;
+
+/// 加载期预编译的单条 atom（含排序键，供 solve 时 k 路归并）。
 #[derive(Debug, Clone)]
 pub struct CompiledAtom {
     pub atom: EffectAtom,

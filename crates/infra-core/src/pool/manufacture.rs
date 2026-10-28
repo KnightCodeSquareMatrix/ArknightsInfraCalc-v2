@@ -112,7 +112,10 @@ fn try_entry(
     let mut flat_eff_hint = 0.0;
     let mut has_l2_delegate = false;
     for bid in &buff_ids {
-        let Some(skill) = table.get(bid) else {
+        let Some(skill) = table
+            .dense_id_of(bid)
+            .and_then(|id| table.get_by_dense_id(id))
+        else {
             return Err(PoolSkip::UnmodeledBuff(bid.clone()));
         };
         if skill.facility != "manufacture" {
