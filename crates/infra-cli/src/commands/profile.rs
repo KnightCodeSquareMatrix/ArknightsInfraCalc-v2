@@ -196,6 +196,7 @@ fn run_layout_full(
     table: &SkillTable,
     top_k: usize,
 ) -> Result<RunProfile, Error> {
+    let _memo_scope = infra_core::search::ensure_search_memo_scope();
     let _trace = infra_core::profile::start_solver_perf_trace(layout_label, operbox_label);
     reset_hot_path_counters();
     let total_start = Instant::now();

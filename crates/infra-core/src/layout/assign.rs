@@ -272,6 +272,7 @@ pub fn assign_shift_with_plan(
     mode: AssignShiftMode,
     seed: &BaseAssignment,
 ) -> Result<AssignShiftResult> {
+    let _memo_scope = crate::search::ensure_search_memo_scope();
     let mut result = assign_shift_with_plan_skip(
         blueprint,
         operbox,
@@ -503,6 +504,7 @@ pub(crate) fn assign_shift_with_preclaimed_plan<F>(
 where
     F: FnMut(&mut AssignmentPlan) -> Result<()>,
 {
+    let _memo_scope = crate::search::ensure_search_memo_scope();
     blueprint.validate()?;
 
     let mut skip_system_ids = skip_system_ids.clone();

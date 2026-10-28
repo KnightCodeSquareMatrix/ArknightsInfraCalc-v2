@@ -192,6 +192,7 @@ fn compute_plan_attempt(
     input: PlanComputeInput<'_>,
     requested: RequestedOutputs,
 ) -> PlanComputeAttempt {
+    let _memo_scope = infra_core::search::ensure_search_memo_scope();
     let _trace =
         infra_core::profile::ensure_solver_perf_trace(input.layout_label, input.operbox_label);
     let total_started = Instant::now();

@@ -6844,6 +6844,7 @@ fn schedule_abc_rotation_candidates_with_timing(
     profile: TimedRotationProfile,
     input_order_offset: Option<usize>,
 ) -> Result<TeamRotationReport> {
+    let _memo_scope = crate::search::ensure_search_memo_scope();
     let a_eligible = fiammetta_a_eligible(blueprint, operbox);
     let b_eligible = fiammetta_b_eligible(blueprint, operbox, instances, table)?;
     let finish_candidate = |mut report: TeamRotationReport, fiammetta_enable: bool| {
@@ -7260,6 +7261,7 @@ pub fn schedule_timed_rotation_request(
     options: &AssignBaseOptions,
     request: super::rotation_types::TimedRotationRequest,
 ) -> Result<TeamRotationReport> {
+    let _memo_scope = crate::search::ensure_search_memo_scope();
     request.validate_duration_input()?;
     let request = request.preserve_named_timing();
     let started = Instant::now();

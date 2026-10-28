@@ -69,3 +69,5 @@ runtime、CLI 默认输出和 debug 的 manifest 发现共用 `default_baked_out
 黑键—巫恋产品禁配只在读取已验证完整的贸易 Bake 表时过滤，先排除非法行再取前 K 条；它本身不造成 `Required` miss。其他未表示的同站禁配仍由 `Auto` 回 live、`Required` 报错。catalog 的可执行文件指纹失效时，`Auto` 首次尝试重建，`Required` 照常 miss，不能拿旧表证明命中。
 
 核验：`bake validate`、`bake verify`、`infra-cli verify`，并记录输入、组合数、evaluated 和命中模式。候选/剪枝/Bake 改动还要运行最终 assignment invariant gate。
+
+请求scope覆盖整个 `schedule_timed_rotation_request`、ABC候选共同入口、独立assignment入口以及CLI单次plan/profile run；嵌套搜索只复用外层scope。因此N/A/B候选、控制中枢重建和各房间搜索可复用完整输入一致的叶报告，请求结束即释放；不传播到Rayon组合评估线程，不跨请求缓存。此阶段仅编译，真实命中率及性能留最终统一包。
