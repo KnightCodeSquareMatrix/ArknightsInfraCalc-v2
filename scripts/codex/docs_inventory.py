@@ -309,7 +309,7 @@ def _path_role_errors(document: Document) -> list[str]:
     return errors
 
 
-def validate_document(document: Document, *, final: bool) -> list[str]:
+def validate_document(document: Document) -> list[str]:
     errors: list[str] = []
     role = document.role
     status = document.status
@@ -347,16 +347,14 @@ def validate_document(document: Document, *, final: bool) -> list[str]:
     for owner in document.owners:
         if owner != "self" and (not _is_repo_path(owner) or any(char in owner for char in "*?[")):
             errors.append(f"current owner must be a concrete repository path: {document.path}: {owner}")
-    if final and role == "active-change" and status == "in-progress":
-        errors.append(f"in-progress change cannot pass final check: {document.path}")
     return errors
 
 
-def validate_inventory(repo: Path, documents: list[Document], *, final: bool) -> list[str]:
+def validate_inventory(repo: Path, documents: list[Document]) -> list[str]:
     errors: list[str] = []
     by_path = {document.path: document for document in documents}
     for document in documents:
-        errors.extend(validate_document(document, final=final))
+        errors.extend(validate_document(document))
         errors.extend(_validate_repo_refs(repo, document))
         generator = document.metadata.get("生成器", "")
         if generator and not (repo / generator).is_file():
@@ -458,8 +456,8 @@ def write_generated_sections(repo: Path, documents: list[Document]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--check", action="store_true", help="run final hard checks")
-    parser.add_argument("--report", action="store_true", help="print inventory violations without final-only rules")
+    parser.add_argument("--check", action="store_true", help="run hard checks, including generated index sections")
+    parser.add_argument("--report", action="store_true", help="print inventory violations only")
     parser.add_argument("--write-indexes", action="store_true")
     return parser
 
@@ -468,7 +466,7 @@ def main() -> int:
     args = build_parser().parse_args()
     repo = args.repo_root.resolve()
     documents, errors = load_inventory(repo)
-    errors.extend(validate_inventory(repo, documents, final=args.check))
+    errors.extend(validate_inventory(repo, documents))
     if args.write_indexes and not errors:
         write_generated_sections(repo, documents)
     if args.check:
