@@ -76,7 +76,7 @@
 
 | 项 | 内容 | 状态 |
 |---|---|---|
-| A 修工具层门禁 | `docs_inventory.py` 增加 `--allow-in-progress`，语义与 `check_repository_facts.py` 一致，并补单元测试；CI 只在目标为 main 的 PR 上跑 final 检查；修复 3 个过时的工具测试；去掉 owner 校验里已不会触发的兼容分支；同步更新生命周期 §7、CONTRIBUTING、`scripts/codex/README.md`、AGENTS.md 中的检查命令 | 已完成，待提交 |
+| A 修工具层门禁 | `docs_inventory.py` 增加 `--allow-in-progress`，语义与 `check_repository_facts.py` 一致，并补单元测试；CI 只在目标为 main 的 PR 上跑 final 检查；修复 3 个过时的工具测试；去掉 owner 校验里已不会触发的兼容分支；同步更新生命周期 §7、CONTRIBUTING、`scripts/codex/README.md`、AGENTS.md 中的检查命令 | 已被取代：2026-10-28 用户裁决删除“进行中文档不能通过检查”的要求（提交 184196b），`--allow-in-progress` 不再需要；合入 main 时已撤回该参数 |
 | B 规则可达 | 把其余 7 个 skill 链接进 `.claude/skills/`，校验 symlink 可解析、`name` 与目录名一致；从 `opencode.json` 删除 `plan-reviewer` | 已完成，待提交；`/skills`、`/agents` 需在新会话确认 |
 | C 硬约束补来源 | 逐条追查 AGENTS.md“硬约束”9 条的来源，整理成表交给用户，由用户决定每条保留、降为默认工作方式还是删除 | 调查中 |
 | D 复审检查文档同步 | `arknights-intent-review` 的第 3 问把 owner 文档列为下游；收集事实一步增加“owner 文档”调查 | 已完成，待提交 |

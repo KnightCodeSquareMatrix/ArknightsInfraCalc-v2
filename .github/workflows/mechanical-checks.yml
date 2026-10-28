@@ -33,21 +33,11 @@ jobs:
       - name: Run Codex tooling tests
         run: python3 -m unittest discover -s scripts/codex/tests -p 'test_*.py' -v
 
-      # in-progress active changes may live on working branches; only PRs into main must be final.
-      - name: Select documentation final mode
-        id: docs-mode
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" = "main" ]; then
-            echo "flag=" >> "$GITHUB_OUTPUT"
-          else
-            echo "flag=--allow-in-progress" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Check stable Markdown and CLI facts
-        run: python3 scripts/codex/check_repository_facts.py ${{ steps.docs-mode.outputs.flag }}
+        run: python3 scripts/codex/check_repository_facts.py
 
       - name: Check Agent documentation indexes
         run: python3 scripts/codex/generate_agent_index.py --check
 
       - name: Check documentation lifecycle
-        run: python3 scripts/codex/docs_inventory.py --check ${{ steps.docs-mode.outputs.flag }}
+        run: python3 scripts/codex/docs_inventory.py --check

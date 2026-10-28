@@ -44,8 +44,8 @@ scripts/codex/compare_test_failures.py \
 ## 完成检查
 
 ```bash
-python3 scripts/codex/docs_inventory.py --check --allow-in-progress
-python3 scripts/codex/check_repository_facts.py --allow-in-progress
+python3 scripts/codex/docs_inventory.py --check
+python3 scripts/codex/check_repository_facts.py
 scripts/codex/check_task_scope.py --manifest target/codex-runs/<task>/manifest.json
 scripts/codex/render_evidence.py \
   --manifest target/codex-runs/<task>/manifest.json \
