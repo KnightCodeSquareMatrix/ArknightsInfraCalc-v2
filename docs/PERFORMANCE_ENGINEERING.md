@@ -21,7 +21,7 @@
 
 ## Bake 生命周期
 
-`BAKE_SCHEMA_VERSION` 当前为 13。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存输入文件 fingerprint、生成选项、schema 和 row hash。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝。
+`BAKE_SCHEMA_VERSION` 当前为 15。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存输入文件 fingerprint、生成选项、schema 和 row hash。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝。
 
 运行时 `BakeMode::Auto` 命中兼容行，否则回退 live；`Disabled` 永不读取；`Required` 对任何 miss/error 失败。Bake 生成期间禁止自读生成物。`bake verify` 用 live solver 对 signature 的首/中/尾响应抽样对账；生成物不能手工改成语义来源。
 
