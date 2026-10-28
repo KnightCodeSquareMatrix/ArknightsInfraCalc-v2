@@ -9,7 +9,7 @@ use infra_core::layout::BaseBlueprint;
 use infra_core::operbox::{OperBox, OperBoxEntry};
 use infra_core::schedule::{TeamRotationReport, TimedRotationProfile, TimedRotationRequest};
 use infra_core::skill_table::{data_path, default_skill_table_path, SkillTable};
-use infra_core::Error;
+use infra_core::{default_baked_out_dir, resolved_baked_catalog_dir, Error};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -1032,14 +1032,22 @@ fn current_runtime_fingerprint() -> CurrentRuntimeFingerprint {
     };
     let catalogs = RUNTIME_CATALOGS
         .iter()
-        .map(|name| match data_path(name) {
-            Ok(path) => fingerprint_path(name, &path),
-            Err(error) => FingerprintEntry {
-                name: (*name).to_string(),
-                resolved_path: None,
-                sha256: None,
-                error: Some(error.to_string()),
-            },
+        .map(|name| {
+            match if *name == "baked/manifest.json" {
+                default_baked_out_dir()
+                    .and_then(|root| resolved_baked_catalog_dir(&root))
+                    .map(|generation| generation.join("manifest.json"))
+            } else {
+                data_path(name)
+            } {
+                Ok(path) => fingerprint_path(name, &path),
+                Err(error) => FingerprintEntry {
+                    name: (*name).to_string(),
+                    resolved_path: None,
+                    sha256: None,
+                    error: Some(error.to_string()),
+                },
+            }
         })
         .collect();
     CurrentRuntimeFingerprint {

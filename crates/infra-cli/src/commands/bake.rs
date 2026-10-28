@@ -1,9 +1,10 @@
 use std::path::PathBuf;
-use std::{env, fs, hash::Hash, hash::Hasher, sync::Arc};
+use std::sync::Arc;
 
 use infra_core::{
-    bake_catalogs, default_baked_out_dir, validate_baked_catalog, verify_baked_catalog_responses,
-    BakeGeneratorFingerprint, BakeOptions, BakeProgressEvent, Error,
+    bake_and_publish_catalogs, bake_catalogs, current_exe_generator_fingerprint,
+    default_baked_out_dir, validate_baked_catalog, verify_baked_catalog_responses, BakeOptions,
+    BakeProgressEvent, Error,
 };
 
 use super::verify::run_all_regressions;
@@ -83,7 +84,7 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         ));
     }
 
-    let generator = current_generator_fingerprint()?;
+    let generator = current_exe_generator_fingerprint()?;
     if validate_only || verify_only {
         validate_baked_catalog(&options.out_dir, &generator)?;
         eprintln!(
@@ -125,7 +126,11 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         _ => unreachable!(),
     }
 
-    let report = bake_catalogs(&options)?;
+    let report = if options.limit_per_signature.is_some() {
+        bake_catalogs(&options)?
+    } else {
+        bake_and_publish_catalogs(&options)?
+    };
     eprintln!(
         "baked operators={} trade_signatures={} trade_hits={} trade_mechanism_rows={} trade_mechanism_signatures={} manufacture_signatures={} manufacture_hits={} elapsed={}ms -> {}",
         report.operator_count,
@@ -207,17 +212,4 @@ fn print_bake_progress(event: BakeProgressEvent) {
             eprintln!("[bake] done combo_table_rows={combo_table_rows} elapsed={elapsed_ms}ms");
         }
     }
-}
-
-fn current_generator_fingerprint() -> Result<BakeGeneratorFingerprint, Error> {
-    let path = env::current_exe()?;
-    let bytes = fs::read(&path)?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    Ok(BakeGeneratorFingerprint {
-        kind: "infra-cli-exe".to_string(),
-        path: path.to_string_lossy().to_string(),
-        bytes: bytes.len() as u64,
-        hash64: format!("{:016x}", hasher.finish()),
-    })
 }

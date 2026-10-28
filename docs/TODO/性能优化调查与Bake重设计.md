@@ -11,7 +11,8 @@
 
 - **已写并静态复核，最终运行验收待完成**：U1a 涉及 `crates/infra-cli/src/commands/bake.rs`、`crates/infra-core/src/bake.rs`、`crates/infra-core/src/search/manufacture.rs`、`crates/infra-core/src/search/trade.rs` 四个文件。制造 helper 的静态等价与排序键合理性已有静态判断；响应顺序尚未普遍证明，不能据此声明 U1a 已验收。
 - **基线已冻结**：当前版本 baseline 已完成四种轮换及全精二产物采集。基础日志汇总已实现（4d057a3），批次计数与阶段归因已实现并编译，运行验证留最终版本。新基线根目录为 `/tmp/perf-current-20261028`，冻结当前工作树（含未提交 U1a）；是否已完成构建与运行，以该目录实际证据和主代理交接为准。旧 e976b1a 基线保留为历史参考，不再作为本轮最终对拍基准。
-- **明确未开始**：U1b～U6。下一步推进 U1b，中途不做逐单元验收，最终统一对拍与复审。
+- **U1b 运行时再生已实现并 release 编译，最终运行验收待主代理汇总**：Auto 缺表/失效一次 live 生成与全量核心 verify，exe 指纹和加载失败进程缓存，generation + CURRENT 原子发布与不等待跨进程锁，Required 保持严格只读 miss；CLI/debug 与完整 API 共用 CURRENT 解析。生成失败只 stderr 一次原因，miss 类别 `[perf]` 计数留下一小单元。`.gitignore` 已加入 `data/baked/`，取消跟踪及旧 `aic-baked-save/` 删除仍待主代理执行。未运行 Bake、solver 或对拍。
+- **明确未开始**：U2～U6及 U1b miss 计数。中途不做逐单元验收，最终统一对拍与复审。
 - 已完成的周边清理（主代理交接记录）：删除 GPT 测试的提交为 `0d8b935`；Python 测试、无引用 fixture 与文档中的 `cargo test` 引用已删除，CI 改用 `cargo check --workspace`。仓库不再新增源码测试。
 - 两班与三班使用泛型入口。CLI rotation 接受 `3`、`2`、`12/12/12`、`24/24`、`main-backup@H1/H2`、`abc@H1/H2/H3`；`abc_12_6_6` 仅是 wire/profile 字段。相关 `SCHEDULE_ROTATION`、`MAINTENANCE_MODE` 与报错文字已纠正（主代理交接记录）。
 - CRLF/LF 与三条既有警告不在本轮处理；`box-bundles` 已复制到 main 工作树，但不入库。顺手相关小修直接推进；大调查拆成只答具体事实的子问题，15 次工具调用限额，报告必须读取并核对（§6.1）。长期 memory 已存，不在本页复制。
@@ -171,8 +172,8 @@
 - **U1a 命中结果补全与全量对账（先做，不改变生产输出）**：现有 Bake 命中结果与 live 不是逐字段一致（§3.7：制造的 `unit_output_per_day`/`output_per_day` 为 0，排序末级键不同等）。在让表“生效”之前，先让 `row_to_trade_hit` 与制造对应函数产出的命中结构和 live 的 `eval_combo_hit` 逐字段相等（缺的字段要么存进行里，要么用函数从行数据重算），排序改成 live 的比较规则；再把 `bake verify` 扩成**全量对账**：对每个 signature 的每一行，用 live 搜索路径重建同一组合的命中结构并整体比较，任何不一致都使生成或校验失败并列出前若干条。因为现在表在生产里从不生效，这一步不改变任何输出。
 - **U1b 让表生效、可见、可再生（依赖 U1a）**：
   - 指纹**保留可执行文件哈希与输入数据指纹**。上一版文档写的“改成输入内容哈希”作废：表现在不再提交，而是首次运行时按当前构建生成，exe 哈希正好防住“求解器逻辑改了但表没重算”，只看输入文件会漏掉这种情况。指纹在进程内只算一次，失败结果同样缓存；输入数据指纹继续覆盖运行期数据替换。
-  - 表缺失或失效时（`BakeMode::Auto`），先置位 `RUNTIME_BAKE_IN_PROGRESS`，用 live solver 生成到临时目录，校验通过后原子改名到目标；并发进程竞争时，输的一方发现目标已有效就丢弃自己的结果。目标目录不可写则本进程放弃 Bake、回退 live，并记录原因。
-  - miss 原因按类别计数，输出在 `[perf]` 汇总里，不再静默。
+  - 表缺失或失效时（`BakeMode::Auto`），先置位 `RUNTIME_BAKE_IN_PROGRESS`，用 live solver 生成到独立 generation 目录，校验通过后只读，再用临时 CURRENT 指针原子 rename 发布；并发进程竞争时，输的一方发现目标已有效就丢弃自己的结果。目标目录不可写则本进程放弃 Bake、回退 live，并记录原因。
+  - miss 原因按类别计数，输出在 `[perf]` 汇总里，不再静默（运行时再生先落一次失败原因日志，类别计数留下一小单元）。
   - `data/baked/` 加入 `.gitignore`，`git rm --cached` 取消跟踪 12 个文件（历史里仍可找回），schema 4 旧目录 `aic-baked-save/` 删除。
   - **风险**：表一旦生效，满足条件的查询（例如全精二 box 的 24/24 主班）会真正命中；若 U1a 没做完，不完整的命中结果会进入产出。所以 U1b 必须在 U1a 之后，且对拍要加入 `data/fixtures/243/operbox_full_e2.json`（现有 38 个 box 都含非精二干员，碰不到命中路径）。
 - **U2 编号化与定长表**：为干员与 buff 建稠密 `u16` 编号，热路径用数组下标代替字符串与 `HashMap`。具体生成方式（`build.rs` 或加载期）取决于 §3.8 的结论与 §8-2。先做贸易：`TradeContext::from_room` 去掉克隆，`current_room_tag_counts` 改定长数组；再把制造的原子展开挪到建池时预编译，与贸易对齐，最后删旧路径。

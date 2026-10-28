@@ -34,12 +34,16 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## Bake
 
-`bake_catalogs` 用 live solver 生成 schema v16 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。v16 行补全贸易 total_efficiency、制造单位与每日产出；查询按 live 子池顺序与制造仓库比较键重排，signature 干员域未覆盖整个查询池时回退。`bake verify` 对存储行全量重算并比较完整命中，另做确定性子集查询差分；本轮运行验收集中在全部优化完成后。旧 catalog 因 schema 不匹配需重建；当前 `data/baked/` 的运行 catalog 是仓库跟踪数据，schema 变更后必须同步重建。
+`bake_catalogs` 用 live solver 生成 schema v16 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。v16 行补全贸易 total_efficiency、制造单位与每日产出；查询按 live 子池顺序与制造仓库比较键重排，signature 干员域未覆盖整个查询池时回退。`bake verify` 对存储行全量重算并比较完整命中，另做确定性子集查询差分；本轮运行验收集中在全部优化完成后。旧 catalog 因 schema 不匹配需重建。`data/baked/` 是首次运行生成的可丢弃数据，已加入 `.gitignore`；取消历史跟踪和删除旧 `aic-baked-save/` 由主代理完成，不以仓库里的旧表作为当前构建的有效依据。
 
 Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金产出和单位源石消耗。命中时分别按实时路径用单位值 × `total_efficiency` 复原日产贸易与源石产出；特殊赤金产出再乘 `GSL_GOLD_UNIT_SCALE`，避免把普通订单赤金消耗误报为特殊产金。该恢复不改变候选集合、比较键或排序。
 
-`BakeMode::Auto` 不兼容就回 live，`Disabled` 禁用，`Required` 对 miss 失败。生成物不可手工编辑为规则。
+`BakeMode::Auto` 对不兼容查询回 live；首次兼容查询（或 `warm_runtime_baked_table`）加载缺失/失效表时，用显式 `Disabled` 的 live 路径生成完整 catalog 并做核心全量行校验与查询差分。该过程不调用 CLI 的 `run_all_regressions`。生成期间 RAII 标记禁止递归自读；同进程初始化与失败原因由 `OnceLock` 缓存，失败只在 stderr 简短报告一次后回 live。`Disabled` 禁用；`Required` 只加载有效表、对任何 miss 失败，自身不生成。可执行文件 hash（含读取失败）在进程内只计算一次，继续保留输入文件指纹；进程已加载成功的内存表不会随运行中数据替换自动重载，新加载和显式校验仍会验证输入指纹。生成物不可手工编辑为规则。
 
-黑键—巫恋产品禁配只在读取已验证完整的贸易 Bake 表时过滤，先排除非法行再取前 K 条；它本身不造成 `Required` miss。其他未表示的同站禁配仍由 `Auto` 回 live、`Required` 报错。catalog 的可执行文件指纹失效时照常 miss，需另行重建，不能拿旧表证明命中。
+生成写入 `baked/gen-<unique-id>/`，全部核心校验通过后冻结该目录及文件，再在短发布锁下复核目标，把临时指针文件原子 rename 成 `baked/CURRENT`。既有非空 `baked/` 和旧 generation 都不被原地替换。并发输方发现目标已有效就丢弃自己的 generation；锁不可取时不等待，尝试加载已完成的胜方，否则本进程回 live。失败/不可写不改变求解结果，不发布 limited catalog。已发布的 generation 保留给读取者；进程异常终止可能留下未引用 generation 或发布锁，仍可读取有效 CURRENT，未有有效表时保守回 live。
+
+runtime、CLI 默认输出和 debug 的 manifest 发现共用 `default_baked_out_dir`，所有校验/verify/完整贸易 API 由同一 owner 解析 CURRENT。CURRENT 仅接受一个子目录名，并校验实际目录未越过根目录；没有 CURRENT 时兼容旧平铺 catalog。目录发现先按环境变量 `ARKNIGHTS_INFRA_DATA_DIR`、exe 同目录 `data`、exe 父目录 `data`、当前工作目录 `data` 的顺序选已有 CURRENT/manifest；全部缺失时取第一根。这保留既有默认输出规则：仓库中有旧 `data/baked/manifest.json` 时仍选它；全部删除且无环境变量时 `target/release/infra-cli` 首次生成位置是 `target/release/data/baked`，设置环境变量且无其他已有表时生成到该变量的 `baked` 子目录。环境变量并非对既有 Bake 目录的强制覆盖。CLI 完整生成走同一核心发布 API，limited 生成只允许写独立非 CURRENT 目录，之后原有完整校验仍会拒绝该 limited 表。
+
+黑键—巫恋产品禁配只在读取已验证完整的贸易 Bake 表时过滤，先排除非法行再取前 K 条；它本身不造成 `Required` miss。其他未表示的同站禁配仍由 `Auto` 回 live、`Required` 报错。catalog 的可执行文件指纹失效时，`Auto` 首次尝试重建，`Required` 照常 miss，不能拿旧表证明命中。
 
 核验：`bake validate`、`bake verify`、`infra-cli verify`，并记录输入、组合数、evaluated 和命中模式。候选/剪枝/Bake 改动还要运行最终 assignment invariant gate。

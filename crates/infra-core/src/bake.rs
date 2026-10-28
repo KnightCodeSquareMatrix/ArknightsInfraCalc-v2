@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
-use std::io::BufWriter;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::io::{BufWriter, Write};
+use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::time::Instant;
 use std::time::Instant as StdInstant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -95,7 +95,7 @@ pub fn default_baked_out_dir() -> Result<PathBuf> {
     let roots = default_baked_data_roots()?;
     for root in &roots {
         let out_dir = root.join("baked");
-        if out_dir.join("manifest.json").exists() {
+        if out_dir.join("CURRENT").exists() || out_dir.join("manifest.json").exists() {
             return Ok(out_dir);
         }
     }
@@ -104,6 +104,36 @@ pub fn default_baked_out_dir() -> Result<PathBuf> {
         .next()
         .unwrap_or_else(|| PathBuf::from("data"))
         .join("baked"))
+}
+
+/// Resolve an atomically published generation, or a legacy flat catalog.
+/// CURRENT accepts exactly one directory name; symlinks may not escape the root.
+pub fn resolved_baked_catalog_dir(out_dir: &Path) -> Result<PathBuf> {
+    let pointer = out_dir.join("CURRENT");
+    let name = match fs::read_to_string(&pointer) {
+        Ok(name) => name,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(out_dir.to_path_buf());
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let name = name.trim();
+    let mut components = Path::new(name).components();
+    if name.is_empty()
+        || name.contains(['/', '\\'])
+        || !matches!(components.next(), Some(Component::Normal(_)))
+        || components.next().is_some()
+    {
+        return Err(Error::msg("invalid baked CURRENT generation name"));
+    }
+    let root = fs::canonicalize(out_dir)?;
+    let generation = fs::canonicalize(out_dir.join(name))?;
+    if generation.parent() != Some(root.as_path()) || !generation.is_dir() {
+        return Err(Error::msg(
+            "baked CURRENT generation escapes catalog directory",
+        ));
+    }
+    Ok(generation)
 }
 
 fn default_baked_data_roots() -> Result<Vec<PathBuf>> {
@@ -682,6 +712,11 @@ impl From<OperatorProgress> for OperatorProgressJson {
 
 pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
     let start = Instant::now();
+    if options.out_dir.join("CURRENT").exists() {
+        return Err(Error::msg(
+            "use bake_and_publish_catalogs to replace a published catalog",
+        ));
+    }
     fs::create_dir_all(&options.out_dir)?;
 
     let instances_path = default_instances_path()?;
@@ -845,6 +880,130 @@ pub fn bake_catalogs(options: &BakeOptions) -> Result<BakeReport> {
             elapsed_ms: start.elapsed().as_millis(),
         },
     );
+    Ok(report)
+}
+
+/// Generate and fully verify a fresh immutable generation, then atomically
+/// publish CURRENT. Never replaces or edits the generation readers are using.
+pub fn bake_and_publish_catalogs(options: &BakeOptions) -> Result<BakeReport> {
+    publish_baked_catalogs(options, false)
+}
+
+struct BakeGeneration {
+    path: PathBuf,
+    published: bool,
+}
+
+impl Drop for BakeGeneration {
+    fn drop(&mut self) {
+        if !self.published {
+            // A failed publication can leave the private generation read-only.
+            let _ = set_generation_readonly(&self.path, false);
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
+struct BakePublishLock(PathBuf);
+
+impl Drop for BakePublishLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir(&self.0);
+    }
+}
+
+fn set_generation_readonly(path: &Path, readonly: bool) -> Result<()> {
+    let mut permissions = fs::metadata(path)?.permissions();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = permissions.mode();
+        permissions.set_mode(if readonly {
+            mode & !0o222
+        } else {
+            mode | 0o200
+        });
+    }
+    #[cfg(not(unix))]
+    permissions.set_readonly(readonly);
+    // Restore a directory before descending, freeze it after its children.
+    if !readonly {
+        fs::set_permissions(path, permissions.clone())?;
+    }
+    if path.is_dir() {
+        for entry in fs::read_dir(path)? {
+            set_generation_readonly(&entry?.path(), readonly)?;
+        }
+    }
+    if readonly {
+        fs::set_permissions(path, permissions)?;
+    }
+    Ok(())
+}
+
+fn publish_baked_catalogs(options: &BakeOptions, prefer_existing: bool) -> Result<BakeReport> {
+    if options.limit_per_signature.is_some() {
+        return Err(Error::msg("limited catalogs cannot be published"));
+    }
+    let generator = options
+        .generator
+        .as_ref()
+        .ok_or_else(|| Error::msg("catalog publication requires generator fingerprint"))?;
+    fs::create_dir_all(&options.out_dir)?;
+    static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
+    let generation_name = format!(
+        "gen-{}-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| Error::msg(error.to_string()))?
+            .as_nanos(),
+        NEXT_GENERATION.fetch_add(1, Ordering::Relaxed)
+    );
+    let generation_path = options.out_dir.join(&generation_name);
+    fs::create_dir(&generation_path)?;
+    let mut generation = BakeGeneration {
+        path: generation_path.clone(),
+        published: false,
+    };
+    let mut generation_options = options.clone();
+    generation_options.out_dir = generation_path;
+    let mut report = bake_catalogs(&generation_options)?;
+    verify_baked_catalog_responses(&generation_options.out_dir, generator)?;
+
+    let lock_path = options.out_dir.join(".publish-lock");
+    if let Err(error) = fs::create_dir(&lock_path) {
+        // Never wait behind another publisher on a runtime request.
+        if validate_baked_catalog(&options.out_dir, generator).is_ok() {
+            report.out_dir = options.out_dir.clone();
+            return Ok(report);
+        }
+        return Err(Error::msg(format!("Bake publication unavailable: {error}")));
+    }
+    let _lock = BakePublishLock(lock_path);
+    if prefer_existing && validate_baked_catalog(&options.out_dir, generator).is_ok() {
+        report.out_dir = options.out_dir.clone();
+        return Ok(report);
+    }
+    set_generation_readonly(&generation.path, true)?;
+    let pointer_path = options.out_dir.join(format!(".CURRENT-{generation_name}"));
+    let publish = || -> Result<()> {
+        let mut pointer = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pointer_path)?;
+        writeln!(pointer, "{generation_name}")?;
+        pointer.sync_all()?;
+        drop(pointer);
+        fs::rename(&pointer_path, options.out_dir.join("CURRENT"))?;
+        Ok(())
+    };
+    if let Err(error) = publish() {
+        let _ = fs::remove_file(&pointer_path);
+        return Err(error);
+    }
+    generation.published = true;
+    report.out_dir = options.out_dir.clone();
     Ok(report)
 }
 
@@ -1279,6 +1438,8 @@ fn load_validated_baked_catalog(
     out_dir: &Path,
     generator: &BakeGeneratorFingerprint,
 ) -> Result<ValidatedBakedCatalog> {
+    let resolved_dir = resolved_baked_catalog_dir(out_dir)?;
+    let out_dir = resolved_dir.as_path();
     let manifest_path = out_dir.join("manifest.json");
     let raw = fs::read_to_string(&manifest_path)?;
     let manifest: BakeManifest = serde_json::from_str(&raw)?;
@@ -2735,7 +2896,7 @@ pub fn try_baked_trade_search(
     if !baked_trade_compatible(pool, options, filter) {
         return baked_miss(mode, trade_incompatibility_reason(pool, options, filter));
     }
-    let Some(table) = load_runtime_baked_table()? else {
+    let Some(table) = load_runtime_baked_table(mode)? else {
         return baked_miss(
             mode,
             "catalog is missing, stale, or currently being generated",
@@ -2892,7 +3053,7 @@ pub fn try_baked_manufacture_search(
     if !baked_manufacture_compatible(pool, options) {
         return baked_miss(mode, manufacture_incompatibility_reason(pool, options));
     }
-    let Some(table) = load_runtime_baked_table()? else {
+    let Some(table) = load_runtime_baked_table(mode)? else {
         return baked_miss(
             mode,
             "catalog is missing, stale, or currently being generated",
@@ -3007,43 +3168,76 @@ fn baked_manufacture_report(
 }
 
 pub fn warm_runtime_baked_table() -> Result<bool> {
-    Ok(load_runtime_baked_table()?.is_some())
+    Ok(load_runtime_baked_table(BakeMode::Auto)?.is_some())
 }
 
 static RUNTIME_BAKE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+static RUNTIME_AUTO_CACHE: OnceLock<std::result::Result<RuntimeBakedComboTable, String>> =
+    OnceLock::new();
+static RUNTIME_REQUIRED_CACHE: OnceLock<std::result::Result<RuntimeBakedComboTable, String>> =
+    OnceLock::new();
 
-pub fn set_runtime_bake_in_progress(in_progress: bool) {
-    RUNTIME_BAKE_IN_PROGRESS.store(in_progress, Ordering::Release);
+struct RuntimeBakeGuard;
+
+impl RuntimeBakeGuard {
+    fn acquire() -> Result<Self> {
+        RUNTIME_BAKE_IN_PROGRESS
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| Error::msg("runtime Bake generation already in progress"))?;
+        Ok(Self)
+    }
 }
 
-fn load_runtime_baked_table() -> Result<Option<&'static RuntimeBakedComboTable>> {
-    // The background baker writes several files into the catalog directory. Do
-    // not cache or consume a catalog until that write set is complete.
+impl Drop for RuntimeBakeGuard {
+    fn drop(&mut self) {
+        RUNTIME_BAKE_IN_PROGRESS.store(false, Ordering::Release);
+    }
+}
+
+fn load_runtime_baked_table(mode: BakeMode) -> Result<Option<&'static RuntimeBakedComboTable>> {
     if RUNTIME_BAKE_IN_PROGRESS.load(Ordering::Acquire) {
-        return Ok(None);
+        return baked_miss(mode, "catalog is currently being generated");
     }
-    static CACHE: OnceLock<Option<RuntimeBakedComboTable>> = OnceLock::new();
-    if let Some(table) = CACHE.get() {
-        return Ok(table.as_ref());
+    if let Some(Ok(table)) = RUNTIME_AUTO_CACHE.get() {
+        return Ok(Some(table));
     }
-    match load_runtime_baked_table_inner() {
-        Ok(table) => {
-            let _ = CACHE.set(Some(table));
-            Ok(CACHE.get().and_then(|t| t.as_ref()))
-        }
-        Err(_) => Ok(None),
+    if let Some(Ok(table)) = RUNTIME_REQUIRED_CACHE.get() {
+        return Ok(Some(table));
+    }
+    let cached = if mode == BakeMode::Auto {
+        RUNTIME_AUTO_CACHE.get_or_init(|| {
+            let result = load_runtime_baked_table_inner(true).map_err(|error| error.to_string());
+            if let Err(reason) = &result {
+                eprintln!("[bake] runtime catalog unavailable; using live: {reason}");
+            }
+            result
+        })
+    } else {
+        RUNTIME_REQUIRED_CACHE.get_or_init(|| {
+            load_runtime_baked_table_inner(false).map_err(|error| error.to_string())
+        })
+    };
+    match cached {
+        Ok(table) => Ok(Some(table)),
+        Err(reason) => baked_miss(mode, reason.as_str()),
     }
 }
 
-fn load_runtime_baked_table_inner() -> Result<RuntimeBakedComboTable> {
-    let Ok(manifest_path) = data_path("baked/manifest.json") else {
-        return Err(Error::msg("data/baked/manifest.json not found"));
-    };
-    let out_dir = manifest_path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("data/baked"));
+fn load_runtime_baked_table_inner(regenerate: bool) -> Result<RuntimeBakedComboTable> {
+    let out_dir = default_baked_out_dir()?;
     let generator = current_exe_generator_fingerprint()?;
+    match load_validated_baked_catalog(&out_dir, &generator) {
+        Ok(validated) => return Ok(runtime_baked_table_from_disk(validated.disk)),
+        Err(error) if !regenerate => return Err(error),
+        Err(_) => {}
+    }
+    let _guard = RuntimeBakeGuard::acquire()?;
+    let options = BakeOptions {
+        out_dir: out_dir.clone(),
+        generator: Some(generator.clone()),
+        ..BakeOptions::default()
+    };
+    publish_baked_catalogs(&options, true)?;
     let disk = load_validated_baked_catalog(&out_dir, &generator)?.disk;
     Ok(runtime_baked_table_from_disk(disk))
 }
@@ -3122,17 +3316,25 @@ fn manufacture_lookup_key(room_level: u8, operator_capacity: usize, recipe: Reci
     .to_ascii_lowercase()
 }
 
-fn current_exe_generator_fingerprint() -> Result<BakeGeneratorFingerprint> {
-    let path = std::env::current_exe()?;
-    let bytes = fs::read(&path)?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    Ok(BakeGeneratorFingerprint {
-        kind: "infra-cli-exe".to_string(),
-        path: path.to_string_lossy().to_string(),
-        bytes: bytes.len() as u64,
-        hash64: format!("{:016x}", hasher.finish()),
-    })
+/// The executable fingerprint (including failures) is computed once per process.
+pub fn current_exe_generator_fingerprint() -> Result<BakeGeneratorFingerprint> {
+    static CACHE: OnceLock<std::result::Result<BakeGeneratorFingerprint, String>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let fingerprint = || -> Result<BakeGeneratorFingerprint> {
+                let path = std::env::current_exe()?;
+                let bytes = fs::read(&path)?;
+                Ok(BakeGeneratorFingerprint {
+                    kind: "infra-cli-exe".to_string(),
+                    path: path.to_string_lossy().to_string(),
+                    bytes: bytes.len() as u64,
+                    hash64: hash_bytes(&bytes),
+                })
+            };
+            fingerprint().map_err(|error| error.to_string())
+        })
+        .clone()
+        .map_err(Error::msg)
 }
 
 fn baked_trade_compatible(

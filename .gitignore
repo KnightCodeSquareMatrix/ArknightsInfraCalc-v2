@@ -41,3 +41,6 @@ data/fixtures/box-bundles/
 feedback/
 
 从公孙长乐电脑里搜集到的资料/
+
+# Runtime-generated verified Bake generations
+/data/baked/
