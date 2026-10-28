@@ -457,7 +457,7 @@ impl std::str::FromStr for TimedRotationProfile {
                 "rotation 4 requires a named profile: fiammetta-8844 or abyssal-7575",
             )),
             other => Err(Error::msg(format!(
-                "unsupported rotation {other:?}; expected 2, 3, 12/12/12, 24/24, fiammetta-8844, or abyssal-7575"
+                "unsupported rotation {other:?}; expected 2, 3, 12/12/12, 24/24, fiammetta-8844, abyssal-7575, main-backup@H1/H2 or abc@H1/H2/H3"
             ))),
         }
     }
