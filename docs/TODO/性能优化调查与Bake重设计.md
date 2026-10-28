@@ -9,8 +9,10 @@
 
 ## 0. 当前进度与接手入口（2026-10-28）
 
+> **恢复基线现已完成（23:12）**：独立 release 编译成功，四源码 blob 在采集后仍精确匹配；新二进制 SHA256 为 `6beff764d155986d5daf4989019e211c817d7c87d37a579359bc4de76768340e`，与原 SHA 不同，只声明源码恢复。四轮换共 152 次执行：3、2、12/12/12 各 38/38；24/24 为 33/38，五个失败 box、shift 和涤火杰西卡断言原因与原记录一致。全精二无断言三份产物成功；带断言在 shift2 同一既有失败。证据 `target/codex-runs/perf-final-20261028/baseline-recovered/{report.md,result-summary.json,runs,full-e2-output,full-e2}`。后续比较使用这里的恢复基线，不能把仍未完成的最终版本验收写成通过。
+
 > **2026-10-28 23:00 后的验收状态**：本地 WSL 全表生成触发 OOM（内核记录杀死 infra-cli），随后执行环境重启，`/tmp` 冻结基线和临时验收记录丢失，尚无全量对账或最终对拍通过证据。SSH 只读资源查询被沙箱以 `socket: Operation not permitted` 拒绝。没有缩表、缩输入或降低验收；继续路径待用户选择大内存服务器执行入口或本地冷路径分块。
-> 冻结源码已由原会话日志确证：基底 `3201fa7`，仅替换为 `47cbf62` 中四个 U1a 源码 blob；原提交成功 `git apply --cached` 的正是冻结 patch。原基线 SHA256 `315c1954fd3d8c75c10152ec353398734aa0c79ee8397656099833a22b1def07`，与阶段测量 `168a12...` 分开。原二进制及产物仍丢失，当前精确源码的 release 重建/再采集进行中，不把源码恢复写成二进制字节复刻。
+> 冻结源码已由原会话日志确证：基底 `3201fa7`，仅替换为 `47cbf62` 中四个 U1a 源码 blob；原提交成功 `git apply --cached` 的正是冻结 patch。原基线 SHA256 `315c1954fd3d8c75c10152ec353398734aa0c79ee8397656099833a22b1def07`，与阶段测量 `168a12...` 分开。原二进制及原产物仍丢失，当前精确源码的 release 重建/再采集已完成（见上方最新记录），不把源码恢复写成二进制字节复刻。
 > 持久证据改存 `target/codex-runs/perf-final-20261028`：`baseline-recovery/` 保存源码恢复和原会话证据，`baseline-recovered/` 保存重建与采集，`intent-review/report.md` 为独立静态复审（未发现实质问题，不能代替运行验收），`bake-foreground/kernel-oom-session-evidence.json` 保存内核 OOM 原工具输出。此处后续状态优先于本页历史 `/tmp` 路径。
 
 - **U1～U6 均已实现并提交，代码 HEAD 为 509ad44；最终运行验收与独立复审仍待收口。** 格式化/编译证据不能替代全量对账、输出等价或性能收益证据。
