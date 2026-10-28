@@ -198,9 +198,9 @@ pub fn facility_base_storage(level: u8) -> i32 {
 pub fn collect_manu_atoms<'a>(
     ops: &[ManuOperatorRuntime],
     table: &'a SkillTable,
-) -> Vec<(&'a EffectAtom, String)> {
+) -> Vec<(&'a EffectAtom, usize)> {
     let mut atoms = Vec::new();
-    for op in ops {
+    for (owner_index, op) in ops.iter().enumerate() {
         for bid in &op.buff_ids {
             let Some(skill) = table.get(bid) else {
                 continue;
@@ -209,7 +209,7 @@ pub fn collect_manu_atoms<'a>(
                 continue;
             }
             for atom in &skill.atoms {
-                atoms.push((atom, op.name.clone()));
+                atoms.push((atom, owner_index));
             }
         }
     }
@@ -222,14 +222,17 @@ pub fn collect_manu_atoms<'a>(
 }
 
 pub fn apply_manu_phases(ctx: &mut ManuContext, table: &SkillTable) {
-    let names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
     let atoms = collect_manu_atoms(&ctx.operators, table);
 
-    for (atom, owner) in atoms {
-        if !condition_met(&atom.condition, ctx, &owner) {
+    // 干员名在整个循环内不变（apply_* 只改效率/仓库/心情字段），每名干员只克隆一次，
+    // 不再对每个 atom 克隆一次。
+    let owner_names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
+    for (atom, owner_index) in atoms {
+        let owner = owner_names[owner_index].as_str();
+        if !condition_met(&atom.condition, ctx, owner) {
             continue;
         }
-        apply_atom(ctx, atom, &owner, &names);
+        apply_atom(ctx, atom, owner);
     }
     apply_tagged_control_injects(ctx);
     apply_abyssal_hunters_control(ctx);
@@ -351,7 +354,7 @@ fn room_has_buff(ctx: &ManuContext, buff_id: &str) -> bool {
         .any(|o| o.buff_ids.iter().any(|b| b == buff_id))
 }
 
-fn apply_atom(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str, names: &[String]) {
+fn apply_atom(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
     if matches!(&atom.action, Action::AddEffFromLimitContribSum { .. })
         && room_has_buff(ctx, BUFF_PAOPAO_LIMIT_VAR)
     {
@@ -367,7 +370,6 @@ fn apply_atom(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str, names: &[St
         Phase::PeerAbsorb => apply_peer_absorb(ctx, &atom.action, owner),
         Phase::GlobalInject | Phase::OrderMechanic | Phase::PeerShare => {}
     }
-    let _ = names;
 }
 
 /// 按基建设施数量结算的生产力（冬时/森蚺归零时不计入「其他干员技能面」）。

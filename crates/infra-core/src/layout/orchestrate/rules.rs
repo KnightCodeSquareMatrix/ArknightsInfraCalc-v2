@@ -1634,6 +1634,11 @@ fn power_role_beats_unplanned(
     else {
         return false;
     };
+    // 最终判定要求 candidate_power > baseline_power。发电分不占优时结果必为 false，
+    // 逐房制造评分是纯函数且无副作用，跳过它不改变结果，只省掉两次全组合制造搜索。
+    if candidate_power <= baseline_power {
+        return false;
+    }
     let Some(candidate_manu) = score_completed_manufacture(ctx, assignment, used) else {
         return false;
     };
