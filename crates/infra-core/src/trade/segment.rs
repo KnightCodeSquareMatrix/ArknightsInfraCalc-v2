@@ -8,15 +8,17 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use serde::Deserialize;
+use smallvec::SmallVec;
 
 use crate::error::Result;
 use crate::global_resource::GlobalInjectManifest;
 use crate::skill_table::{data_path, SkillTable};
-use crate::trade::input::TradeOperator;
+use crate::trade::input::{TradeOperator, TradeOperatorRef};
 use crate::trade::shortcut::{
-    is_blackkey_closure_station, is_docus_syracusa_station, is_penguin_exusiai_lemuen_station,
-    is_penguin_texangel_e2_station, is_penguin_texlap_e0_station, is_vina_lungmen_station,
-    trade_shortcut_cache, TradeShortcutMatch,
+    is_blackkey_closure_station_refs, is_docus_syracusa_station_refs,
+    is_penguin_exusiai_lemuen_station_refs, is_penguin_texangel_e2_station_refs,
+    is_penguin_texlap_e0_station_refs, is_vina_lungmen_station_refs, trade_shortcut_cache,
+    TradeShortcutMatch,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -132,17 +134,17 @@ pub fn segment_producer_active(
 
 fn segment_consumer_matches(
     kind: &str,
-    ops: &[TradeOperator],
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     _inject: &GlobalInjectManifest,
 ) -> bool {
     match kind {
-        "docus_syracusa" => is_docus_syracusa_station(ops, table),
-        "blackkey_closure" => is_blackkey_closure_station(ops, table),
-        "vina_lungmen" => is_vina_lungmen_station(ops, table),
-        "penguin_texlap_e0" => is_penguin_texlap_e0_station(ops, table),
-        "penguin_texangel_e2" => is_penguin_texangel_e2_station(ops, table),
-        "penguin_exusiai_lemuen" => is_penguin_exusiai_lemuen_station(ops, table),
+        "docus_syracusa" => is_docus_syracusa_station_refs(ops, table),
+        "blackkey_closure" => is_blackkey_closure_station_refs(ops, table),
+        "vina_lungmen" => is_vina_lungmen_station_refs(ops, table),
+        "penguin_texlap_e0" => is_penguin_texlap_e0_station_refs(ops, table),
+        "penguin_texangel_e2" => is_penguin_texangel_e2_station_refs(ops, table),
+        "penguin_exusiai_lemuen" => is_penguin_exusiai_lemuen_station_refs(ops, table),
         _ => false,
     }
 }
@@ -150,6 +152,15 @@ fn segment_consumer_matches(
 /// 按 `priority` 命中第一个链段；用于 `resolve_trade_shortcut`。
 pub fn match_registered_trade_segment(
     ops: &[TradeOperator],
+    table: &SkillTable,
+    inject: &GlobalInjectManifest,
+) -> Option<TradeShortcutMatch> {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_registered_trade_segment_refs(&ops, table, inject)
+}
+
+pub(crate) fn match_registered_trade_segment_refs(
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     inject: &GlobalInjectManifest,
 ) -> Option<TradeShortcutMatch> {
@@ -162,7 +173,7 @@ pub fn match_registered_trade_segment(
             continue;
         }
         let shortcut_id = if seg.shortcut_id == "gsl_docus_syracusa"
-            && !crate::trade::shortcut::docus_operator_is_e2(ops, table)
+            && !crate::trade::shortcut::docus_operator_is_e2_refs(ops, table)
         {
             "gsl_docus_solo_e0"
         } else {

@@ -62,6 +62,8 @@
 
 借用类型与转换小单元仅格式化、workspace 离线编译及源差异检查；未新增测试或运行 solver、Bake、性能测量，未验证运行结果或性能幅度。
 
+贸易 shortcut 的互斥、站型识别与匹配内核，以及注册 segment 的 consumer 转发和匹配内核，已统一读取 `TradeOperatorRef` 切片。原公开 owned 入口保留，通过一次五槽 `SmallVec` 引用转换进入同名 `_refs` 入口；内核互相调用直接传引用，私有身份 helper 也使用借用输入，一种判定只保留一份实现。注册链段优先级、shortcut 回退次序、互斥计数位置、tier 判定和命中 entry 的克隆保持；此单元尚未改接 solver/search 的组合构造。本次仅 owner 文件格式化、workspace 离线编译及源差异检查，未新增测试或运行 solver、Bake、性能测量。
+
 
 ## 制造房间解释器的借用边界
 

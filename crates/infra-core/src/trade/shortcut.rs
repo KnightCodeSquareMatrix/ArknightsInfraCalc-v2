@@ -3,6 +3,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use crate::efficiency::Efficiency;
 use crate::error::Result;
@@ -10,7 +11,7 @@ use crate::global_resource::GlobalInjectManifest;
 use crate::skill_table::data_path;
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
-use crate::trade::input::{TradeOperator, TradeOrderKind};
+use crate::trade::input::{TradeOperator, TradeOperatorRef, TradeOrderKind};
 use crate::trade::order_mechanic::{GoldDistribution, OrderMechanicResult, SpecialOrderKind};
 use crate::types::Action;
 
@@ -248,6 +249,14 @@ pub(crate) fn trade_shortcut_cache() -> Option<&'static TradeShortcutCache> {
 
 /// 巫恋核 / 龙舌兰投资 / 裁缝 α/β（与但书、可露希尔互斥的「巫恋侧」机制）。
 pub fn room_has_witch_side_group(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    room_has_witch_side_group_refs(&ops, table)
+}
+
+pub(crate) fn room_has_witch_side_group_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     if has_witch_e2(ops, table) {
         return true;
     }
@@ -263,11 +272,27 @@ pub fn room_has_witch_side_group(ops: &[TradeOperator], table: &SkillTable) -> b
 
 /// 但书（合同法/违约）与巫恋侧机制 **不得同站**。
 pub fn docus_tailor_exclusive_violation(ops: &[TradeOperator], table: &SkillTable) -> bool {
-    room_has_docus_mechanic(ops, table) && room_has_witch_side_group(ops, table)
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    docus_tailor_exclusive_violation_refs(&ops, table)
+}
+
+pub(crate) fn docus_tailor_exclusive_violation_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
+    room_has_docus_mechanic(ops, table) && room_has_witch_side_group_refs(ops, table)
 }
 
 /// 佩佩独占站：同房不得进驻提供订单获取效率% 的干员（工具人位应填上限/心情等）。
 pub fn pepe_station_trade_eff_violation(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    pepe_station_trade_eff_violation_refs(&ops, table)
+}
+
+pub(crate) fn pepe_station_trade_eff_violation_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     if !room_has_pepe_exclusive(ops, table) {
         return false;
     }
@@ -277,19 +302,27 @@ pub fn pepe_station_trade_eff_violation(ops: &[TradeOperator], table: &SkillTabl
 
 /// 贸易站同房互斥（公孙长乐）：违约 / 特别订单 / 巫恋低语 / 佩佩+效率人 不得混排。
 pub fn trade_station_exclusive_violation(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    trade_station_exclusive_violation_refs(&ops, table)
+}
+
+pub(crate) fn trade_station_exclusive_violation_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     crate::profile::record_exclusive_check();
     let docus = room_has_docus_mechanic(ops, table);
     let closure = has_closure(ops, table);
     let witch = has_witch_e2(ops, table);
     let pepe = room_has_pepe_exclusive(ops, table);
 
-    if docus_tailor_exclusive_violation(ops, table) {
+    if docus_tailor_exclusive_violation_refs(ops, table) {
         return true;
     }
-    if pepe_station_trade_eff_violation(ops, table) {
+    if pepe_station_trade_eff_violation_refs(ops, table) {
         return true;
     }
-    if pepe && (docus || closure || room_has_witch_side_group(ops, table)) {
+    if pepe && (docus || closure || room_has_witch_side_group_refs(ops, table)) {
         return true;
     }
     if docus && closure {
@@ -303,12 +336,27 @@ pub fn trade_station_exclusive_violation(ops: &[TradeOperator], table: &SkillTab
 
 /// 但书 + 工具人三人站（搜索/轮换均为 C(n,3)）。
 pub fn is_docus_solo_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
-    ops.len() >= 3 && room_has_docus_mechanic(ops, table) && !room_has_witch_side_group(ops, table)
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_docus_solo_station_refs(&ops, table)
+}
+
+pub(crate) fn is_docus_solo_station_refs(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
+    ops.len() >= 3
+        && room_has_docus_mechanic(ops, table)
+        && !room_has_witch_side_group_refs(ops, table)
 }
 
 /// 叙拉古但书链段 consumer：但书 + 伺夜 + 贝洛内（无巫恋侧）。
 pub fn is_docus_syracusa_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
-    is_docus_solo_station(ops, table)
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_docus_syracusa_station_refs(&ops, table)
+}
+
+pub(crate) fn is_docus_syracusa_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
+    is_docus_solo_station_refs(ops, table)
         && ops.iter().any(|o| o.name == "伺夜")
         && ops.iter().any(|o| o.name == "贝洛内")
 }
@@ -320,6 +368,11 @@ pub fn docus_syracusa_segment_active(inject: &GlobalInjectManifest) -> bool {
 
 /// 可露希尔特别订单站（不含但书/巫恋低语）。
 pub fn is_closure_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_closure_station_refs(&ops, table)
+}
+
+pub(crate) fn is_closure_station_refs(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     has_closure(ops, table) && !has_witch_e2(ops, table) && !room_has_docus_mechanic(ops, table)
 }
 
@@ -329,6 +382,17 @@ pub const DOCUS_MECHANIC_GOLD_PCT: f64 = 55.0;
 /// **L3 组合短路**（见 `docs/EFFECT_ATOM_DESIGN.md` §8.7）：工具人表最优解查表。
 pub fn resolve_trade_shortcut(
     ops: &[TradeOperator],
+    table: &SkillTable,
+    order_eff_pre: f64,
+    trade_level: u8,
+    inject: &GlobalInjectManifest,
+) -> Option<TradeShortcutMatch> {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    resolve_trade_shortcut_refs(&ops, table, order_eff_pre, trade_level, inject)
+}
+
+pub(crate) fn resolve_trade_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     order_eff_pre: f64,
     trade_level: u8,
@@ -345,41 +409,53 @@ pub(crate) fn resolve_trade_shortcut_prevalidated(
     trade_level: u8,
     inject: &GlobalInjectManifest,
 ) -> Option<TradeShortcutMatch> {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    resolve_trade_shortcut_prevalidated_refs(&ops, table, order_eff_pre, trade_level, inject)
+}
+
+pub(crate) fn resolve_trade_shortcut_prevalidated_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+    order_eff_pre: f64,
+    trade_level: u8,
+    inject: &GlobalInjectManifest,
+) -> Option<TradeShortcutMatch> {
     resolve_trade_shortcut_inner(ops, table, order_eff_pre, trade_level, inject, false)
 }
 
 fn resolve_trade_shortcut_inner(
-    ops: &[TradeOperator],
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     order_eff_pre: f64,
     trade_level: u8,
     inject: &GlobalInjectManifest,
     check_exclusivity: bool,
 ) -> Option<TradeShortcutMatch> {
-    if check_exclusivity && trade_station_exclusive_violation(ops, table) {
+    if check_exclusivity && trade_station_exclusive_violation_refs(ops, table) {
         return None;
     }
-    if let Some(m) = crate::trade::segment::match_registered_trade_segment(ops, table, inject) {
+    if let Some(m) = crate::trade::segment::match_registered_trade_segment_refs(ops, table, inject)
+    {
         return Some(m);
     }
-    if let Some(m) = match_docus_solo_shortcut(ops, table) {
+    if let Some(m) = match_docus_solo_shortcut_refs(ops, table) {
         return Some(m);
     }
-    if let Some(m) = match_witch_group_shortcut(ops, table, trade_level) {
+    if let Some(m) = match_witch_group_shortcut_refs(ops, table, trade_level) {
         return Some(m);
     }
-    if let Some(m) = match_blackkey_closure_shortcut(ops, table) {
+    if let Some(m) = match_blackkey_closure_shortcut_refs(ops, table) {
         return Some(m);
     }
     // 推王龙门的 135% 贸易效率是戴菲恩中枢 producer 激活后的 vault 满配值，
     // 只能通过 trade_segments 的 producer-gated 路径命中；无戴菲恩 fallback 需另建锚点。
-    if let Some(m) = match_penguin_exusiai_lemuen_shortcut(ops, table) {
+    if let Some(m) = match_penguin_exusiai_lemuen_shortcut_refs(ops, table) {
         return Some(m);
     }
-    if let Some(m) = match_penguin_texangel_e2_shortcut(ops, table) {
+    if let Some(m) = match_penguin_texangel_e2_shortcut_refs(ops, table) {
         return Some(m);
     }
-    if let Some(m) = match_penguin_texlap_e0_shortcut(ops, table) {
+    if let Some(m) = match_penguin_texlap_e0_shortcut_refs(ops, table) {
         return Some(m);
     }
     match_closure_shortcut(ops, table, order_eff_pre, trade_level)
@@ -387,10 +463,18 @@ fn resolve_trade_shortcut_inner(
 
 /// 公孙感知链贸站：黑键 E2（乐感）+ 可露希尔 closure，第三人任意高效散件；不与但书/巫恋同房。
 pub fn is_blackkey_closure_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_blackkey_closure_station_refs(&ops, table)
+}
+
+pub(crate) fn is_blackkey_closure_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     ops.len() >= 3
         && room_has_blackkey_perception(ops, table)
         && has_closure(ops, table)
-        && !room_has_witch_side_group(ops, table)
+        && !room_has_witch_side_group_refs(ops, table)
         && !room_has_docus_mechanic(ops, table)
 }
 
@@ -398,7 +482,15 @@ pub fn match_blackkey_closure_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_blackkey_closure_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_blackkey_closure_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_blackkey_closure_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_blackkey_closure_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
@@ -416,6 +508,14 @@ const BLACKKEY_PERCEPTION_BUFF: &str = "trade_ord_spd_bd_n1[000]";
 /// 公孙 vault 明确德克萨斯精 2 不会失去「恩怨」，所以这里不再要求
 /// `TEX_ENEMY_BUFF` 只存在于 E0，也不因 E2「默契」排除德狼路线。
 pub fn is_penguin_texlap_e0_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_penguin_texlap_e0_station_refs(&ops, table)
+}
+
+pub(crate) fn is_penguin_texlap_e0_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     ops.len() >= 3
         && ops.iter().any(|o| o.name == "德克萨斯")
         && ops.iter().any(|o| o.name == "拉普兰德")
@@ -426,7 +526,15 @@ pub fn match_penguin_texlap_e0_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_penguin_texlap_e0_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_penguin_texlap_e0_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_penguin_texlap_e0_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_texlap_e0_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
@@ -436,6 +544,14 @@ pub fn match_penguin_texlap_e0_shortcut(
 
 /// 德克萨斯 E2「默契」+ 能天使；不含蕾缪安 E2 相伴链。
 pub fn is_penguin_texangel_e2_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_penguin_texangel_e2_station_refs(&ops, table)
+}
+
+pub(crate) fn is_penguin_texangel_e2_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     ops.len() >= 3
         && room_has_named_buff(ops, "德克萨斯", TEX_MOQI_BUFF)
         && ops.iter().any(|o| o.name == "能天使")
@@ -449,7 +565,15 @@ pub fn match_penguin_texangel_e2_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_penguin_texangel_e2_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_penguin_texangel_e2_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_penguin_texangel_e2_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_texangel_e2_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
@@ -459,6 +583,14 @@ pub fn match_penguin_texangel_e2_shortcut(
 
 /// 能天使 + 蕾缪安 E2「相伴」；第三人任意。
 pub fn is_penguin_exusiai_lemuen_station(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_penguin_exusiai_lemuen_station_refs(&ops, table)
+}
+
+pub(crate) fn is_penguin_exusiai_lemuen_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> bool {
     ops.len() >= 3
         && ops.iter().any(|o| o.name == "能天使")
         && ops
@@ -471,7 +603,15 @@ pub fn match_penguin_exusiai_lemuen_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_penguin_exusiai_lemuen_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_penguin_exusiai_lemuen_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_penguin_exusiai_lemuen_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_penguin_exusiai_lemuen_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
@@ -481,6 +621,14 @@ pub fn match_penguin_exusiai_lemuen_shortcut(
 
 /// 推王组：推进之王 + 摩根 + 维娜·维多利亚（需中枢戴菲恩 E2 producer）。
 pub fn is_vina_lungmen_station(ops: &[TradeOperator], _table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    is_vina_lungmen_station_refs(&ops, _table)
+}
+
+pub(crate) fn is_vina_lungmen_station_refs(
+    ops: &[TradeOperatorRef<'_>],
+    _table: &SkillTable,
+) -> bool {
     ops.len() >= 3
         && ops.iter().any(|o| o.name == "推进之王")
         && ops.iter().any(|o| o.name == "摩根")
@@ -491,7 +639,15 @@ pub fn match_vina_lungmen_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_vina_lungmen_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_vina_lungmen_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_vina_lungmen_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_vina_lungmen_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
@@ -503,11 +659,19 @@ pub fn match_docus_solo_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,
 ) -> Option<TradeShortcutMatch> {
-    if !is_docus_solo_station(ops, table) {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_docus_solo_shortcut_refs(&ops, table)
+}
+
+pub(crate) fn match_docus_solo_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+) -> Option<TradeShortcutMatch> {
+    if !is_docus_solo_station_refs(ops, table) {
         return None;
     }
     let cache = trade_shortcut_cache()?;
-    let docus_e2 = docus_operator_is_e2(ops, table);
+    let docus_e2 = docus_operator_is_e2_refs(ops, table);
     let shortcut_id = if docus_e2 {
         "gsl_docus_solo"
     } else {
@@ -518,6 +682,11 @@ pub fn match_docus_solo_shortcut(
 }
 
 pub(crate) fn docus_operator_is_e2(ops: &[TradeOperator], table: &SkillTable) -> bool {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    docus_operator_is_e2_refs(&ops, table)
+}
+
+pub(crate) fn docus_operator_is_e2_refs(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter()
         .find(|operator| has_docus_buff(operator, table))
         .is_some_and(|operator| operator.tier() == PromotionTier::TierUp)
@@ -529,12 +698,30 @@ pub fn match_docus_syracusa_shortcut(
     table: &SkillTable,
     inject: &GlobalInjectManifest,
 ) -> Option<TradeShortcutMatch> {
-    crate::trade::segment::match_registered_trade_segment(ops, table, inject)
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_docus_syracusa_shortcut_refs(&ops, table, inject)
+}
+
+pub(crate) fn match_docus_syracusa_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
+    table: &SkillTable,
+    inject: &GlobalInjectManifest,
+) -> Option<TradeShortcutMatch> {
+    crate::trade::segment::match_registered_trade_segment_refs(ops, table, inject)
         .filter(|m| m.entry.id == "gsl_docus_syracusa")
 }
 
 pub fn match_witch_group_shortcut(
     ops: &[TradeOperator],
+    table: &SkillTable,
+    trade_level: u8,
+) -> Option<TradeShortcutMatch> {
+    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
+    match_witch_group_shortcut_refs(&ops, table, trade_level)
+}
+
+pub(crate) fn match_witch_group_shortcut_refs(
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     trade_level: u8,
 ) -> Option<TradeShortcutMatch> {
@@ -567,7 +754,7 @@ enum WitchRoomKind {
     BetaBlankNoLongE2,
 }
 
-fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<WitchRoomKind> {
+fn classify_witch_room(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> Option<WitchRoomKind> {
     if ops.len() < 3 {
         return None;
     }
@@ -615,34 +802,34 @@ fn classify_witch_room(ops: &[TradeOperator], table: &SkillTable) -> Option<Witc
     None
 }
 
-fn room_has_docus_mechanic(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn room_has_docus_mechanic(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter().any(|o| has_docus_buff(o, table))
 }
 
-fn room_has_named_buff(ops: &[TradeOperator], name: &str, buff: &str) -> bool {
+fn room_has_named_buff(ops: &[TradeOperatorRef<'_>], name: &str, buff: &str) -> bool {
     ops.iter()
         .any(|o| o.name == name && o.buff_ids.iter().any(|b| b == buff))
 }
 
-fn penguin_bond_excluded(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn penguin_bond_excluded(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     room_has_docus_mechanic(ops, table)
-        || room_has_witch_side_group(ops, table)
-        || is_blackkey_closure_station(ops, table)
+        || room_has_witch_side_group_refs(ops, table)
+        || is_blackkey_closure_station_refs(ops, table)
         || has_closure(ops, table)
 }
 
-fn room_has_blackkey_perception(ops: &[TradeOperator], _table: &SkillTable) -> bool {
+fn room_has_blackkey_perception(ops: &[TradeOperatorRef<'_>], _table: &SkillTable) -> bool {
     ops.iter().any(|op| {
         op.tier() == PromotionTier::TierUp
             && op.buff_ids.iter().any(|b| b == BLACKKEY_PERCEPTION_BUFF)
     })
 }
 
-fn room_has_pepe_exclusive(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn room_has_pepe_exclusive(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter().any(|o| has_pepe_exclusive_buff(o, table))
 }
 
-fn has_pepe_exclusive_buff(op: &TradeOperator, table: &SkillTable) -> bool {
+fn has_pepe_exclusive_buff(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     op.buff_ids.iter().any(|bid| {
         bid.starts_with("trade_ord_pepe")
             || table.get(bid).is_some_and(|s| {
@@ -657,9 +844,9 @@ fn has_pepe_exclusive_buff(op: &TradeOperator, table: &SkillTable) -> bool {
 }
 
 /// `constant` 阶段 `AddFlatEff` 之和（佩佩站互斥判定用）。
-fn operator_constant_trade_flat_eff(op: &TradeOperator, table: &SkillTable) -> f64 {
+fn operator_constant_trade_flat_eff(op: &TradeOperatorRef<'_>, table: &SkillTable) -> f64 {
     let mut flat = 0.0;
-    for bid in &op.buff_ids {
+    for bid in op.buff_ids {
         let Some(skill) = table.get(bid) else {
             continue;
         };
@@ -674,7 +861,7 @@ fn operator_constant_trade_flat_eff(op: &TradeOperator, table: &SkillTable) -> f
     flat
 }
 
-fn has_long_invest_buff(op: &TradeOperator, table: &SkillTable) -> bool {
+fn has_long_invest_buff(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     op.buff_ids.iter().any(|bid| {
         bid.starts_with("trade_ord_long")
             || table.get(bid).is_some_and(|s| {
@@ -689,11 +876,14 @@ fn has_long_invest_buff(op: &TradeOperator, table: &SkillTable) -> bool {
     })
 }
 
-fn find_op<'a>(ops: &'a [TradeOperator], name: &str) -> Option<&'a TradeOperator> {
+fn find_op<'a, 'b>(
+    ops: &'a [TradeOperatorRef<'b>],
+    name: &str,
+) -> Option<&'a TradeOperatorRef<'b>> {
     ops.iter().find(|o| o.name == name)
 }
 
-fn has_witch_e2(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn has_witch_e2(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter().any(|o| {
         o.name == "巫恋"
             && o.tier() == PromotionTier::TierUp
@@ -717,7 +907,7 @@ fn peer_absorb_rate(bid: &str, table: &SkillTable) -> Option<f64> {
     })
 }
 
-fn has_docus_buff(op: &TradeOperator, table: &SkillTable) -> bool {
+fn has_docus_buff(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     op.buff_ids.iter().any(|bid| {
         bid == "trade_ord_law[000]"
             || table.get(bid).is_some_and(|s| {
@@ -748,7 +938,7 @@ fn is_tailor_alpha_id(bid: &str) -> bool {
     )
 }
 
-fn has_tailor_beta(op: &TradeOperator, table: &SkillTable) -> bool {
+fn has_tailor_beta(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     op.buff_ids.iter().any(|bid| {
         is_tailor_beta_id(bid)
             || table.get(bid).is_some_and(|s| {
@@ -762,7 +952,7 @@ fn has_tailor_beta(op: &TradeOperator, table: &SkillTable) -> bool {
     })
 }
 
-fn has_tailor_alpha(op: &TradeOperator, table: &SkillTable) -> bool {
+fn has_tailor_alpha(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     op.buff_ids.iter().any(|bid| {
         is_tailor_alpha_id(bid)
             || table.get(bid).is_some_and(|s| {
@@ -776,18 +966,18 @@ fn has_tailor_alpha(op: &TradeOperator, table: &SkillTable) -> bool {
     })
 }
 
-fn is_mechanic_filler(op: &TradeOperator, table: &SkillTable) -> bool {
+fn is_mechanic_filler(op: &TradeOperatorRef<'_>, table: &SkillTable) -> bool {
     if op.name == "巫恋" || op.name == "龙舌兰" {
         return false;
     }
     !has_tailor_beta(op, table) && !has_tailor_alpha(op, table) && !has_docus_buff(op, table)
 }
 
-fn has_blank_third(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn has_blank_third(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter().any(|o| is_mechanic_filler(o, table))
 }
 
-fn has_closure(ops: &[TradeOperator], table: &SkillTable) -> bool {
+fn has_closure(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter().any(|op| {
         if op.tier() == PromotionTier::Tier0 {
             return false;
@@ -806,7 +996,7 @@ fn has_closure(ops: &[TradeOperator], table: &SkillTable) -> bool {
 }
 
 fn match_closure_shortcut(
-    ops: &[TradeOperator],
+    ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,
     order_eff_pre: f64,
     _trade_level: u8,
