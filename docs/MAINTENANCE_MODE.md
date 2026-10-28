@@ -35,7 +35,7 @@
 
 ```bash
 cargo run -q -p infra-cli -- plan --layout <layout.json> --operbox <operbox.json> --profile-out <private>/profile.json --maa-out <private>/maa.json
-cargo run -q -p infra-cli -- layout team-rotation --layout <layout.json> --operbox <operbox.json> --rotation <profile> --maa-out <private>/maa.json
+cargo run -q -p infra-cli -- layout team-rotation --layout <layout.json> --operbox <operbox.json> --rotation <3|2|12/12/12|24/24|main-backup@H1/H2|abc@H1/H2/H3> --maa-out <private>/maa.json
 cargo run -q -p infra-cli -- layout eval --layout <layout.json> --operbox <operbox.json> --assignment <assignment.json> --explain-json > <private>/explain.json
 cargo run -q -p infra-cli -- debug rerun --bundle <debug-bundle.json> --output-dir <new-private-dir> --pretty
 cargo run -q -p infra-cli -- verify --case <case-id>
