@@ -6,7 +6,6 @@
       "permission": {
         "task": {
           "*": "deny",
-          "plan-reviewer": "allow",
           "terra-explorer": "allow",
           "luna-extractor": "allow",
           "sol-reviewer": "allow"

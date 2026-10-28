@@ -40,12 +40,12 @@ cargo fmt --all -- --check
 cargo test -p infra-core <test-filter>
 cargo test -p infra-cli <test-filter>
 cargo run -q -p infra-cli -- verify --all
-python3 scripts/codex/docs_inventory.py --check
-python3 scripts/codex/check_repository_facts.py
+python3 scripts/codex/docs_inventory.py --check --allow-in-progress
+python3 scripts/codex/check_repository_facts.py --allow-in-progress
 ```
 
 - Rust 改动至少运行相关测试和 `cargo fmt --all`。
-- 文档角色、状态、owner 或索引变化必须运行两个文档检查器；生成区块使用 `python3 scripts/codex/docs_inventory.py --write-indexes` 更新，不手工维护表格行。
+- 文档角色、状态、owner 或索引变化必须运行两个文档检查器；合入 main 前去掉 `--allow-in-progress` 再跑一次；生成区块使用 `python3 scripts/codex/docs_inventory.py --write-indexes` 更新，不手工维护表格行。
 - 搜索空间、求解保证、性能或跨设施行为变化按 [质量与审计](docs/QUALITY_AND_AUDIT.md) 扩大证据。
 - Agent 产出的 build、test、CLI、benchmark、format 和 structure 结论通过 [证据工具](scripts/codex/README.md) 留痕。
 

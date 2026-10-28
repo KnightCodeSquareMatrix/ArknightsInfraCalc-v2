@@ -70,7 +70,7 @@
 - 测试、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo test --release`、`cargo build --release -p infra-cli`、`target/release/infra-cli`。debug 下全量库测试约 41 分钟。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
 - 修改 Rust 后运行 `cargo fmt --all`。
 - 需要长期留痕的证据（命令包装、失败集合对比、汇总报告）：见 `scripts/codex/README.md`。
-- 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。
+- 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check --allow-in-progress`、`python3 scripts/codex/check_repository_facts.py --allow-in-progress`；合入 main 前去掉 `--allow-in-progress` 再跑（见 `docs/文档生命周期.md` 生成索引一节）。
 - `target/codex-runs/`、兼容日志和 `out/` 里的证据保留到交付，但不提交。
 
 ## 4. 从哪里读
