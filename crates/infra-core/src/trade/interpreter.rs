@@ -1,18 +1,20 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use smallvec::SmallVec;
+
 use crate::global_resource::GlobalResourceKey;
 use crate::layout::SharedLayout;
 use crate::skill_table::SkillTable;
 use crate::trade::gold_flow::apply_gold_flow_chain;
 use crate::types::{Action, CompiledAtom, Condition, EffectAtom, Phase, Selector, StateKey};
 #[derive(Debug, Clone, Default)]
-pub struct OperatorRuntime {
-    pub name: String,
+pub struct OperatorRuntime<'a> {
+    pub name: &'a str,
     pub elite: u8,
-    pub buff_ids: Vec<String>,
-    pub tags: Vec<String>,
-    pub compiled_atoms: Arc<[CompiledAtom]>,
+    pub buff_ids: &'a [String],
+    pub tags: &'a [String],
+    pub compiled_atoms: &'a [CompiledAtom],
     pub settled_eff: f64,
     pub direct_eff: f64,
     pub limit_contrib: i32,
@@ -22,8 +24,8 @@ pub struct OperatorRuntime {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct TradeContext {
-    pub operators: Vec<OperatorRuntime>,
+pub struct TradeContext<'a> {
+    pub operators: SmallVec<[OperatorRuntime<'a>; 5]>,
     pub facility_level: u8,
     pub layout: SharedLayout,
     pub facility_base_limit: i32,
@@ -51,18 +53,18 @@ pub struct MechanicCaps {
     pub closure: bool,
 }
 
-impl TradeContext {
-    pub fn from_room(input: &crate::trade::input::TradeRoomInput) -> Self {
+impl<'a> TradeContext<'a> {
+    pub fn from_room(input: &'a crate::trade::input::TradeRoomInput) -> Self {
         let facility_base_limit = facility_base_limit(input.level);
         let operators = input
             .operators
             .iter()
             .map(|o| OperatorRuntime {
-                name: o.name.clone(),
+                name: &o.name,
                 elite: o.elite,
-                buff_ids: o.buff_ids.clone(),
-                tags: o.tags.clone(),
-                compiled_atoms: o.compiled_atoms.clone(),
+                buff_ids: &o.buff_ids,
+                tags: &o.tags,
+                compiled_atoms: &o.compiled_atoms,
                 ..Default::default()
             })
             .collect();
@@ -152,21 +154,27 @@ impl TradeContext {
     }
 
     pub fn order_eff_total(&self) -> f64 {
-        let mut current_room_tag_counts = HashMap::new();
-        for operator in &self.operators {
-            for tag in &operator.tags {
-                *current_room_tag_counts.entry(tag.clone()).or_insert(0) += 1;
-            }
-        }
         self.order_eff_base()
             + self.order_eff_skill()
             + self
                 .layout
                 .global_inject
-                .trade_eff_pct_with_scoped_tag_counts(
-                    &self.layout.trade_tagged_count_sum,
-                    &current_room_tag_counts,
-                )
+                .trade_eff_pct_with_current_room_count(&self.layout.trade_tagged_count_sum, |tag| {
+                    self.current_room_tag_count(tag)
+                })
+    }
+
+    /// Count every tag occurrence, matching the former per-room u8 map.
+    pub fn current_room_tag_count(&self, tag: &str) -> u8 {
+        let mut count = 0u8;
+        for operator in &self.operators {
+            for candidate in operator.tags {
+                if candidate == tag {
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     pub fn mechanic_caps(&self) -> MechanicCaps {
@@ -180,7 +188,7 @@ impl TradeContext {
     pub fn mood_drain_summary(&self) -> Vec<(String, f64)> {
         self.operators
             .iter()
-            .map(|o| (o.name.clone(), o.mood_drain_delta))
+            .map(|o| (o.name.to_owned(), o.mood_drain_delta))
             .collect()
     }
 }
@@ -194,171 +202,89 @@ pub fn facility_base_limit(level: u8) -> i32 {
     }
 }
 
-pub fn collect_atoms<'a>(
-    ops: &[OperatorRuntime],
-    table: &'a SkillTable,
-) -> Vec<(&'a EffectAtom, String)> {
-    let mut atoms = Vec::new();
-    for op in ops {
-        for bid in &op.buff_ids {
-            let Some(skill) = table.get(bid) else {
-                continue;
-            };
-            for atom in &skill.atoms {
-                atoms.push((atom, op.name.clone()));
-            }
-        }
-    }
-    atoms.sort_by(|(a, _), (b, _)| {
-        let pa = a.phase.sort_key();
-        let pb = b.phase.sort_key();
-        pa.cmp(&pb).then(a.phase_order.cmp(&b.phase_order))
-    });
-    atoms
-}
-
-fn ops_use_compiled_atoms(ops: &[OperatorRuntime]) -> bool {
-    !ops.is_empty() && ops.iter().all(|o| !o.compiled_atoms.is_empty())
-}
-
-/// 三路归并预编译 atom（与 `collect_atoms` 全序等价；并列键用 owner 序号打破）。
-fn collect_atoms_merged(ops: &[OperatorRuntime]) -> Vec<(usize, usize)> {
-    let mut heads = vec![0usize; ops.len()];
-    let mut out = Vec::new();
-    loop {
-        let mut pick: Option<(usize, usize)> = None;
-        let mut best_key: Option<((i32, i32), usize, u16)> = None;
-        for (oi, op) in ops.iter().enumerate() {
-            let h = heads[oi];
-            if h >= op.compiled_atoms.len() {
-                continue;
-            }
-            let ca = &op.compiled_atoms[h];
-            let key = (ca.sort_key, oi, ca.seq);
-            if best_key.is_none_or(|bk| key < bk) {
-                best_key = Some(key);
-                pick = Some((oi, h));
-            }
-        }
-        let Some((oi, h)) = pick else {
-            break;
-        };
-        out.push((oi, h));
-        heads[oi] = h + 1;
-    }
-    out
-}
-
-fn recompute_limit(ctx: &mut TradeContext) {
+fn recompute_limit(ctx: &mut TradeContext<'_>) {
     ctx.limit_gross = ctx.operators.iter().map(|o| o.limit_contrib).sum();
     ctx.final_order_limit =
         (ctx.facility_base_limit + ctx.limit_gross - ctx.limit_compression).max(1);
 }
 
-pub fn apply_trade_phases(ctx: &mut TradeContext, table: &SkillTable) {
-    let names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
-    if ops_use_compiled_atoms(&ctx.operators) {
-        let order = collect_atoms_merged(&ctx.operators);
-        apply_atoms_loop_compiled(ctx, table, &names, &order);
-        return;
-    }
-    let atoms = {
-        let ops = ctx.operators.clone();
-        collect_atoms(&ops, table)
-    };
-    let legacy: Vec<(&EffectAtom, usize)> = atoms
+pub fn apply_trade_phases(ctx: &mut TradeContext<'_>, table: &SkillTable) {
+    // Hand-built operators may lack prepared atoms. Only those operators need
+    // temporary Arc owners; the table caches compilation, including empty results.
+    let missing: SmallVec<[(usize, Arc<[CompiledAtom]>); 5]> = ctx
+        .operators
         .iter()
-        .map(|(a, owner)| {
-            let idx = ctx
-                .operators
+        .enumerate()
+        .filter(|(_, op)| op.compiled_atoms.is_empty() && !op.buff_ids.is_empty())
+        .map(|(idx, op)| (idx, table.compile_operator_atoms(op.buff_ids)))
+        .collect();
+    // Copy references out of the runtime so applying an atom can mutate ctx.
+    let sources: SmallVec<[(&str, &[CompiledAtom]); 5]> = ctx
+        .operators
+        .iter()
+        .enumerate()
+        .map(|(idx, op)| {
+            let atoms = missing
                 .iter()
-                .position(|o| o.name == *owner)
-                .expect("owner in room");
-            (*a, idx)
+                .find(|(owner_idx, _)| *owner_idx == idx)
+                .map_or(op.compiled_atoms, |(_, atoms)| atoms.as_ref());
+            (op.name, atoms)
         })
         .collect();
-    apply_atoms_loop(ctx, table, &names, legacy);
-}
+    let mut inline_heads = [0usize; 5];
+    let mut spilled_heads = if sources.len() > inline_heads.len() {
+        vec![0usize; sources.len()]
+    } else {
+        Vec::new()
+    };
+    let heads = if sources.len() > inline_heads.len() {
+        spilled_heads.as_mut_slice()
+    } else {
+        &mut inline_heads[..sources.len()]
+    };
 
-fn apply_atoms_loop_compiled(
-    ctx: &mut TradeContext,
-    table: &SkillTable,
-    names: &[String],
-    order: &[(usize, usize)],
-) {
-    let peer_absorb_key = crate::types::Phase::PeerAbsorb.sort_key();
+    let peer_absorb_key = Phase::PeerAbsorb.sort_key();
     let mut last_phase_group = 0i32;
     let mut gold_flow_done = false;
-    for &(owner_idx, atom_idx) in order {
-        let atom = ctx.operators[owner_idx].compiled_atoms[atom_idx]
-            .atom
-            .clone();
-        let owner_name = ctx.operators[owner_idx].name.clone();
+    loop {
+        // The key retains phase/order, owner input order, then stable atom seq.
+        let mut pick = None;
+        let mut best_key = None;
+        for (owner_idx, (_, atoms)) in sources.iter().enumerate() {
+            let Some(compiled) = atoms.get(heads[owner_idx]) else {
+                continue;
+            };
+            let key = (compiled.sort_key, owner_idx, compiled.seq);
+            if best_key.is_none_or(|best| key < best) {
+                best_key = Some(key);
+                pick = Some(owner_idx);
+            }
+        }
+        let Some(owner_idx) = pick else { break };
+        let (owner_name, atoms) = sources[owner_idx];
+        let atom = &atoms[heads[owner_idx]].atom;
+        heads[owner_idx] += 1;
         let phase_group = atom.phase.sort_key();
         if !gold_flow_done && phase_group >= peer_absorb_key && ctx.active_order_kind.is_gold() {
             apply_gold_flow_chain(ctx, table);
             gold_flow_done = true;
         }
-        if phase_group > crate::types::Phase::Limit.sort_key()
-            && last_phase_group <= crate::types::Phase::Limit.sort_key()
-        {
+        if phase_group > Phase::Limit.sort_key() && last_phase_group <= Phase::Limit.sort_key() {
             recompute_limit(ctx);
         }
         last_phase_group = phase_group;
 
-        if !condition_met(&atom.condition, ctx, &owner_name, names) {
-            continue;
+        if condition_met(&atom.condition, ctx, owner_name) {
+            apply_atom(ctx, atom, owner_name);
         }
-        apply_atom(ctx, &atom, &owner_name);
     }
     if !gold_flow_done && ctx.active_order_kind.is_gold() {
         apply_gold_flow_chain(ctx, table);
     }
-
     recompute_limit(ctx);
 }
 
-fn apply_atoms_loop(
-    ctx: &mut TradeContext,
-    table: &SkillTable,
-    names: &[String],
-    atoms: Vec<(&EffectAtom, usize)>,
-) {
-    let peer_absorb_key = crate::types::Phase::PeerAbsorb.sort_key();
-    let mut last_phase_group = 0i32;
-    let mut gold_flow_done = false;
-    for (atom, owner_idx) in atoms {
-        let owner_name = ctx.operators[owner_idx].name.clone();
-        let phase_group = atom.phase.sort_key();
-        if !gold_flow_done && phase_group >= peer_absorb_key && ctx.active_order_kind.is_gold() {
-            apply_gold_flow_chain(ctx, table);
-            gold_flow_done = true;
-        }
-        if phase_group > crate::types::Phase::Limit.sort_key()
-            && last_phase_group <= crate::types::Phase::Limit.sort_key()
-        {
-            recompute_limit(ctx);
-        }
-        last_phase_group = phase_group;
-
-        if !condition_met(&atom.condition, ctx, &owner_name, names) {
-            continue;
-        }
-        apply_atom(ctx, atom, &owner_name);
-    }
-    if !gold_flow_done && ctx.active_order_kind.is_gold() {
-        apply_gold_flow_chain(ctx, table);
-    }
-
-    recompute_limit(ctx);
-}
-
-fn condition_met(
-    cond: &Option<Condition>,
-    ctx: &TradeContext,
-    owner: &str,
-    names: &[String],
-) -> bool {
+fn condition_met(cond: &Option<Condition>, ctx: &TradeContext<'_>, owner: &str) -> bool {
     let Some(cond) = cond else { return true };
     match cond {
         Condition::GoldDeliveryBelow { n } => {
@@ -389,7 +315,7 @@ fn condition_met(
             .iter()
             .find(|op| op.name == owner)
             .is_some_and(|op| op.elite < *n),
-        Condition::PartnerInRoom { name } => names.iter().any(|n| n == name),
+        Condition::PartnerInRoom { name } => ctx.operators.iter().any(|op| op.name == name),
         Condition::TagPresentInRoom { tag } => ctx
             .operators
             .iter()
@@ -430,7 +356,7 @@ fn has_buff_stem(buff_ids: &[String], stem: &str) -> bool {
 }
 
 /// 市井之道 + 天道酬勤不可单独互叠；有第三方 settled 贡献时天道酬勤才生效。
-fn tiandao_eff_var_allowed(ctx: &TradeContext) -> bool {
+fn tiandao_eff_var_allowed(ctx: &TradeContext<'_>) -> bool {
     let has_jie = ctx
         .operators
         .iter()
@@ -454,18 +380,18 @@ fn tiandao_eff_var_allowed(ctx: &TradeContext) -> bool {
     third_party_settled > 0.0
 }
 
-fn order_has_tag(ctx: &TradeContext, tag: &str) -> bool {
+fn order_has_tag(ctx: &TradeContext<'_>, tag: &str) -> bool {
     ctx.order_tags.iter().any(|t| t == tag)
 }
 
-fn default_gold_delivery(ctx: &TradeContext) -> f64 {
+fn default_gold_delivery(ctx: &TradeContext<'_>) -> f64 {
     if order_has_tag(ctx, "closure_special") {
         return 2.0;
     }
     3.0
 }
 
-fn apply_atom(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
+fn apply_atom(ctx: &mut TradeContext<'_>, atom: &EffectAtom, owner: &str) {
     match atom.phase {
         Phase::StateWrite => apply_state_write(ctx, atom, owner),
         Phase::Constant | Phase::PeerShare | Phase::EffVar | Phase::OrderVar | Phase::LimitVar => {
@@ -484,7 +410,7 @@ fn apply_atom(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
     }
 }
 
-fn apply_peer_absorb(ctx: &mut TradeContext, action: &Action, owner: &str) {
+fn apply_peer_absorb(ctx: &mut TradeContext<'_>, action: &Action, owner: &str) {
     let Action::PeerEffAbsorb { rate_per_peer } = action else {
         return;
     };
@@ -501,7 +427,7 @@ fn apply_peer_absorb(ctx: &mut TradeContext, action: &Action, owner: &str) {
     }
 }
 
-fn apply_mood_action(ctx: &mut TradeContext, action: &Action, owner: &str) {
+fn apply_mood_action(ctx: &mut TradeContext<'_>, action: &Action, owner: &str) {
     match action {
         Action::MoodDrainDelta { delta, scope } => match scope {
             crate::types::MoodDrainScope::SelfOp => {
@@ -547,7 +473,7 @@ fn apply_mood_action(ctx: &mut TradeContext, action: &Action, owner: &str) {
     }
 }
 
-fn apply_state_write(ctx: &mut TradeContext, atom: &EffectAtom, _owner: &str) {
+fn apply_state_write(ctx: &mut TradeContext<'_>, atom: &EffectAtom, _owner: &str) {
     match &atom.action {
         Action::StateProduce { key, amount } => {
             if let Some(sk) = StateKey::parse(key) {
@@ -571,7 +497,7 @@ fn apply_state_write(ctx: &mut TradeContext, atom: &EffectAtom, _owner: &str) {
     }
 }
 
-fn apply_eff_action(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
+fn apply_eff_action(ctx: &mut TradeContext<'_>, atom: &EffectAtom, owner: &str) {
     let idx = ctx.operators.iter().position(|o| o.name == owner);
     let Some(idx) = idx else { return };
     let value = resolve_eff_value(ctx, atom, owner);
@@ -599,7 +525,7 @@ fn apply_eff_action(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
     }
 }
 
-fn resolve_eff_value(ctx: &TradeContext, atom: &EffectAtom, owner: &str) -> f64 {
+fn resolve_eff_value(ctx: &TradeContext<'_>, atom: &EffectAtom, owner: &str) -> f64 {
     match &atom.action {
         Action::AddFlatEff { value, .. } => *value,
         Action::AddPerGapEff { rate } => *rate * ctx.order_gap() as f64,
@@ -645,7 +571,7 @@ fn resolve_eff_value(ctx: &TradeContext, atom: &EffectAtom, owner: &str) -> f64 
     }
 }
 
-fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner: &str) -> f64 {
+fn resolve_selector_value(ctx: &TradeContext<'_>, selector: Option<&Selector>, owner: &str) -> f64 {
     match selector {
         Some(Selector::FinalOrderLimit) => ctx.final_order_limit as f64,
         Some(Selector::LimitExcess) => {
@@ -728,7 +654,7 @@ fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner
     }
 }
 
-fn apply_limit_action(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
+fn apply_limit_action(ctx: &mut TradeContext<'_>, atom: &EffectAtom, owner: &str) {
     match &atom.action {
         Action::ReduceLimit { div, min: _ } => {
             let eff = resolve_selector_value(ctx, atom.selector.as_ref(), owner);
@@ -750,7 +676,7 @@ fn apply_limit_action(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
     }
 }
 
-fn apply_order_mechanic(ctx: &mut TradeContext, atom: &EffectAtom) {
+fn apply_order_mechanic(ctx: &mut TradeContext<'_>, atom: &EffectAtom) {
     match &atom.action {
         Action::TagOrder { tag } => {
             if !ctx.order_tags.contains(tag) {

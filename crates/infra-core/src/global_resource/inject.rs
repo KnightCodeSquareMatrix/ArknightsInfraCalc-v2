@@ -122,15 +122,23 @@ impl GlobalInjectManifest {
         all_trade_counts: &HashMap<String, u8>,
         current_room_counts: &HashMap<String, u8>,
     ) -> f64 {
-        self.trade_eff_pct_by(|rule| {
-            let counts = match rule.count_scope {
-                TradeTaggedCountScope::AllTradeRooms => all_trade_counts,
-                TradeTaggedCountScope::CurrentTradeRoom => current_room_counts,
-                TradeTaggedCountScope::QualifiedTradeRooms { .. } => {
-                    return rule.resolved_count;
-                }
-            };
-            counts.get(&rule.target_tag).copied().unwrap_or(0)
+        self.trade_eff_pct_with_current_room_count(all_trade_counts, |tag| {
+            current_room_counts.get(tag).copied().unwrap_or(0)
+        })
+    }
+
+    /// Resolve current-room counts without constructing a per-room tag map.
+    pub fn trade_eff_pct_with_current_room_count(
+        &self,
+        all_trade_counts: &HashMap<String, u8>,
+        current_room_count: impl Fn(&str) -> u8,
+    ) -> f64 {
+        self.trade_eff_pct_by(|rule| match rule.count_scope {
+            TradeTaggedCountScope::AllTradeRooms => {
+                all_trade_counts.get(&rule.target_tag).copied().unwrap_or(0)
+            }
+            TradeTaggedCountScope::CurrentTradeRoom => current_room_count(&rule.target_tag),
+            TradeTaggedCountScope::QualifiedTradeRooms { .. } => rule.resolved_count,
         })
     }
 
@@ -142,19 +150,27 @@ impl GlobalInjectManifest {
         all_trade_counts: &HashMap<String, u8>,
         current_room_counts: &HashMap<String, u8>,
     ) -> f64 {
+        self.trade_eff_pct_for_family_with_current_room_count(family, all_trade_counts, |tag| {
+            current_room_counts.get(tag).copied().unwrap_or(0)
+        })
+    }
+
+    pub fn trade_eff_pct_for_family_with_current_room_count(
+        &self,
+        family: &str,
+        all_trade_counts: &HashMap<String, u8>,
+        current_room_count: impl Fn(&str) -> u8,
+    ) -> f64 {
         let static_value = self.trade_by_family.get(family).copied().unwrap_or(0.0);
         self.trade_tagged
             .iter()
             .filter(|rule| rule.family == family)
-            .map(|rule| {
-                let counts = match rule.count_scope {
-                    TradeTaggedCountScope::AllTradeRooms => all_trade_counts,
-                    TradeTaggedCountScope::CurrentTradeRoom => current_room_counts,
-                    TradeTaggedCountScope::QualifiedTradeRooms { .. } => {
-                        return rule.resolved_count
-                    }
-                };
-                counts.get(&rule.target_tag).copied().unwrap_or(0)
+            .map(|rule| match rule.count_scope {
+                TradeTaggedCountScope::AllTradeRooms => {
+                    all_trade_counts.get(&rule.target_tag).copied().unwrap_or(0)
+                }
+                TradeTaggedCountScope::CurrentTradeRoom => current_room_count(&rule.target_tag),
+                TradeTaggedCountScope::QualifiedTradeRooms { .. } => rule.resolved_count,
             })
             .map(f64::from)
             .zip(

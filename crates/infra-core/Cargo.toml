@@ -11,3 +11,4 @@ thiserror.workspace = true
 csv.workspace = true
 rayon.workspace = true
 calamine.workspace = true
+smallvec = "1"

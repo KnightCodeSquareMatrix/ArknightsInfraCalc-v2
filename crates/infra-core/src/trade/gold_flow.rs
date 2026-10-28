@@ -92,26 +92,30 @@ pub fn has_ordered_gold_flow<'a>(names: impl IntoIterator<Item = &'a str>) -> bo
 }
 
 /// 在 `PeerAbsorb` 之前执行：按干员进驻顺序结算赤金链效率。
-pub fn apply_gold_flow_chain(ctx: &mut TradeContext, table: &SkillTable) {
+pub fn apply_gold_flow_chain(ctx: &mut TradeContext<'_>, table: &SkillTable) {
     let real = ctx.real_gold_lines;
     let mut virtual_lines = ctx.virtual_gold_lines;
     for (name, amount, _) in &ctx.layout.trade_gold_line_sources {
-        if ctx.operators.iter().any(|operator| operator.name == *name) {
+        if ctx
+            .operators
+            .iter()
+            .any(|operator| operator.name == name.as_str())
+        {
             virtual_lines = virtual_lines.saturating_sub(*amount);
         }
     }
-    let names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
-
-    for name in &names {
-        let buff_ids: Vec<String> = ctx
+    for owner_idx in 0..ctx.operators.len() {
+        let name = ctx.operators[owner_idx].name;
+        // Preserve the existing first-matching owner behavior for duplicate names.
+        let buff_ids = ctx
             .operators
             .iter()
-            .find(|o| o.name == *name)
-            .map(|o| o.buff_ids.clone())
+            .find(|o| o.name == name)
+            .map(|o| o.buff_ids)
             .unwrap_or_default();
 
         let mut extra = 0.0f64;
-        for bid in &buff_ids {
+        for bid in buff_ids {
             if table.get(bid).is_none() {
                 continue;
             }
@@ -142,7 +146,7 @@ pub fn apply_gold_flow_chain(ctx: &mut TradeContext, table: &SkillTable) {
         }
 
         if extra > 0.0 {
-            if let Some(idx) = ctx.operators.iter().position(|o| o.name == *name) {
+            if let Some(idx) = ctx.operators.iter().position(|o| o.name == name) {
                 ctx.operators[idx].settled_eff += extra;
             }
         }

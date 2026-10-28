@@ -122,7 +122,7 @@ pub fn daily_yield(
 }
 
 pub fn compute_unit_output(
-    ctx: &TradeContext,
+    ctx: &TradeContext<'_>,
     dist: &GoldDistribution,
     caps: &MechanicCaps,
     mechanic: &OrderMechanicResult,

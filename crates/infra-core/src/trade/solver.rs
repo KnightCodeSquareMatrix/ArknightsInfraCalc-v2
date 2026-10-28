@@ -37,7 +37,7 @@ pub struct TradeProductionReport {
     pub daily_at_shift: TradeDailyYield,
 }
 
-fn mood_drain_from_ctx(ctx: &TradeContext) -> Vec<OperatorMoodDrain> {
+fn mood_drain_from_ctx(ctx: &TradeContext<'_>) -> Vec<OperatorMoodDrain> {
     ctx.mood_drain_summary()
         .into_iter()
         .map(|(name, drain_delta_per_hour)| OperatorMoodDrain {
@@ -59,7 +59,7 @@ fn build_production(
 }
 
 fn resolve_unit_output(
-    ctx: &TradeContext,
+    ctx: &TradeContext<'_>,
     mechanic: &OrderMechanicResult,
     sc: Option<&shortcut::TradeShortcutMatch>,
     level: u8,
@@ -187,10 +187,10 @@ fn solve_trade_with_shift_inner(
     let siracusa_skill_eff = input
         .layout
         .global_inject
-        .trade_eff_pct_for_family_with_scoped_tag_counts(
+        .trade_eff_pct_for_family_with_current_room_count(
             "trade_siracusa_scaling",
             &input.layout.trade_tagged_count_sum,
-            &current_room_tag_counts(&ctx),
+            |tag| ctx.current_room_tag_count(tag),
         );
     let order_eff_skill = ctx.order_eff_skill() + siracusa_skill_eff;
     let order_eff_pre = ctx.order_eff_total();
@@ -253,14 +253,4 @@ fn solve_trade_with_shift_inner(
         mood_drain: mood_drain_from_ctx(&ctx),
         production,
     })
-}
-
-fn current_room_tag_counts(ctx: &TradeContext) -> std::collections::HashMap<String, u8> {
-    let mut counts = std::collections::HashMap::new();
-    for operator in &ctx.operators {
-        for tag in &operator.tags {
-            *counts.entry(tag.clone()).or_insert(0) += 1;
-        }
-    }
-    counts
 }

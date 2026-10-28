@@ -147,7 +147,10 @@ impl OrderMechanicResult {
     }
 }
 
-pub fn resolve_order_mechanic(ctx: &TradeContext, order_eff_total_pct: f64) -> OrderMechanicResult {
+pub fn resolve_order_mechanic(
+    ctx: &TradeContext<'_>,
+    order_eff_total_pct: f64,
+) -> OrderMechanicResult {
     if ctx.active_order_kind == TradeOrderKind::Originium {
         return originium_result(ctx.facility_level);
     }
