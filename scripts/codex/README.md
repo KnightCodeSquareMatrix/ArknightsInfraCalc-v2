@@ -10,7 +10,7 @@ scripts/codex/run_evidence.sh \
   --category targeted-test \
   --stem infra-core-case \
   --inputs 'fixture=data/example.json' \
-  -- cargo test -p infra-core test_name -- --exact
+  -- target/release/infra-cli verify --all
 ```
 
 支持重复 `--artifact kind=path` 登记命令产物，支持 `--metadata task.json` 写入任务范围、旁支发现和 reviewer 声明。metadata 结构见 `task_metadata.example.json`。
@@ -58,15 +58,3 @@ scripts/codex/render_evidence.py \
 
 `render_evidence.py` 会交叉核对 manifest、status、log 内的 exit code / PASS / FAIL，并检查所有登记产物存在。缺少的 build、定向测试、full suite、CLI、性能或 JSON 类别会明确渲染为“未跑”。
 
-## 自测
-
-本目录工具自身的回归可以通过证据包装器运行；普通仓库任务不要求使用包装器：
-
-```bash
-scripts/codex/run_evidence.sh \
-  --task codex-tools \
-  --category targeted-test \
-  --stem unittest \
-  --inputs 'scripts/codex tests and fixtures' \
-  -- python3 -m unittest discover -s scripts/codex/tests -p 'test_*.py' -v
-```

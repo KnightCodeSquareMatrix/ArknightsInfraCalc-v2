@@ -121,16 +121,3 @@ impl Roster {
 pub fn default_roster_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("roster.csv")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn load_trade_roster_takes_max_elite() {
-        let path = default_roster_path().unwrap();
-        let roster = Roster::load_csv_for_facility(&path, "trade").unwrap();
-        assert_eq!(roster.elite("但书"), Some(2));
-        assert_eq!(roster.elite("龙舌兰"), Some(2));
-    }
-}

@@ -24,14 +24,8 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-      - name: Compile infra-core tests
-        run: cargo test -p infra-core --no-run
-
-      - name: Run infra-core tests
-        run: cargo test -p infra-core --quiet
-
-      - name: Run Codex tooling tests
-        run: python3 -m unittest discover -s scripts/codex/tests -p 'test_*.py' -v
+      - name: Check workspace compiles
+        run: cargo check --workspace
 
       - name: Check stable Markdown and CLI facts
         run: python3 scripts/codex/check_repository_facts.py

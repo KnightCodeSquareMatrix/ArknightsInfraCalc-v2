@@ -145,31 +145,3 @@ impl<'de> Deserialize<'de> for Efficiency {
         Ok(Self::from_decimal(value))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rounds_half_away_from_zero_to_three_decimals() {
-        assert_eq!(Efficiency::from_decimal(1.2344).millis(), 1234);
-        assert_eq!(Efficiency::from_decimal(1.2345).millis(), 1235);
-        assert_eq!(Efficiency::from_decimal(-1.2345).millis(), -1235);
-    }
-
-    #[test]
-    fn multiplication_uses_integer_rounding() {
-        assert_eq!(
-            (Efficiency::from_decimal(1.83) * Efficiency::from_decimal(1.55)).millis(),
-            2837
-        );
-    }
-
-    #[test]
-    fn json_is_decimal_not_raw_integer() {
-        assert_eq!(
-            serde_json::to_string(&Efficiency::from_millis(2837)).unwrap(),
-            "2.837"
-        );
-    }
-}

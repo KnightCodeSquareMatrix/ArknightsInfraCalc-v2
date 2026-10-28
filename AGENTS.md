@@ -49,7 +49,7 @@
 - **修在哪**：改最早放行错误状态的那个 owner，不在下游补偿。owner 已经能表达规则时直接局部修，不要求先做架构准备。
 - **体系或结构性改写**（现有模型表达不了已确认的不变量，或多个阶段在重复兜底）：先简述领域不变量、首次违规的位置、修复后唯一的责任边界，以及要删掉的冲突路径。完成时旧的过渡路径和兼容分支一并删掉。
 - **范围**：一个写入单元只有一个主要意图，旁支发现记下来延后处理。修 bug 时发现的"代码可以更干净"另起任务，不借 bug 扩大范围；改变能力、可行行为、policy 或输出口径的，按新功能对待。没有用户恢复授权时，不推进无关的历史 TODO、Mower 动态换班或全基建连续心情最优化。
-- **验证**：按风险匹配。实现闭环后跑一轮完整验证包；失败时先改完，再整轮重跑，不拿反复编译代替调查。选人、排班、导出类的大改动靠 §2.1-9 的终态断言加批量 box，不新增源码测试；单房间计算这类局部修复可以补最小复现测试，改候选或搜索时同时测进入和被排除两侧。只改单个房间的计算或只改文档时，可以不跑 §2.1-9 的整体自检，但要在报告里说明原因。复现入口不清时查 `docs/MAINTENANCE_MODE.md` 对应章节。
+- **验证**：按风险匹配。实现闭环后跑一轮完整验证包；失败时先改完，再整轮重跑，不拿反复编译代替调查。仓库不保留源码测试（2026-10-28 用户裁决删除，不再新增），验证靠 §2.1-9 的终态断言加批量 box、`infra-cli verify` 和新旧输出对拍；改候选或搜索时，对拍要覆盖进入和被排除两侧。只改单个房间的计算或只改文档时，可以不跑 §2.1-9 的整体自检，但要在报告里说明原因。复现入口不清时查 `docs/MAINTENANCE_MODE.md` 对应章节。
 - **复审**：中高风险的选人、排班、导出或跨模块改动，整个功能完成后用 `arknights-intent-review`。复审只查三件事：是否照用户的想法改、实现是否干净、耦合代码依赖的条件是否还成立。准绳是用户原话和改动前的裁决，不是本次刚改的文档。主 agent 不自己复审，也不重复验收；每条发现必须落到已修复、有证据驳回或交给用户之一。
 - **提交**：授权的修复验证通过后，主动做原子提交。标题用中文，因为会显示在质量网页上。提交前看 `git status --short`、`git diff`、`git log --oneline -10`。
 - **文档**：改动涉及入口、状态写入、分支或 fallback、错误、输出、机制映射或保证等级时，在同一个变更里更新对应的 owner 文档并跑文档检查；纯内部重构写一句“已复核，无需修改”。新的人读文档用中文文件名。
@@ -67,7 +67,7 @@
 
 ## 3. 环境与命令
 
-- 测试、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo test --release`、`cargo build --release -p infra-cli`、`target/release/infra-cli`。debug 下全量库测试约 41 分钟。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
+- 批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo build --release -p infra-cli`、`target/release/infra-cli`。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
 - 修改 Rust 后运行 `cargo fmt --all`。
 - 需要长期留痕的证据（命令包装、失败集合对比、汇总报告）：见 `scripts/codex/README.md`。
 - 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。

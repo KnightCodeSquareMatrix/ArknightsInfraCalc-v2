@@ -446,38 +446,3 @@ fn commit_control_combo(
     assignment.set_room(room_id.clone(), ops);
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::instances::{default_instances_path, OperatorInstances};
-    use crate::pool::build_control_pool;
-    use crate::roster::Roster;
-    use crate::skill_table::{default_skill_table_path, SkillTable};
-
-    #[test]
-    fn final_control_pool_keeps_legal_operator_without_control_buff() {
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
-        let roster = Roster::from_elite_map([("阿米娅".to_string(), 2)].into_iter().collect());
-        let mut pool = build_control_pool(&roster, &instances, &table).unwrap();
-        pool.entries[0].buff_ids.clear();
-
-        let filtered = filter_control_pool_for_fill(
-            &pool,
-            &table,
-            &HashSet::new(),
-            &HashSet::new(),
-            &HashSet::new(),
-        )
-        .unwrap();
-
-        assert_eq!(filtered.entries.len(), 1);
-        assert!(filtered.entries[0].buff_ids.is_empty());
-
-        let pinned = HashSet::from(["阿米娅".to_string()]);
-        let filtered =
-            filter_control_pool_for_fill(&pool, &table, &HashSet::new(), &pinned, &pinned).unwrap();
-        assert_eq!(filtered.entries.len(), 1);
-    }
-}

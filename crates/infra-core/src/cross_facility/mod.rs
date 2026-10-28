@@ -32,32 +32,3 @@ pub struct GlobalResourceSnapshot {
     /// 全基建布局统计（不含 global/inject，仅 layout 字段）。
     pub layout: LayoutContext,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::global_resource::GlobalResourceKey;
-    use crate::instances::{default_instances_path, OperatorInstances};
-    use crate::layout::{AssignedOperator, BaseAssignment, BaseBlueprint};
-    use crate::skill_table::{default_skill_table_path, SkillTable};
-
-    #[test]
-    fn mulberry_e2_produces_fireworks_from_extra_office_slots() {
-        let blueprint: BaseBlueprint =
-            serde_json::from_str(r#"{"rooms":[{"id":"office","kind":"office","level":3}]}"#)
-                .unwrap();
-        let mut assignment = BaseAssignment::default();
-        assignment.set_room("office", vec![AssignedOperator::new("桑葚", 2)]);
-        let instances = OperatorInstances::load(&default_instances_path().unwrap()).unwrap();
-        let table = SkillTable::load(&default_skill_table_path().unwrap()).unwrap();
-        let layout = LayoutContext::default();
-        let atoms = collect_global_atoms(&blueprint, &assignment, &instances, &table, &layout);
-        let result = orchestrate_global_atoms(
-            &atoms,
-            &layout,
-            crate::global_resource::GlobalResourcePool::new(),
-        );
-
-        assert_eq!(result.global.get(GlobalResourceKey::HumanFireworks), 20.0);
-    }
-}
