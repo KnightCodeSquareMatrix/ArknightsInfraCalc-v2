@@ -149,6 +149,7 @@ pub struct OperationMetrics {
     pub room_context_clones: u64,
     pub support_registry_parses: u64,
     pub prepare_nanos: u64,
+    pub memo_key_prepare_nanos: u64,
     pub bake_lookup_nanos: u64,
     pub evaluate_nanos: u64,
     pub sort_topk_nanos: u64,
@@ -157,6 +158,8 @@ pub struct OperationMetrics {
     pub accepted_hits: u64,
     pub selected_assignments: u64,
     pub bake_hits: u64,
+    pub memo_hits: u64,
+    pub memo_misses: u64,
     pub live_calls: u64,
     pub actual_trade_solves: u64,
     pub actual_exclusive_checks: u64,
@@ -195,6 +198,9 @@ impl OperationMetrics {
             .support_registry_parses
             .saturating_add(other.support_registry_parses);
         self.prepare_nanos = self.prepare_nanos.saturating_add(other.prepare_nanos);
+        self.memo_key_prepare_nanos = self
+            .memo_key_prepare_nanos
+            .saturating_add(other.memo_key_prepare_nanos);
         self.bake_lookup_nanos = self
             .bake_lookup_nanos
             .saturating_add(other.bake_lookup_nanos);
@@ -211,6 +217,8 @@ impl OperationMetrics {
             .selected_assignments
             .saturating_add(other.selected_assignments);
         self.bake_hits = self.bake_hits.saturating_add(other.bake_hits);
+        self.memo_hits = self.memo_hits.saturating_add(other.memo_hits);
+        self.memo_misses = self.memo_misses.saturating_add(other.memo_misses);
         self.live_calls = self.live_calls.saturating_add(other.live_calls);
         self.actual_trade_solves = self
             .actual_trade_solves
@@ -257,6 +265,9 @@ impl OperationMetrics {
                 .support_registry_parses
                 .saturating_sub(before.support_registry_parses),
             prepare_nanos: self.prepare_nanos.saturating_sub(before.prepare_nanos),
+            memo_key_prepare_nanos: self
+                .memo_key_prepare_nanos
+                .saturating_sub(before.memo_key_prepare_nanos),
             bake_lookup_nanos: self
                 .bake_lookup_nanos
                 .saturating_sub(before.bake_lookup_nanos),
@@ -273,6 +284,8 @@ impl OperationMetrics {
                 .selected_assignments
                 .saturating_sub(before.selected_assignments),
             bake_hits: self.bake_hits.saturating_sub(before.bake_hits),
+            memo_hits: self.memo_hits.saturating_sub(before.memo_hits),
+            memo_misses: self.memo_misses.saturating_sub(before.memo_misses),
             live_calls: self.live_calls.saturating_sub(before.live_calls),
             actual_trade_solves: self
                 .actual_trade_solves
@@ -865,6 +878,8 @@ pub struct SearchPerfGuard {
     selected_assignments: u64,
     baked: bool,
     phases: SearchPhaseDurations,
+    memo_key_prepare: Duration,
+    memo_hit: Option<bool>,
     live_started: bool,
     finished: bool,
     hot_path_totals: Option<Arc<HotPathCounters>>,
@@ -890,6 +905,8 @@ pub fn start_search_perf(operation: SearchOperation) -> SearchPerfGuard {
         selected_assignments: 0,
         baked: false,
         phases: SearchPhaseDurations::default(),
+        memo_key_prepare: Duration::ZERO,
+        memo_hit: None,
         live_started: false,
         finished: false,
         hot_path_totals,
@@ -898,6 +915,12 @@ pub fn start_search_perf(operation: SearchOperation) -> SearchPerfGuard {
 }
 
 impl SearchPerfGuard {
+    /// 叶入口只记录一次数字；None 表示查询不具备缓存资格或键编码失败。
+    pub fn set_memo_lookup(&mut self, key_prepare: Duration, hit: Option<bool>) {
+        self.memo_key_prepare = key_prepare;
+        self.memo_hit = hit;
+    }
+
     /// Share numeric counts explicitly with Rayon tasks; request TLS is not inherited.
     pub fn hot_path_batch_counters(&self) -> Arc<HotPathCounters> {
         Arc::clone(
@@ -956,6 +979,24 @@ impl SearchPerfGuard {
         // Rayon collection has dropped every task guard. Flush serial entries before
         // sampling totals, including preparation/Bake failures and full materialization.
         drop(self.hot_path_batch.take());
+        PERF_TRACE.with(|trace| {
+            if let Some(state) = trace.borrow_mut().as_mut() {
+                let metrics = match self.operation {
+                    SearchOperation::Trade => &mut state.metrics.trade,
+                    SearchOperation::Manufacture => &mut state.metrics.manufacture,
+                    SearchOperation::Control => &mut state.metrics.control,
+                    SearchOperation::Power => &mut state.metrics.power,
+                };
+                metrics.memo_key_prepare_nanos = metrics
+                    .memo_key_prepare_nanos
+                    .saturating_add(duration_nanos(self.memo_key_prepare));
+                match self.memo_hit {
+                    Some(true) => metrics.memo_hits = metrics.memo_hits.saturating_add(1),
+                    Some(false) => metrics.memo_misses = metrics.memo_misses.saturating_add(1),
+                    None => {}
+                }
+            }
+        });
         if let Some(totals) = self.hot_path_totals.as_ref() {
             let counts = totals.snapshot();
             PERF_TRACE.with(|trace| {
@@ -1166,6 +1207,7 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
         "room_context_clones": metrics.room_context_clones,
         "support_registry_parses": metrics.support_registry_parses,
         "prepare_ms": nanos_ms(metrics.prepare_nanos),
+        "memo_key_prepare_ms": nanos_ms(metrics.memo_key_prepare_nanos),
         "bake_lookup_ms": nanos_ms(metrics.bake_lookup_nanos),
         "evaluate_ms": nanos_ms(metrics.evaluate_nanos),
         "sort_topk_ms": nanos_ms(metrics.sort_topk_nanos),
@@ -1174,6 +1216,8 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
         "accepted_hits": metrics.accepted_hits,
         "selected_assignments": metrics.selected_assignments,
         "bake_hits": metrics.bake_hits,
+        "memo_hits": metrics.memo_hits,
+        "memo_misses": metrics.memo_misses,
         "live_calls": metrics.live_calls,
         "actual_trade_solves": metrics.actual_trade_solves,
         "actual_exclusive_checks": metrics.actual_exclusive_checks,

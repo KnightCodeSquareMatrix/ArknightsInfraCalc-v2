@@ -181,6 +181,7 @@ pub fn search_trade_triples_filtered(
     options: &TradeSearchOptions,
     filter: SearchTripleFilter,
 ) -> Result<TradeSearchReport> {
+    let _memo_scope = super::ensure_search_memo_scope();
     match options.order_mode {
         TradeSearchOrderMode::Stations(scenario) => {
             search_trade_split_stations(pool, table, options, scenario, filter)
@@ -261,6 +262,22 @@ fn search_trade_single_order(
 ) -> Result<TradeSearchReport> {
     let leaf_started = Instant::now();
     let mut perf = crate::profile::start_search_perf(crate::profile::SearchOperation::Trade);
+    let memo_key_started = Instant::now();
+    let memo_key = super::memo::trade_key(pool, table, options, order_kind, &filter)
+        .ok()
+        .flatten();
+    let memo_key_elapsed = memo_key_started.elapsed();
+    let cached_report = memo_key.as_deref().and_then(super::memo::trade_get);
+    perf.set_memo_lookup(
+        memo_key_elapsed,
+        memo_key.as_ref().map(|_| cached_report.is_some()),
+    );
+    if let Some(mut report) = cached_report {
+        report.elapsed = leaf_started.elapsed();
+        perf.finish(0, 0, 0, report.top.len() as u64, false, Default::default());
+        return Ok(report);
+    }
+    let setup_started = Instant::now();
     if !filter
         .forbidden_pairs
         .iter()
@@ -324,7 +341,7 @@ fn search_trade_single_order(
             operator_capacity.saturating_sub(must_indices.len()),
         )
     };
-    let setup_elapsed = leaf_started.elapsed();
+    let setup_elapsed = setup_started.elapsed();
     perf.set_progress(
         combo_count,
         0,
@@ -352,6 +369,9 @@ fn search_trade_single_order(
     };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
+        if let Some(key) = memo_key {
+            super::memo::trade_insert(key, &report);
+        }
         perf.finish(
             combo_count,
             0,
@@ -458,6 +478,9 @@ fn search_trade_single_order(
         gold_order_line: None,
         originium_order_line: None,
     };
+    if let Some(key) = memo_key {
+        super::memo::trade_insert(key, &report);
+    }
     perf.finish(
         combo_count,
         candidate_attempts,

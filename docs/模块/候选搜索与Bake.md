@@ -32,6 +32,18 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 该顺序入口的贸易/制造区只读取冻结 `ControlEffectLedger` 的静态全局 key；按人数缩放、当前房间、deferred producer 和动态 projection 留给后续 resolve，不得提前成为中枢区 winner。调用方提供的 ETA eligibility 在候选组、每个效果区、统一心情区和普通补位每次形成满容量候选时都会检查。候选组逐组贪心仍是具名 policy，不能把 `NO_CANDIDATE_UNDER_POLICY` 或预算耗尽解释成 canonical `INFEASIBLE`。
 
+## 请求内搜索 memo
+
+贸易单订单和制造单配方叶入口在各自过滤、组合准备之前查询请求内 memo。这属于完整输入精确相等的 `safe reduction`：复用成功 report，不更改候选、必选、禁配、排序、top-K 或组合计数；`Stations` / `Lines` 包装器仍分别调用叶搜索并自行组合报告。叶入口的错误不缓存，`BakeMode::Required` 和带贸易 hit predicate 的查询不缓存；键编码失败保守执行原搜索。
+
+键覆盖不可变 SkillTable identity、有序完整 pool entry（含练度、buff、标签、预编译 atom、hint、mechanic/delegate、tier）、完整 LayoutContext 及其私有 global 数据、全部 options 和叶订单/配方、贸易 must/完整 override/禁配。`pool.skipped` 只用于建池诊断，不参与叶结果。编码保留浮点 bit、序列顺序和 map 实际遍历顺序；layout 与 atom 首次精确编码后 intern，以完整 bytes 相等判定，并保活 Arc 防止地址复用或 `Arc::make_mut` 原地修改。含动态贸易 tagged 或制造 count-scaled 注入的 layout 额外按 Arc 实例分离，避免未经证明的 map clone/insert 求和顺序等价合并。
+
+`search_trade_triples_filtered`（普通贸易入口委托它）与 `search_manufacture_triples` 建立线程本地 scope；调用方可用公开的 `ensure_search_memo_scope` 包住多个搜索。只有最外层 guard 创建和释放状态，内层复用；正常返回、错误及展开均释放该请求的状态，guard 不可跨线程，Rayon 组合任务不继承 scope。memo 独立于 perf 开关，不跨独立请求共享。本阶段尚未将 scope 接入调度或 CLI 请求边界，因此两个独立公开搜索只有被外层 scope 包住时才共享结果。
+
+成功 live 与 Bake 报告按完整内存 Clone 保存；命中保持 best/top、breakdown、combinations/evaluated 等原值，仅重新记录 elapsed。命中不新增实际 solver 调用或 Bake hit，也不伪造 generated/candidate/accepted 工作计数。perf 另累计 `memo_hits`、`memo_misses` 和 `memo_key_prepare_ms`；不具备缓存资格或编码失败不计 hit/miss，键准备耗时仅在叶入口记录一次，和原 prepare 阶段分开，诊断 JSON 仍在原统计输出边界生成。
+
+本阶段只完成 fmt 与 workspace offline check；编译不能证明运行等价或性能收益，结果差分和运行验收集中在全部优化完成后。
+
 ## Bake
 
 `bake_catalogs` 用 live solver 生成 schema v17 catalog 和 input fingerprint；贸易行以 `final_efficiency` 作为 `sort_efficiency`，校验按 `trade_final_efficiency` 检查排序键。`validate_baked_catalog` 检查 schema、输入 hash、row 集、combo table hash 和签名集合。贸易合法签名固定为 level1/2/3 赤金及 level3 源石：空 lv1/lv2 源石由 solver 的订单等级 hard constraint 不产生，故校验正好期望这四个 signature；manufacture 仍为 3 级 × 3 配方共 9 个。行保留贸易 total_efficiency、制造单位与每日产出；v17 以完整运行时身份索引行，不再把同名状态合并。查询沿 live 子池相对顺序枚举并使用制造仓库比较键，未表示的完整状态或非 canonical 顺序回退。`bake verify` 对存储行全量重算并比较完整命中，另做确定性子集查询差分；本轮运行验收集中在全部优化完成后。旧 catalog 因 schema 不匹配需重建。`data/baked/` 是首次运行生成的可丢弃数据，已加入 `.gitignore`；历史跟踪和旧 `aic-baked-save/` 已移除，不以仓库里的旧表作为当前构建的有效依据。

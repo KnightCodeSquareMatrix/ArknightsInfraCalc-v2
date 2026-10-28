@@ -178,6 +178,7 @@ pub fn search_manufacture_triples(
     table: &SkillTable,
     options: &ManuSearchOptions,
 ) -> Result<ManuSearchReport> {
+    let _memo_scope = super::ensure_search_memo_scope();
     let mut general_pool = filter_general_manufacture_search_pool(pool);
     if let Some(anchor) = options.must_include_name.as_deref() {
         if general_pool.entry(anchor).is_none() {
@@ -272,6 +273,22 @@ fn search_manufacture_single_recipe(
             "search_manufacture_single_recipe requires Single recipe mode",
         ));
     };
+    let memo_key_started = Instant::now();
+    let memo_key = super::memo::manu_key(pool, table, options, recipe)
+        .ok()
+        .flatten();
+    let memo_key_elapsed = memo_key_started.elapsed();
+    let cached_report = memo_key.as_deref().and_then(super::memo::manu_get);
+    perf.set_memo_lookup(
+        memo_key_elapsed,
+        memo_key.as_ref().map(|_| cached_report.is_some()),
+    );
+    if let Some(mut report) = cached_report {
+        report.elapsed = leaf_started.elapsed();
+        perf.finish(0, 0, 0, report.top.len() as u64, false, Default::default());
+        return Ok(report);
+    }
+    let prepare_started = Instant::now();
     let sub = if options.full_pool || options.must_include_name.is_some() {
         pool.clone()
     } else {
@@ -306,7 +323,7 @@ fn search_manufacture_single_recipe(
     let operator_capacity = options.operator_capacity.clamp(1, 3);
     let flat = flat_combinations(n, operator_capacity, must_idx);
     let combinations = (flat.len() / operator_capacity) as u64;
-    let prepare_elapsed = leaf_started.elapsed();
+    let prepare_elapsed = prepare_started.elapsed();
     perf.set_progress(
         combinations,
         0,
@@ -334,6 +351,9 @@ fn search_manufacture_single_recipe(
     };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
+        if let Some(key) = memo_key {
+            super::memo::manu_insert(key, &report);
+        }
         perf.finish(
             combinations,
             0,
@@ -468,6 +488,9 @@ fn search_manufacture_single_recipe(
         gold_line: None,
         battle_record_line: None,
     };
+    if let Some(key) = memo_key {
+        super::memo::manu_insert(key, &report);
+    }
     perf.finish(
         combinations,
         combinations,
