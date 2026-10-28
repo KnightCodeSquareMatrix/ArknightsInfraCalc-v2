@@ -21,6 +21,8 @@
 
 ## Bake 生命周期
 
+全表运行时变体准备模块已提供完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥辅助；目前尚未接入 Bake 生成或查询，生产候选政策保持现状。
+
 `BAKE_SCHEMA_VERSION` 当前为 16。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
 
 运行时 `BakeMode::Auto` 在兼容查询首次加载缺表/失效时生成完整表，全量核心校验通过才发布；生成和校验的 live 搜索显式 `Disabled`，RAII 标记防止递归。无参预热也用 Auto。进程内初始化及失败由 OnceLock 缓存，不在每次查询重复读取 exe；失败只 stderr 报告一次简短原因后回 live。`Disabled` 永不读取；`Required` 不主动生成，对任何 miss/error 失败。当前单元尚未把 miss 按类别接入 `[perf]`，计数留下一单元。
