@@ -36,7 +36,7 @@ use crate::skill_table::{data_path, default_skill_table_path, SkillTable};
 use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput, TradeSearchOrderMode};
 use crate::trade::shortcut::trade_station_exclusive_violation;
 use crate::trade::solver::solve_trade_with_shift_prevalidated;
-use crate::types::{CompiledAtom, Condition, RecipeKind, Selector};
+use crate::types::{Action, CompiledAtom, Condition, RecipeKind, Selector};
 use crate::FacilityKind;
 
 pub const BAKE_SCHEMA_VERSION: u32 = 17;
@@ -59,6 +59,7 @@ impl BakeMissKind {
             Self::InvalidShift => "shift duration must be finite",
             Self::Layout => "complete layout differs from the baked baseline",
             Self::MoodSensitive => "mood-sensitive skills require live settlement",
+            Self::Ramp => "shift-dependent ramp skills require live settlement",
             Self::PeerReset => "peer-reset skills require live settlement",
             Self::Generating => "catalog is currently being generated",
             Self::Unavailable => "catalog is missing, stale, or unavailable",
@@ -3988,11 +3989,26 @@ fn baked_manufacture_compatible(
         Some(BakeMissKind::Layout)
     } else if mood_sensitive_pool(pool, |entry| &entry.buff_ids, table) {
         Some(BakeMissKind::MoodSensitive)
+    } else if options.shift_hours.is_some() && manufacture_ramp_pool(pool, table) {
+        Some(BakeMissKind::Ramp)
     } else if options.pool_has_peer_reset(pool, table) {
         Some(BakeMissKind::PeerReset)
     } else {
         None
     }
+}
+
+fn manufacture_ramp_pool(pool: &ManuPool, table: &SkillTable) -> bool {
+    pool.entries.iter().any(|entry| {
+        entry.buff_ids.iter().any(|id| {
+            table.get(id).is_some_and(|skill| {
+                skill
+                    .atoms
+                    .iter()
+                    .any(|atom| matches!(atom.action, Action::AddEffRamp { .. }))
+            })
+        })
+    })
 }
 
 fn baked_search_baseline() -> &'static LayoutContext {

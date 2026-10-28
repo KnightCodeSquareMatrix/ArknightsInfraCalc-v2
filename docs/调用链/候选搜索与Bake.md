@@ -42,7 +42,7 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 
 ## Bake 分支
 
-`bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 在 miss 或不兼容时回 live，`Disabled` 直接 live，`Required` 对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。
+`bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 对查询不兼容回 live，首次加载缺表或失效时先生成并校验，成功后查表，失败才回 live。`Disabled` 直接 live，`Required` 只读有效表并对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。制造带班长且池含暖机 atom 时整体回 live，按整班逐时平均结算；无班长仍保留 20 小时。
 
 完整贸易行集合经 catalog 校验后，在查询行时按同一黑键—巫恋禁配过滤，再取前 K 条；该全局产品禁配可在 `Required` 下命中。其他未表示的禁配仍按原有 miss 语义处理；可执行文件或输入指纹不匹配的旧表不能跳过验证。
 

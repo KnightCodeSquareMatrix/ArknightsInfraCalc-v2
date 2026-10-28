@@ -38,7 +38,7 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 键覆盖不可变 SkillTable identity、有序完整 pool entry（含练度、buff、标签、预编译 atom、hint、mechanic/delegate、tier）、完整 LayoutContext 及其私有 global 数据、全部 options 和叶订单/配方、贸易 must/完整 override/禁配。`pool.skipped` 只用于建池诊断，不参与叶结果。编码保留浮点 bit、序列顺序和 map 实际遍历顺序；layout 与 atom 首次精确编码后 intern，以完整 bytes 相等判定，并保活 Arc 防止地址复用或 `Arc::make_mut` 原地修改。含动态贸易 tagged 或制造 count-scaled 注入的 layout 额外按 Arc 实例分离，避免未经证明的 map clone/insert 求和顺序等价合并。
 
-`search_trade_triples_filtered`（普通贸易入口委托它）与 `search_manufacture_triples` 建立线程本地 scope；调用方可用公开的 `ensure_search_memo_scope` 包住多个搜索。只有最外层 guard 创建和释放状态，内层复用；正常返回、错误及展开均释放该请求的状态，guard 不可跨线程，Rayon 组合任务不继承 scope。memo 独立于 perf 开关，不跨独立请求共享。本阶段尚未将 scope 接入调度或 CLI 请求边界，因此两个独立公开搜索只有被外层 scope 包住时才共享结果。
+`search_trade_triples_filtered`（普通贸易入口委托它）与 `search_manufacture_triples` 建立线程本地 scope；调用方可用公开的 `ensure_search_memo_scope` 包住多个搜索。只有最外层 guard 创建和释放状态，内层复用；正常返回、错误及展开均释放该请求的状态，guard 不可跨线程，Rayon 组合任务不继承 scope。memo 独立于 perf 开关，不跨独立请求共享。scope 已接入完整排班、独立 assignment 和 CLI plan/profile 请求边界；两个独立公开搜索只有被外层 scope 包住时才共享结果。
 
 成功 live 与 Bake 报告按完整内存 Clone 保存；命中保持 best/top、breakdown、combinations/evaluated 等原值，仅重新记录 elapsed。命中不新增实际 solver 调用或 Bake hit，也不伪造 generated/candidate/accepted 工作计数。perf 另累计 `memo_hits`、`memo_misses` 和 `memo_key_prepare_ms`；不具备缓存资格或编码失败不计 hit/miss，键准备耗时仅在叶入口记录一次，和原 prepare 阶段分开，诊断 JSON 仍在原统计输出边界生成。
 
@@ -74,9 +74,11 @@ runtime、CLI 默认输出和 debug 的 manifest 发现共用 `default_baked_out
 
 ## Bake 诊断计数
 
-query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compatibility 一次返回 typed 原因，Required 才延迟格式化原错误，Auto 不构造 miss 诊断字符串。内部 report helper 的 verify 调用、load 和 warm 不再计 query miss；加载中的 `generating` 与缓存失效/不可用的 `unavailable` 分开。rank sentinel 跳过和制造成功空报告不计 miss，rank/row 越界或物化等原 Err 继续传播，另记 `query_errors`，不能改成成功回退。
+query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compatibility 一次返回 typed 原因，Required 才延迟格式化原错误，Auto 不构造 miss 诊断字符串。制造搜索不再在此入口之前单独跳过 peer-reset 池，由同一兼容门禁记原因并保证 Required 严格报错。内部 report helper 的 verify 调用、load 和 warm 不再计 query miss；加载中的 `generating` 与缓存失效/不可用的 `unavailable` 分开。rank sentinel 跳过和制造成功空报告不计 miss，rank/row 越界或物化等原 Err 继续传播，另记 `query_errors`，不能改成成功回退。
 
-`metrics.bake.trade` / `manufacture` 输出非零类别：`forbidden_pairs`、`override`、`predicate`、`invalid_mood`、`invalid_shift`、`layout`、`mood_sensitive`、`peer_reset`、`generating`、`unavailable`、`skill_table`、`duplicate_names`、`state_absent`、`facility_state_absent`、`noncanonical_order`、`trade_atoms`、`manufacture_atoms`、`signature_absent`、`capacity`、`heap_unavailable`、`trade_incomplete`、`manufacture_incomplete`、`no_eligible_trade`。
+`metrics.bake.trade` / `manufacture` 输出非零类别：`forbidden_pairs`、`override`、`predicate`、`invalid_mood`、`invalid_shift`、`layout`、`mood_sensitive`、`ramp`、`peer_reset`、`generating`、`unavailable`、`skill_table`、`duplicate_names`、`state_absent`、`facility_state_absent`、`noncanonical_order`、`trade_atoms`、`manufacture_atoms`、`signature_absent`、`capacity`、`heap_unavailable`、`trade_incomplete`、`manufacture_incomplete`、`no_eligible_trade`。
+
+制造有班长且池内技能包含 `AddEffRamp` 时，以 `ramp` 原因整体回 live；Required 严格报 miss。live 先按整班的逐时加成平均，再执行原解释器，心情分段共用该窗口。无班长仍按 20 小时，固定 Bake 行及其全量校验保持此口径；带班长且含暖机的查询差分明确计 skipped，不计 checked。此门禁不删候选，也不把 20 小时表当作新班长结果。
 
 冷阶段 `metrics.bake.cold` 按 `init`、`generate`、`validate`、`verify`、`index`、`publish` 保存 calls/errors/elapsed_ms；init 只覆盖真正 OnceLock 初始化，缓存访问不冒充冷加载。实际重复验证照次数记；父子阶段 inclusive，不能相加作总耗时。CLI bake 在动作体包 trace，保留核心全量校验与既有 CLI 回归失败；serve 的启动 warm 单独输出 trace。
 

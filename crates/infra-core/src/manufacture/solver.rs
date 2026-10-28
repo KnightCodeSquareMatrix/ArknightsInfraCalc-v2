@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::eff_ramp::MANU_RAMP_HOURS;
 use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 use crate::layout::FacilityKind;
@@ -60,7 +61,14 @@ pub(crate) fn solve_manufacture_view(
     input: &ManuRoomView<'_>,
     table: &SkillTable,
 ) -> Result<ManuResult> {
-    solve_manufacture_at_gaps(input, table, &[])
+    solve_manufacture_at_gaps(input, table, &[], MANU_RAMP_HOURS)
+}
+
+/// 暖机先按整班逐时平均，再参与现有阶段解释；不是逐时非线性积分。
+fn manufacture_ramp_hours(shift_hours: Option<f64>) -> u32 {
+    shift_hours.map_or(MANU_RAMP_HOURS, |hours| {
+        hours.round().clamp(1.0, 24.0) as u32
+    })
 }
 
 pub fn solve_manufacture_with_shift(
@@ -79,8 +87,9 @@ pub(crate) fn solve_manufacture_with_shift_view(
     if !shift_hours.is_finite() {
         return Err(Error::msg("manufacture shift duration must be finite"));
     }
+    let ramp_hours = manufacture_ramp_hours(Some(shift_hours));
     if shift_hours <= 0.0 || !room_has_mood_gap_effect(input, table) {
-        return solve_manufacture_view(input, table);
+        return solve_manufacture_at_gaps(input, table, &[], ramp_hours);
     }
 
     let model = default_mood_model()?;
@@ -154,7 +163,7 @@ pub(crate) fn solve_manufacture_with_shift_view(
                 )
             })
             .collect();
-        let result = solve_manufacture_at_gaps(input, table, &gaps)?;
+        let result = solve_manufacture_at_gaps(input, table, &gaps, ramp_hours)?;
         base += result.base_efficiency.as_f64() * duration;
         occupancy += result.occupancy_efficiency.as_f64() * duration;
         skill += result.skill_efficiency.as_f64() * duration;
@@ -172,7 +181,7 @@ pub(crate) fn solve_manufacture_with_shift_view(
             )
         })
         .collect();
-    let end = solve_manufacture_at_gaps(input, table, &end_gaps)?;
+    let end = solve_manufacture_at_gaps(input, table, &end_gaps, ramp_hours)?;
     let base_efficiency = Efficiency::from_decimal(base / shift_hours);
     let occupancy_efficiency = Efficiency::from_decimal(occupancy / shift_hours);
     let skill_efficiency = Efficiency::from_decimal(skill / shift_hours);
@@ -195,8 +204,10 @@ fn solve_manufacture_at_gaps(
     input: &ManuRoomView<'_>,
     table: &SkillTable,
     mood_gaps: &[(&str, f64)],
+    ramp_hours: u32,
 ) -> Result<ManuResult> {
     let mut ctx = ManuContext::from_view(input);
+    ctx.ramp_hours = ramp_hours;
     for operator in &mut ctx.operators {
         if let Some((_, gap)) = mood_gaps.iter().find(|(name, _)| *name == operator.name) {
             operator.mood_gap = *gap;
@@ -303,6 +314,7 @@ pub(crate) fn solve_manufacture_light_view(
     }
 
     let mut ctx = ManuContext::from_view(input);
+    ctx.ramp_hours = manufacture_ramp_hours(shift_hours);
     apply_manu_phases(&mut ctx, table);
 
     let recipe = input.active_recipe;

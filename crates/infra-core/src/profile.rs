@@ -311,6 +311,7 @@ pub(crate) enum BakeMissKind {
     InvalidShift,
     Layout,
     MoodSensitive,
+    Ramp,
     PeerReset,
     Generating,
     Unavailable,
@@ -330,7 +331,7 @@ pub(crate) enum BakeMissKind {
 }
 
 impl BakeMissKind {
-    const ALL: [Self; 23] = [
+    const ALL: [Self; 24] = [
         Self::ForbiddenPairs,
         Self::Override,
         Self::Predicate,
@@ -338,6 +339,7 @@ impl BakeMissKind {
         Self::InvalidShift,
         Self::Layout,
         Self::MoodSensitive,
+        Self::Ramp,
         Self::PeerReset,
         Self::Generating,
         Self::Unavailable,
@@ -365,6 +367,7 @@ impl BakeMissKind {
             Self::InvalidShift => "invalid_shift",
             Self::Layout => "layout",
             Self::MoodSensitive => "mood_sensitive",
+            Self::Ramp => "ramp",
             Self::PeerReset => "peer_reset",
             Self::Generating => "generating",
             Self::Unavailable => "unavailable",
@@ -426,8 +429,8 @@ pub struct BakeColdMetrics {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BakeMetrics {
-    pub trade_misses: [u64; 23],
-    pub manufacture_misses: [u64; 23],
+    pub trade_misses: [u64; BakeMissKind::ALL.len()],
+    pub manufacture_misses: [u64; BakeMissKind::ALL.len()],
     pub trade_errors: u64,
     pub manufacture_errors: u64,
     pub cold: [BakeColdMetrics; 6],
@@ -457,7 +460,7 @@ impl BakeMetrics {
     }
     fn delta(self, before: Self) -> Self {
         let mut result = Self::default();
-        for i in 0..23 {
+        for i in 0..BakeMissKind::ALL.len() {
             result.trade_misses[i] = self.trade_misses[i].saturating_sub(before.trade_misses[i]);
             result.manufacture_misses[i] =
                 self.manufacture_misses[i].saturating_sub(before.manufacture_misses[i]);

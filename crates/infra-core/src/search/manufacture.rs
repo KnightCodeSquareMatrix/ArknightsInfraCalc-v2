@@ -341,8 +341,7 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     let bake_started = Instant::now();
-    let has_peer_reset = options.pool_has_peer_reset(&sub, table);
-    let baked_report = if !has_peer_reset && options.bake_mode != crate::bake::BakeMode::Disabled {
+    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
         crate::bake::try_baked_manufacture_search(
             &sub,
             table,

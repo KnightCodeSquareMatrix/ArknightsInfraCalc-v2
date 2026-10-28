@@ -29,7 +29,7 @@
 
 `BAKE_SCHEMA_VERSION` 当前为 17。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
 
-运行时 `BakeMode::Auto` 在兼容查询首次加载缺表/失效时生成完整表，全量核心校验通过才发布；生成和校验的 live 搜索显式 `Disabled`，RAII 标记防止递归。无参预热也用 Auto。进程内初始化及失败由 OnceLock 缓存，不在每次查询重复读取 exe；失败只 stderr 报告一次简短原因后回 live。`Disabled` 永不读取；`Required` 不主动生成，对任何 miss/error 失败。当前单元尚未把 miss 按类别接入 `[perf]`，计数留下一单元。
+运行时 `BakeMode::Auto` 在兼容查询首次加载缺表/失效时生成完整表，全量核心校验通过才发布；生成和校验的 live 搜索显式 `Disabled`，RAII 标记防止递归。无参预热也用 Auto。进程内初始化及失败由 OnceLock 缓存，不在每次查询重复读取 exe；失败只 stderr 报告一次简短原因后回 live。`Disabled` 永不读取；`Required` 不主动生成，对任何 miss/error 失败。miss 已按固定类别接入 `[perf]`，热查询只累计整数，结束时统一格式化。
 
 发布使用独立 generation 目录与 CURRENT 指针的原子 rename，生成目录验证后只读；同进程只初始化一次，跨进程通过不等待的短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。校验、verify、完整贸易 API 和 debug 指纹统一解析 CURRENT；旧平铺表仍可校验。默认目录优先规则与首次 release 输出位置见 [候选搜索与 Bake](模块/候选搜索与Bake.md)。`data/baked/` 已忽略；历史跟踪和旧目录已清理。生成物不能手工改成语义来源。
 
@@ -79,7 +79,7 @@
 
 轻量评分在 `None` 或不存在 `OwnerMoodGap` selector/condition 的有限时长输入上执行完整 phases，仅读取原 solver 的效率转换与仓库表达式，跳过 `ManuResult` 及心情输出的两次 Vec 物化。非有限时长仍失败；存在心情差效果的定时输入继续进入原定时 solver（包括其非正时长回退），保留阈值分段、逐项时长平均和结束时刻仓库。定时 `DrainInputs` 的拥有姓名名单、动态 layout 的工作名单和标签计数、最终搜索命中的姓名均在原边界物化。
 
-此单元是内部执行成本优化；配方浮点累加、peer reset、条件及仓库保持原实现，房间 state_pool 的固定快照边界见下文；暖机仍按原 20 小时结算，轻量评分及前 K 条完整物化边界保留。不改变枚举、候选集合、剪枝、目标、同分顺序、K=0、evaluated 或保证等级。本次仅格式化和 workspace 离线编译，未运行 solver、Bake 或新旧输出对拍，不能据此声称性能提升幅度或全局机制等价。
+此单元是内部执行成本优化；配方浮点累加、peer reset、条件及仓库保持原实现，房间 state_pool 的固定快照边界见下文；轻量评分及前 K 条完整物化边界保留。不改变枚举、候选集合、剪枝、目标、同分顺序、K=0、evaluated 或保证等级。本次仅格式化和 workspace 离线编译，未运行 solver、Bake 或新旧输出对拍，不能据此声称性能提升幅度或全局机制等价。后续已落实用户裁决的暖机行为：有班长按整班逐时平均，无班长仍 20 小时；轻量与完整结算共享窗口，详见制造状态文档。
 
 ## 制造全局注入的实例缓存
 

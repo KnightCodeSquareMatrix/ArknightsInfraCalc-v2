@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use smallvec::SmallVec;
 
-use crate::eff_ramp::eff_ramp_avg_20h;
+use crate::eff_ramp::{eff_ramp_avg_over_hours, MANU_RAMP_HOURS};
 use crate::global_resource::RoomState;
 use crate::layout::SharedLayout;
 use crate::manufacture::input::{ManuRoomInput, ManuRoomView};
@@ -108,6 +108,8 @@ pub struct ManuContext<'a> {
     pub layout: SharedLayout,
     pub facility_base_storage: i32,
     pub mood: f64,
+    /// 整班暖机逐时平均窗口；无班长的静态结算保持 20 小时。
+    pub ramp_hours: u32,
     pub state_pool: RoomState,
 }
 
@@ -138,6 +140,7 @@ impl<'a> ManuContext<'a> {
             layout: Arc::clone(input.layout),
             facility_base_storage: facility_base_storage(input.level),
             mood: input.mood,
+            ramp_hours: MANU_RAMP_HOURS,
             state_pool: input.layout.global.to_fixed_room_state(),
         }
     }
@@ -599,7 +602,7 @@ fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f
             per_hour,
             cap,
             style,
-        } => eff_ramp_avg_20h(*style, *initial, *per_hour, *cap),
+        } => eff_ramp_avg_over_hours(*style, *initial, *per_hour, *cap, ctx.ramp_hours),
         Action::AddFlatEff { value, .. } => *value,
         Action::AddFlatEffFromSelector {
             multiplier, cap, ..
