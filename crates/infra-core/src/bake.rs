@@ -56,6 +56,14 @@ fn baked_miss<T>(mode: BakeMode, reason: impl Into<String>) -> Result<Option<T>>
     }
 }
 
+fn baked_miss_lazy<T>(mode: BakeMode, reason: impl FnOnce() -> String) -> Result<Option<T>> {
+    if mode == BakeMode::Required {
+        baked_miss(mode, reason())
+    } else {
+        Ok(None)
+    }
+}
+
 pub type BakeProgressCallback = Arc<dyn Fn(BakeProgressEvent) + Send + Sync>;
 
 #[derive(Clone)]
@@ -95,6 +103,9 @@ impl std::fmt::Debug for BakeOptions {
 }
 
 pub fn default_baked_out_dir() -> Result<PathBuf> {
+    if let Some(out_dir) = std::env::var_os("ARKNIGHTS_INFRA_BAKED_DIR") {
+        return Ok(PathBuf::from(out_dir));
+    }
     let roots = default_baked_data_roots()?;
     for root in &roots {
         let out_dir = root.join("baked");
@@ -522,7 +533,9 @@ struct RuntimeBakedComboTable {
     /// 每个 signature 实际出现过的干员位图（行 mask 的并集）。
     /// 查询池必须是该集合的子集，否则 Bake 无法覆盖该池的全部组合，必须 miss 回退。
     universe_mask_by_key: HashMap<String, Vec<u64>>,
-    rank_rows_by_key: HashMap<String, Vec<usize>>,
+    /// 贸易四种与制造九种合法 signature；磁盘仍保留原 String key。
+    rank_rows_by_signature: [Option<Vec<usize>>; BAKED_SIGNATURE_SLOTS],
+    trade_gold_lines: u32,
     trade_canonical: HashMap<usize, usize>,
     manu_canonical: HashMap<usize, usize>,
     trade_atoms: HashMap<usize, Arc<[CompiledAtom]>>,
@@ -3083,14 +3096,20 @@ fn baked_trade_report(
     } else {
         options.gold_production_lines
     };
-    let key = trade_lookup_key(
-        options.trade_level,
-        options.operator_capacity,
-        order_kind,
-        gold_lines,
-    );
-    let Some(ranks) = table.rank_rows_by_key.get(&key) else {
-        return baked_miss(mode, format!("signature {key:?} is absent"));
+    let signature_slot =
+        trade_signature_slot(options.trade_level, options.operator_capacity, order_kind)
+            .filter(|_| !order_kind.is_gold() || gold_lines == table.trade_gold_lines);
+    let Some(ranks) = signature_slot.and_then(|slot| table.rank_rows_by_signature[slot].as_ref())
+    else {
+        return baked_miss_lazy(mode, || {
+            let key = trade_lookup_key(
+                options.trade_level,
+                options.operator_capacity,
+                order_kind,
+                gold_lines,
+            );
+            format!("signature {key:?} is absent")
+        });
     };
     let k = options.operator_capacity;
     if !(1..=3).contains(&k) {
@@ -3206,9 +3225,13 @@ fn baked_manufacture_report(
         Ok(ids) => ids,
         Err(reason) => return baked_miss(mode, reason),
     };
-    let key = manufacture_lookup_key(options.level, options.operator_capacity, recipe);
-    let Some(ranks) = table.rank_rows_by_key.get(&key) else {
-        return baked_miss(mode, format!("signature {key:?} is absent"));
+    let Some(ranks) = manufacture_signature_slot(options.level, options.operator_capacity, recipe)
+        .and_then(|slot| table.rank_rows_by_signature[slot].as_ref())
+    else {
+        return baked_miss_lazy(mode, || {
+            let key = manufacture_lookup_key(options.level, options.operator_capacity, recipe);
+            format!("signature {key:?} is absent")
+        });
     };
     let k = options.operator_capacity;
     if !(1..=3).contains(&k) {
@@ -3620,11 +3643,46 @@ fn runtime_baked_table_from_disk(disk: BakedComboTableDisk) -> Result<RuntimeBak
             )
         })
         .collect();
-    let mut rank_rows_by_key = HashMap::new();
+    let trade_gold_lines = baked_search_baseline().gold_manu_line_count;
+    let mut rank_rows_by_signature = std::array::from_fn(|_| None);
     for index in &table.indexes {
-        let capacity = table.rows[index.start].operator_capacity;
+        let end = index
+            .start
+            .checked_add(index.len)
+            .ok_or_else(|| Error::msg("Bake signature range overflow"))?;
+        let rows = table
+            .rows
+            .get(index.start..end)
+            .ok_or_else(|| Error::msg("Bake signature range is out of bounds"))?;
+        let first = rows
+            .first()
+            .ok_or_else(|| Error::msg("empty Bake signature"))?;
+        let capacity = first.operator_capacity;
+        let (signature_slot, expected_key) = match (first.order_kind, first.recipe) {
+            (Some(order), None) => (
+                trade_signature_slot(first.room_level, capacity, order),
+                trade_lookup_key(first.room_level, capacity, order, trade_gold_lines),
+            ),
+            (None, Some(recipe)) => (
+                manufacture_signature_slot(first.room_level, capacity, recipe),
+                manufacture_lookup_key(first.room_level, capacity, recipe),
+            ),
+            _ => {
+                return Err(Error::msg(
+                    "Bake signature has inconsistent facility fields",
+                ))
+            }
+        };
+        let signature_slot =
+            signature_slot.ok_or_else(|| Error::msg("unsupported Bake signature"))?;
+        if expected_key != index.signature_key {
+            return Err(Error::msg("Bake signature key differs from its first row"));
+        }
+        if rank_rows_by_signature[signature_slot].is_some() {
+            return Err(Error::msg("duplicate Bake signature slot"));
+        }
         let mut ranks = rank::empty_rows(table.operator_count, capacity)?;
-        for row in &table.rows[index.start..index.start + index.len] {
+        for row in rows {
             let position = rank::colex(&row.operator_indices)?;
             let slot = ranks
                 .get_mut(position)
@@ -3634,13 +3692,14 @@ fn runtime_baked_table_from_disk(disk: BakedComboTableDisk) -> Result<RuntimeBak
             }
             *slot = row.row_id;
         }
-        rank_rows_by_key.insert(index.signature_key.clone(), ranks);
+        rank_rows_by_signature[signature_slot] = Some(ranks);
     }
     Ok(RuntimeBakedComboTable {
         table,
         operator_index_by_state,
         universe_mask_by_key,
-        rank_rows_by_key,
+        rank_rows_by_signature,
+        trade_gold_lines,
         trade_canonical,
         manu_canonical,
         trade_atoms,
@@ -3678,6 +3737,33 @@ fn runtime_skill_table_matches(runtime: &RuntimeBakedComboTable, table: &SkillTa
     *cache
         .entry(table.identity())
         .or_insert_with(|| runtime.skill_source_json.as_ref() == table.source_json().as_ref())
+}
+
+const BAKED_SIGNATURE_SLOTS: usize = 13;
+
+/// 只接受磁盘完整验证允许的等级和容量，不把越界等级 clamp 成合法 signature。
+fn trade_signature_slot(level: u8, capacity: usize, order: TradeOrderKind) -> Option<usize> {
+    if !(1..=3).contains(&level) || capacity != usize::from(level) {
+        return None;
+    }
+    match order {
+        TradeOrderKind::Gold => Some(usize::from(level - 1)),
+        TradeOrderKind::Originium if level == 3 => Some(3),
+        TradeOrderKind::Originium => None,
+    }
+}
+
+fn manufacture_signature_slot(level: u8, capacity: usize, recipe: RecipeKind) -> Option<usize> {
+    if !(1..=3).contains(&level) || capacity != usize::from(level) {
+        return None;
+    }
+    let recipe_index = match recipe {
+        RecipeKind::Gold => 0,
+        RecipeKind::BattleRecord => 1,
+        RecipeKind::Originium => 2,
+        RecipeKind::All => return None,
+    };
+    Some(4 + usize::from(level - 1) * 3 + recipe_index)
 }
 
 fn trade_lookup_key(

@@ -98,3 +98,11 @@
 
 
 U4a 提供内部 `ExactKeySerializer`：完整类型/字段/容器边界、原始浮点 bit 和 map 实际迭代顺序进入键，布局与注入的全部业务字段及预编译 atom 可直接编码；该模块尚未接入搜索或 memo，本阶段仅格式化、release 离线编译及差异检查，不能据此证明缓存等价或性能收益。
+
+## Bake signature 的固定槽位与目录隔离
+
+生产 rank 查询只接受现有 13 种合法 signature，以四个贸易槽和九个制造槽取代字符串 HashMap。level 必须在 1–3 且 capacity 等于等级；贸易赤金的有效金线数必须等于冷加载的 search baseline，源石继续沿原 signature 不限制金线。冷加载从各 index 首行重建原字符串 key 并核对，拒绝不支持或重复槽；磁盘 v17、完整 signature 集合与逐行验证、rank 填充、heap、门禁和比较顺序不变。这是内部查找成本优化，不扩大 Bake 支持域。正常 signature miss 不构造诊断字符串，Required 才延迟格式化原 key。
+
+`ARKNIGHTS_INFRA_BAKED_DIR` 单独指定默认 Bake 目录，设置后直接使用，不参与其他输入文件的 `data_path` 发现。它可将最终验收生成和运行时加载都隔离到临时目录，保持默认 layout/baseline 标签与冻结产物一致；未设置时完全保留原目录发现顺序，CLI 显式 `--out` 继续优先。
+
+本单元仅格式化、workspace 离线编译和源差异检查；未运行 solver、Bake、测量或测试，不能据此证明运行等价或性能幅度。最终全量 Bake 验证、产物差分和终态断言集中执行。
