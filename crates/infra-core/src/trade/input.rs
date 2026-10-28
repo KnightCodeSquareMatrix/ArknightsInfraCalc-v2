@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use smallvec::SmallVec;
+
 pub use crate::layout::{LayoutContext, SharedLayout, DEFAULT_DORM_OCCUPANT_COUNT};
 
 /// 兼容旧名；新代码请用 [`LayoutContext`]。
@@ -75,6 +77,26 @@ pub struct TradeOperator {
     pub compiled_atoms: Arc<[CompiledAtom]>,
 }
 
+/// 房间执行期间借用干员身份，不拥有姓名、技能、标签或预编译 atoms。
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TradeOperatorRef<'a> {
+    pub name: &'a str,
+    pub elite: u8,
+    pub buff_ids: &'a [String],
+    pub tags: &'a [String],
+    pub compiled_atoms: &'a [CompiledAtom],
+}
+
+impl TradeOperatorRef<'_> {
+    pub(crate) fn tier(&self) -> PromotionTier {
+        PromotionTier::from_elite(self.elite)
+    }
+
+    pub(crate) fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+}
+
 impl Default for TradeOperator {
     fn default() -> Self {
         Self::new("", 0, Vec::new())
@@ -82,6 +104,16 @@ impl Default for TradeOperator {
 }
 
 impl TradeOperator {
+    pub(crate) fn as_ref(&self) -> TradeOperatorRef<'_> {
+        TradeOperatorRef {
+            name: &self.name,
+            elite: self.elite,
+            buff_ids: &self.buff_ids,
+            tags: &self.tags,
+            compiled_atoms: &self.compiled_atoms,
+        }
+    }
+
     pub fn tier(&self) -> PromotionTier {
         PromotionTier::from_elite(self.elite)
     }
@@ -118,7 +150,35 @@ pub struct TradeRoomInput {
     pub active_order_kind: TradeOrderKind,
 }
 
+/// 自持引用槽位，借用生命周期只依赖真实身份和共享布局。
+#[derive(Debug, Clone)]
+pub(crate) struct TradeRoomView<'a> {
+    pub level: u8,
+    pub operators: SmallVec<[TradeOperatorRef<'a>; 5]>,
+    pub order_count: Option<i32>,
+    pub mood: f64,
+    pub gold_production_lines: Option<u32>,
+    pub durin_virtual_lines: Option<u32>,
+    pub human_fireworks: Option<f64>,
+    pub layout: &'a SharedLayout,
+    pub active_order_kind: TradeOrderKind,
+}
+
 impl TradeRoomInput {
+    pub(crate) fn as_view(&self) -> TradeRoomView<'_> {
+        TradeRoomView {
+            level: self.level,
+            operators: self.operators.iter().map(TradeOperator::as_ref).collect(),
+            order_count: self.order_count,
+            mood: self.mood,
+            gold_production_lines: self.gold_production_lines,
+            durin_virtual_lines: self.durin_virtual_lines,
+            human_fireworks: self.human_fireworks,
+            layout: &self.layout,
+            active_order_kind: self.active_order_kind,
+        }
+    }
+
     pub fn operator_names(&self) -> Vec<&str> {
         self.operators.iter().map(|o| o.name.as_str()).collect()
     }

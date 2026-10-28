@@ -54,9 +54,13 @@
 
 ## 贸易房间解释器的借用边界
 
+`TradeOperatorRef` 借用姓名、技能 ID、标签及 atom 切片，`TradeRoomView` 自持五槽引用 `SmallVec` 并完整携带原房间 scalar，借用共享 layout。公开 owned 输入与 `TradeContext::from_room` 保留，context 通过临时 view 进入同一初始化链，借用生命周期只绑定底层身份；人间烟火覆盖、灵知初始注入和浮点顺序保留。池已提供借用身份与组合 helper，override 选择及赤金链稳定排序照原 owned helper；借用候选投影判定也已准备。本小单元仅增加数据转换，solver、search、shortcut 与现 owned 组合 helper 调用者尚未改接借用入口，因此不据此声称逐组合复制已消除。
+
 单次房间解释器借用输入干员的名字、技能 ID、标签及预编译 atom 切片；房间 runtime 与归并源用五槽 `SmallVec`，归并游标用固定五槽数组，人数超过五人时允许堆上溢出。归并按原 `phase/order → 输入 owner 序号 → atom seq` 次序逐条应用，不再构造、排序整房 atom 列表或逐 atom 克隆。手动构造且未携带 atom 的技能组合通过同一技能表的冷缓存补齐，包括合法空结果；仅补缺项临时持有 Arc。赤金链仍按输入顺序在 `PeerAbsorb` 前结算，订单上限重算时机不变。
 
 当前房标签注入改为按请求标签遍历计数，重复标签每次出现仍计一次；注入 family 的 HashMap 克隆和浮点求和遍历保留。拥有名字的心情输出在输出边界分配，layout 仍共享 Arc，房间 state_pool 的固定快照边界见下文。该单元属于内部执行成本优化，不改变候选集合、剪枝、目标或保证等级；本次仅格式化与 release 编译，未运行求解、Bake 或新旧输出对拍，不能据此声称性能提升幅度或全局机制等价。
+
+借用类型与转换小单元仅格式化、workspace 离线编译及源差异检查；未新增测试或运行 solver、Bake、性能测量，未验证运行结果或性能幅度。
 
 
 ## 制造房间解释器的借用边界

@@ -1,11 +1,14 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use smallvec::SmallVec;
+
 use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
+use crate::trade::input::TradeOperatorRef;
 use crate::trade::TradeOperator;
 use crate::types::{Action, CompiledAtom, Condition, EffectAtom, Phase, Selector, SkillDef};
 
@@ -152,6 +155,16 @@ impl TierTagged for TradePoolEntry {
 }
 
 impl TradePoolEntry {
+    pub(crate) fn as_trade_operator_ref(&self) -> TradeOperatorRef<'_> {
+        TradeOperatorRef {
+            name: &self.name,
+            elite: self.elite,
+            buff_ids: &self.buff_ids,
+            tags: &self.tags,
+            compiled_atoms: &self.compiled_atoms,
+        }
+    }
+
     pub fn to_trade_operator(&self) -> TradeOperator {
         TradeOperator {
             name: self.name.clone(),
@@ -176,6 +189,22 @@ pub(crate) fn trade_atom_requires_candidate_projection(atom: &EffectAtom) -> boo
 }
 
 pub(crate) fn trade_operators_require_candidate_projection(operators: &[TradeOperator]) -> bool {
+    operators.iter().any(|operator| {
+        operator
+            .tags
+            .iter()
+            .any(|tag| tag == crate::layout::TAG_DURIN)
+            || operator.buff_ids.iter().any(|id| is_gold_flow_skill(id))
+            || operator
+                .compiled_atoms
+                .iter()
+                .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
+    })
+}
+
+pub(crate) fn trade_operator_refs_require_candidate_projection(
+    operators: &[TradeOperatorRef<'_>],
+) -> bool {
     operators.iter().any(|operator| {
         operator
             .tags
@@ -227,6 +256,32 @@ pub fn build_trade_combo_operators_vec(
         operators.iter().map(|op: &TradeOperator| op.name.as_str()),
     ) {
         operators.sort_by_key(|op| crate::trade::gold_flow::ordered_trio_priority(&op.name));
+    }
+    operators
+}
+
+/// 借用版组合构造；override 选择与赤金链稳定排序同 owned 入口。
+pub(crate) fn build_trade_combo_operator_refs<'a>(
+    pool: &'a TradePool,
+    combo: &[usize],
+    must_name: Option<&str>,
+    override_op: Option<&'a TradeOperator>,
+) -> SmallVec<[TradeOperatorRef<'a>; 5]> {
+    let mut operators: SmallVec<[_; 5]> = combo
+        .iter()
+        .map(|idx| {
+            let entry = &pool.entries[*idx];
+            if must_name.is_some_and(|n| entry.name == n) {
+                override_op
+                    .map(TradeOperator::as_ref)
+                    .unwrap_or_else(|| entry.as_trade_operator_ref())
+            } else {
+                entry.as_trade_operator_ref()
+            }
+        })
+        .collect();
+    if crate::trade::gold_flow::has_ordered_gold_flow(operators.iter().map(|op| op.name)) {
+        operators.sort_by_key(|op| crate::trade::gold_flow::ordered_trio_priority(op.name));
     }
     operators
 }

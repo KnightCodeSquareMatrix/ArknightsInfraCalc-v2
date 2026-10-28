@@ -6,6 +6,7 @@ use crate::global_resource::{GlobalResourceKey, RoomState};
 use crate::layout::SharedLayout;
 use crate::skill_table::SkillTable;
 use crate::trade::gold_flow::apply_gold_flow_chain;
+use crate::trade::input::{TradeRoomInput, TradeRoomView};
 use crate::types::{Action, CompiledAtom, Condition, EffectAtom, Phase, Selector, StateKey};
 #[derive(Debug, Clone, Default)]
 pub struct OperatorRuntime<'a> {
@@ -53,17 +54,21 @@ pub struct MechanicCaps {
 }
 
 impl<'a> TradeContext<'a> {
-    pub fn from_room(input: &'a crate::trade::input::TradeRoomInput) -> Self {
+    pub fn from_room(input: &'a TradeRoomInput) -> Self {
+        Self::from_view(&input.as_view())
+    }
+
+    pub(crate) fn from_view(input: &TradeRoomView<'a>) -> Self {
         let facility_base_limit = facility_base_limit(input.level);
         let operators = input
             .operators
             .iter()
             .map(|o| OperatorRuntime {
-                name: &o.name,
+                name: o.name,
                 elite: o.elite,
-                buff_ids: &o.buff_ids,
-                tags: &o.tags,
-                compiled_atoms: &o.compiled_atoms,
+                buff_ids: o.buff_ids,
+                tags: o.tags,
+                compiled_atoms: o.compiled_atoms,
                 ..Default::default()
             })
             .collect();
@@ -71,7 +76,7 @@ impl<'a> TradeContext<'a> {
         let mut ctx = Self {
             operators,
             facility_level: input.level,
-            layout: input.layout.clone(),
+            layout: Arc::clone(input.layout),
             facility_base_limit,
             final_order_limit: facility_base_limit,
             order_count,
