@@ -1,9 +1,12 @@
 mod control;
 pub(crate) mod exact_key;
 mod manufacture;
+pub(crate) mod memo;
 mod power;
 mod role_pick;
 mod trade;
+
+pub use memo::{ensure_search_memo_scope, SearchMemoScopeGuard};
 
 pub use control::{
     control_efficiency_fill_sort_weight, control_entry_core_inject_fill,
