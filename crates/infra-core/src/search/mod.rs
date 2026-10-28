@@ -1,4 +1,5 @@
 mod control;
+mod enumerate;
 pub(crate) mod exact_key;
 mod manufacture;
 pub(crate) mod memo;

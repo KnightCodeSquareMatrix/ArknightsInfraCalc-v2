@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rayon::prelude::*;
 use serde::Serialize;
 use smallvec::SmallVec;
 
@@ -24,6 +23,8 @@ use crate::pool::{
 use crate::skill_table::SkillTable;
 use crate::types::{Action, Condition, EffectAtom, RecipeKind, SkillDef};
 use crate::FacilityKind;
+
+use super::enumerate::{evaluate_flat_combinations, flat_combinations};
 
 /// 制造站直接效率分解，所有数值均为无量纲小数效率。
 ///
@@ -325,7 +326,7 @@ fn search_manufacture_single_recipe(
         )));
     }
     let operator_capacity = options.operator_capacity.clamp(1, 3);
-    let flat = flat_combinations(n, operator_capacity, must_idx);
+    let flat = flat_combinations(n, operator_capacity, must_idx.as_slice());
     let combinations = (flat.len() / operator_capacity) as u64;
     let prepare_elapsed = prepare_started.elapsed();
     perf.set_progress(
@@ -392,38 +393,36 @@ fn search_manufacture_single_recipe(
         storage: i32,
     }
     let k = operator_capacity;
-    let mut hits: Vec<Light> = flat
-        .par_chunks(k)
-        .enumerate()
-        .map_init(
-            || crate::profile::start_hot_path_batch(std::sync::Arc::clone(&batch_counters)),
-            |_, (ci, combo)| {
-                let ops: SmallVec<[_; 5]> = combo
-                    .iter()
-                    .map(|i| sub.entries[*i].as_manu_operator_ref())
-                    .collect();
-                if !manufacture_combo_refs_allowed_for_shift(&ops, table, options.shift_hours) {
-                    return None;
-                }
-                let layout = manufacture_combo_layout(&options.layout, &ops);
-                let base = ManuRoomView {
-                    level: options.level,
-                    operators: ops,
-                    active_recipe: recipe,
-                    mood: options.mood,
-                    layout: &layout,
-                };
-                let (eff, storage) =
-                    evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
-                Some(Light {
-                    idx: ci,
-                    eff,
-                    storage,
-                })
-            },
-        )
-        .flatten()
-        .collect();
+    let mut hits: Vec<Light> = evaluate_flat_combinations(
+        &flat,
+        k,
+        &batch_counters,
+        |ci, combo| {
+            let ops: SmallVec<[_; 5]> = combo
+                .iter()
+                .map(|i| sub.entries[*i].as_manu_operator_ref())
+                .collect();
+            if !manufacture_combo_refs_allowed_for_shift(&ops, table, options.shift_hours) {
+                return None;
+            }
+            let layout = manufacture_combo_layout(&options.layout, &ops);
+            let base = ManuRoomView {
+                level: options.level,
+                operators: ops,
+                active_recipe: recipe,
+                mood: options.mood,
+                layout: &layout,
+            };
+            let (eff, storage) =
+                evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
+            Some(Light {
+                idx: ci,
+                eff,
+                storage,
+            })
+        },
+        |_| true,
+    );
     let evaluate_elapsed = evaluate_started.elapsed();
 
     let accepted_hits = hits.len() as u64;
@@ -798,40 +797,6 @@ fn evaluate_manufacture_room_view_with_shift(
         storage,
         breakdown,
     })
-}
-
-/// 与 `combinations_indices` 同序的平铺组合：一次分配，`k` 个下标一组。
-fn flat_combinations(n: usize, k: usize, anchor: Option<usize>) -> Vec<usize> {
-    let mut out = Vec::new();
-    if k == 0 || k > n {
-        return out;
-    }
-    let mut combo = [0usize; 3];
-    for (i, slot) in combo.iter_mut().enumerate().take(k) {
-        *slot = i;
-    }
-    loop {
-        if anchor.is_none_or(|a| combo[..k].contains(&a)) {
-            out.extend_from_slice(&combo[..k]);
-        }
-        let mut i = k;
-        let mut advanced = false;
-        while i > 0 {
-            i -= 1;
-            if combo[i] != i + n - k {
-                combo[i] += 1;
-                for j in i + 1..k {
-                    combo[j] = combo[j - 1] + 1;
-                }
-                advanced = true;
-                break;
-            }
-        }
-        if !advanced {
-            break;
-        }
-    }
-    out
 }
 
 /// 只产出排序所需的 (final_efficiency, storage key)，不构造 names / breakdown。

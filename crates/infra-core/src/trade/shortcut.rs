@@ -401,18 +401,6 @@ pub(crate) fn resolve_trade_shortcut_refs(
     resolve_trade_shortcut_inner(ops, table, order_eff_pre, trade_level, inject, true)
 }
 
-/// 搜索热路径：调用方已做互斥预筛时跳过重复校验。
-pub(crate) fn resolve_trade_shortcut_prevalidated(
-    ops: &[TradeOperator],
-    table: &SkillTable,
-    order_eff_pre: f64,
-    trade_level: u8,
-    inject: &GlobalInjectManifest,
-) -> Option<TradeShortcutMatch> {
-    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
-    resolve_trade_shortcut_prevalidated_refs(&ops, table, order_eff_pre, trade_level, inject)
-}
-
 pub(crate) fn resolve_trade_shortcut_prevalidated_refs(
     ops: &[TradeOperatorRef<'_>],
     table: &SkillTable,

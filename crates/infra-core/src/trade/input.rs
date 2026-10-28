@@ -91,10 +91,6 @@ impl TradeOperatorRef<'_> {
     pub(crate) fn tier(&self) -> PromotionTier {
         PromotionTier::from_elite(self.elite)
     }
-
-    pub(crate) fn has_tag(&self, tag: &str) -> bool {
-        self.tags.iter().any(|t| t == tag)
-    }
 }
 
 impl Default for TradeOperator {

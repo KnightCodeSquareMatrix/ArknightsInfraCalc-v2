@@ -2,14 +2,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::pool::{
-    build_trade_combo_operator_refs, combinations_indices, filter_standalone_exact_with,
+    build_trade_combo_operator_refs, filter_standalone_exact_with,
     trade_operator_refs_require_candidate_projection, StandaloneFilter, TradePool,
 };
 use crate::skill_table::SkillTable;
@@ -19,6 +18,8 @@ use crate::trade::input::{
 };
 use crate::trade::shortcut::trade_station_exclusive_violation_refs;
 use crate::trade::solver::{solve_trade_with_shift_prevalidated_view, TradeResult};
+
+use super::enumerate::{evaluate_flat_combinations, flat_combinations};
 
 /// 贸易站评分的完整分解。
 ///
@@ -394,14 +395,11 @@ fn search_trade_single_order(
     let hit_filter = filter.hit_filter;
     let forbidden_pairs = &filter.forbidden_pairs;
 
-    let mut combos: Vec<_> = combinations_indices(n, operator_capacity).collect();
-    if !must_indices.is_empty() {
-        combos.retain(|combo| must_indices.iter().all(|idx| combo.contains(idx)));
-    }
+    let flat = flat_combinations(n, operator_capacity, &must_indices);
     let prepare_elapsed = setup_elapsed + prepare_started.elapsed();
     perf.set_progress(
         combo_count,
-        combos.len() as u64,
+        (flat.len() / operator_capacity) as u64,
         0,
         crate::profile::SearchPhaseDurations {
             prepare: prepare_elapsed,
@@ -412,33 +410,32 @@ fn search_trade_single_order(
     let evaluate_started = Instant::now();
     perf.mark_live_started();
     let batch_counters = perf.hot_path_batch_counters();
-    let mut hits: Vec<TradeSearchHit> = combos
-        .par_iter()
-        .map_init(
-            || crate::profile::start_hot_path_batch(std::sync::Arc::clone(&batch_counters)),
-            |_, combo| {
-                eval_combo_hit(
-                    &sub,
-                    table,
-                    options,
-                    order_kind,
-                    combo,
-                    must_name.as_deref(),
-                    override_op.as_ref(),
-                )
-            },
-        )
-        .flatten()
-        .filter(|hit| hit_filter.is_none_or(|f| f(hit)))
-        .filter(|hit| {
-            forbidden_pairs.iter().all(|(a, b)| {
-                !(hit.names.iter().any(|name| name == a) && hit.names.iter().any(|name| name == b))
-            })
-        })
-        .collect();
+    let mut hits: Vec<TradeSearchHit> = evaluate_flat_combinations(
+        &flat,
+        operator_capacity,
+        &batch_counters,
+        |_, combo| {
+            eval_combo_hit(
+                &sub,
+                table,
+                options,
+                order_kind,
+                combo,
+                must_name.as_deref(),
+                override_op.as_ref(),
+            )
+        },
+        |hit| {
+            hit_filter.is_none_or(|f| f(hit))
+                && forbidden_pairs.iter().all(|(a, b)| {
+                    !(hit.names.iter().any(|name| name == a)
+                        && hit.names.iter().any(|name| name == b))
+                })
+        },
+    );
     let evaluate_elapsed = evaluate_started.elapsed();
 
-    let candidate_attempts = combos.len() as u64;
+    let candidate_attempts = (flat.len() / operator_capacity) as u64;
     let evaluated = hits.len() as u64;
     perf.set_progress(
         combo_count,
