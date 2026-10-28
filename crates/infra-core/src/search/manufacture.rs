@@ -5,13 +5,17 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 use serde::Serialize;
+use smallvec::SmallVec;
 
 use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
-use crate::manufacture::input::{ManuRoomInput, ManuSearchRecipeMode};
+use crate::manufacture::input::{
+    ManuOperator, ManuOperatorRef, ManuRoomInput, ManuRoomView, ManuSearchRecipeMode,
+};
 use crate::manufacture::solver::{
-    solve_manufacture, solve_manufacture_with_shift, ManuProdBreakdown, ManuStorageBreakdown,
+    solve_manufacture_light_view, solve_manufacture_view, solve_manufacture_with_shift_view,
+    ManuProdBreakdown, ManuStorageBreakdown,
 };
 use crate::pool::{
     filter_general_manufacture_search_pool, filter_standalone_exact_with, ManuPool,
@@ -147,29 +151,29 @@ impl ManuSearchOptions {
         recipe: RecipeKind,
         combo: &[usize],
     ) -> Option<ManuSearchHit> {
-        let operators: Vec<_> = combo
+        let operators: SmallVec<[_; 5]> = combo
             .iter()
-            .map(|idx| pool.entries[*idx].to_manu_operator())
+            .map(|idx| pool.entries[*idx].as_manu_operator_ref())
             .collect();
-        if !manufacture_combo_allowed_for_shift(&operators, table, self.shift_hours) {
+        if !manufacture_combo_refs_allowed_for_shift(&operators, table, self.shift_hours) {
             return None;
         }
         let layout = manufacture_combo_layout(&self.layout, &operators);
-        let base = ManuRoomInput {
+        let base = ManuRoomView {
             level: self.level,
             operators,
             active_recipe: recipe,
             mood: self.mood,
-            layout,
+            layout: &layout,
         };
-        evaluate_manufacture_room_with_shift(&base, table, recipe, self.shift_hours)
+        evaluate_manufacture_room_view_with_shift(&base, table, recipe, self.shift_hours)
     }
 
     /// 池内是否有清零同伴产出的干员；Bake 查表在存在这类干员时不可用。
     pub(crate) fn pool_has_peer_reset(&self, pool: &ManuPool, table: &SkillTable) -> bool {
         pool.entries
             .iter()
-            .any(|entry| manufacture_operator_resets_peers(&entry.to_manu_operator(), table))
+            .any(|entry| manufacture_operator_resets_peers(&entry.as_manu_operator_ref(), table))
     }
 }
 
@@ -394,20 +398,20 @@ fn search_manufacture_single_recipe(
         .map_init(
             || crate::profile::start_hot_path_batch(std::sync::Arc::clone(&batch_counters)),
             |_, (ci, combo)| {
-                let ops: Vec<_> = combo
+                let ops: SmallVec<[_; 5]> = combo
                     .iter()
-                    .map(|i| sub.entries[*i].to_manu_operator())
+                    .map(|i| sub.entries[*i].as_manu_operator_ref())
                     .collect();
-                if !manufacture_combo_allowed_for_shift(&ops, table, options.shift_hours) {
+                if !manufacture_combo_refs_allowed_for_shift(&ops, table, options.shift_hours) {
                     return None;
                 }
                 let layout = manufacture_combo_layout(&options.layout, &ops);
-                let base = ManuRoomInput {
+                let base = ManuRoomView {
                     level: options.level,
                     operators: ops,
                     active_recipe: recipe,
                     mood: options.mood,
-                    layout,
+                    layout: &layout,
                 };
                 let (eff, storage) =
                     evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
@@ -454,20 +458,21 @@ fn search_manufacture_single_recipe(
     let mut full: Vec<ManuSearchHit> = Vec::with_capacity(materialize);
     for light in hits.iter().take(materialize) {
         let combo = &flat[light.idx * k..light.idx * k + k];
-        let ops: Vec<_> = combo
+        let ops: SmallVec<[_; 5]> = combo
             .iter()
-            .map(|i| sub.entries[*i].to_manu_operator())
+            .map(|i| sub.entries[*i].as_manu_operator_ref())
             .collect();
         let layout = manufacture_combo_layout(&options.layout, &ops);
-        let base = ManuRoomInput {
+        let base = ManuRoomView {
             level: options.level,
             operators: ops,
             active_recipe: recipe,
             mood: options.mood,
-            layout,
+            layout: &layout,
         };
-        let hit = evaluate_manufacture_room_with_shift(&base, table, recipe, options.shift_hours)
-            .expect("lazy manufacture hit must re-evaluate");
+        let hit =
+            evaluate_manufacture_room_view_with_shift(&base, table, recipe, options.shift_hours)
+                .expect("lazy manufacture hit must re-evaluate");
         assert_eq!(
             hit.final_efficiency, light.eff,
             "lazy re-evaluation drifted"
@@ -508,11 +513,20 @@ fn search_manufacture_single_recipe(
 }
 
 pub(crate) fn manufacture_combo_allowed_for_shift(
-    operators: &[crate::manufacture::ManuOperator],
+    operators: &[ManuOperator],
     table: &SkillTable,
     shift_hours: Option<f64>,
 ) -> bool {
-    if !manufacture_peers_compatible(operators, table) {
+    let operators: SmallVec<[_; 5]> = operators.iter().map(ManuOperator::as_ref).collect();
+    manufacture_combo_refs_allowed_for_shift(&operators, table, shift_hours)
+}
+
+fn manufacture_combo_refs_allowed_for_shift(
+    operators: &[ManuOperatorRef<'_>],
+    table: &SkillTable,
+    shift_hours: Option<f64>,
+) -> bool {
+    if !manufacture_peer_refs_compatible(operators, table) {
         return false;
     }
     if !shift_hours.is_some_and(|hours| hours >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS) {
@@ -520,13 +534,15 @@ pub(crate) fn manufacture_combo_allowed_for_shift(
     }
     !operators
         .iter()
-        .any(|operator| manufacture_operator_has_mood_gap_decay(operator, table))
+        .any(|operator| manufacture_operator_ref_has_mood_gap_decay(operator, table))
 }
 
-pub(crate) fn manufacture_peers_compatible(
-    operators: &[crate::manufacture::ManuOperator],
-    table: &SkillTable,
-) -> bool {
+pub(crate) fn manufacture_peers_compatible(operators: &[ManuOperator], table: &SkillTable) -> bool {
+    let operators: SmallVec<[_; 5]> = operators.iter().map(ManuOperator::as_ref).collect();
+    manufacture_peer_refs_compatible(&operators, table)
+}
+
+fn manufacture_peer_refs_compatible(operators: &[ManuOperatorRef<'_>], table: &SkillTable) -> bool {
     !operators
         .iter()
         .any(|operator| manufacture_operator_resets_peers(operator, table))
@@ -535,10 +551,7 @@ pub(crate) fn manufacture_peers_compatible(
         })
 }
 
-fn manufacture_operator_resets_peers(
-    operator: &crate::manufacture::ManuOperator,
-    table: &SkillTable,
-) -> bool {
+fn manufacture_operator_resets_peers(operator: &ManuOperatorRef<'_>, table: &SkillTable) -> bool {
     operator.buff_ids.iter().any(|buff_id| {
         table.get(buff_id).is_some_and(|skill| {
             skill.facility == "manufacture"
@@ -550,7 +563,14 @@ fn manufacture_operator_resets_peers(
 }
 
 pub(crate) fn manufacture_operator_has_mood_gap_decay(
-    operator: &crate::manufacture::ManuOperator,
+    operator: &ManuOperator,
+    table: &SkillTable,
+) -> bool {
+    manufacture_operator_ref_has_mood_gap_decay(&operator.as_ref(), table)
+}
+
+fn manufacture_operator_ref_has_mood_gap_decay(
+    operator: &ManuOperatorRef<'_>,
     table: &SkillTable,
 ) -> bool {
     operator.buff_ids.iter().any(|buff_id| {
@@ -569,7 +589,7 @@ pub(crate) fn manufacture_operator_has_mood_gap_decay(
 
 fn manufacture_combo_layout(
     base: &SharedLayout,
-    operators: &[crate::manufacture::ManuOperator],
+    operators: &[ManuOperatorRef<'_>],
 ) -> SharedLayout {
     let changes_dynamic_count = base.global_inject.manu_count_scaled().iter().any(|rule| {
         operators
@@ -584,8 +604,8 @@ fn manufacture_combo_layout(
     let mut base_names: HashSet<_> = layout.base_workforce.iter().cloned().collect();
     let mut manu_names: HashSet<_> = layout.manu_workforce.iter().cloned().collect();
     for operator in operators {
-        if base_names.insert(operator.name.clone()) {
-            layout.base_workforce.push(operator.name.clone());
+        if base_names.insert(operator.name.to_owned()) {
+            layout.base_workforce.push(operator.name.to_owned());
             // 解释器按 base_workforce 去重补算房内莱茵候选；候选一旦进入 base_workforce，
             // 就必须同步进入 rhine_life_in_base，否则会被去重吞掉，娜斯提少算一名。
             if operator
@@ -596,12 +616,12 @@ fn manufacture_combo_layout(
                 layout.rhine_life_in_base = layout.rhine_life_in_base.saturating_add(1).min(6);
             }
         }
-        if !manu_names.insert(operator.name.clone()) {
+        if !manu_names.insert(operator.name.to_owned()) {
             continue;
         }
-        layout.manu_workforce.push(operator.name.clone());
+        layout.manu_workforce.push(operator.name.to_owned());
         let mut seen_tags = HashSet::new();
-        for tag in &operator.tags {
+        for tag in operator.tags {
             if seen_tags.insert(tag.as_str()) {
                 *layout.manu_tagged_count_sum.entry(tag.clone()).or_insert(0) += 1;
             }
@@ -713,28 +733,28 @@ pub(crate) fn evaluate_manufacture_room(
     table: &SkillTable,
     recipe: RecipeKind,
 ) -> Option<ManuSearchHit> {
-    evaluate_manufacture_room_with_shift(base, table, recipe, None)
+    evaluate_manufacture_room_view_with_shift(&base.as_view(), table, recipe, None)
 }
 
-fn evaluate_manufacture_room_with_shift(
-    base: &ManuRoomInput,
+fn evaluate_manufacture_room_view_with_shift(
+    base: &ManuRoomView<'_>,
     table: &SkillTable,
     recipe: RecipeKind,
     shift_hours: Option<f64>,
 ) -> Option<ManuSearchHit> {
-    if !manufacture_peers_compatible(&base.operators, table) {
+    if !manufacture_peer_refs_compatible(&base.operators, table) {
         return None;
     }
     let names = base
-        .operator_names()
-        .into_iter()
-        .map(str::to_string)
+        .operators
+        .iter()
+        .map(|operator| operator.name.to_owned())
         .collect();
     let mut room = base.clone();
     room.active_recipe = recipe;
     let result = match shift_hours {
-        Some(hours) => solve_manufacture_with_shift(&room, table, hours).ok()?,
-        None => solve_manufacture(&room, table).ok()?,
+        Some(hours) => solve_manufacture_with_shift_view(&room, table, hours).ok()?,
+        None => solve_manufacture_view(&room, table).ok()?,
     };
     let mut per_station = ManuProdBreakdown::default();
     let mut storage = ManuStorageBreakdown::default();
@@ -816,23 +836,21 @@ fn flat_combinations(n: usize, k: usize, anchor: Option<usize>) -> Vec<usize> {
 
 /// 只产出排序所需的 (final_efficiency, storage key)，不构造 names / breakdown。
 fn evaluate_manufacture_room_light(
-    base: &ManuRoomInput,
+    base: &ManuRoomView<'_>,
     table: &SkillTable,
     recipe: RecipeKind,
     shift_hours: Option<f64>,
 ) -> Option<(Efficiency, i32)> {
-    if !manufacture_peers_compatible(&base.operators, table) {
+    if !manufacture_peer_refs_compatible(&base.operators, table) {
         return None;
     }
-    let result = match shift_hours {
-        Some(hours) => solve_manufacture_with_shift(base, table, hours).ok()?,
-        None => solve_manufacture(base, table).ok()?,
-    };
+    let (final_efficiency, storage_limit) =
+        solve_manufacture_light_view(base, table, shift_hours).ok()?;
     let storage = match recipe {
-        RecipeKind::Gold | RecipeKind::BattleRecord => result.storage_limit.max(0),
+        RecipeKind::Gold | RecipeKind::BattleRecord => storage_limit.max(0),
         _ => 0,
     };
-    Some((result.final_efficiency, storage))
+    Some((final_efficiency, storage))
 }
 
 fn empty_hit() -> ManuSearchHit {

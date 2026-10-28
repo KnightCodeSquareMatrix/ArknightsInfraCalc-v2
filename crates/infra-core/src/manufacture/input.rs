@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use smallvec::SmallVec;
+
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::tier::PromotionTier;
 use crate::types::{CompiledAtom, RecipeKind};
@@ -69,7 +71,27 @@ pub struct ManuOperator {
     pub compiled_atoms: Option<Arc<[CompiledAtom]>>,
 }
 
+/// 房间执行期间借用真实身份；不拥有姓名、技能、标签或预编译 atoms。
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ManuOperatorRef<'a> {
+    pub name: &'a str,
+    pub elite: u8,
+    pub buff_ids: &'a [String],
+    pub tags: &'a [String],
+    pub compiled_atoms: Option<&'a [CompiledAtom]>,
+}
+
 impl ManuOperator {
+    pub(crate) fn as_ref(&self) -> ManuOperatorRef<'_> {
+        ManuOperatorRef {
+            name: &self.name,
+            elite: self.elite,
+            buff_ids: &self.buff_ids,
+            tags: &self.tags,
+            compiled_atoms: self.compiled_atoms.as_deref(),
+        }
+    }
+
     pub fn tier(&self) -> PromotionTier {
         PromotionTier::from_elite(self.elite)
     }
@@ -94,7 +116,27 @@ pub struct ManuRoomInput {
     pub layout: SharedLayout,
 }
 
+/// 自持干员引用槽位，生命周期仅依赖底层身份和共享布局。
+#[derive(Debug, Clone)]
+pub(crate) struct ManuRoomView<'a> {
+    pub level: u8,
+    pub operators: SmallVec<[ManuOperatorRef<'a>; 5]>,
+    pub active_recipe: RecipeKind,
+    pub mood: f64,
+    pub layout: &'a SharedLayout,
+}
+
 impl ManuRoomInput {
+    pub(crate) fn as_view(&self) -> ManuRoomView<'_> {
+        ManuRoomView {
+            level: self.level,
+            operators: self.operators.iter().map(ManuOperator::as_ref).collect(),
+            active_recipe: self.active_recipe,
+            mood: self.mood,
+            layout: &self.layout,
+        }
+    }
+
     pub fn with_operators(
         level: u8,
         active_recipe: RecipeKind,

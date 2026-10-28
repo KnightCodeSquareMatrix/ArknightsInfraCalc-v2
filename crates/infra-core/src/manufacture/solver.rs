@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 use crate::layout::FacilityKind;
-use crate::manufacture::input::{ManuLineScenario, ManuRoomInput};
+use crate::manufacture::input::{ManuLineScenario, ManuOperatorRef, ManuRoomInput, ManuRoomView};
 use crate::manufacture::interpreter::{apply_manu_phases, ManuContext};
 use crate::mood::{default_mood_model, operator_net_drain, DrainInputs};
 use crate::skill_table::SkillTable;
@@ -53,6 +53,13 @@ pub struct ManuResult {
 }
 
 pub fn solve_manufacture(input: &ManuRoomInput, table: &SkillTable) -> Result<ManuResult> {
+    solve_manufacture_view(&input.as_view(), table)
+}
+
+pub(crate) fn solve_manufacture_view(
+    input: &ManuRoomView<'_>,
+    table: &SkillTable,
+) -> Result<ManuResult> {
     solve_manufacture_at_gaps(input, table, &[])
 }
 
@@ -61,11 +68,19 @@ pub fn solve_manufacture_with_shift(
     table: &SkillTable,
     shift_hours: f64,
 ) -> Result<ManuResult> {
+    solve_manufacture_with_shift_view(&input.as_view(), table, shift_hours)
+}
+
+pub(crate) fn solve_manufacture_with_shift_view(
+    input: &ManuRoomView<'_>,
+    table: &SkillTable,
+    shift_hours: f64,
+) -> Result<ManuResult> {
     if !shift_hours.is_finite() {
         return Err(Error::msg("manufacture shift duration must be finite"));
     }
     if shift_hours <= 0.0 || !room_has_mood_gap_effect(input, table) {
-        return solve_manufacture(input, table);
+        return solve_manufacture_view(input, table);
     }
 
     let model = default_mood_model()?;
@@ -73,7 +88,7 @@ pub fn solve_manufacture_with_shift(
     let room_ops: Vec<_> = input
         .operators
         .iter()
-        .map(|operator| (operator.name.clone(), operator.elite))
+        .map(|operator| (operator.name.to_owned(), operator.elite))
         .collect();
     let control_ops = &input.layout.control_operators;
     let full_control = control_ops.len().max(input.layout.control_workforce.len()) >= 5;
@@ -90,7 +105,7 @@ pub fn solve_manufacture_with_shift(
             let drain = operator_net_drain(
                 model,
                 &DrainInputs {
-                    name: &operator.name,
+                    name: operator.name,
                     elite: operator.elite,
                     facility: FacilityKind::Factory,
                     room_ops: &room_ops,
@@ -99,7 +114,7 @@ pub fn solve_manufacture_with_shift(
                     recipe,
                 },
             );
-            (operator.name.as_str(), drain)
+            (operator.name, drain)
         })
         .collect();
 
@@ -177,11 +192,11 @@ pub fn solve_manufacture_with_shift(
 }
 
 fn solve_manufacture_at_gaps(
-    input: &ManuRoomInput,
+    input: &ManuRoomView<'_>,
     table: &SkillTable,
     mood_gaps: &[(&str, f64)],
 ) -> Result<ManuResult> {
-    let mut ctx = ManuContext::from_room(input);
+    let mut ctx = ManuContext::from_view(input);
     for operator in &mut ctx.operators {
         if let Some((_, gap)) = mood_gaps.iter().find(|(name, _)| *name == operator.name) {
             operator.mood_gap = *gap;
@@ -228,7 +243,7 @@ pub fn unit_output_per_day(recipe: RecipeKind) -> f64 {
     }
 }
 
-fn room_has_mood_gap_effect(input: &ManuRoomInput, table: &SkillTable) -> bool {
+fn room_has_mood_gap_effect(input: &ManuRoomView<'_>, table: &SkillTable) -> bool {
     input.operators.iter().any(|operator| {
         operator.buff_ids.iter().any(|buff_id| {
             table.get(buff_id).is_some_and(|skill| {
@@ -242,12 +257,12 @@ fn room_has_mood_gap_effect(input: &ManuRoomInput, table: &SkillTable) -> bool {
 }
 
 fn operator_mood_gap_thresholds(
-    operator: &crate::manufacture::input::ManuOperator,
+    operator: &ManuOperatorRef<'_>,
     table: &SkillTable,
     mood_cap: f64,
 ) -> Vec<f64> {
     let mut thresholds = Vec::new();
-    for buff_id in &operator.buff_ids {
+    for buff_id in operator.buff_ids {
         let Some(skill) = table.get(buff_id) else {
             continue;
         };
@@ -269,6 +284,36 @@ fn operator_mood_gap_thresholds(
         }
     }
     thresholds
+}
+
+/// 轻量排序复用静态结算表达式；定时心情差效果仍由原分段求解结算。
+pub(crate) fn solve_manufacture_light_view(
+    input: &ManuRoomView<'_>,
+    table: &SkillTable,
+    shift_hours: Option<f64>,
+) -> Result<(Efficiency, i32)> {
+    if let Some(hours) = shift_hours {
+        if !hours.is_finite() {
+            return Err(Error::msg("manufacture shift duration must be finite"));
+        }
+        if room_has_mood_gap_effect(input, table) {
+            let result = solve_manufacture_with_shift_view(input, table, hours)?;
+            return Ok((result.final_efficiency, result.storage_limit));
+        }
+    }
+
+    let mut ctx = ManuContext::from_view(input);
+    apply_manu_phases(&mut ctx, table);
+
+    let recipe = input.active_recipe;
+    let occupancy_efficiency = Efficiency::from_percent_points(ctx.prod_base());
+    let skill_efficiency = Efficiency::from_percent_points(ctx.prod_skill(recipe));
+    let global_efficiency = Efficiency::from_percent_points(
+        ctx.prod_total(recipe) - ctx.prod_base() - ctx.prod_skill(recipe),
+    );
+    let final_efficiency =
+        Efficiency::ONE + occupancy_efficiency + skill_efficiency + global_efficiency;
+    Ok((final_efficiency, ctx.storage_limit(recipe)))
 }
 
 /// 按 `ManuLineScenario` 对同一三人组在各配方产线上求值并加权求和。

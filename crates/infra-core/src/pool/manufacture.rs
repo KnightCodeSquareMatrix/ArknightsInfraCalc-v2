@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
+use crate::manufacture::input::ManuOperatorRef;
 use crate::manufacture::ManuOperator;
 use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
@@ -51,6 +52,16 @@ impl TierTagged for ManuPoolEntry {
 }
 
 impl ManuPoolEntry {
+    pub(crate) fn as_manu_operator_ref(&self) -> ManuOperatorRef<'_> {
+        ManuOperatorRef {
+            name: &self.name,
+            elite: self.elite,
+            buff_ids: &self.buff_ids,
+            tags: &self.tags,
+            compiled_atoms: self.compiled_atoms.as_deref(),
+        }
+    }
+
     pub fn to_manu_operator(&self) -> ManuOperator {
         ManuOperator {
             name: self.name.clone(),

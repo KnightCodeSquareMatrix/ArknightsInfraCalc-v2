@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 use crate::eff_ramp::eff_ramp_avg_20h;
 use crate::global_resource::RoomState;
 use crate::layout::SharedLayout;
-use crate::manufacture::input::ManuRoomInput;
+use crate::manufacture::input::{ManuRoomInput, ManuRoomView};
 use crate::skill_table::SkillTable;
 use crate::types::{
     Action, CompiledAtom, Condition, EffectAtom, Phase, RecipeKind, Selector, StateKey,
@@ -113,15 +113,19 @@ pub struct ManuContext<'a> {
 
 impl<'a> ManuContext<'a> {
     pub fn from_room(input: &'a ManuRoomInput) -> Self {
+        Self::from_view(&input.as_view())
+    }
+
+    pub(crate) fn from_view(input: &ManuRoomView<'a>) -> Self {
         let operators = input
             .operators
             .iter()
             .map(|o| ManuOperatorRuntime {
-                name: &o.name,
+                name: o.name,
                 elite: o.elite,
-                buff_ids: &o.buff_ids,
-                tags: &o.tags,
-                compiled_atoms: o.compiled_atoms.as_deref(),
+                buff_ids: o.buff_ids,
+                tags: o.tags,
+                compiled_atoms: o.compiled_atoms,
                 mood_gap: (24.0 - input.mood).clamp(0.0, 24.0),
                 ..Default::default()
             })
@@ -131,7 +135,7 @@ impl<'a> ManuContext<'a> {
             station_eff: RecipeEff::default(),
             facility_level: input.level,
             active_recipe: input.active_recipe,
-            layout: input.layout.clone(),
+            layout: Arc::clone(input.layout),
             facility_base_storage: facility_base_storage(input.level),
             mood: input.mood,
             state_pool: input.layout.global.to_fixed_room_state(),
