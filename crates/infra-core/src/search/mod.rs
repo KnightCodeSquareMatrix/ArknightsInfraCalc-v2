@@ -1,4 +1,5 @@
 mod control;
+pub(crate) mod exact_key;
 mod manufacture;
 mod power;
 mod role_pick;

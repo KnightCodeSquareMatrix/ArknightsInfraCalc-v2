@@ -21,13 +21,13 @@
 
 ## Bake 生命周期
 
-全表运行时变体准备模块已提供完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥辅助；目前尚未接入 Bake 生成或查询，生产候选政策保持现状。
+全表生成与冷校验已使用完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥；热查询使用 checked colex rank 和有界 top-K 堆，并核对 canonical 相对顺序、完整布局、技能原文及编译 atom，生产候选政策保持现状。最终行/查询差分和运行验收尚未执行，门禁与边界详见当前真源。
 
-`BAKE_SCHEMA_VERSION` 当前为 16。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
+`BAKE_SCHEMA_VERSION` 当前为 17。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
 
 运行时 `BakeMode::Auto` 在兼容查询首次加载缺表/失效时生成完整表，全量核心校验通过才发布；生成和校验的 live 搜索显式 `Disabled`，RAII 标记防止递归。无参预热也用 Auto。进程内初始化及失败由 OnceLock 缓存，不在每次查询重复读取 exe；失败只 stderr 报告一次简短原因后回 live。`Disabled` 永不读取；`Required` 不主动生成，对任何 miss/error 失败。当前单元尚未把 miss 按类别接入 `[perf]`，计数留下一单元。
 
-发布使用独立 generation 目录与 CURRENT 指针的原子 rename，生成目录验证后只读；同进程只初始化一次，跨进程通过不等待的短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。校验、verify、完整贸易 API 和 debug 指纹统一解析 CURRENT；旧平铺表仍可校验。默认目录优先规则与首次 release 输出位置见 [候选搜索与 Bake](模块/候选搜索与Bake.md)。`data/baked/` 已忽略；取消历史跟踪和清理旧目录待主代理执行。生成物不能手工改成语义来源。
+发布使用独立 generation 目录与 CURRENT 指针的原子 rename，生成目录验证后只读；同进程只初始化一次，跨进程通过不等待的短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。校验、verify、完整贸易 API 和 debug 指纹统一解析 CURRENT；旧平铺表仍可校验。默认目录优先规则与首次 release 输出位置见 [候选搜索与 Bake](模块/候选搜索与Bake.md)。`data/baked/` 已忽略；历史跟踪和旧目录已清理。生成物不能手工改成语义来源。
 
 ## 诊断与验证
 
@@ -73,3 +73,6 @@
 两解释器的 `state_pool` 使用 `RoomState` 固定 16 个 `f64` 槽位，与 `GlobalResourceKey::ALL` 的现有资源集合对应；缺省槽位为 `0.0`。房间内原来全部读取都以缺键为零，不依赖键存在性、遍历顺序或回写全局池；现在通过状态键索引读取，`StateProduce` 与 `StateConvert` 直接 `+=`，贸易人间烟火显式输入仍覆盖初值。转化先读取源值再累加目标，即使源和目标相同也保持原顺序；乘法、下取整及后续浮点累加表达式不变。
 
 `GlobalResourcePool` 继续使用 HashMap，并保留 `contains`、`iter`、`to_room_state` 和回写接口；中枢、办公室与发电站沿用原快照。新增 `to_fixed_room_state` 仅把现有全局项按键复制到房间槽位，不做浮点运算或归并。该优化不改变候选、phase 应用顺序、输出合同或保证等级。格式化、release 离线编译及差异检查通过仅证明构建与源代码边界；本次未运行求解、Bake、对拍或新增测试，未验证性能幅度和全局机制等价。
+
+
+U4a 提供内部 `ExactKeySerializer`：完整类型/字段/容器边界、原始浮点 bit 和 map 实际迭代顺序进入键，布局与注入的全部业务字段及预编译 atom 可直接编码；该模块尚未接入搜索或 memo，本阶段仅格式化、release 离线编译及差异检查，不能据此证明缓存等价或性能收益。

@@ -24,7 +24,7 @@ impl IndexMut<GlobalResourceKey> for RoomState {
 }
 
 /// 全基建全局资源池：producer 写入、consumer 读取、同房 StateWrite 可在快照上叠加。
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct GlobalResourcePool {
     values: HashMap<GlobalResourceKey, f64>,
 }

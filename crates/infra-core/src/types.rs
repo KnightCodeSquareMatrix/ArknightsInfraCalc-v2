@@ -438,7 +438,7 @@ pub type BuffDenseId = u16;
 pub type OperatorId = u16;
 
 /// 加载期预编译的单条 atom（含排序键，供 solve 时 k 路归并）。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CompiledAtom {
     pub atom: EffectAtom,
     pub sort_key: (i32, i32),

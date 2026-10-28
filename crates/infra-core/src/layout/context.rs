@@ -10,7 +10,7 @@ pub type SharedLayout = Arc<LayoutContext>;
 pub const DEFAULT_DORM_OCCUPANT_COUNT: u8 = 20;
 
 /// 全基建场景快照（贸易/制造/发电/中控共享的布局假设与全局资源池）。
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct LayoutContext {
     pub meeting_max_level: u8,
     pub dorm_level_sum: u16,

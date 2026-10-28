@@ -33,14 +33,14 @@ pub struct ManuInjectCandidate {
 
 /// 灵知·精密计算：每名同贸易房谢拉格干员的订单效率/上限增量规则。
 /// 控制域只携带系数；最终值在贸易域按房间内 `cc.g.karlan` 计数结算。
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct KarlanPrecision {
     pub eff_per_karlan: f64,
     pub limit_per_karlan: i32,
 }
 
 /// 中枢 `GlobalInject` 汇总：同 `inject_family` 取最高，不同族相加。
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct GlobalInjectManifest {
     trade_by_family: HashMap<String, f64>,
     manu_all_by_family: HashMap<String, f64>,
@@ -61,7 +61,7 @@ pub struct GlobalInjectManifest {
 /// 控制中枢先于贸易站搜索，因此不能在中枢求值时把标签人数冻结为 0。
 /// `resolved_count` 只保存当前完整 layout 的展示快照；最终贸易房结算通过
 /// [`GlobalInjectManifest::trade_eff_pct_with_scoped_tag_counts`] 分别提供全站与当前房计数。
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TaggedTradeInject {
     pub source_operator: String,
     pub source_buff_id: String,
@@ -72,14 +72,14 @@ pub struct TaggedTradeInject {
     pub count_scope: TradeTaggedCountScope,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum TradeTaggedCountScope {
     AllTradeRooms,
     CurrentTradeRoom,
     QualifiedTradeRooms { min: u8 },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TaggedManuInject {
     pub source_buff_id: String,
     pub target_tag: String,
@@ -87,7 +87,7 @@ pub struct TaggedManuInject {
     pub value: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TaggedManuCountInject {
     pub source_operator: String,
     pub source_buff_id: String,
@@ -447,13 +447,6 @@ impl GlobalInjectManifest {
         !self.trade_tagged.is_empty()
     }
 
-    pub(crate) fn same_trade_effects_as(&self, other: &Self) -> bool {
-        self.trade_by_family == other.trade_by_family
-            && self.trade_tagged == other.trade_tagged
-            && self.karlan_precision == other.karlan_precision
-            && self.active_source_buffs == other.active_source_buffs
-    }
-
     pub fn record_manu(&mut self, family: &str, recipe: Option<RecipeKind>, value: f64) {
         let map = match manu_inject_slot(recipe) {
             ManuInjectSlot::All => &mut self.manu_all_by_family,
@@ -517,15 +510,6 @@ impl GlobalInjectManifest {
         for rule in &mut self.manu_count_scaled {
             rule.resolved_count = counts.get(&rule.target_tag).copied().unwrap_or(0);
         }
-    }
-
-    pub(crate) fn same_manufacture_effects_as(&self, other: &Self) -> bool {
-        self.manu_all_by_family == other.manu_all_by_family
-            && self.manu_gold_by_family == other.manu_gold_by_family
-            && self.manu_battle_record_by_family == other.manu_battle_record_by_family
-            && self.manu_originium_by_family == other.manu_originium_by_family
-            && self.manu_tagged == other.manu_tagged
-            && self.manu_count_scaled == other.manu_count_scaled
     }
 
     /// 记录灵知·精密计算；单一中枢不叠加，取订单上限增益更大的一条。
