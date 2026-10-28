@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use std::sync::OnceLock;
 
 use crate::types::RecipeKind;
 
@@ -40,7 +41,7 @@ pub struct KarlanPrecision {
 }
 
 /// 中枢 `GlobalInject` 汇总：同 `inject_family` 取最高，不同族相加。
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct GlobalInjectManifest {
     trade_by_family: HashMap<String, f64>,
     manu_all_by_family: HashMap<String, f64>,
@@ -54,6 +55,24 @@ pub struct GlobalInjectManifest {
     active_source_buffs: BTreeSet<String>,
     /// 灵知·精密计算规则（单一中枢，不与自身叠加）。
     karlan_precision: Option<KarlanPrecision>,
+    /// 同一实例按配方复用首次原算法结算值；制造输入变更时全槽失效。
+    #[serde(skip)]
+    manu_eff_cache: [OnceLock<f64>; 4],
+}
+
+impl PartialEq for GlobalInjectManifest {
+    fn eq(&self, other: &Self) -> bool {
+        self.trade_by_family == other.trade_by_family
+            && self.manu_all_by_family == other.manu_all_by_family
+            && self.manu_gold_by_family == other.manu_gold_by_family
+            && self.manu_battle_record_by_family == other.manu_battle_record_by_family
+            && self.manu_originium_by_family == other.manu_originium_by_family
+            && self.trade_tagged == other.trade_tagged
+            && self.manu_tagged == other.manu_tagged
+            && self.manu_count_scaled == other.manu_count_scaled
+            && self.active_source_buffs == other.active_source_buffs
+            && self.karlan_precision == other.karlan_precision
+    }
 }
 
 /// 中枢按贸易站实际标签人数结算的延迟注入规则。
@@ -286,6 +305,16 @@ impl GlobalInjectManifest {
     }
 
     pub fn manu_eff_for(&self, recipe: RecipeKind) -> f64 {
+        let index = match recipe {
+            RecipeKind::All => 0,
+            RecipeKind::Gold => 1,
+            RecipeKind::BattleRecord => 2,
+            RecipeKind::Originium => 3,
+        };
+        *self.manu_eff_cache[index].get_or_init(|| self.manu_eff_for_uncached(recipe))
+    }
+
+    fn manu_eff_for_uncached(&self, recipe: RecipeKind) -> f64 {
         let mut all_by_family = self.manu_all_by_family.clone();
         let mut recipe_by_family = match recipe {
             RecipeKind::All => HashMap::new(),
@@ -448,6 +477,7 @@ impl GlobalInjectManifest {
     }
 
     pub fn record_manu(&mut self, family: &str, recipe: Option<RecipeKind>, value: f64) {
+        self.invalidate_manu_eff_cache();
         let map = match manu_inject_slot(recipe) {
             ManuInjectSlot::All => &mut self.manu_all_by_family,
             ManuInjectSlot::Gold => &mut self.manu_gold_by_family,
@@ -491,6 +521,7 @@ impl GlobalInjectManifest {
         value_per_operator: f64,
         resolved_count: u8,
     ) {
+        self.invalidate_manu_eff_cache();
         self.manu_count_scaled.push(TaggedManuCountInject {
             source_operator: source_operator.to_string(),
             source_buff_id: source_buff_id.to_string(),
@@ -507,8 +538,15 @@ impl GlobalInjectManifest {
     }
 
     pub fn refresh_manu_count_scaled(&mut self, counts: &HashMap<String, u8>) {
+        self.invalidate_manu_eff_cache();
         for rule in &mut self.manu_count_scaled {
             rule.resolved_count = counts.get(&rule.target_tag).copied().unwrap_or(0);
+        }
+    }
+
+    fn invalidate_manu_eff_cache(&mut self) {
+        for cached in &mut self.manu_eff_cache {
+            cached.take();
         }
     }
 

@@ -69,6 +69,14 @@
 
 此单元是内部执行成本优化；配方浮点累加、peer reset、条件及仓库保持原实现，房间 state_pool 的固定快照边界见下文；暖机仍按原 20 小时结算，轻量评分及前 K 条完整物化边界保留。不改变枚举、候选集合、剪枝、目标、同分顺序、K=0、evaluated 或保证等级。本次仅格式化和 workspace 离线编译，未运行 solver、Bake 或新旧输出对拍，不能据此声称性能提升幅度或全局机制等价。
 
+## 制造全局注入的实例缓存
+
+`GlobalInjectManifest::manu_eff_for` 用四个 `OnceLock<f64>` 槽按配方保存本实例首次结算值。冷路径仍由单一 `manu_eff_for_uncached` 执行原 family map 克隆、动态规则原序插入与同族取 max、两个 map 分别按实际 `values()` 次序求和后相加的算法；没有改成排序求和。热读取直接取对应槽位，缓存不进入 serde 输出、布局精确键或业务 `PartialEq`。
+
+`record_manu`、`record_manu_count_scaled` 和 `refresh_manu_count_scaled` 每次调用均清空四槽；即使静态 max 值未变，也不能跳过失效，因为插入或容量变化可能影响后续求和顺序。同源 `Clone` 可复制已算值，后续制造写入口仍重新失效；除此之外不同动态实例之间没有缓存复用，布局 memo 原实例隔离保持。标签制造注入和 active buff 不参与此项数值读取，沿用各自结算路径。
+
+这是内部重复执行成本优化，不改变 HashMap 领域接口、浮点表达式、规则顺序、候选或输出合同。本次仅格式化、workspace 离线编译与源差异检查；未新增测试或运行 solver、Bake、性能测量，不能据此证明性能幅度或全局机制等价。
+
 
 ## 贸易与制造房间的固定状态快照
 
