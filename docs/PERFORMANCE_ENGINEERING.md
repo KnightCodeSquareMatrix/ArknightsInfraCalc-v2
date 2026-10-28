@@ -54,7 +54,7 @@
 
 ## 贸易房间解释器的借用边界
 
-`TradeOperatorRef` 借用姓名、技能 ID、标签及 atom 切片，`TradeRoomView` 自持五槽引用 `SmallVec` 并完整携带原房间 scalar，借用共享 layout。公开 owned 输入与 `TradeContext::from_room` 保留，context 通过临时 view 进入同一初始化链，借用生命周期只绑定底层身份；人间烟火覆盖、灵知初始注入和浮点顺序保留。池已提供借用身份与组合 helper，override 选择及赤金链稳定排序照原 owned helper；借用候选投影判定也已准备。本小单元仅增加数据转换，solver、search、shortcut 与现 owned 组合 helper 调用者尚未改接借用入口，因此不据此声称逐组合复制已消除。
+`TradeOperatorRef` 借用姓名、技能 ID、标签及 atom 切片，`TradeRoomView` 自持五槽引用 `SmallVec` 并完整携带原房间 scalar，借用共享 layout。公开 owned 输入与 `TradeContext::from_room` 保留，context 通过临时 view 进入同一初始化链，借用生命周期只绑定底层身份；人间烟火覆盖、灵知初始注入和浮点顺序保留。热搜索的单组合入口经借用池 helper、房间 view、solver 单一内部实现贯通到 shortcut/segment 的 refs 内核，不再在每个组合复制姓名、技能 ID、标签或克隆预编译 Arc。override 选择及赤金链稳定排序保持；公开 owned solver API 和 Bake 使用的 owned prevalidated 入口通过 `as_view` 进入同一求解链。
 
 单次房间解释器借用输入干员的名字、技能 ID、标签及预编译 atom 切片；房间 runtime 与归并源用五槽 `SmallVec`，归并游标用固定五槽数组，人数超过五人时允许堆上溢出。归并按原 `phase/order → 输入 owner 序号 → atom seq` 次序逐条应用，不再构造、排序整房 atom 列表或逐 atom 克隆。手动构造且未携带 atom 的技能组合通过同一技能表的冷缓存补齐，包括合法空结果；仅补缺项临时持有 Arc。赤金链仍按输入顺序在 `PeerAbsorb` 前结算，订单上限重算时机不变。
 
@@ -62,7 +62,9 @@
 
 借用类型与转换小单元仅格式化、workspace 离线编译及源差异检查；未新增测试或运行 solver、Bake、性能测量，未验证运行结果或性能幅度。
 
-贸易 shortcut 的互斥、站型识别与匹配内核，以及注册 segment 的 consumer 转发和匹配内核，已统一读取 `TradeOperatorRef` 切片。原公开 owned 入口保留，通过一次五槽 `SmallVec` 引用转换进入同名 `_refs` 入口；内核互相调用直接传引用，私有身份 helper 也使用借用输入，一种判定只保留一份实现。注册链段优先级、shortcut 回退次序、互斥计数位置、tier 判定和命中 entry 的克隆保持；此单元尚未改接 solver/search 的组合构造。本次仅 owner 文件格式化、workspace 离线编译及源差异检查，未新增测试或运行 solver、Bake、性能测量。
+贸易 shortcut 的互斥、站型识别与匹配内核，以及注册 segment 的 consumer 转发和匹配内核，已统一读取 `TradeOperatorRef` 切片。原公开 owned 入口保留，通过一次五槽 `SmallVec` 引用转换进入同名 `_refs` 入口；内核互相调用直接传引用，私有身份 helper 也使用借用输入，一种判定只保留一份实现。注册链段优先级、shortcut 回退次序、互斥计数位置、tier 判定和命中 entry 的克隆保持。
+
+候选投影和命中构造直接读取 refs；动态 layout 的工作名单、标签计数与命中姓名仍在输出边界拥有。热搜索仍完整构造 `TradeResult` 和命中，枚举、过滤、排序与轻量评分边界未改。没有调用者的旧内部 projection helper 和但书 owned tier 过渡 wrapper 已删除。贯通单元仅 owner 文件格式化、workspace 离线编译及源差异检查；未新增测试或运行 solver、Bake、性能测量，未验证性能幅度或全局机制等价。
 
 
 ## 制造房间解释器的借用边界

@@ -9,15 +9,16 @@ use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::pool::{
-    build_trade_combo_operators_vec, combinations_indices, filter_standalone_exact_with,
-    trade_operators_require_candidate_projection, StandaloneFilter, TradePool,
+    build_trade_combo_operator_refs, combinations_indices, filter_standalone_exact_with,
+    trade_operator_refs_require_candidate_projection, StandaloneFilter, TradePool,
 };
 use crate::skill_table::SkillTable;
 use crate::trade::input::{
-    TradeOperator, TradeOrderKind, TradeRoomInput, TradeSearchOrderMode, TradeStationScenario,
+    TradeOperator, TradeOperatorRef, TradeOrderKind, TradeRoomView, TradeSearchOrderMode,
+    TradeStationScenario,
 };
-use crate::trade::shortcut::trade_station_exclusive_violation;
-use crate::trade::solver::{solve_trade_with_shift_prevalidated, TradeResult};
+use crate::trade::shortcut::trade_station_exclusive_violation_refs;
+use crate::trade::solver::{solve_trade_with_shift_prevalidated_view, TradeResult};
 
 /// 贸易站评分的完整分解。
 ///
@@ -560,8 +561,8 @@ impl TradeSearchOptions {
         must_name: Option<&str>,
         override_op: Option<&TradeOperator>,
     ) -> Option<(TradeSearchHit, TradeResult)> {
-        let ops = build_trade_combo_operators_vec(pool, combo, must_name, override_op);
-        if trade_station_exclusive_violation(&ops, table) {
+        let ops = build_trade_combo_operator_refs(pool, combo, must_name, override_op);
+        if trade_station_exclusive_violation_refs(&ops, table) {
             return None;
         }
         let gold_lines = if self.layout.gold_manu_line_count > 0 {
@@ -570,7 +571,7 @@ impl TradeSearchOptions {
             self.gold_production_lines
         };
         let projected_layout = trade_combo_layout(&self.layout, &ops);
-        let input = TradeRoomInput {
+        let input = TradeRoomView {
             level: self.trade_level,
             operators: ops,
             order_count: None,
@@ -578,20 +579,21 @@ impl TradeSearchOptions {
             gold_production_lines: Some(gold_lines),
             durin_virtual_lines: None,
             human_fireworks: None,
-            layout: projected_layout,
+            layout: &projected_layout,
             active_order_kind: order_kind,
         };
-        let result = solve_trade_with_shift_prevalidated(&input, table, self.shift_hours).ok()?;
+        let result =
+            solve_trade_with_shift_prevalidated_view(&input, table, self.shift_hours).ok()?;
         let hit = trade_search_hit_from_result(&input.operators, &result);
         Some((hit, result))
     }
 }
 
 fn trade_search_hit_from_result(
-    operators: &[TradeOperator],
+    operators: &[TradeOperatorRef<'_>],
     result: &TradeResult,
 ) -> TradeSearchHit {
-    let names: Vec<String> = operators.iter().map(|o| o.name.clone()).collect();
+    let names: Vec<String> = operators.iter().map(|o| o.name.to_owned()).collect();
     let efficiency = &result.efficiency;
     let breakdown = TradeEfficiencyBreakdown {
         base_efficiency: efficiency.paper.base_efficiency,
@@ -648,13 +650,13 @@ fn eval_combo_hit(
         .map(|(hit, _result)| hit)
 }
 
-fn trade_combo_layout(base: &SharedLayout, operators: &[TradeOperator]) -> SharedLayout {
+fn trade_combo_layout(base: &SharedLayout, operators: &[TradeOperatorRef<'_>]) -> SharedLayout {
     let changes_dynamic_tag_count = base.global_inject.trade_tagged().iter().any(|rule| {
         operators
             .iter()
             .any(|operator| operator.tags.contains(&rule.target_tag))
     });
-    if changes_dynamic_tag_count || trade_operators_require_candidate_projection(operators) {
+    if changes_dynamic_tag_count || trade_operator_refs_require_candidate_projection(operators) {
         project_trade_combo_layout(base, operators)
     } else {
         Arc::clone(base)
@@ -667,14 +669,17 @@ fn trade_combo_layout(base: &SharedLayout, operators: &[TradeOperator]) -> Share
 /// 贸易 workforce 或 `TaggedCountInTradeSum` 的机制必须看到候选本身。
 /// 已经存在于贸易 workforce 的 anchor 不重复计数；本 helper 不负责
 /// `TradeStationsWithTaggedGte` 的逐房门槛投影。
-fn project_trade_combo_layout(base: &LayoutContext, operators: &[TradeOperator]) -> SharedLayout {
+fn project_trade_combo_layout(
+    base: &LayoutContext,
+    operators: &[TradeOperatorRef<'_>],
+) -> SharedLayout {
     let mut layout = base.clone();
     let mut base_names: HashSet<String> = layout.base_workforce.iter().cloned().collect();
     let mut trade_names: HashSet<String> = layout.trade_workforce.iter().cloned().collect();
 
     for operator in operators {
-        if base_names.insert(operator.name.clone()) {
-            layout.base_workforce.push(operator.name.clone());
+        if base_names.insert(operator.name.to_owned()) {
+            layout.base_workforce.push(operator.name.to_owned());
             if operator
                 .tags
                 .iter()
@@ -699,17 +704,17 @@ fn project_trade_combo_layout(base: &LayoutContext, operators: &[TradeOperator])
         }
     }
     for operator in operators {
-        if !trade_names.insert(operator.name.clone()) {
+        if !trade_names.insert(operator.name.to_owned()) {
             continue;
         }
         let amount = crate::trade::gold_flow::virtual_line_yield(
-            &operator.buff_ids,
+            operator.buff_ids,
             layout.gold_manu_line_count,
             layout.durin_virtual_lines(),
         );
         if amount > 0 {
             layout.trade_gold_line_sources.push((
-                operator.name.clone(),
+                operator.name.to_owned(),
                 amount,
                 operator
                     .buff_ids
@@ -721,9 +726,9 @@ fn project_trade_combo_layout(base: &LayoutContext, operators: &[TradeOperator])
                 amount as f64,
             );
         }
-        layout.trade_workforce.push(operator.name.clone());
+        layout.trade_workforce.push(operator.name.to_owned());
         let mut seen_tags = HashSet::new();
-        for tag in &operator.tags {
+        for tag in operator.tags {
             if seen_tags.insert(tag.as_str()) {
                 *layout
                     .trade_tagged_count_sum

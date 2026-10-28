@@ -188,20 +188,6 @@ pub(crate) fn trade_atom_requires_candidate_projection(atom: &EffectAtom) -> boo
     )
 }
 
-pub(crate) fn trade_operators_require_candidate_projection(operators: &[TradeOperator]) -> bool {
-    operators.iter().any(|operator| {
-        operator
-            .tags
-            .iter()
-            .any(|tag| tag == crate::layout::TAG_DURIN)
-            || operator.buff_ids.iter().any(|id| is_gold_flow_skill(id))
-            || operator
-                .compiled_atoms
-                .iter()
-                .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
-    })
-}
-
 pub(crate) fn trade_operator_refs_require_candidate_projection(
     operators: &[TradeOperatorRef<'_>],
 ) -> bool {
@@ -212,17 +198,6 @@ pub(crate) fn trade_operator_refs_require_candidate_projection(
             .any(|tag| tag == crate::layout::TAG_DURIN)
             || operator.buff_ids.iter().any(|id| is_gold_flow_skill(id))
             || operator
-                .compiled_atoms
-                .iter()
-                .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))
-    })
-}
-
-pub(crate) fn trade_pool_requires_candidate_projection(pool: &TradePool) -> bool {
-    pool.entries.iter().any(|entry| {
-        entry.tags.iter().any(|tag| tag == crate::layout::TAG_DURIN)
-            || entry.buff_ids.iter().any(|id| is_gold_flow_skill(id))
-            || entry
                 .compiled_atoms
                 .iter()
                 .any(|compiled| trade_atom_requires_candidate_projection(&compiled.atom))

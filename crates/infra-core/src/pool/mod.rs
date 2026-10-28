@@ -28,5 +28,5 @@ pub use trade::{
     TradePool, TradePoolEntry, JIE_TRADE_NAME,
 };
 pub(crate) use trade::{
-    trade_operators_require_candidate_projection, trade_pool_requires_candidate_projection,
+    build_trade_combo_operator_refs, trade_operator_refs_require_candidate_projection,
 };

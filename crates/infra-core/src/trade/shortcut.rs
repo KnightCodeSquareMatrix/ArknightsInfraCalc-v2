@@ -681,11 +681,6 @@ pub(crate) fn match_docus_solo_shortcut_refs(
     Some(TradeShortcutMatch { entry })
 }
 
-pub(crate) fn docus_operator_is_e2(ops: &[TradeOperator], table: &SkillTable) -> bool {
-    let ops: SmallVec<[_; 5]> = ops.iter().map(TradeOperator::as_ref).collect();
-    docus_operator_is_e2_refs(&ops, table)
-}
-
 pub(crate) fn docus_operator_is_e2_refs(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter()
         .find(|operator| has_docus_buff(operator, table))

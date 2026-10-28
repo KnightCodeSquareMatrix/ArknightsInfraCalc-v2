@@ -6,7 +6,7 @@ use crate::tier::PromotionTier;
 use crate::trade::efficiency::{
     PaperTradeEfficiency, TradeEfficiency, GOLD_TRADE_REFERENCE_OUTPUT_PER_DAY,
 };
-use crate::trade::input::{TradeOrderKind, TradeRoomInput};
+use crate::trade::input::{TradeOrderKind, TradeRoomInput, TradeRoomView};
 use crate::trade::interpreter::{apply_trade_phases, TradeContext};
 use crate::trade::order_mechanic::{self, OrderMechanicResult, SpecialOrderKind};
 use crate::trade::shortcut;
@@ -150,6 +150,14 @@ pub(crate) fn solve_trade_with_shift_prevalidated(
     table: &SkillTable,
     shift_hours: f64,
 ) -> Result<TradeResult> {
+    solve_trade_with_shift_prevalidated_view(&input.as_view(), table, shift_hours)
+}
+
+pub(crate) fn solve_trade_with_shift_prevalidated_view(
+    input: &TradeRoomView<'_>,
+    table: &SkillTable,
+    shift_hours: f64,
+) -> Result<TradeResult> {
     solve_trade_with_shift_inner(input, table, shift_hours, false)
 }
 
@@ -158,11 +166,11 @@ pub fn solve_trade_with_shift(
     table: &SkillTable,
     shift_hours: f64,
 ) -> Result<TradeResult> {
-    solve_trade_with_shift_inner(input, table, shift_hours, true)
+    solve_trade_with_shift_inner(&input.as_view(), table, shift_hours, true)
 }
 
 fn solve_trade_with_shift_inner(
-    input: &TradeRoomInput,
+    input: &TradeRoomView<'_>,
     table: &SkillTable,
     shift_hours: f64,
     check_exclusivity: bool,
@@ -174,13 +182,15 @@ fn solve_trade_with_shift_inner(
             "originium trade orders require a level-3 trade post",
         ));
     }
-    if check_exclusivity && shortcut::trade_station_exclusive_violation(&input.operators, table) {
+    if check_exclusivity
+        && shortcut::trade_station_exclusive_violation_refs(&input.operators, table)
+    {
         return Err(crate::error::Error::msg(
             "trade station violates mechanism exclusivity (docus / closure / witch)",
         ));
     }
 
-    let mut ctx = TradeContext::from_room(input);
+    let mut ctx = TradeContext::from_view(input);
     apply_trade_phases(&mut ctx, table);
 
     let order_eff_base = ctx.order_eff_base();
@@ -203,7 +213,7 @@ fn solve_trade_with_shift_inner(
 
     if input.active_order_kind.is_gold() {
         let sc = if check_exclusivity {
-            shortcut::resolve_trade_shortcut(
+            shortcut::resolve_trade_shortcut_refs(
                 &input.operators,
                 table,
                 order_eff_pre,
@@ -211,7 +221,7 @@ fn solve_trade_with_shift_inner(
                 &input.layout.global_inject,
             )
         } else {
-            shortcut::resolve_trade_shortcut_prevalidated(
+            shortcut::resolve_trade_shortcut_prevalidated_refs(
                 &input.operators,
                 table,
                 order_eff_pre,
