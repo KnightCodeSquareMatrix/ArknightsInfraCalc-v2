@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// 轻量运行时计数器，供 `infra-cli profile` 对比优化前后热路径行为。
 #[derive(Debug, Default)]
@@ -49,7 +49,7 @@ pub fn record_trade_solve() {
     COUNTERS.trade_solves.fetch_add(1, Ordering::Relaxed);
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct OperationMetrics {
     pub calls: u64,
     pub wall_nanos: u64,
@@ -79,6 +79,56 @@ pub struct OperationMetrics {
 }
 
 impl OperationMetrics {
+    fn accumulate(&mut self, other: Self) {
+        self.calls = self.calls.saturating_add(other.calls);
+        self.wall_nanos = self.wall_nanos.saturating_add(other.wall_nanos);
+        self.workforce_nanos = self.workforce_nanos.saturating_add(other.workforce_nanos);
+        self.layout_nanos = self.layout_nanos.saturating_add(other.layout_nanos);
+        self.mechanics_nanos = self.mechanics_nanos.saturating_add(other.mechanics_nanos);
+        self.cross_facility_nanos = self
+            .cross_facility_nanos
+            .saturating_add(other.cross_facility_nanos);
+        self.support_nanos = self.support_nanos.saturating_add(other.support_nanos);
+        self.support_registry_load_nanos = self
+            .support_registry_load_nanos
+            .saturating_add(other.support_registry_load_nanos);
+        self.room_materialize_nanos = self
+            .room_materialize_nanos
+            .saturating_add(other.room_materialize_nanos);
+        self.support_registry_loads = self
+            .support_registry_loads
+            .saturating_add(other.support_registry_loads);
+        self.layout_clones = self.layout_clones.saturating_add(other.layout_clones);
+        self.blueprint_clones = self.blueprint_clones.saturating_add(other.blueprint_clones);
+        self.assignment_clones = self
+            .assignment_clones
+            .saturating_add(other.assignment_clones);
+        self.room_context_clones = self
+            .room_context_clones
+            .saturating_add(other.room_context_clones);
+        self.support_registry_parses = self
+            .support_registry_parses
+            .saturating_add(other.support_registry_parses);
+        self.prepare_nanos = self.prepare_nanos.saturating_add(other.prepare_nanos);
+        self.bake_lookup_nanos = self
+            .bake_lookup_nanos
+            .saturating_add(other.bake_lookup_nanos);
+        self.evaluate_nanos = self.evaluate_nanos.saturating_add(other.evaluate_nanos);
+        self.sort_topk_nanos = self.sort_topk_nanos.saturating_add(other.sort_topk_nanos);
+        self.generated_combinations = self
+            .generated_combinations
+            .saturating_add(other.generated_combinations);
+        self.candidate_attempts = self
+            .candidate_attempts
+            .saturating_add(other.candidate_attempts);
+        self.accepted_hits = self.accepted_hits.saturating_add(other.accepted_hits);
+        self.selected_assignments = self
+            .selected_assignments
+            .saturating_add(other.selected_assignments);
+        self.bake_hits = self.bake_hits.saturating_add(other.bake_hits);
+        self.live_calls = self.live_calls.saturating_add(other.live_calls);
+    }
+
     fn delta(self, before: Self) -> Self {
         Self {
             calls: self.calls.saturating_sub(before.calls),
@@ -144,6 +194,14 @@ pub struct SolverPerfSnapshot {
 }
 
 impl SolverPerfSnapshot {
+    fn accumulate(&mut self, other: Self) {
+        self.resolve.accumulate(other.resolve);
+        self.control.accumulate(other.control);
+        self.trade.accumulate(other.trade);
+        self.manufacture.accumulate(other.manufacture);
+        self.power.accumulate(other.power);
+    }
+
     pub fn delta(self, before: Self) -> Self {
         Self {
             resolve: self.resolve.delta(before.resolve),
@@ -181,13 +239,216 @@ pub struct SearchPhaseDurations {
     pub sort_topk: Duration,
 }
 
-#[derive(Debug, Clone)]
+// IDs are stable within diagnostic schema v2; the final slot safely combines unknown labels.
+const STAGE_LABELS: [(&str, &str); 48] = [
+    ("search", "control"),
+    ("search", "trade"),
+    ("search", "manufacture"),
+    ("search", "power"),
+    ("shift", "plan_build"),
+    ("shift", "pipeline"),
+    ("shift_pipeline", "plan_execute"),
+    ("shift_pipeline", "pool_build"),
+    ("shift_pipeline", "peak_prepare_control"),
+    ("shift_pipeline", "peak_prefixes"),
+    ("shift_pipeline", "final_snapshot_refresh"),
+    ("shift_pipeline", "meeting_fill"),
+    ("shift_pipeline", "stable_sort"),
+    ("shift_pipeline", "total"),
+    ("shift_pipeline_resolve", "plan_execute"),
+    ("shift_pipeline_resolve", "pool_build"),
+    ("shift_pipeline_resolve", "peak_prepare_control"),
+    ("shift_pipeline_resolve", "peak_prefixes"),
+    ("shift_pipeline_resolve", "final_snapshot_refresh"),
+    ("shift_pipeline_resolve", "meeting_fill"),
+    ("shift_pipeline_resolve", "stable_sort"),
+    ("rotation_finalize", "dorm_prepare"),
+    ("rotation_finalize", "rescore"),
+    ("rotation_finalize", "dorm_assign_and_totals"),
+    ("rotation_finalize", "invariants"),
+    ("rotation_finalize", "total"),
+    ("rotation_resolve", "total"),
+    ("rotation", "total"),
+    ("rotation_abc", "shift_1"),
+    ("rotation_abc", "shift_2"),
+    ("rotation_abc", "shift_3"),
+    ("rotation_abc", "peak"),
+    ("rotation_abc", "shared_pool_split"),
+    ("rotation_abc", "gamma"),
+    ("rotation_abc", "shifts_and_postprocess"),
+    ("rotation_abc", "total"),
+    ("plan_cli", "resource_load"),
+    ("plan_cli", "compute_plan"),
+    ("plan_cli", "prefix_shadow"),
+    ("plan_cli", "output_serialize_write"),
+    ("plan_compute", "total"),
+    ("plan_compute", "current_probe"),
+    ("plan_compute", "explicit_invariants"),
+    ("plan_compute", "profile_baseline"),
+    ("plan_compute", "maa_build"),
+    ("plan_compute_resolve", "current_probe"),
+    ("serve_request", "request_parse"),
+    ("serve_request", "request_total"),
+];
+const OVERFLOW_STAGE_ID: usize = STAGE_LABELS.len();
+const STAGE_SLOT_COUNT: usize = STAGE_LABELS.len() + 1;
+
+fn stage_id(scope: &str, stage: &str) -> usize {
+    match (scope, stage) {
+        ("search", "control") => 0,
+        ("search", "trade") => 1,
+        ("search", "manufacture") => 2,
+        ("search", "power") => 3,
+        ("shift", "plan_build") => 4,
+        ("shift", "pipeline") => 5,
+        ("shift_pipeline", "plan_execute") => 6,
+        ("shift_pipeline", "pool_build") => 7,
+        ("shift_pipeline", "peak_prepare_control") => 8,
+        ("shift_pipeline", "peak_prefixes") => 9,
+        ("shift_pipeline", "final_snapshot_refresh") => 10,
+        ("shift_pipeline", "meeting_fill") => 11,
+        ("shift_pipeline", "stable_sort") => 12,
+        ("shift_pipeline", "total") => 13,
+        ("shift_pipeline_resolve", "plan_execute") => 14,
+        ("shift_pipeline_resolve", "pool_build") => 15,
+        ("shift_pipeline_resolve", "peak_prepare_control") => 16,
+        ("shift_pipeline_resolve", "peak_prefixes") => 17,
+        ("shift_pipeline_resolve", "final_snapshot_refresh") => 18,
+        ("shift_pipeline_resolve", "meeting_fill") => 19,
+        ("shift_pipeline_resolve", "stable_sort") => 20,
+        ("rotation_finalize", "dorm_prepare") => 21,
+        ("rotation_finalize", "rescore") => 22,
+        ("rotation_finalize", "dorm_assign_and_totals") => 23,
+        ("rotation_finalize", "invariants") => 24,
+        ("rotation_finalize", "total") => 25,
+        ("rotation_resolve", "total") => 26,
+        ("rotation", "total") => 27,
+        ("rotation_abc", "shift_1") => 28,
+        ("rotation_abc", "shift_2") => 29,
+        ("rotation_abc", "shift_3") => 30,
+        ("rotation_abc", "peak") => 31,
+        ("rotation_abc", "shared_pool_split") => 32,
+        ("rotation_abc", "gamma") => 33,
+        ("rotation_abc", "shifts_and_postprocess") => 34,
+        ("rotation_abc", "total") => 35,
+        ("plan_cli", "resource_load") => 36,
+        ("plan_cli", "compute_plan") => 37,
+        ("plan_cli", "prefix_shadow") => 38,
+        ("plan_cli", "output_serialize_write") => 39,
+        ("plan_compute", "total") => 40,
+        ("plan_compute", "current_probe") => 41,
+        ("plan_compute", "explicit_invariants") => 42,
+        ("plan_compute", "profile_baseline") => 43,
+        ("plan_compute", "maa_build") => 44,
+        ("plan_compute_resolve", "current_probe") => 45,
+        ("serve_request", "request_parse") => 46,
+        ("serve_request", "request_total") => 47,
+        _ => OVERFLOW_STAGE_ID,
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct StageTotals {
+    calls: u64,
+    errors: u64,
+    elapsed_nanos: u64,
+    metrics: SolverPerfSnapshot,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RawStageEvent {
+    stage_id: usize,
+    scope: &'static str,
+    stage: &'static str,
+    status: &'static str,
+    elapsed_nanos: u64,
+    metrics: SolverPerfSnapshot,
+}
+
+#[derive(Debug)]
 struct PerfTraceState {
     trace_id: u64,
     layout: String,
     operbox: String,
+    started: Instant,
     metrics: SolverPerfSnapshot,
     resolve_depth: u32,
+    stages: Box<[StageTotals; STAGE_SLOT_COUNT]>,
+    details: Option<Vec<RawStageEvent>>,
+}
+
+impl PerfTraceState {
+    fn record_stage(&mut self, event: RawStageEvent) {
+        let totals = &mut self.stages[event.stage_id];
+        totals.calls = totals.calls.saturating_add(1);
+        totals.errors = totals
+            .errors
+            .saturating_add(u64::from(event.status == "error"));
+        totals.elapsed_nanos = totals.elapsed_nanos.saturating_add(event.elapsed_nanos);
+        totals.metrics.accumulate(event.metrics);
+        if let Some(details) = self.details.as_mut() {
+            details.push(event);
+        }
+    }
+
+    fn flush(self) {
+        // Stop the request/run clock before any diagnostic allocation, formatting or I/O.
+        let elapsed_nanos = duration_nanos(self.started.elapsed());
+        let stages: Vec<_> = self
+            .stages
+            .iter()
+            .enumerate()
+            .filter(|(_, totals)| totals.calls != 0)
+            .map(|(id, totals)| {
+                let (scope, stage) = STAGE_LABELS
+                    .get(id)
+                    .copied()
+                    .unwrap_or(("overflow", "unknown"));
+                serde_json::json!({
+                    "stage_id": id,
+                    "scope": scope,
+                    "stage": stage,
+                    "calls": totals.calls,
+                    "errors": totals.errors,
+                    "elapsed_ms": nanos_ms(totals.elapsed_nanos),
+                    "metrics": snapshot_json(totals.metrics),
+                })
+            })
+            .collect();
+        let mut summary = serde_json::json!({
+            "schema_version": 2,
+            "event": "solver_summary",
+            "trace_id": self.trace_id,
+            "layout": self.layout,
+            "operbox": self.operbox,
+            "elapsed_ms": nanos_ms(elapsed_nanos),
+            "elapsed_boundary": "trace_start_to_before_perf_format",
+            "timing": "inclusive_non_additive",
+            "metrics": snapshot_json(self.metrics),
+            "stages": stages,
+        });
+        if let Some(details) = self.details {
+            summary["details"] = serde_json::Value::Array(
+                details
+                    .into_iter()
+                    .map(|event| {
+                        serde_json::json!({
+                            "stage_id": event.stage_id,
+                            "scope": event.scope,
+                            "stage": event.stage,
+                            "status": event.status,
+                            "elapsed_nanos": event.elapsed_nanos,
+                            "elapsed_ms": nanos_ms(event.elapsed_nanos),
+                            "metrics": snapshot_json(event.metrics),
+                        })
+                    })
+                    .collect(),
+            );
+        }
+        // Ignore stderr failure: diagnostics must not turn a completed solve into a failure.
+        use std::io::Write;
+        let _ = writeln!(std::io::stderr().lock(), "[perf] {summary}");
+    }
 }
 
 thread_local! {
@@ -196,6 +457,11 @@ thread_local! {
 
 static NEXT_TRACE_ID: AtomicU64 = AtomicU64::new(1);
 static SOLVER_PERF_ENABLED: AtomicBool = AtomicBool::new(true);
+static SOLVER_PERF_DETAIL_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_solver_perf_detail_enabled(enabled: bool) {
+    SOLVER_PERF_DETAIL_ENABLED.store(enabled, Ordering::Relaxed);
+}
 
 pub fn set_solver_perf_enabled(enabled: bool) {
     SOLVER_PERF_ENABLED.store(enabled, Ordering::Relaxed);
@@ -210,9 +476,12 @@ pub struct SolverPerfTraceGuard {
 impl Drop for SolverPerfTraceGuard {
     fn drop(&mut self) {
         if self.owns_trace {
-            PERF_TRACE.with(|trace| {
-                *trace.borrow_mut() = self.previous.take();
-            });
+            // Release the RefCell borrow before flushing or dropping the completed state.
+            let completed = PERF_TRACE
+                .with(|trace| std::mem::replace(&mut *trace.borrow_mut(), self.previous.take()));
+            if let Some(state) = completed {
+                state.flush();
+            }
         }
     }
 }
@@ -228,8 +497,13 @@ pub fn start_solver_perf_trace(layout: &str, operbox: &str) -> SolverPerfTraceGu
         trace_id: NEXT_TRACE_ID.fetch_add(1, Ordering::Relaxed),
         layout: layout.to_string(),
         operbox: operbox.to_string(),
+        started: Instant::now(),
         metrics: SolverPerfSnapshot::default(),
         resolve_depth: 0,
+        stages: Box::new([StageTotals::default(); STAGE_SLOT_COUNT]),
+        details: SOLVER_PERF_DETAIL_ENABLED
+            .load(Ordering::Relaxed)
+            .then(Vec::new),
     };
     let previous = PERF_TRACE.with(|trace| trace.borrow_mut().replace(state));
     SolverPerfTraceGuard {
@@ -565,27 +839,10 @@ pub fn emit_solver_stage(
     stage: &'static str,
     status: &'static str,
     elapsed: Duration,
-    _before: SolverPerfSnapshot,
-    _after: SolverPerfSnapshot,
+    before: SolverPerfSnapshot,
+    after: SolverPerfSnapshot,
 ) {
-    PERF_TRACE.with(|trace| {
-        let trace = trace.borrow();
-        let Some(state) = trace.as_ref() else {
-            return;
-        };
-        let event = serde_json::json!({
-            "schema_version": 1,
-            "event": "solver_stage",
-            "trace_id": state.trace_id,
-            "layout": state.layout,
-            "operbox": state.operbox,
-            "scope": scope,
-            "stage": stage,
-            "status": status,
-            "elapsed_ms": duration_ms(elapsed),
-        });
-        eprintln!("[perf] {event}");
-    });
+    emit_solver_stage_metrics(scope, stage, status, elapsed, before, after);
 }
 
 pub fn emit_solver_stage_metrics(
@@ -596,32 +853,7 @@ pub fn emit_solver_stage_metrics(
     before: SolverPerfSnapshot,
     after: SolverPerfSnapshot,
 ) {
-    PERF_TRACE.with(|trace| {
-        let trace = trace.borrow();
-        let Some(state) = trace.as_ref() else {
-            return;
-        };
-        let metrics = after.delta(before);
-        let event = serde_json::json!({
-            "schema_version": 1,
-            "event": "solver_stage",
-            "trace_id": state.trace_id,
-            "layout": state.layout,
-            "operbox": state.operbox,
-            "scope": scope,
-            "stage": stage,
-            "status": status,
-            "elapsed_ms": duration_ms(elapsed),
-            "metrics": {
-                "resolve": operation_json(metrics.resolve),
-                "control": operation_json(metrics.control),
-                "trade": operation_json(metrics.trade),
-                "manufacture": operation_json(metrics.manufacture),
-                "power": operation_json(metrics.power),
-            }
-        });
-        eprintln!("[perf] {event}");
-    });
+    record_stage_event(scope, stage, status, elapsed, after.delta(before));
 }
 
 pub fn emit_resolve_stage(
@@ -632,29 +864,59 @@ pub fn emit_resolve_stage(
     before: SolverPerfSnapshot,
     after: SolverPerfSnapshot,
 ) {
-    let metrics = after.delta(before).resolve;
-    if metrics.calls == 0 {
+    let resolve = after.delta(before).resolve;
+    if resolve.calls == 0 {
         return;
     }
+    record_stage_event(
+        scope,
+        stage,
+        status,
+        elapsed,
+        SolverPerfSnapshot {
+            resolve,
+            ..SolverPerfSnapshot::default()
+        },
+    );
+}
+
+fn record_stage_event(
+    scope: &'static str,
+    stage: &'static str,
+    status: &'static str,
+    elapsed: Duration,
+    metrics: SolverPerfSnapshot,
+) {
     PERF_TRACE.with(|trace| {
-        let trace = trace.borrow();
-        let Some(state) = trace.as_ref() else {
+        let mut trace = trace.borrow_mut();
+        let Some(state) = trace.as_mut() else {
             return;
         };
-        let event = serde_json::json!({
-            "schema_version": 1,
-            "event": "solver_stage",
-            "trace_id": state.trace_id,
-            "layout": state.layout,
-            "operbox": state.operbox,
-            "scope": scope,
-            "stage": stage,
-            "status": status,
-            "elapsed_ms": duration_ms(elapsed),
-            "metrics": {"resolve": operation_json(metrics)}
+        state.record_stage(RawStageEvent {
+            stage_id: stage_id(scope, stage),
+            scope,
+            stage,
+            status,
+            elapsed_nanos: duration_nanos(elapsed),
+            metrics,
         });
-        eprintln!("[perf] {event}");
     });
+}
+
+fn snapshot_json(metrics: SolverPerfSnapshot) -> serde_json::Value {
+    let mut operations = serde_json::Map::new();
+    for (name, operation) in [
+        ("resolve", metrics.resolve),
+        ("control", metrics.control),
+        ("trade", metrics.trade),
+        ("manufacture", metrics.manufacture),
+        ("power", metrics.power),
+    ] {
+        if operation != OperationMetrics::default() {
+            operations.insert(name.to_string(), operation_json(operation));
+        }
+    }
+    serde_json::Value::Object(operations)
 }
 
 fn search_operation_name(operation: SearchOperation) -> &'static str {
@@ -698,10 +960,6 @@ fn operation_json(metrics: OperationMetrics) -> serde_json::Value {
 
 fn duration_nanos(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
-}
-
-fn duration_ms(duration: Duration) -> f64 {
-    nanos_ms(duration_nanos(duration))
 }
 
 fn nanos_ms(nanos: u64) -> f64 {

@@ -158,6 +158,8 @@ fn profile_layout_full_cmd(args: &[String]) -> Result<(), Error> {
         runs
     );
 
+    let layout_label = layout_path.to_string_lossy();
+    let operbox_label = operbox_path.to_string_lossy();
     let mut profiles = Vec::with_capacity(runs);
     let mut owned_labels = Vec::new();
     for i in 0..runs {
@@ -169,7 +171,14 @@ fn profile_layout_full_cmd(args: &[String]) -> Result<(), Error> {
             owned_labels.last().unwrap().clone()
         };
         profiles.push(run_layout_full(
-            &run_label, &blueprint, &operbox, &instances, &table, top_k,
+            &run_label,
+            &layout_label,
+            &operbox_label,
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            top_k,
         )?);
     }
 
@@ -179,12 +188,15 @@ fn profile_layout_full_cmd(args: &[String]) -> Result<(), Error> {
 
 fn run_layout_full(
     label: &str,
+    layout_label: &str,
+    operbox_label: &str,
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     instances: &OperatorInstances,
     table: &SkillTable,
     top_k: usize,
 ) -> Result<RunProfile, Error> {
+    let _trace = infra_core::profile::start_solver_perf_trace(layout_label, operbox_label);
     reset_hot_path_counters();
     let total_start = Instant::now();
     let mut phases = Vec::new();

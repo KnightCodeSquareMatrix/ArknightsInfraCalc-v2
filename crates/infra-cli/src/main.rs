@@ -50,9 +50,12 @@ fn run() -> Result<(), Error> {
 
     let perf_enabled = !args[2..].iter().any(|arg| arg == "--no-perf");
     infra_core::profile::set_solver_perf_enabled(perf_enabled);
+    infra_core::profile::set_solver_perf_detail_enabled(
+        perf_enabled && args[2..].iter().any(|arg| arg == "--perf-detail"),
+    );
     let command_args: Vec<String> = args[2..]
         .iter()
-        .filter(|arg| arg.as_str() != "--no-perf")
+        .filter(|arg| !matches!(arg.as_str(), "--no-perf" | "--perf-detail"))
         .cloned()
         .collect();
 
@@ -108,7 +111,7 @@ fn print_usage() {
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");
     eprintln!("  infra-cli trade yield <fixture> [--level <n>] [--shift <hours>] [-o <file.csv>] [--text]");
     eprintln!();
-    eprintln!("Global: append --no-perf to disable [perf] stderr trace output");
+    eprintln!("Global: [perf] stderr summary is enabled; --perf-detail adds buffered events; --no-perf disables both");
     eprintln!("Output: CSV by default (UTF-8 BOM when writing to file). Use --text for human-readable stderr.");
 }
 
