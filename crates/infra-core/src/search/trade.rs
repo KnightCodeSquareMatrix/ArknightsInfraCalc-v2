@@ -17,7 +17,7 @@ use crate::trade::input::{
     TradeOperator, TradeOrderKind, TradeRoomInput, TradeSearchOrderMode, TradeStationScenario,
 };
 use crate::trade::shortcut::trade_station_exclusive_violation;
-use crate::trade::solver::solve_trade_with_shift_prevalidated;
+use crate::trade::solver::{solve_trade_with_shift_prevalidated, TradeResult};
 
 /// 贸易站评分的完整分解。
 ///
@@ -518,39 +518,52 @@ fn trade_search_pool_for_order(
     }
 }
 
-fn eval_combo_hit(
-    pool: &TradePool,
-    table: &SkillTable,
-    options: &TradeSearchOptions,
-    order_kind: TradeOrderKind,
-    combo: &[usize],
-    must_name: Option<&str>,
-    override_op: Option<&TradeOperator>,
-) -> Option<TradeSearchHit> {
-    let ops = build_trade_combo_operators_vec(pool, combo, must_name, override_op);
-    if trade_station_exclusive_violation(&ops, table) {
-        return None;
+impl TradeSearchOptions {
+    /// 单个组合的 live 命中构造（含候选投影与同房禁配预筛）。
+    ///
+    /// 实时搜索、Bake 行生成与 Bake 行级对账共用同一入口，保证三者对同一组合
+    /// 产出的 `TradeSearchHit` 逐字段一致。
+    pub(crate) fn solve_trade_combo(
+        &self,
+        pool: &TradePool,
+        table: &SkillTable,
+        order_kind: TradeOrderKind,
+        combo: &[usize],
+        must_name: Option<&str>,
+        override_op: Option<&TradeOperator>,
+    ) -> Option<(TradeSearchHit, TradeResult)> {
+        let ops = build_trade_combo_operators_vec(pool, combo, must_name, override_op);
+        if trade_station_exclusive_violation(&ops, table) {
+            return None;
+        }
+        let gold_lines = if self.layout.gold_manu_line_count > 0 {
+            self.layout.gold_manu_line_count
+        } else {
+            self.gold_production_lines
+        };
+        let projected_layout = trade_combo_layout(&self.layout, &ops);
+        let input = TradeRoomInput {
+            level: self.trade_level,
+            operators: ops,
+            order_count: None,
+            mood: self.mood,
+            gold_production_lines: Some(gold_lines),
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: projected_layout,
+            active_order_kind: order_kind,
+        };
+        let result = solve_trade_with_shift_prevalidated(&input, table, self.shift_hours).ok()?;
+        let hit = trade_search_hit_from_result(&input.operators, &result);
+        Some((hit, result))
     }
-    let gold_lines = if options.layout.gold_manu_line_count > 0 {
-        options.layout.gold_manu_line_count
-    } else {
-        options.gold_production_lines
-    };
-    let projected_layout = trade_combo_layout(&options.layout, &ops);
-    let input = TradeRoomInput {
-        level: options.trade_level,
-        operators: ops,
-        order_count: None,
-        mood: options.mood,
-        gold_production_lines: Some(gold_lines),
-        durin_virtual_lines: None,
-        human_fireworks: None,
-        layout: projected_layout,
-        active_order_kind: order_kind,
-    };
-    let result = solve_trade_with_shift_prevalidated(&input, table, options.shift_hours).ok()?;
-    let names: Vec<String> = input.operators.iter().map(|o| o.name.clone()).collect();
+}
 
+fn trade_search_hit_from_result(
+    operators: &[TradeOperator],
+    result: &TradeResult,
+) -> TradeSearchHit {
+    let names: Vec<String> = operators.iter().map(|o| o.name.clone()).collect();
     let efficiency = &result.efficiency;
     let breakdown = TradeEfficiencyBreakdown {
         base_efficiency: efficiency.paper.base_efficiency,
@@ -579,18 +592,32 @@ fn eval_combo_hit(
         rule_id: result.rule_id.clone(),
     };
 
-    Some(TradeSearchHit {
+    TradeSearchHit {
         names,
         gold_names: vec![],
         originium_names: vec![],
         final_efficiency: efficiency.final_efficiency,
         mechanic_equivalent_efficiency: result.order_mechanic.mechanic_equivalent_efficiency,
-        rule_id: result.rule_id,
+        rule_id: result.rule_id.clone(),
         unit_trade_per_day: result.production.unit.unit_trade_per_day,
         unit_gold_per_day: result.production.unit.unit_gold_per_day,
         unit_originium_per_day: result.production.unit.unit_originium_per_day,
         breakdown: Some(breakdown),
-    })
+    }
+}
+
+fn eval_combo_hit(
+    pool: &TradePool,
+    table: &SkillTable,
+    options: &TradeSearchOptions,
+    order_kind: TradeOrderKind,
+    combo: &[usize],
+    must_name: Option<&str>,
+    override_op: Option<&TradeOperator>,
+) -> Option<TradeSearchHit> {
+    options
+        .solve_trade_combo(pool, table, order_kind, combo, must_name, override_op)
+        .map(|(hit, _result)| hit)
 }
 
 fn trade_combo_layout(base: &SharedLayout, operators: &[TradeOperator]) -> SharedLayout {

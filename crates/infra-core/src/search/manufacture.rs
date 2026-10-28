@@ -135,6 +135,44 @@ impl Default for ManuSearchOptions {
     }
 }
 
+impl ManuSearchOptions {
+    /// 单个组合的 live 命中构造（含同房兼容、候选投影与班次门槛）。
+    ///
+    /// 实时搜索、Bake 行生成与 Bake 行级对账共用同一入口，保证三者对同一组合
+    /// 产出的 `ManuSearchHit` 逐字段一致。
+    pub(crate) fn solve_manufacture_combo(
+        &self,
+        pool: &ManuPool,
+        table: &SkillTable,
+        recipe: RecipeKind,
+        combo: &[usize],
+    ) -> Option<ManuSearchHit> {
+        let operators: Vec<_> = combo
+            .iter()
+            .map(|idx| pool.entries[*idx].to_manu_operator())
+            .collect();
+        if !manufacture_combo_allowed_for_shift(&operators, table, self.shift_hours) {
+            return None;
+        }
+        let layout = manufacture_combo_layout(&self.layout, &operators);
+        let base = ManuRoomInput {
+            level: self.level,
+            operators,
+            active_recipe: recipe,
+            mood: self.mood,
+            layout,
+        };
+        evaluate_manufacture_room_with_shift(&base, table, recipe, self.shift_hours)
+    }
+
+    /// 池内是否有清零同伴产出的干员；Bake 查表在存在这类干员时不可用。
+    pub(crate) fn pool_has_peer_reset(&self, pool: &ManuPool, table: &SkillTable) -> bool {
+        pool.entries
+            .iter()
+            .any(|entry| manufacture_operator_resets_peers(&entry.to_manu_operator(), table))
+    }
+}
+
 pub fn search_manufacture_triples(
     pool: &ManuPool,
     table: &SkillTable,
@@ -281,10 +319,7 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     let bake_started = Instant::now();
-    let has_peer_reset = sub
-        .entries
-        .iter()
-        .any(|entry| manufacture_operator_resets_peers(&entry.to_manu_operator(), table));
+    let has_peer_reset = options.pool_has_peer_reset(&sub, table);
     let baked_report = if !has_peer_reset && options.bake_mode != crate::bake::BakeMode::Disabled {
         crate::bake::try_baked_manufacture_search(
             &sub,

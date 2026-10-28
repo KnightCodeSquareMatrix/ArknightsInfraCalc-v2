@@ -93,10 +93,16 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         );
         if verify_only {
             let verified = verify_baked_catalog_responses(&options.out_dir, &generator)?;
-            run_all_regressions()?;
             eprintln!(
-                "baked catalog verification passed: sampled_responses={verified} plus mechanism regressions"
+                "baked catalog verification passed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={}",
+                verified.rows_checked,
+                verified.row_mismatches,
+                verified.queries_checked,
+                verified.query_mismatches,
+                verified.skipped_signatures
             );
+            run_all_regressions()?;
+            eprintln!("mechanism regressions passed");
         }
         return Ok(());
     }
@@ -135,10 +141,16 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
     validate_baked_catalog(&options.out_dir, report.generator.as_ref().unwrap())?;
     let verified =
         verify_baked_catalog_responses(&options.out_dir, report.generator.as_ref().unwrap())?;
-    run_all_regressions()?;
     eprintln!(
-        "baked catalog validation passed: sampled_responses={verified} plus mechanism regressions"
+        "baked catalog validation passed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={}",
+        verified.rows_checked,
+        verified.row_mismatches,
+        verified.queries_checked,
+        verified.query_mismatches,
+        verified.skipped_signatures
     );
+    run_all_regressions()?;
+    eprintln!("mechanism regressions passed");
     Ok(())
 }
 
