@@ -23,7 +23,7 @@
 
 1. 用户和其他 writer 的既有改动不覆盖、不清理、不 stash、不混入本任务提交。开始和结束都看 `git status --short`。
 2. 不做 destructive git：`reset --hard`、force push、amend、rebase、丢弃改动的 checkout、`clean`。只 stage 本任务的显式路径，不用 `git add .`。
-3. 共享工作区只有一个 writer。并行写入时，各 writer 从同一 base SHA 建隔离 worktree，按不重叠的文件划分，由一个集成人逐个 `cherry-pick` 已验证的原子提交；不手工拼接冲突。
+3. 共享工作区只有一个 writer。本项目只有用户一人维护：默认直接在 main 上按原子提交推进，不为每个任务新开分支或 worktree；只有确实需要多个 writer 并行写入时才开（用户 2026-10-28 裁决）。并行写入时，各 writer 从同一 base SHA 建隔离 worktree，按不重叠的文件划分，由一个集成人逐个 `cherry-pick` 已验证的原子提交；不手工拼接冲突。
 4. 分层边界：L1 interpreter 只认 `buff_id`，不认干员名；L3 shortcut 只结算实际组合，不负责选型或进编；CLI / export 只编排调用和忠实输出，不写机制、公式，也不重新决策。生产搜索使用各域具名目标，多目标优先显式词典序，中枢或 global heuristic 必须具名。
 5. Layout 主路径是 `build_plan -> execute_plan -> fill -> resolve`，排班不绕过 Plan 修 admission。`shift_bind`、tag、priority、shortcut 只消费各自语义，不能代替 required admission。
 6. 不为单一 operbox、room id、Shift 下标、fixture 或当前 top hit 写补偿特判。
