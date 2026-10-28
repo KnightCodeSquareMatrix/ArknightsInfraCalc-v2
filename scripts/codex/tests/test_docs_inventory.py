@@ -55,7 +55,7 @@ class DocsInventoryTests(unittest.TestCase):
         document = self.canonical()
         self.assertEqual(document.role, "canonical")
         self.assertEqual(document.domains, ["a"])
-        self.assertEqual(docs_inventory.validate_inventory(self.repo, [document], final=False), [])
+        self.assertEqual(docs_inventory.validate_inventory(self.repo, [document]), [])
 
     def test_rejects_duplicate_domain_and_illegal_todo_status(self) -> None:
         first = self.canonical("docs/A.md", "same")
@@ -69,25 +69,10 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：invalid fixture",
         )
         errors = docs_inventory.validate_inventory(
-            self.repo, [first, second, docs_inventory.parse_document(self.repo, todo)], final=False
+            self.repo, [first, second, docs_inventory.parse_document(self.repo, todo)]
         )
         self.assertTrue(any("exactly one canonical owner" in error for error in errors))
         self.assertTrue(any("invalid lifecycle status" in error for error in errors))
-
-    def test_final_check_rejects_in_progress(self) -> None:
-        canonical = self.canonical()
-        todo = write_doc(
-            self.repo,
-            "docs/TODO/X.md",
-            "> 文档角色：active-change\n"
-            "> 生命周期状态：in-progress\n"
-            "> 当前真源：docs/A.md\n"
-            "> 摘要：work fixture",
-        )
-        errors = docs_inventory.validate_inventory(
-            self.repo, [canonical, docs_inventory.parse_document(self.repo, todo)], final=True
-        )
-        self.assertTrue(any("cannot pass final check" in error for error in errors))
 
     def test_removed_review_metadata_is_rejected(self) -> None:
         target = write_doc(
@@ -113,7 +98,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：invalid self-owned decision",
         )
         errors = docs_inventory.validate_document(
-            docs_inventory.parse_document(self.repo, target), final=False
+            docs_inventory.parse_document(self.repo, target)
         )
         self.assertTrue(any("only canonical documents" in error for error in errors))
 
@@ -129,7 +114,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：generated fixture",
         )
         generated = docs_inventory.parse_document(self.repo, target)
-        errors = docs_inventory.validate_inventory(self.repo, [canonical, generated], final=False)
+        errors = docs_inventory.validate_inventory(self.repo, [canonical, generated])
         self.assertTrue(any("one concrete repository path" in error for error in errors))
 
     def test_generated_reference_requires_existing_generator(self) -> None:
@@ -144,7 +129,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：generated fixture",
         )
         generated = docs_inventory.parse_document(self.repo, target)
-        errors = docs_inventory.validate_inventory(self.repo, [canonical, generated], final=False)
+        errors = docs_inventory.validate_inventory(self.repo, [canonical, generated])
         self.assertTrue(any("generator path does not exist" in error for error in errors))
 
     def test_generated_tables_are_deterministic(self) -> None:
@@ -176,7 +161,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：reference with an invalid non-document owner",
         )
         errors = docs_inventory.validate_inventory(
-            self.repo, [canonical, docs_inventory.parse_document(self.repo, reference)], final=False
+            self.repo, [canonical, docs_inventory.parse_document(self.repo, reference)]
         )
         self.assertTrue(any("governed current document" in error for error in errors))
 
@@ -190,7 +175,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：decision deliberately placed outside the ADR directory",
         )
         errors = docs_inventory.validate_document(
-            docs_inventory.parse_document(self.repo, target), final=False
+            docs_inventory.parse_document(self.repo, target)
         )
         self.assertTrue(any("only allowed under docs/ADR" in error for error in errors))
 
@@ -203,7 +188,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：archive fixture",
         )
         errors = docs_inventory.validate_document(
-            docs_inventory.parse_document(self.repo, target), final=False
+            docs_inventory.parse_document(self.repo, target)
         )
         self.assertTrue(any("replacement or historical reason" in error for error in errors))
 
@@ -218,7 +203,7 @@ class DocsInventoryTests(unittest.TestCase):
             "> 摘要：archive fixture",
         )
         errors = docs_inventory.validate_document(
-            docs_inventory.parse_document(self.repo, target), final=False
+            docs_inventory.parse_document(self.repo, target)
         )
         self.assertTrue(any("only canonical documents" in error for error in errors))
 

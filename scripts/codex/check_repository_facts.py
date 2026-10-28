@@ -589,12 +589,11 @@ def check_agent_index(repo: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--allow-in-progress", action="store_true")
     args = parser.parse_args()
     repo = args.repo_root.resolve()
 
     documents, errors = docs_inventory.load_inventory(repo)
-    errors.extend(docs_inventory.validate_inventory(repo, documents, final=not args.allow_in_progress))
+    errors.extend(docs_inventory.validate_inventory(repo, documents))
     errors.extend(docs_inventory.check_generated_sections(repo, documents))
     errors.extend(check_markdown_links(repo, [document.path for document in documents]))
     errors.extend(check_tracking(repo, verify_local=False))
