@@ -813,7 +813,7 @@ fn build_manu_rooms(
             let operators: Vec<ManuOperator> = assignment
                 .operators_in(&room.id)
                 .iter()
-                .filter_map(|op| to_manu_operator(instances, op).ok())
+                .filter_map(|op| to_manu_operator(instances, table, op).ok())
                 .collect();
             Some(ResolvedManuRoom {
                 id: room.id.clone(),
@@ -873,12 +873,14 @@ fn to_trade_operator(
 
 fn to_manu_operator(
     instances: Option<&OperatorInstances>,
+    table: Option<&SkillTable>,
     op: &AssignedOperator,
 ) -> Result<ManuOperator> {
     let tier = op.tier();
     let buff_ids = resolve_buff_ids(instances, op, "manufacture")?;
     let tags = instance_tags(instances, &op.name, tier);
     Ok(ManuOperator {
+        compiled_atoms: table.map(|table| table.compile_manufacture_atoms(&buff_ids)),
         name: op.name.clone(),
         elite: op.elite,
         buff_ids,

@@ -235,7 +235,7 @@ fn inject_manu_anchor(
     name: &str,
     operbox: &OperBox,
     instances: &OperatorInstances,
-    _table: &SkillTable,
+    table: &SkillTable,
     pool: &mut crate::pool::ManuPool,
 ) {
     if pool.entry(name).is_some() {
@@ -250,6 +250,7 @@ fn inject_manu_anchor(
         return;
     }
     pool.entries.push(ManuPoolEntry {
+        compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
         name: name.to_string(),
         elite: progress.elite,
         progress,
@@ -384,12 +385,16 @@ fn complete_standalone_assignment(
                 let operators = trial
                     .operators_in(&room.id)
                     .iter()
-                    .map(|operator| crate::manufacture::ManuOperator {
-                        name: operator.name.clone(),
-                        elite: operator.elite,
-                        buff_ids: instances
-                            .resolve_manufacture_buff_ids(&operator.name, operator.tier()),
-                        tags: instances.tags_for(&operator.name, operator.tier()),
+                    .map(|operator| {
+                        let buff_ids =
+                            instances.resolve_manufacture_buff_ids(&operator.name, operator.tier());
+                        crate::manufacture::ManuOperator {
+                            name: operator.name.clone(),
+                            elite: operator.elite,
+                            compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
+                            buff_ids,
+                            tags: instances.tags_for(&operator.name, operator.tier()),
+                        }
                     })
                     .collect::<Vec<_>>();
                 if !crate::search::manufacture_combo_allowed_for_shift(

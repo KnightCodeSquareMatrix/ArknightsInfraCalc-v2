@@ -1,10 +1,15 @@
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use smallvec::SmallVec;
 
 use crate::eff_ramp::eff_ramp_avg_20h;
 use crate::layout::SharedLayout;
 use crate::manufacture::input::ManuRoomInput;
 use crate::skill_table::SkillTable;
-use crate::types::{Action, Condition, EffectAtom, Phase, RecipeKind, Selector, StateKey};
+use crate::types::{
+    Action, CompiledAtom, Condition, EffectAtom, Phase, RecipeKind, Selector, StateKey,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct RecipeEff {
@@ -69,11 +74,12 @@ impl RecipeLimit {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ManuOperatorRuntime {
-    pub name: String,
+pub struct ManuOperatorRuntime<'a> {
+    pub name: &'a str,
     pub elite: u8,
-    pub buff_ids: Vec<String>,
-    pub tags: Vec<String>,
+    pub buff_ids: &'a [String],
+    pub tags: &'a [String],
+    pub compiled_atoms: Option<&'a [CompiledAtom]>,
     /// 干员技能直接提供的生产力；`PeerEffAbsorb` 清零他人此项。
     pub skill_eff: RecipeEff,
     /// 按基建设施数量结算的生产力（不被他人归零技能清零）。
@@ -86,15 +92,15 @@ pub struct ManuOperatorRuntime {
     pub mood_gap: f64,
 }
 
-impl ManuOperatorRuntime {
+impl ManuOperatorRuntime<'_> {
     pub fn total_eff(&self, recipe: RecipeKind) -> f64 {
         self.skill_eff.for_recipe(recipe) + self.layout_eff.for_recipe(recipe)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ManuContext {
-    pub operators: Vec<ManuOperatorRuntime>,
+pub struct ManuContext<'a> {
+    pub operators: SmallVec<[ManuOperatorRuntime<'a>; 5]>,
     /// 制造站房间级生产力加成（冬时 per-op +10% 等固定数值，非「干员技能面」）。
     pub station_eff: RecipeEff,
     pub facility_level: u8,
@@ -105,16 +111,17 @@ pub struct ManuContext {
     pub state_pool: HashMap<StateKey, f64>,
 }
 
-impl ManuContext {
-    pub fn from_room(input: &ManuRoomInput) -> Self {
+impl<'a> ManuContext<'a> {
+    pub fn from_room(input: &'a ManuRoomInput) -> Self {
         let operators = input
             .operators
             .iter()
             .map(|o| ManuOperatorRuntime {
-                name: o.name.clone(),
+                name: &o.name,
                 elite: o.elite,
-                buff_ids: o.buff_ids.clone(),
-                tags: o.tags.clone(),
+                buff_ids: &o.buff_ids,
+                tags: &o.tags,
+                compiled_atoms: o.compiled_atoms.as_deref(),
                 mood_gap: (24.0 - input.mood).clamp(0.0, 24.0),
                 ..Default::default()
             })
@@ -152,7 +159,7 @@ impl ManuContext {
                 .tags
                 .iter()
                 .any(|tag| tag == crate::layout::TAG_RHINE)
-                && names.insert(operator.name.as_str())
+                && names.insert(operator.name)
             {
                 count += 1;
             }
@@ -181,7 +188,7 @@ impl ManuContext {
     pub fn mood_drain_summary(&self) -> Vec<(String, f64)> {
         self.operators
             .iter()
-            .map(|o| (o.name.clone(), o.mood_drain_delta))
+            .map(|o| (o.name.to_owned(), o.mood_drain_delta))
             .collect()
     }
 }
@@ -195,53 +202,74 @@ pub fn facility_base_storage(level: u8) -> i32 {
     }
 }
 
-pub fn collect_manu_atoms<'a>(
-    ops: &[ManuOperatorRuntime],
-    table: &'a SkillTable,
-) -> Vec<(&'a EffectAtom, usize)> {
-    let mut atoms = Vec::new();
-    for (owner_index, op) in ops.iter().enumerate() {
-        for bid in &op.buff_ids {
-            let Some(skill) = table.get(bid) else {
+pub fn apply_manu_phases(ctx: &mut ManuContext<'_>, table: &SkillTable) {
+    // 仅缺少预备结果的输入持有临时 Arc；已预备的空技能无需再次访问缓存。
+    let missing: SmallVec<[(usize, Arc<[CompiledAtom]>); 5]> = ctx
+        .operators
+        .iter()
+        .enumerate()
+        .filter(|(_, op)| op.compiled_atoms.is_none())
+        .map(|(idx, op)| (idx, table.compile_manufacture_atoms(op.buff_ids)))
+        .collect();
+    // 从 runtime 复制借用，应用 atom 时只改变可变数值状态。
+    let sources: SmallVec<[(&str, &[CompiledAtom]); 5]> = ctx
+        .operators
+        .iter()
+        .enumerate()
+        .map(|(idx, op)| {
+            let atoms = op.compiled_atoms.unwrap_or_else(|| {
+                missing
+                    .iter()
+                    .find(|(owner_idx, _)| *owner_idx == idx)
+                    .expect("unprepared manufacture atoms have a temporary owner")
+                    .1
+                    .as_ref()
+            });
+            (op.name, atoms)
+        })
+        .collect();
+    let mut inline_heads = [0usize; 5];
+    let mut spilled_heads = if sources.len() > inline_heads.len() {
+        vec![0usize; sources.len()]
+    } else {
+        Vec::new()
+    };
+    let heads = if sources.len() > inline_heads.len() {
+        spilled_heads.as_mut_slice()
+    } else {
+        &mut inline_heads[..sources.len()]
+    };
+    loop {
+        // stable sort 的同分顺序：输入 owner 顺序，再按 buff/atom 展开顺序。
+        let mut pick = None;
+        let mut best_key = None;
+        for (owner_idx, (_, atoms)) in sources.iter().enumerate() {
+            let Some(compiled) = atoms.get(heads[owner_idx]) else {
                 continue;
             };
-            if skill.facility != "manufacture" {
-                continue;
-            }
-            for atom in &skill.atoms {
-                atoms.push((atom, owner_index));
+            let key = (compiled.sort_key, owner_idx, compiled.seq);
+            if best_key.is_none_or(|best| key < best) {
+                best_key = Some(key);
+                pick = Some(owner_idx);
             }
         }
-    }
-    atoms.sort_by(|(a, _), (b, _)| {
-        let pa = a.phase.sort_key();
-        let pb = b.phase.sort_key();
-        pa.cmp(&pb).then(a.phase_order.cmp(&b.phase_order))
-    });
-    atoms
-}
-
-pub fn apply_manu_phases(ctx: &mut ManuContext, table: &SkillTable) {
-    let atoms = collect_manu_atoms(&ctx.operators, table);
-
-    // 干员名在整个循环内不变（apply_* 只改效率/仓库/心情字段），每名干员只克隆一次，
-    // 不再对每个 atom 克隆一次。
-    let owner_names: Vec<String> = ctx.operators.iter().map(|o| o.name.clone()).collect();
-    for (atom, owner_index) in atoms {
-        let owner = owner_names[owner_index].as_str();
-        if !condition_met(&atom.condition, ctx, owner) {
-            continue;
+        let Some(owner_idx) = pick else { break };
+        let (owner, atoms) = sources[owner_idx];
+        let atom = &atoms[heads[owner_idx]].atom;
+        heads[owner_idx] += 1;
+        if condition_met(&atom.condition, ctx, owner) {
+            apply_atom(ctx, atom, owner);
         }
-        apply_atom(ctx, atom, owner);
     }
     apply_tagged_control_injects(ctx);
     apply_abyssal_hunters_control(ctx);
 }
 
-fn apply_tagged_control_injects(ctx: &mut ManuContext) {
-    let rules = ctx.layout.global_inject.manu_tagged().to_vec();
+fn apply_tagged_control_injects(ctx: &mut ManuContext<'_>) {
+    let layout = Arc::clone(&ctx.layout);
+    let rules = layout.global_inject.manu_tagged();
     for op in &mut ctx.operators {
-        for rule in &rules {
+        for rule in rules {
             if rule.recipe.is_none_or(|recipe| recipe == ctx.active_recipe)
                 && op.tags.iter().any(|tag| tag == &rule.target_tag)
             {
@@ -251,7 +279,7 @@ fn apply_tagged_control_injects(ctx: &mut ManuContext) {
     }
 }
 
-fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
+fn apply_abyssal_hunters_control(ctx: &mut ManuContext<'_>) {
     const GLADIIA_ALPHA: &str = "control_mp_aegir2[000]";
     const GLADIIA_BETA: &str = "control_mp_aegir2[010]";
     const TAG_ABYSSAL: &str = "cc.g.abyssal";
@@ -298,7 +326,7 @@ fn apply_abyssal_hunters_control(ctx: &mut ManuContext) {
     ctx.station_eff.add(None, bonus);
 }
 
-fn room_has_peer_eff_absorb(ctx: &ManuContext) -> bool {
+fn room_has_peer_eff_absorb(ctx: &ManuContext<'_>) -> bool {
     ctx.operators.iter().any(|op| {
         op.buff_ids.iter().any(|buff_id| {
             buff_id == "manu_prod_spd&power[000]"
@@ -308,7 +336,7 @@ fn room_has_peer_eff_absorb(ctx: &ManuContext) -> bool {
     })
 }
 
-fn condition_met(cond: &Option<Condition>, ctx: &ManuContext, owner: &str) -> bool {
+fn condition_met(cond: &Option<Condition>, ctx: &ManuContext<'_>, owner: &str) -> bool {
     let Some(cond) = cond else { return true };
     match cond {
         Condition::ActiveRecipe { kind } => ctx.active_recipe == *kind,
@@ -335,7 +363,7 @@ fn condition_met(cond: &Option<Condition>, ctx: &ManuContext, owner: &str) -> bo
         Condition::NoPlatformInOtherPower {} => !ctx.layout.other_power_has_platform,
         Condition::OtherPlatformInPower {} => ctx.layout.other_platform_in_power,
         Condition::OtherLateranoInPower {} => ctx.layout.other_laterano_in_power,
-        Condition::PartnerInRoom { name } => ctx.operators.iter().any(|o| o.name == *name),
+        Condition::PartnerInRoom { name } => ctx.operators.iter().any(|o| o.name == name),
         Condition::ExternalMomentumGteField {} => {
             ctx.layout.external_momentum() >= ctx.layout.field_momentum()
         }
@@ -348,13 +376,13 @@ fn condition_met(cond: &Option<Condition>, ctx: &ManuContext, owner: &str) -> bo
 
 const BUFF_PAOPAO_LIMIT_VAR: &str = "manu_prod_spd_variable3[000]";
 
-fn room_has_buff(ctx: &ManuContext, buff_id: &str) -> bool {
+fn room_has_buff(ctx: &ManuContext<'_>, buff_id: &str) -> bool {
     ctx.operators
         .iter()
         .any(|o| o.buff_ids.iter().any(|b| b == buff_id))
 }
 
-fn apply_atom(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
+fn apply_atom(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     if matches!(&atom.action, Action::AddEffFromLimitContribSum { .. })
         && room_has_buff(ctx, BUFF_PAOPAO_LIMIT_VAR)
     {
@@ -382,7 +410,7 @@ fn eff_target_is_layout(atom: &EffectAtom) -> bool {
     )
 }
 
-fn apply_peer_absorb(ctx: &mut ManuContext, action: &Action, owner: &str) {
+fn apply_peer_absorb(ctx: &mut ManuContext<'_>, action: &Action, owner: &str) {
     let Action::PeerEffAbsorb { rate_per_peer } = action else {
         return;
     };
@@ -401,7 +429,7 @@ fn apply_peer_absorb(ctx: &mut ManuContext, action: &Action, owner: &str) {
     }
 }
 
-fn apply_eff_action(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
+fn apply_eff_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     let Some(idx) = ctx.operators.iter().position(|o| o.name == owner) else {
         return;
     };
@@ -427,7 +455,7 @@ fn limit_delta_counts_as_contrib(recipe: &Option<RecipeKind>) -> bool {
     matches!(recipe, None | Some(RecipeKind::All))
 }
 
-fn apply_limit_action(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
+fn apply_limit_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     let Some(idx) = ctx.operators.iter().position(|o| o.name == owner) else {
         return;
     };
@@ -457,7 +485,7 @@ fn apply_limit_action(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
     }
 }
 
-fn apply_mood_action(ctx: &mut ManuContext, action: &Action, owner: &str) {
+fn apply_mood_action(ctx: &mut ManuContext<'_>, action: &Action, owner: &str) {
     match action {
         Action::MoodDrainDelta { delta, scope } => match scope {
             crate::types::MoodDrainScope::SelfOp => {
@@ -503,7 +531,7 @@ fn apply_mood_action(ctx: &mut ManuContext, action: &Action, owner: &str) {
     }
 }
 
-fn apply_state_write(ctx: &mut ManuContext, atom: &EffectAtom, owner: &str) {
+fn apply_state_write(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     match &atom.action {
         Action::StateProduce { key, amount } => {
             if let Some(sk) = StateKey::parse(key) {
@@ -542,7 +570,7 @@ fn eff_from_limit_contrib_tiered(
     }
 }
 
-fn resolve_eff_value(ctx: &ManuContext, atom: &EffectAtom, owner: &str) -> f64 {
+fn resolve_eff_value(ctx: &ManuContext<'_>, atom: &EffectAtom, owner: &str) -> f64 {
     match &atom.action {
         Action::AddEffFromLimitContribSum { rate } => {
             ctx.operators
@@ -632,7 +660,7 @@ fn is_rhine_skill_buff(buff_id: &str) -> bool {
     )
 }
 
-fn manu_skill_family_count_in_room(ctx: &ManuContext, pred: fn(&str) -> bool) -> f64 {
+fn manu_skill_family_count_in_room(ctx: &ManuContext<'_>, pred: fn(&str) -> bool) -> f64 {
     ctx.operators
         .iter()
         .flat_map(|o| o.buff_ids.iter())
@@ -646,14 +674,14 @@ fn is_pinecone_skill_buff(buff_id: &str) -> bool {
 
 const BUFF_HIGHMORE_COMPAT: &str = "manu_skill_change[000]";
 
-fn room_has_highmore_compat(ctx: &ManuContext) -> bool {
+fn room_has_highmore_compat(ctx: &ManuContext<'_>) -> bool {
     ctx.operators
         .iter()
         .flat_map(|o| o.buff_ids.iter())
         .any(|b| b == BUFF_HIGHMORE_COMPAT)
 }
 
-fn standard_skill_count_in_room(ctx: &ManuContext) -> f64 {
+fn standard_skill_count_in_room(ctx: &ManuContext<'_>) -> f64 {
     let mut count = manu_skill_family_count_in_room(ctx, is_standard_skill_buff);
     if room_has_highmore_compat(ctx) {
         count += manu_skill_family_count_in_room(ctx, is_rhine_skill_buff);
@@ -662,11 +690,11 @@ fn standard_skill_count_in_room(ctx: &ManuContext) -> f64 {
     count
 }
 
-fn metal_formula_skill_count_in_room(ctx: &ManuContext) -> f64 {
+fn metal_formula_skill_count_in_room(ctx: &ManuContext<'_>) -> f64 {
     manu_skill_family_count_in_room(ctx, is_metal_formula_buff)
 }
 
-fn resolve_selector_value(ctx: &ManuContext, selector: Option<&Selector>, owner: &str) -> f64 {
+fn resolve_selector_value(ctx: &ManuContext<'_>, selector: Option<&Selector>, owner: &str) -> f64 {
     match selector {
         Some(Selector::FacilityLevel) => f64::from(ctx.facility_level),
         Some(Selector::FacilityLevelMinusOne) => f64::from(ctx.facility_level.saturating_sub(1)),

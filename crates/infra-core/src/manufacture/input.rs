@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::layout::{LayoutContext, SharedLayout};
 use crate::tier::PromotionTier;
-use crate::types::RecipeKind;
+use crate::types::{CompiledAtom, RecipeKind};
 
 /// 制造站产线布局假设：同类产线用同一三人组（L1 搜索简化，不做 12 人分站排班）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -65,6 +65,8 @@ pub struct ManuOperator {
     pub elite: u8,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
+    /// None 表示尚未预备；Some 空切片是合法的已编译结果。
+    pub compiled_atoms: Option<Arc<[CompiledAtom]>>,
 }
 
 impl ManuOperator {
@@ -78,6 +80,7 @@ impl ManuOperator {
             elite,
             buff_ids,
             tags: Vec::new(),
+            compiled_atoms: None,
         }
     }
 }

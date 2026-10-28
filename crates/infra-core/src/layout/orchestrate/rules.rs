@@ -1279,6 +1279,7 @@ fn manufacture_objective_candidates<'a>(
                     let tier = crate::tier::PromotionTier::from_progress(progress);
                     let buff_ids = ctx.instances.resolve_manufacture_buff_ids(name, tier);
                     (!buff_ids.is_empty()).then(|| crate::manufacture::ManuOperator {
+                        compiled_atoms: Some(ctx.table.compile_manufacture_atoms(&buff_ids)),
                         name: name.clone(),
                         elite: progress.elite,
                         buff_ids,

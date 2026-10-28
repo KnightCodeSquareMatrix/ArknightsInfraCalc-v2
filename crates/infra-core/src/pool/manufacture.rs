@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::error::Result;
 use crate::instances::OperatorInstances;
@@ -6,7 +7,7 @@ use crate::manufacture::ManuOperator;
 use crate::roster::{OperatorProgress, Roster};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
-use crate::types::{Action, Phase, RecipeKind, SkillDef};
+use crate::types::{Action, CompiledAtom, Phase, RecipeKind, SkillDef};
 
 use crate::layout::tier::OperatorTier;
 
@@ -20,6 +21,7 @@ pub struct ManuPoolEntry {
     pub progress: OperatorProgress,
     pub buff_ids: Vec<String>,
     pub tags: Vec<String>,
+    pub compiled_atoms: Option<Arc<[CompiledAtom]>>,
     /// Sum of general `AddFlatEff` in `constant` phase — sort hint only.
     pub flat_eff_hint: f64,
     pub has_l2_delegate: bool,
@@ -55,6 +57,7 @@ impl ManuPoolEntry {
             elite: self.elite,
             buff_ids: self.buff_ids.clone(),
             tags: self.tags.clone(),
+            compiled_atoms: self.compiled_atoms.as_ref().map(Arc::clone),
         }
     }
 }
@@ -132,6 +135,7 @@ fn try_entry(
         name: name.to_string(),
         elite: progress.elite,
         progress,
+        compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
         buff_ids,
         tags,
         flat_eff_hint,

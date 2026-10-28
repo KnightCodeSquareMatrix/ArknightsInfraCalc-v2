@@ -22,6 +22,7 @@ pub struct SkillTable {
     skills: Vec<SkillDef>,
     compiled_atoms: Vec<Arc<[CompiledAtom]>>,
     operator_atoms: Arc<Mutex<HashMap<Vec<String>, Arc<[CompiledAtom]>>>>,
+    manufacture_atoms: Arc<Mutex<HashMap<Vec<String>, Arc<[CompiledAtom]>>>>,
 }
 
 impl SkillTable {
@@ -85,6 +86,7 @@ impl SkillTable {
             skills: file.skills,
             compiled_atoms,
             operator_atoms: Arc::new(Mutex::new(HashMap::new())),
+            manufacture_atoms: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -140,6 +142,40 @@ impl SkillTable {
             atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
             atoms.into()
         };
+        cache.insert(buff_ids.to_vec(), Arc::clone(&atoms));
+        atoms
+    }
+
+    /// 制造独立缓存：保留 buff 输入顺序，跳过未知 ID 与非制造技能。
+    /// 空结果同样缓存，由输入的 Option 明确标记预备完成。
+    pub fn compile_manufacture_atoms(&self, buff_ids: &[String]) -> Arc<[CompiledAtom]> {
+        let mut cache = self
+            .manufacture_atoms
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(atoms) = cache.get(buff_ids) {
+            return Arc::clone(atoms);
+        }
+        let mut atoms = Vec::new();
+        let mut offset = 0usize;
+        for buff_id in buff_ids {
+            let Some(id) = self.dense_id_of(buff_id) else {
+                continue;
+            };
+            let skill = &self.skills[usize::from(id)];
+            if skill.facility != "manufacture" {
+                continue;
+            }
+            for compiled in self.compiled_atoms[usize::from(id)].iter() {
+                let mut compiled = compiled.clone();
+                compiled.seq = u16::try_from(offset.saturating_add(usize::from(compiled.seq)))
+                    .unwrap_or(u16::MAX);
+                atoms.push(compiled);
+            }
+            offset = offset.saturating_add(skill.atoms.len());
+        }
+        atoms.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.seq.cmp(&b.seq)));
+        let atoms: Arc<[CompiledAtom]> = atoms.into();
         cache.insert(buff_ids.to_vec(), Arc::clone(&atoms));
         atoms
     }

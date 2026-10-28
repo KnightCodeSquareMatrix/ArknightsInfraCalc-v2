@@ -160,11 +160,16 @@ pub(crate) fn ordinary_room_compatible(
     if room.kind == FacilityKind::Factory {
         let operators: Vec<_> = members
             .iter()
-            .map(|operator| crate::manufacture::ManuOperator {
-                name: operator.name.clone(),
-                elite: operator.elite,
-                buff_ids: instances.resolve_manufacture_buff_ids(&operator.name, operator.tier()),
-                tags: instances.tags_for(&operator.name, operator.tier()),
+            .map(|operator| {
+                let buff_ids =
+                    instances.resolve_manufacture_buff_ids(&operator.name, operator.tier());
+                crate::manufacture::ManuOperator {
+                    name: operator.name.clone(),
+                    elite: operator.elite,
+                    compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
+                    buff_ids,
+                    tags: instances.tags_for(&operator.name, operator.tier()),
+                }
             })
             .collect();
         return crate::search::manufacture_peers_compatible(&operators, table);

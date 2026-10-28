@@ -1850,12 +1850,16 @@ fn fill_rotation_vacancies(
                     let members = trial
                         .operators_in(&room.id)
                         .iter()
-                        .map(|operator| crate::manufacture::ManuOperator {
-                            name: operator.name.clone(),
-                            elite: operator.elite,
-                            buff_ids: instances
-                                .resolve_manufacture_buff_ids(&operator.name, operator.tier()),
-                            tags: instances.tags_for(&operator.name, operator.tier()),
+                        .map(|operator| {
+                            let buff_ids = instances
+                                .resolve_manufacture_buff_ids(&operator.name, operator.tier());
+                            crate::manufacture::ManuOperator {
+                                name: operator.name.clone(),
+                                elite: operator.elite,
+                                compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
+                                buff_ids,
+                                tags: instances.tags_for(&operator.name, operator.tier()),
+                            }
                         })
                         .collect::<Vec<_>>();
                     let hours = report.shifts[index].duration_hours
@@ -4192,6 +4196,7 @@ fn abyssal_manu_entry(
         tags.push(TAG_ABYSSAL.to_string());
     }
     Some(ManuPoolEntry {
+        compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
         name: name.to_string(),
         elite: progress.elite,
         progress,
@@ -4982,11 +4987,16 @@ fn assert_final_rotation_invariants_with_mood(
             }
             let operators: Vec<_> = members
                 .iter()
-                .map(|member| crate::manufacture::ManuOperator {
-                    name: member.name.clone(),
-                    elite: member.elite,
-                    buff_ids: instances.resolve_manufacture_buff_ids(&member.name, member.tier()),
-                    tags: instances.tags_for(&member.name, member.tier()),
+                .map(|member| {
+                    let buff_ids =
+                        instances.resolve_manufacture_buff_ids(&member.name, member.tier());
+                    crate::manufacture::ManuOperator {
+                        name: member.name.clone(),
+                        elite: member.elite,
+                        compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
+                        buff_ids,
+                        tags: instances.tags_for(&member.name, member.tier()),
+                    }
                 })
                 .collect();
             if !crate::search::manufacture_peers_compatible(&operators, table) {
@@ -11473,6 +11483,7 @@ fn validate_mood_gap_decay_work_spans(
                 elite: operator.elite,
                 buff_ids: instances.resolve_manufacture_buff_ids(&operator.name, operator.tier()),
                 tags: Vec::new(),
+                compiled_atoms: None,
             };
             manufacture_operator_has_mood_gap_decay(&manu_operator, table)
                 .then(|| operator.name.clone())
