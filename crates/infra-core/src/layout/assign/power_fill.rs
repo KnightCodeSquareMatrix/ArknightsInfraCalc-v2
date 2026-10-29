@@ -219,7 +219,7 @@ pub(super) fn assign_power_rooms_with_instances(
     Ok(())
 }
 
-fn filter_power_pool(pool: &PowerPool, exclude: &HashSet<String>) -> PowerPool {
+pub(crate) fn filter_power_pool(pool: &PowerPool, exclude: &HashSet<String>) -> PowerPool {
     PowerPool {
         entries: pool
             .entries

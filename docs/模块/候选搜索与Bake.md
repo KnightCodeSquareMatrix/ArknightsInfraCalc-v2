@@ -99,3 +99,5 @@ auto候选房身份进入memo输入；备态候选还检查与固定主态其他
 发电搜索接调用方本轮空房列表并随选入更新真实房快照；夜烟影子探测在auto使用清空后的试排副本，贸易与制造分别绑定实际目标房。
 
 普通两/三班及自动的Plan早期贸易gate、制造receiver比较、完整制造/发电与普通基线都读取 `RuleCompileContext.shift_hours`。排班options时长写入seed后传入编译上下文；无排班时长的独立Plan入口保留24h默认。三班Peak沿既有累计窗口，γ两半使用各自输入时长，不改变候选截断或比较目标。
+
+自动宿舍1＋1的受益者由原设施搜索直接决定：临时实际挂件环境下清空该房预选成员，不设must-include；赢家包含受益者才提交原Plan成员与依赖。制造使用已有full_pool，贸易保留有序role链并使普通full_pool输入贯通上层筛选，发电复用单站assignment搜索。该路径不再补排全制造/全发电或重搜无挂件基线；普通定时competitive政策保留。规则及alternative仍有序取首个可行方案，属于既有heuristic，不声称跨alternative或全布局最优。

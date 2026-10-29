@@ -148,6 +148,7 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
             room.level,
             used,
             &anchors,
+            false,
         );
         let hit = match hit {
             Ok(hit) => hit,
@@ -508,6 +509,7 @@ pub(crate) fn pick_trade_meta_then_plain(
     room_level: u8,
     used: &mut HashSet<String>,
     required_names: &[String],
+    full_pool: bool,
 ) -> Result<TradeSearchHit> {
     if order == TradeOrderKind::Originium
         && required_names
@@ -703,10 +705,12 @@ pub(crate) fn pick_trade_meta_then_plain(
     if order == TradeOrderKind::Originium {
         plain_used.extend(GOLD_ORDER_CORE_NAMES.map(str::to_string));
     }
+    let mut search_options = trade_room_options(layout, gold_lines, options, order, room_level);
+    search_options.full_pool = full_pool;
     pick_trade_hit(
         pool,
         table,
-        trade_room_options(layout, gold_lines, options, order, room_level),
+        search_options,
         SearchTripleFilter {
             must_include_names: required_names.to_vec(),
             forbidden_pairs: plain_forbidden_pairs,
@@ -732,7 +736,7 @@ pub(super) fn pick_trade_hit(
     let base_sub = filter_trade_pool(pool, &used_for_filter);
     // Search the reduced standalone pool first; expand only when it cannot
     // provide a complete legal room.
-    let reduced_sub = if filter.has_must_include() {
+    let reduced_sub = if search_opts.full_pool || filter.has_must_include() {
         base_sub.clone()
     } else if karlan_precision_active(&search_opts.layout.global_inject) {
         base_sub.clone()

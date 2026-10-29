@@ -509,6 +509,7 @@ fn probe_shadow_pair(
         trade_room.level,
         &mut probe_used,
         &[],
+        false,
     )?;
     let trade_takes_night_smoke = trade_hit_names(&trade_hit)
         .iter()

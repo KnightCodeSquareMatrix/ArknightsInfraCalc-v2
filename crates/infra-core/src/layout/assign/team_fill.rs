@@ -214,6 +214,7 @@ fn assign_team_trade_meta_rooms(
             room.level,
             used,
             &[],
+            false,
         )
         .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;
         eprintln!(
