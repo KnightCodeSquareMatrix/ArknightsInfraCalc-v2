@@ -12,6 +12,8 @@
 
 主要成本是对候选组合运行真实 domain solver，并在部分 assignment、producer prefix 和 shadow branch 上重复 resolve。组合数由 pool size 和人数决定；报告的 `combinations` 与 `evaluated` 必须保留，不能只报 wall time。
 
+自动轮换的逐候选协同准入还会复制站点成员和布局、重建实际资源来源；这些工作没有计入普通`resolve.calls`，不能用该计数判断全部跨设施状态成本。挂件修正后的三模式实测、函数采样质量与终态组合遍历规模见[排班性能评估](ARCHIVE/done/排班性能评估-20261029.md)；这是7322ecf的测量快照，后续优化尚未实施。
+
 贸易与制造共用内部 `search/enumerate.rs` 的固定三槽字典序枚举：容量为 1..=3，按全部必含下标过滤，只为平铺的 `Vec<usize>` 分配组合载体，每 `k` 个下标代表一个组合。制造传入单锚下标，贸易传入原必含集合；贸易原 `combo_count` 公式保留，实际尝试数按平铺长度除以容量计算。公共 `combinations_indices` 及其其他调用者保留。
 
 两域的求值闭包交给静态泛型并行 helper，沿用 `flat.par_chunks(k).enumerate().map_init(batch) → flatten → filter → collect` 的相对次序；闭包直接执行原域内求值，不使用 Box、动态分派或额外锁。贸易仍按原顺序先执行命中过滤，再执行禁配过滤，制造保留原 Light 与前 K 完整物化。排序、同分顺序、top-K、错误及枚举集合保持，本单元属于执行成本优化；仅格式化、workspace 离线编译与源代码顺序检查，未新增测试或运行 solver、Bake、性能测量。

@@ -61,6 +61,7 @@
 | CLI、Worker、协议和字段 | [CLI 与 Worker](接口/CLI与Worker.md)、[输入输出与兼容](接口/输入输出与兼容.md) |
 | 错误、bundle、反馈和复现 | [错误与诊断](接口/错误与诊断.md)、[debug 与验证](调用链/debug与验证.md) |
 | 正确性保证和证据 | [质量、求解保证与验证证据](QUALITY_AND_AUDIT.md)、[Evidence 工具](../scripts/codex/README.md) |
+| 两班、三班、自动轮换耗时与热点 | [挂件修正后排班性能评估](ARCHIVE/done/排班性能评估-20261029.md)、[性能后续交接](TODO/性能优化交接.md#413-挂件修正后详细profile2026-10-29) |
 | 生成模块和 route 索引 | [生成代码与文档地图](生成索引/代码与文档地图.md)、[路由注册表说明](agent-index/README.md) |
 | 当前源码模块 owner | [项目地图](PROJECT_MAP.md) |
 
