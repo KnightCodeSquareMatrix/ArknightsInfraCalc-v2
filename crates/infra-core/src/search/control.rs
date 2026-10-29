@@ -832,6 +832,23 @@ fn search_control_in_order(
         )
     };
     let legal = |ops: &[ControlOperator]| {
+        if !crate::layout::admission::candidate_admitted(
+            &options.layout,
+            "control",
+            ops.iter()
+                .map(|op| {
+                    (
+                        op.name.clone(),
+                        op.elite,
+                        op.buff_ids.clone(),
+                        op.tags.clone(),
+                    )
+                })
+                .collect(),
+            table,
+        ) {
+            return false;
+        }
         let control: Vec<_> = ops.iter().map(|op| (op.name.clone(), op.elite)).collect();
         !model.control_global_recovery_has_conflict(&control)
             && !evaluate(ops).effect_ledger.has_conflicting_effect_sources()
@@ -1184,6 +1201,9 @@ fn search_control_in_order(
             observe!(
                 "control_step stage=mood_and_ordinary_fill prefix={prefix:?} result=no_candidate"
             );
+            if options.layout.auto_rotation {
+                break;
+            }
             return Ok(Vec::new());
         };
         observe!("control_select stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} ranked={:?}", entry.name, ranked.iter().map(|(candidate, preferred, effect)| (&candidate.name, preferred, effect)).collect::<Vec<_>>());

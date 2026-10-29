@@ -48,6 +48,16 @@ pub fn dependency_inputs() -> &'static [DomainDependencyInputDecl] {
     DEPENDENCY_INPUTS
 }
 
+/// 候选准入消费本域委托技能的外部虚拟线读取事实，不重新实现赤金公式。
+pub(crate) fn reads_virtual_lines(buff_ids: &[String]) -> bool {
+    buff_ids.iter().any(|buff| {
+        matches!(
+            buff.as_str(),
+            "trade_ord_spd&gold[100]" | "trade_ord_spd&gold[010]" | "trade_ord_spd&gold[000]"
+        )
+    })
+}
+
 pub fn virtual_line_yield(buff_ids: &[String], real: u32, durin: u32) -> u32 {
     buff_ids
         .iter()

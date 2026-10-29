@@ -13,7 +13,6 @@ use super::drain::{operator_net_drain_with_sui, DrainInputs};
 use super::{facility_key, MoodModel};
 
 const ABYSSAL_CONTROL_RECOVERY_BUFF: &str = "control_mp_aegir1[000]";
-const ABYSSAL_CONTROL_DRAIN_BUFF: &str = "control_mp_aegir2[010]";
 const TAG_ABYSSAL: &str = "cc.g.abyssal";
 
 /// 单个在岗干员的 ETA 明细。
@@ -197,18 +196,15 @@ fn shift_eta_inner(
             });
             let mut x = operator_net_drain_with_sui(model, &inputs, sui_member);
             if bp.kind == FacilityKind::ControlCenter {
-                if abyssal_control_recovery {
-                    x -= 0.05;
-                }
-                if instances.is_some_and(|instances| {
-                    instances
-                        .resolve_control_buff_ids(&op.name, op.tier())
-                        .iter()
-                        .any(|buff_id| buff_id == ABYSSAL_CONTROL_DRAIN_BUFF)
-                }) {
-                    x += abyssal_outside_dorm as f64 * 0.5;
-                }
-                x = x.max(0.0);
+                let buffs = instances
+                    .map(|instances| instances.resolve_control_buff_ids(&op.name, op.tier()))
+                    .unwrap_or_default();
+                x = super::drain::control_tag_drain(
+                    x,
+                    abyssal_control_recovery,
+                    &buffs,
+                    abyssal_outside_dorm,
+                );
             }
             let hours = if x <= 0.0 {
                 None

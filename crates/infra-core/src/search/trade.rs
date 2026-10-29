@@ -356,19 +356,20 @@ fn search_trade_single_order(
 
     let start = Instant::now();
     let bake_started = Instant::now();
-    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
-        crate::bake::try_baked_trade_search(
-            &sub,
-            table,
-            options,
-            order_kind,
-            &filter,
-            combo_count,
-            start,
-        )?
-    } else {
-        None
-    };
+    let baked_report =
+        if !options.layout.auto_rotation && options.bake_mode != crate::bake::BakeMode::Disabled {
+            crate::bake::try_baked_trade_search(
+                &sub,
+                table,
+                options,
+                order_kind,
+                &filter,
+                combo_count,
+                start,
+            )?
+        } else {
+            None
+        };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
         if let Some(key) = memo_key {
@@ -562,6 +563,33 @@ impl TradeSearchOptions {
         if trade_station_exclusive_violation_refs(&ops, table) {
             return None;
         }
+        let members: Vec<_> = ops
+            .iter()
+            .map(|op| {
+                (
+                    op.name.to_owned(),
+                    op.elite,
+                    op.buff_ids.to_vec(),
+                    op.tags.to_vec(),
+                )
+            })
+            .collect();
+        if !crate::layout::admission::candidate_admitted(
+            &self.layout,
+            "trade",
+            members.clone(),
+            table,
+        ) {
+            return None;
+        }
+        let shift_hours = crate::mood::room_work_window(
+            &self.layout,
+            crate::layout::FacilityKind::TradePost,
+            None,
+            &members,
+            self.shift_hours,
+        )
+        .ok()?;
         let gold_lines = if self.layout.gold_manu_line_count > 0 {
             self.layout.gold_manu_line_count
         } else {
@@ -579,8 +607,7 @@ impl TradeSearchOptions {
             layout: &projected_layout,
             active_order_kind: order_kind,
         };
-        let result =
-            solve_trade_with_shift_prevalidated_view(&input, table, self.shift_hours).ok()?;
+        let result = solve_trade_with_shift_prevalidated_view(&input, table, shift_hours).ok()?;
         let hit = trade_search_hit_from_result(&input.operators, &result);
         Some((hit, result))
     }

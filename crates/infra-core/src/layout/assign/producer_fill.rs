@@ -105,6 +105,10 @@ pub(crate) fn cleanup_unused_sphinx_urrbian_dorm_anchor(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) {
+    if assignment.auto_rotation {
+        return;
+    }
+
     let sphinx_used = blueprint
         .rooms
         .iter()

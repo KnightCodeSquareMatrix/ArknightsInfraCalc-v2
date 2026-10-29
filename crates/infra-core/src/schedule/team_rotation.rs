@@ -4808,37 +4808,7 @@ fn assert_final_rotation_invariants_with_mood(
             .ok_or_else(|| {
                 Error::msg("assert-invariants ordinary_fallback_admission failed: missing Plan")
             })?;
-        let mut names = HashSet::new();
-        for room in shift.assignment.iter_rooms() {
-            for operator in &room.operators {
-                if !names.insert(operator.name.clone()) {
-                    return Err(Error::msg(format!(
-                        "assert-invariants ordinary_fallback_admission failed: duplicate {} in shift {}",
-                        operator.name, shift.index + 1,
-                    )));
-                }
-            }
-            if !blueprint
-                .room(&room.room_id)
-                .is_some_and(|room| ordinary_workplace(room.kind))
-            {
-                continue;
-            }
-            for operator in &room.operators {
-                let progress = operbox.progress_of(&operator.name);
-                if progress.is_none_or(|progress| {
-                    progress.elite != operator.elite
-                        || (operator.level != 0 && progress.level != operator.level)
-                        || (operator.rarity != 0 && progress.rarity != operator.rarity)
-                }) || plan.excluded_operators.contains(&operator.name)
-                {
-                    return Err(Error::msg(format!(
-                        "assert-invariants ordinary_fallback_admission failed: invalid workplace member {} in shift {}",
-                        operator.name, shift.index + 1,
-                    )));
-                }
-            }
-        }
+        assert_assignment_identity(blueprint, operbox, &shift.assignment, plan)?;
     }
     let mut completed = report.clone();
     fill_rotation_vacancies(
@@ -9151,9 +9121,9 @@ fn assign_originium_pair_peak(
 }
 
 #[derive(Debug, Clone)]
-struct OwnedRotationAssignment {
-    assignment: BaseAssignment,
-    plan: AssignmentPlan,
+pub(crate) struct OwnedRotationAssignment {
+    pub(crate) assignment: BaseAssignment,
+    pub(crate) plan: AssignmentPlan,
 }
 
 enum ProfileOwnerCandidate {
@@ -9194,6 +9164,26 @@ fn solve_owned_peak_assignment(
     options: &AssignBaseOptions,
     shift_hours: f64,
 ) -> Result<OwnedRotationAssignment> {
+    solve_owned_peak_seed(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        shift_hours,
+        &BaseAssignment::default(),
+    )
+}
+
+pub(crate) fn solve_owned_peak_seed(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    shift_hours: f64,
+    seed: &BaseAssignment,
+) -> Result<OwnedRotationAssignment> {
     let mut shift_options = options.clone();
     shift_options.shift_hours = shift_hours;
     let mut result = assign_shift_with_plan_skip(
@@ -9203,7 +9193,7 @@ fn solve_owned_peak_assignment(
         table,
         &shift_options,
         AssignShiftMode::Peak,
-        &BaseAssignment::default(),
+        seed,
         &HashSet::new(),
     )?;
     result.plan.resolve_actual_producer_dependencies(
@@ -9267,7 +9257,7 @@ fn solve_owned_peak_with_originium_pair(
     })
 }
 
-fn solve_policy_disjoint_backup(
+pub(crate) fn solve_policy_disjoint_backup(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -9278,8 +9268,36 @@ fn solve_policy_disjoint_backup(
 ) -> Result<OwnedRotationAssignment> {
     // Two-team policy: the backup state is generated from the operators not
     // present anywhere in the complete main assignment.
-    let unavailable = main.operator_names();
+    let unavailable = if options.auto_rotation {
+        main.work_position_operator_names(blueprint)
+    } else {
+        main.operator_names()
+    };
     let available = operbox.excluding(&unavailable);
+    if options.auto_rotation {
+        let mut seed = BaseAssignment::default();
+        seed.auto_rotation = true;
+        seed.auto_main_presence = crate::layout::admission::presence(blueprint, main, instances);
+        for room in blueprint
+            .rooms
+            .iter()
+            .filter(|room| room.kind == FacilityKind::Dormitory)
+        {
+            seed.set_room(room.id.clone(), main.operators_in(&room.id).to_vec());
+        }
+        super::auto_rotation::select_control(
+            blueprint, &available, instances, table, options, &mut seed,
+        )?;
+        return solve_owned_peak_seed(
+            blueprint,
+            &available,
+            instances,
+            table,
+            options,
+            shift_hours,
+            &seed,
+        );
+    }
     solve_owned_peak_assignment(
         blueprint,
         &available,
@@ -11826,4 +11844,36 @@ pub fn operator_team_map(report: &TeamRotationReport) -> HashMap<String, TeamLab
         }
     }
     map
+}
+
+pub(crate) fn assert_assignment_identity(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    assignment: &BaseAssignment,
+    plan: &AssignmentPlan,
+) -> Result<()> {
+    let violations = assignment.structural_violations(blueprint);
+    if !violations.is_empty() {
+        return Err(Error::msg(format!(
+            "assert-invariants assignment_structure failed: {}",
+            violations.join("; ")
+        )));
+    }
+    for room in assignment.iter_rooms() {
+        for operator in &room.operators {
+            let progress = operbox.progress_of(&operator.name);
+            if progress.is_none_or(|progress| {
+                progress.elite != operator.elite
+                    || (operator.level != 0 && progress.level != operator.level)
+                    || (operator.rarity != 0 && progress.rarity != operator.rarity)
+            }) || plan.excluded_operators.contains(&operator.name)
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants ordinary_fallback_admission failed: invalid member {}",
+                    operator.name
+                )));
+            }
+        }
+    }
+    Ok(())
 }

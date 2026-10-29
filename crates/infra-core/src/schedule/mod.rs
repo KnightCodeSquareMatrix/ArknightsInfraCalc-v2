@@ -1,4 +1,9 @@
+mod auto_rotation;
 mod base_rotation;
+pub use auto_rotation::{
+    assert_auto_rotation_invariants, schedule_auto_rotation, AutoControlEffects,
+    AutoRoomRecommendation, AutoRoomState, AutoRotationReport,
+};
 pub(crate) mod control_rotation;
 mod cycle_mood;
 mod dorm_finalizer;

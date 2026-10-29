@@ -65,7 +65,7 @@ pub(super) fn assign_manufacture_lines(
             Some(RoomProduct::Factory { recipe }) => *recipe,
             _ => continue,
         };
-        let current_layout = crate::layout::resolve_base(
+        let mut current_layout = crate::layout::resolve_base(
             blueprint,
             assignment,
             Some(instances),
@@ -74,6 +74,7 @@ pub(super) fn assign_manufacture_lines(
             Some(operbox.durin_dorm_planning_count(instances)),
         )?
         .layout;
+        current_layout.candidate_room = options.auto_rotation.then(|| room.id.0.clone());
         let opts = manu_options(&current_layout, options, recipe, room.level);
         let existing = assignment.operators_in(&room.id);
         if existing.len() > 1 {
@@ -126,7 +127,12 @@ pub(super) fn assign_manufacture_lines(
             let forbidden = forbidden_teammates(&anchor, forbid_same_room);
             pick_manu_hit_with_anchor(pool, table, opts, used, options.top_k, &anchor, &forbidden)
         }
-        .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)))?;
+        .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)));
+        let hit = match hit {
+            Ok(hit) => hit,
+            Err(_) if options.auto_rotation && existing.is_empty() => continue,
+            Err(error) => return Err(error),
+        };
         commit_manu_room(assignment, &room.id, &hit, pool, used)?;
     }
     Ok(())
@@ -165,13 +171,51 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
                 room.id.0
             )));
         }
-        let solved =
-            crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)?;
+        let members = input
+            .operators
+            .iter()
+            .map(|op| {
+                (
+                    op.name.clone(),
+                    op.elite,
+                    op.buff_ids.clone(),
+                    op.tags.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let hours = crate::mood::room_work_window(
+            &input.layout,
+            FacilityKind::Factory,
+            Some(input.active_recipe),
+            &members,
+            options.shift_hours,
+        )?;
+        let solved = crate::manufacture::solve_manufacture_with_shift(&input, table, hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
         assignment.set_room_with_efficiency(
             room.id,
             operators,
             Some(crate::layout::RoomEfficiencySnapshot {
+                manufacture_base_efficiency: if options.auto_rotation {
+                    solved.base_efficiency
+                } else {
+                    crate::Efficiency::ZERO
+                },
+                manufacture_total_efficiency: if options.auto_rotation {
+                    solved.final_efficiency
+                } else {
+                    crate::Efficiency::ZERO
+                },
+                manufacture_unit_output_per_day: if options.auto_rotation {
+                    solved.unit_output_per_day
+                } else {
+                    0.0
+                },
+                manufacture_output_per_day: if options.auto_rotation {
+                    solved.output_per_day
+                } else {
+                    0.0
+                },
                 manufacture_final_efficiency: solved.final_efficiency,
                 manufacture_occupancy_efficiency: solved.occupancy_efficiency,
                 manufacture_global_efficiency: solved.global_efficiency,
@@ -457,7 +501,30 @@ fn score_manu_entries(
         .iter()
         .map(ManuPoolEntry::to_manu_operator)
         .collect::<Vec<_>>();
-    if !manufacture_combo_allowed_for_shift(&operators, table, Some(options.shift_hours)) {
+    let members = operators
+        .iter()
+        .map(|op| {
+            (
+                op.name.clone(),
+                op.elite,
+                op.buff_ids.clone(),
+                op.tags.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    if !crate::layout::admission::candidate_admitted(layout, "manufacture", members.clone(), table)
+    {
+        return None;
+    }
+    let hours = crate::mood::room_work_window(
+        layout,
+        FacilityKind::Factory,
+        Some(recipe),
+        &members,
+        options.shift_hours,
+    )
+    .ok()?;
+    if !manufacture_combo_allowed_for_shift(&operators, table, Some(hours)) {
         return None;
     }
     let input = ManuRoomInput {
@@ -467,9 +534,7 @@ fn score_manu_entries(
         mood: options.mood,
         layout: Arc::new(layout.clone()),
     };
-    let result =
-        crate::manufacture::solve_manufacture_with_shift(&input, table, options.shift_hours)
-            .ok()?;
+    let result = crate::manufacture::solve_manufacture_with_shift(&input, table, hours).ok()?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
     let mut per_station = crate::manufacture::ManuProdBreakdown::default();
     let mut storage = crate::manufacture::ManuStorageBreakdown::default();
@@ -523,6 +588,28 @@ pub(super) fn pick_capacity_manu_hit(
 ) -> Result<ManuSearchHit> {
     let capacity = station_operator_capacity(room_level);
     let general_pool = filter_general_manufacture_search_pool(pool);
+    if options.auto_rotation {
+        let mut entries = Vec::new();
+        let mut best = None;
+        for entry in general_pool
+            .entries
+            .iter()
+            .filter(|entry| !used.contains(&entry.name))
+        {
+            let mut trial = entries.clone();
+            trial.push(entry.clone());
+            if let Some(hit) =
+                score_manu_entries(&trial, table, layout, options, recipe, room_level)
+            {
+                entries = trial;
+                best = Some(hit);
+                if entries.len() == capacity {
+                    break;
+                }
+            }
+        }
+        return best.ok_or_else(|| Error::msg("no admitted partial manufacture candidate"));
+    }
     let entries: Vec<_> = general_pool
         .entries
         .iter()

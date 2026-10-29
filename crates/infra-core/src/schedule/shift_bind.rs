@@ -350,35 +350,46 @@ fn bind_dorm_support<'a>(
     }
 }
 
+pub(crate) fn validate_assignment_dependency_presence(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    plan: &AssignmentPlan,
+) -> Result<(), String> {
+    let work_names = assignment.work_position_operator_names(blueprint);
+    let present = assignment.operator_names();
+    for dependency in &plan.active_dependencies {
+        let consumer_working = dependency.consumers.iter().any(|consumer| {
+            operator_is_bind_work(blueprint, plan, assignment, &work_names, consumer)
+        });
+        if !consumer_working {
+            continue;
+        }
+        let missing: Vec<_> = dependency
+            .required
+            .iter()
+            .filter(|required| !present.contains(*required))
+            .collect();
+        if !missing.is_empty() {
+            return Err(format!(
+                "rotation_bind: active dependency {:?} missing required {:?}",
+                dependency.consumers, missing
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_bind_dependency_presence(
     blueprint: &BaseBlueprint,
     report: &TeamRotationReport,
 ) -> Result<(), String> {
     for (index, shift) in report.shifts.iter().enumerate() {
-        let plan = shift_plan(report, index)?;
-        let work_names = shift.assignment.work_position_operator_names(blueprint);
-        let present = shift.assignment.operator_names();
-        for dependency in &plan.active_dependencies {
-            let consumer_working = dependency.consumers.iter().any(|consumer| {
-                operator_is_bind_work(blueprint, plan, &shift.assignment, &work_names, consumer)
-            });
-            if !consumer_working {
-                continue;
-            }
-            let missing: Vec<_> = dependency
-                .required
-                .iter()
-                .filter(|required| !present.contains(*required))
-                .collect();
-            if !missing.is_empty() {
-                return Err(format!(
-                    "rotation_bind: shift {} active dependency {:?} missing required {:?}",
-                    shift.index + 1,
-                    dependency.consumers,
-                    missing
-                ));
-            }
-        }
+        validate_assignment_dependency_presence(
+            blueprint,
+            &shift.assignment,
+            shift_plan(report, index)?,
+        )
+        .map_err(|error| format!("shift {} {error}", shift.index + 1))?;
     }
     Ok(())
 }

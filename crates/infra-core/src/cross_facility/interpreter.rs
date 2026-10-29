@@ -17,14 +17,47 @@ pub fn orchestrate_global_atoms(
     layout: &LayoutContext,
     existing_global: GlobalResourcePool,
 ) -> GlobalResourceSnapshot {
+    orchestrate_global_atoms_inner(atoms, layout, existing_global, false).0
+}
+
+/// 由同一执行器记录实际非零写入，供准入读取来源；不另算资源公式。
+pub(crate) fn orchestrate_global_atoms_with_writes(
+    atoms: &[GlobalAtomEntry],
+    layout: &LayoutContext,
+    existing_global: GlobalResourcePool,
+) -> (
+    GlobalResourceSnapshot,
+    Vec<(usize, StateKey, f64, Option<StateKey>)>,
+) {
+    orchestrate_global_atoms_inner(atoms, layout, existing_global, true)
+}
+
+fn orchestrate_global_atoms_inner(
+    atoms: &[GlobalAtomEntry],
+    layout: &LayoutContext,
+    existing_global: GlobalResourcePool,
+    record_writes: bool,
+) -> (
+    GlobalResourceSnapshot,
+    Vec<(usize, StateKey, f64, Option<StateKey>)>,
+) {
     let mut global = existing_global;
 
-    for entry in atoms {
+    let mut writes = Vec::new();
+    for (index, entry) in atoms.iter().enumerate() {
         if !condition_met(&entry.atom.condition, entry, layout) {
             continue;
         }
         match entry.atom.phase {
-            Phase::StateWrite => apply_state_write(&mut global, &entry.atom, entry, layout),
+            Phase::StateWrite => {
+                if let Some((key, delta, from)) =
+                    apply_state_write(&mut global, &entry.atom, entry, layout)
+                {
+                    if record_writes {
+                        writes.push((index, key, delta, from));
+                    }
+                }
+            }
             _ => {
                 // 其他 Phase（GlobalInject, Constant 等）暂不由本层处理
                 // GlobalInject 仍由 control/interpreter.rs 管理
@@ -33,11 +66,14 @@ pub fn orchestrate_global_atoms(
         }
     }
 
-    GlobalResourceSnapshot {
-        global,
-        inject: layout.global_inject.clone(),
-        layout: layout.clone(),
-    }
+    (
+        GlobalResourceSnapshot {
+            global,
+            inject: layout.global_inject.clone(),
+            layout: layout.clone(),
+        },
+        writes,
+    )
 }
 
 /// 求值 Condition（仅处理在跨设施上下文中可用的条件）。
@@ -65,11 +101,11 @@ fn apply_state_write(
     atom: &crate::types::EffectAtom,
     entry: &GlobalAtomEntry,
     layout: &LayoutContext,
-) {
+) -> Option<(StateKey, f64, Option<StateKey>)> {
     match &atom.action {
         Action::StateProduce { key, amount } => {
             let Some(sk) = StateKey::parse(key) else {
-                return;
+                return None;
             };
             let scale = resolve_selector_value(&atom.selector, entry, layout);
             let add = if atom.selector.is_some() {
@@ -79,19 +115,23 @@ fn apply_state_write(
             };
             if add != 0.0 {
                 global.add(sk, add);
+                return Some((sk, add, None));
             }
         }
         Action::StateConvert { from, to, ratio } => {
             let Some(from_k) = StateKey::parse(from) else {
-                return;
+                return None;
             };
             let Some(to_k) = StateKey::parse(to) else {
-                return;
+                return None;
             };
             let src = global.get(from_k);
             if src > 0.0 {
                 let converted = src * ratio;
                 global.add(to_k, converted);
+                if converted != 0.0 {
+                    return Some((to_k, converted, Some(from_k)));
+                }
             }
         }
         Action::AddFlatEff { value: _, .. } => {
@@ -100,6 +140,7 @@ fn apply_state_write(
         }
         _ => {}
     }
+    None
 }
 
 /// 求值 Selector（跨设施上下文：取 layout 级统计数据或 operator 属性）。

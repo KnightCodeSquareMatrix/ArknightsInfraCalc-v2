@@ -82,7 +82,7 @@ fn run() -> Result<(), Error> {
 
 fn print_usage() {
     eprintln!("Usage:");
-    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
+    eprintln!("  infra-cli plan --operbox <path.json|.xlsx> [--layout <path>] [--baseline <operbox>] [--top <n>] [--rotation <auto|named|main-backup@H1/H2|abc@H1/H2/H3>] [--prefer <system=alternative>] [--no-fiammetta] [--prefix-shadow-out <file.json>]");
     eprintln!(
         "      [--profile-out <file.json>] [--rotation-out <file.json>] [--output-dir <dir>] [--maa-out <file.json>] [--assert-invariants] [--json]"
     );

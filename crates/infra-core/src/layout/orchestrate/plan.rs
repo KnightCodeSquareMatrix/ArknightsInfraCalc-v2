@@ -298,6 +298,8 @@ pub struct ControlCandidateRequirement {
 pub struct AssignmentPlan {
     #[serde(skip)]
     pub(crate) support_combinations_enable: bool,
+    #[serde(skip)]
+    pub(crate) auto_rotation: bool,
     pub mode: AssignShiftMode,
     /// 计划阶段已确定的规则 alternatives 与兼容 registry claims 的统一视图。
     pub activated: Vec<ActivatedSystem>,
@@ -341,6 +343,7 @@ impl AssignmentPlan {
     pub(crate) fn empty() -> Self {
         Self {
             support_combinations_enable: false,
+            auto_rotation: false,
             mode: AssignShiftMode::Peak,
             activated: Vec::new(),
             registry_claims: Vec::new(),

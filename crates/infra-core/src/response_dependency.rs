@@ -1067,7 +1067,7 @@ fn selector_action_multiplier(action: &Action) -> f64 {
     }
 }
 
-fn read_resources(atom: &crate::types::EffectAtom) -> Vec<String> {
+pub(crate) fn read_resources(atom: &crate::types::EffectAtom) -> Vec<String> {
     let mut resources = Vec::new();
     if let Some(Selector::StatePoolFloored { key, .. }) = atom.selector.as_ref() {
         resources.push(normalize_resource(key));

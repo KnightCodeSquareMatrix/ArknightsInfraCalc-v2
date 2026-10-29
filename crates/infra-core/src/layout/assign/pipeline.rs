@@ -187,8 +187,11 @@ fn run_shift_pipeline_with_producer_pruning(
 
     match mode {
         AssignShiftMode::Peak => {
-            let dynamic_producers =
-                dynamic_producer_candidates(&control_pool, &trade_pool, &manu_pool, table)?;
+            let dynamic_producers = if options.auto_rotation {
+                Vec::new()
+            } else {
+                dynamic_producer_candidates(&control_pool, &trade_pool, &manu_pool, table)?
+            };
             if dynamic_producers.len() >= usize::BITS as usize {
                 return Err(Error::msg(
                     "too many deferred producer presence combinations",
@@ -482,7 +485,19 @@ fn probe_shadow_pair(
     else {
         return Ok(None);
     };
-    let layout = run.resolve_snapshot(true)?;
+    let mut layout = if run.options.auto_rotation {
+        crate::layout::resolve::resolve_layout_snapshot(
+            run.blueprint,
+            assignment,
+            Some(run.instances),
+            Some(run.table),
+            run.options.mood,
+            Some(run.durin_plan),
+        )?
+    } else {
+        run.resolve_snapshot(true)?
+    };
+    layout.candidate_room = run.options.auto_rotation.then(|| trade_room.id.0.clone());
     let mut probe_used = used.clone();
     let trade_hit = pick_trade_meta_then_plain(
         trade_pool,
@@ -501,6 +516,7 @@ fn probe_shadow_pair(
     if !trade_takes_night_smoke {
         return Ok(None);
     }
+    layout.candidate_room = run.options.auto_rotation.then(|| manu_room.id.0.clone());
     let manu_hit = pick_shadow_manufacture(
         run,
         manu_pool,
@@ -923,13 +939,43 @@ fn assign_meeting_rooms(
                                 mood: options.mood.max(0.0),
                             },
                         ];
+                        let members = vec![
+                            crate::layout::AssignedOperator::from_progress(
+                                left_name,
+                                *left_progress,
+                            ),
+                            crate::layout::AssignedOperator::from_progress(
+                                right_name,
+                                *right_progress,
+                            ),
+                        ];
+                        let mut trial = assignment.clone();
+                        trial.set_room(room.id.clone(), members.clone());
+                        if options.auto_rotation
+                            && !crate::layout::admission::assignment_admitted(
+                                blueprint, &trial, instances, table,
+                            )
+                        {
+                            continue;
+                        }
+                        let members = members
+                            .iter()
+                            .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
+                            .collect::<Vec<_>>();
+                        let candidate_hours = crate::mood::room_work_window(
+                            &layout,
+                            FacilityKind::MeetingRoom,
+                            None,
+                            &members,
+                            elapsed_hours,
+                        )?;
                         let score = crate::meeting::evaluate_meeting(
                             &crate::support_facility::SupportRoomInput {
                                 facility: crate::support_facility::SupportFacility::Meeting,
                                 operators: support_ops,
                                 capacity: room.operator_capacity(),
                                 extra_recruit_slots,
-                                elapsed_hours,
+                                elapsed_hours: candidate_hours,
                                 external_speed_bonus_pct: 0.0,
                                 layout: layout.clone(),
                             },
@@ -1009,13 +1055,37 @@ fn assign_meeting_rooms(
                         mood: options.mood.max(0.0),
                     });
                 }
+                let mut members = operators.clone();
+                members.push(crate::layout::AssignedOperator::from_progress(
+                    name, progress,
+                ));
+                let mut trial = assignment.clone();
+                trial.set_room(room.id.clone(), members.clone());
+                if options.auto_rotation
+                    && !crate::layout::admission::assignment_admitted(
+                        blueprint, &trial, instances, table,
+                    )
+                {
+                    continue;
+                }
+                let members = members
+                    .iter()
+                    .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
+                    .collect::<Vec<_>>();
+                let candidate_hours = crate::mood::room_work_window(
+                    &layout,
+                    FacilityKind::MeetingRoom,
+                    None,
+                    &members,
+                    elapsed_hours,
+                )?;
                 let score = crate::meeting::evaluate_meeting(
                     &crate::support_facility::SupportRoomInput {
                         facility: crate::support_facility::SupportFacility::Meeting,
                         operators: support_ops,
                         capacity: room.operator_capacity(),
                         extra_recruit_slots,
-                        elapsed_hours,
+                        elapsed_hours: candidate_hours,
                         external_speed_bonus_pct: 0.0,
                         layout: layout.clone(),
                     },
@@ -1289,13 +1359,15 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
-    assign_dorm_producers(
-        run.blueprint,
-        run.operbox,
-        run.instances,
-        &mut run.assignment,
-        &mut run.used,
-    )?;
+    if !run.options.auto_rotation {
+        assign_dorm_producers(
+            run.blueprint,
+            run.operbox,
+            run.instances,
+            &mut run.assignment,
+            &mut run.used,
+        )?;
+    }
     if !operator_is_in_normal_base(run.blueprint, &run.assignment, ULPIANUS_NAME) {
         // Deepcolor's trade bonus requires Ulpianus to remain in the normal base.
         // This pipeline does not place Ulpianus beyond the producer anchor, so

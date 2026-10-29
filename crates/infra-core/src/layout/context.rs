@@ -12,6 +12,16 @@ pub const DEFAULT_DORM_OCCUPANT_COUNT: u8 = 20;
 /// 全基建场景快照（贸易/制造/发电/中控共享的布局假设与全局资源池）。
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct LayoutContext {
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) auto_rotation: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) auto_initial_global: Option<GlobalResourcePool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) candidate_room: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) station_presence: Vec<super::admission::StationPresence>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) auto_main_presence: Vec<super::admission::StationPresence>,
     pub meeting_max_level: u8,
     pub dorm_level_sum: u16,
     pub manu_recipe_kinds: u8,
@@ -91,6 +101,11 @@ pub struct LayoutContext {
 impl Default for LayoutContext {
     fn default() -> Self {
         Self {
+            auto_rotation: false,
+            auto_initial_global: None,
+            candidate_room: None,
+            station_presence: Vec::new(),
+            auto_main_presence: Vec::new(),
             meeting_max_level: 0,
             dorm_level_sum: 0,
             manu_recipe_kinds: 0,

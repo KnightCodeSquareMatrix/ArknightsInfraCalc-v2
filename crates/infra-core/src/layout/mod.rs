@@ -1,4 +1,5 @@
-mod assign;
+pub(crate) mod admission;
+pub(crate) mod assign;
 mod assignment;
 mod blueprint;
 mod context;
@@ -14,6 +15,7 @@ mod workforce;
 pub(crate) use assign::assign_control_with_saileach;
 pub(crate) use assign::assign_manu_room_with_anchors;
 pub(crate) use assign::assign_shift_with_preclaimed_plan;
+pub(crate) use assign::complete_standalone_assignment;
 pub(crate) use assign::refill_manu_room_with_core;
 pub(crate) use assign::refill_trade_room_with_core;
 pub use assign::{
@@ -62,3 +64,5 @@ pub use workforce::{
     is_elite_operator, is_platform_operator, WorkforceIndex, TAG_DURIN, TAG_ELITE_OPERATOR,
     TAG_KNIGHT, TAG_PINUS, TAG_RHINE,
 };
+
+pub(crate) use resolve::layout_from_blueprint;

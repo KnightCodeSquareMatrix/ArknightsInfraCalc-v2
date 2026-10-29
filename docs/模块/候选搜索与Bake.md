@@ -87,3 +87,13 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 冷阶段 `metrics.bake.cold` 按 `init`、`generate`、`validate`、`verify`、`index`、`publish` 保存 calls/errors/elapsed_ms；init 只覆盖真正 OnceLock 初始化，缓存访问不冒充冷加载。实际重复验证照次数记；父子阶段 inclusive，不能相加作总耗时。CLI bake 在动作体包 trace，保留核心全量校验与既有 CLI 回归失败；serve 的启动 warm 单独输出 trace。
 
 所有计数在当前 trace 的固定数值数组累积，没有 trace 时不统计。JSON 与标签只在 trace 结束生成；schema 2 的 operation 和 Bake 数值指标省略零值，缺字段按零解释，顶层 event/schema 与阶段结构保留。本阶段仅格式化、workspace 离线编译和文档/源差异检查，未运行 solver、Bake、性能或对拍。
+
+## 自动建议候选
+
+自动模式的候选使用真实站点成员快照检查协同准入，后续候选也不能激活此前房间的禁止依赖。候选窗口由共同心情owner给出；长窗口制造负心情差政策继续执行。模式禁令为 hard constraint，现有选人/顺序/Top-K仍属 heuristic，窗口为 policy，不声称完整或全局最优。新增模式、成员和共享主力快照进入请求memo身份；自动模式两域直接live，不读固定班时Bake，不放宽Bake兼容门禁。定时默认输入仍走原搜索与Bake策略。
+
+auto候选房身份进入memo输入；备态候选还检查与固定主态其他房可共存的关系，不把同房主备混合。终态枚举全部房状态验证独立切换禁令。
+
+协同准入读取中枢实际资源写入、发电虚拟产出与跨设施global执行器的写入事实，同一成员同一资源净值为零不登记；全局conversion只沿实际执行边传播来源并登记在岗转换者。蓝图初始pool保留，因此预置碎片经一级絮雨转换仍构成外站成员依赖。房内状态转换不发布为其他站的供给。真实站点等级、初始pool、静态场景及主力快照进入memo身份。来源在同一次准入中按需读取，实际资源消费者才触发原解释器。
+
+发电搜索接调用方本轮空房列表并随选入更新真实房快照；夜烟影子探测在auto使用清空后的试排副本，贸易与制造分别绑定实际目标房。

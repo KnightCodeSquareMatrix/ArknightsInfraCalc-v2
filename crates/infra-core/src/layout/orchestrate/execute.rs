@@ -34,6 +34,17 @@ pub fn execute_plan(
     if plan.mode == AssignShiftMode::Peak {
         for anchor in &plan.anchors {
             if used.contains(&anchor.operator) {
+                if plan.auto_rotation
+                    && anchor.proactive_support
+                    && anchor.facility == crate::layout::FacilityKind::Dormitory
+                    && anchor.room_id.as_ref().is_some_and(|room| {
+                        assignment.operators_in(room).iter().any(|operator| {
+                            operator.name == anchor.operator && operator.elite == anchor.elite
+                        })
+                    })
+                {
+                    continue;
+                }
                 return Err(crate::error::Error::msg(format!(
                     "planned operator {} for {} was occupied before execute",
                     anchor.operator, anchor.system_id

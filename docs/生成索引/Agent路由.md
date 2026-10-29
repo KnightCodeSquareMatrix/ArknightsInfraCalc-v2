@@ -306,3 +306,23 @@
 **知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/README.md`
 
 **验证**：`infra-cli debug rerun --bundle <debug-bundle.json>`；`python3 scripts/codex/check_repository_facts.py`
+
+## `SCHEDULE.AUTO_ROTATION`：自动轮换逐站主备建议
+
+**优先级**：`85`
+
+**症状**：自动轮换、主备互斥、常驻挂件、建议不完整
+
+**判别**：每站主备建议、禁止跨站成员关系、共享宿舍挂件或缺员标注时选择。
+
+**入口**：`crates/infra-core/src/schedule/auto_rotation.rs::schedule_auto_rotation`；`crates/infra-cli/src/commands/plan.rs::auto_rotation_cmd`
+
+**完整调用链**：[docs/调用链/自动轮换建议.md](../调用链/自动轮换建议.md)
+
+**模块 owner**：[docs/模块/排班与轮换.md](../模块/排班与轮换.md)；[docs/模块/候选搜索与Bake.md](../模块/候选搜索与Bake.md)；[docs/接口/CLI与Worker.md](../接口/CLI与Worker.md)
+
+**机制引用**：[docs/知识库引用.md#可引用范围](../知识库引用.md#可引用范围)
+
+**知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/心情与宿舍.md`
+
+**验证**：`infra-cli plan --operbox <path> --rotation auto --rotation-out out/auto_rotation.json --assert-invariants`

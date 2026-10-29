@@ -122,7 +122,7 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
         .collect();
 
     while let Some(room) = take_next_trade_room(&mut rooms, pool, assignment, used) {
-        let current_layout = crate::layout::resolve_base(
+        let mut current_layout = crate::layout::resolve_base(
             blueprint,
             assignment,
             Some(instances),
@@ -131,6 +131,7 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
             durin_dorm_planning,
         )?
         .layout;
+        current_layout.candidate_room = options.auto_rotation.then(|| room.id.0.clone());
         let order = trade_order_from_room(room)?;
         let existing = assignment.operators_in(&room.id);
         let anchors: Vec<_> = existing.iter().map(|op| op.name.clone()).collect();
@@ -177,6 +178,9 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
                             room.id.0
                         ),
                     });
+                }
+                if options.auto_rotation && anchors.is_empty() {
+                    continue;
                 }
                 return Err(Error::msg(format!("trade {}: {error}", room.id.0)));
             }
@@ -431,7 +435,26 @@ pub(super) fn refresh_trade_efficiency_snapshots(
             layout: Arc::new(room.layout),
             active_order_kind: room.order,
         };
-        let solved = crate::trade::solve_trade_with_shift(&input, table, options.shift_hours)?;
+        let members = input
+            .operators
+            .iter()
+            .map(|op| {
+                (
+                    op.name.clone(),
+                    op.elite,
+                    op.buff_ids.clone(),
+                    op.tags.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let hours = crate::mood::room_work_window(
+            &input.layout,
+            FacilityKind::TradePost,
+            None,
+            &members,
+            options.shift_hours,
+        )?;
+        let solved = crate::trade::solve_trade_with_shift(&input, table, hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
         assignment.set_room_with_efficiency(
             room.id,
@@ -493,7 +516,7 @@ pub(super) fn skip_trade_core_registry_systems(skip: &mut HashSet<String>) {
 /// 未被 plan 认领的金单贸易站：但书 -> 可露希尔 -> 完整龙巫 -> 巫恋兜底 -> 喀兰 -> 企鹅 -> 普通散件。
 ///
 /// Peak 的首个但书 / 一贸可露希尔通常已由 Plan 落位；同一入口也供 gamma fill 使用。
-pub(super) fn pick_trade_meta_then_plain(
+pub(crate) fn pick_trade_meta_then_plain(
     pool: &TradePool,
     table: &SkillTable,
     layout: &LayoutContext,

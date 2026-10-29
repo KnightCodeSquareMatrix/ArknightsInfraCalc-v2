@@ -53,6 +53,10 @@ pub(crate) fn rank_candidates(
                 SupportRegistry::load_default_shared()
                     .expect("support registry loads in office candidate build")
             });
+            let members = vec![(name.clone(), progress.elite, Vec::new(), Vec::new())];
+            let hours =
+                crate::mood::room_work_window(layout, FacilityKind::Office, None, &members, 24.0)
+                    .unwrap_or(24.0);
             let score = evaluate_office(
                 &SupportRoomInput {
                     facility: SupportFacility::Office,
@@ -65,7 +69,7 @@ pub(crate) fn rank_candidates(
                     }],
                     capacity: 1,
                     extra_recruit_slots: 0,
-                    elapsed_hours: 24.0,
+                    elapsed_hours: hours,
                     external_speed_bonus_pct: 0.0,
                     layout: layout.clone(),
                 },

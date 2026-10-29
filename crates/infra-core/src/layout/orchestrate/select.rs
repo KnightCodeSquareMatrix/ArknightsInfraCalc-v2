@@ -103,7 +103,10 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
 
     let mut catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
     validate_rule_preferences(&catalog, preferences)?;
-    if !support_combinations_enable {
+    if seed.auto_rotation {
+        super::rules::restrict_suggestion_catalog(&mut catalog);
+    }
+    if !support_combinations_enable && !seed.auto_rotation {
         for rule in &mut catalog.rules {
             for alternative in &mut rule.alternatives {
                 alternative.roles.retain(|role| !role.proactive_support);
@@ -171,6 +174,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             control_work_hours,
         )?;
         plan.support_combinations_enable = support_combinations_enable;
+        plan.auto_rotation = seed.auto_rotation;
         if crate::layout::blackkey_witch_same_trade_room(&scratch, blueprint) {
             return Err(Error::msg("trade plan cannot colocate 黑键 and 巫恋"));
         }
@@ -231,7 +235,24 @@ fn compile_plan_once(
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
     let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
-    let mut admit_all = |_: &crate::layout::system::RegistrySystemClaim, _: &BaseAssignment| true;
+    let mut admit_all = |claim: &crate::layout::system::RegistrySystemClaim,
+                         trial: &BaseAssignment| {
+        !seed.auto_rotation
+            || (claim
+                .slots
+                .iter()
+                .map(|slot| &slot.room_id)
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                <= 1
+                && !claim
+                    .slots
+                    .iter()
+                    .any(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
+                && crate::layout::admission::assignment_admitted(
+                    blueprint, trial, instances, table,
+                ))
+    };
     let admission = mood_admission.as_deref_mut().unwrap_or(&mut admit_all);
     let registry_claims = crate::layout::system::select_registry_systems_with_admission(
         blueprint,
@@ -443,6 +464,7 @@ fn compile_plan_once(
     control_exclusions.extend(compiled.excluded_operators.iter().cloned());
     let plan = AssignmentPlan {
         support_combinations_enable: false,
+        auto_rotation: seed.auto_rotation,
         mode,
         activated,
         registry_claims,

@@ -137,6 +137,28 @@ pub fn resolve_base_with_trace(
     result
 }
 
+/// 蓝图的静态场景输入；结算与候选准入共用，真实成员统计由各自快照填入。
+pub(crate) fn layout_from_blueprint(blueprint: &BaseBlueprint) -> LayoutContext {
+    LayoutContext {
+        meeting_max_level: blueprint.meeting_max_level(),
+        training_room_level: blueprint.training_room_max_level(),
+        dorm_level_sum: blueprint.dorm_level_sum(),
+        facility_level_sum_excl_meeting: blueprint.facility_level_sum_excl_meeting(),
+        manu_recipe_kinds: blueprint.manu_recipe_kinds(),
+        elite_facility_count: blueprint.scenario.elite_facility_count.unwrap_or(0),
+        sui_facility_count: blueprint.scenario.sui_facility_count.unwrap_or(0),
+        dorm_occupant_count: effective_dorm_occupants(blueprint, &BaseAssignment::default()),
+        trade_station_count: blueprint.count_facility(FacilityKind::TradePost),
+        power_station_count: blueprint.count_facility(FacilityKind::PowerPlant),
+        manufacture_station_count: blueprint.count_facility(FacilityKind::Factory),
+        office_room_count: blueprint.count_facility(FacilityKind::Office),
+        meeting_room_count: blueprint.count_facility(FacilityKind::MeetingRoom),
+        global: blueprint.initial_global_pool(),
+        drone_cap: blueprint.drone_cap,
+        ..Default::default()
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn resolve_base_core(
     blueprint: &BaseBlueprint,
@@ -159,26 +181,19 @@ fn resolve_base_core(
     );
 
     let phase_started = Instant::now();
-    let mut layout = LayoutContext {
-        meeting_max_level: blueprint.meeting_max_level(),
-        training_room_level: blueprint.training_room_max_level(),
-        dorm_level_sum: blueprint.dorm_level_sum(),
-        facility_level_sum_excl_meeting: blueprint.facility_level_sum_excl_meeting(),
-        manu_recipe_kinds: blueprint.manu_recipe_kinds(),
-        elite_facility_count: effective_elite_facility_count(
-            blueprint, assignment, &workforce, instances,
-        ),
-        sui_facility_count: blueprint.scenario.sui_facility_count.unwrap_or(0),
-        dorm_occupant_count: effective_dorm_occupants(blueprint, assignment),
-        trade_station_count: blueprint.count_facility(FacilityKind::TradePost),
-        power_station_count: blueprint.count_facility(FacilityKind::PowerPlant),
-        manufacture_station_count: blueprint.count_facility(FacilityKind::Factory),
-        office_room_count: blueprint.count_facility(FacilityKind::Office),
-        meeting_room_count: blueprint.count_facility(FacilityKind::MeetingRoom),
-        global: blueprint.initial_global_pool(),
-        drone_cap: blueprint.drone_cap,
-        ..Default::default()
+    let mut layout = layout_from_blueprint(blueprint);
+    layout.auto_rotation = assignment.auto_rotation;
+    layout.auto_initial_global = assignment.auto_rotation.then(|| layout.global.clone());
+    layout.auto_main_presence = assignment.auto_main_presence.clone();
+    layout.station_presence = if assignment.auto_rotation {
+        instances
+            .map(|instances| super::admission::presence(blueprint, assignment, instances))
+            .unwrap_or_default()
+    } else {
+        Vec::new()
     };
+    layout.elite_facility_count =
+        effective_elite_facility_count(blueprint, assignment, &workforce, instances);
     workforce.apply_to_layout(&mut layout);
     if let Some(instances) = instances {
         workforce.apply_cross_facility_stats(&mut layout, blueprint, Some(instances));
@@ -437,6 +452,19 @@ pub(crate) fn resolve_control_input_layout(
     .map(|core| core.layout)
 }
 
+fn support_room_window(
+    layout: &LayoutContext,
+    room: &crate::layout::RoomBlueprint,
+    assignment: &BaseAssignment,
+) -> Result<f64> {
+    let members = assignment
+        .operators_in(&room.id)
+        .iter()
+        .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
+        .collect::<Vec<_>>();
+    crate::mood::room_work_window(layout, room.kind, None, &members, 24.0)
+}
+
 fn support_office_hire_speed(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
@@ -469,7 +497,7 @@ fn support_office_hire_speed(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: 24.0,
+                elapsed_hours: support_room_window(layout, room, assignment)?,
                 external_speed_bonus_pct: 0.0,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
@@ -521,7 +549,7 @@ fn build_support_rooms(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: 24.0,
+                elapsed_hours: support_room_window(layout, room, assignment)?,
                 external_speed_bonus_pct: 0.0,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
@@ -559,7 +587,7 @@ fn build_support_rooms(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: 24.0,
+                elapsed_hours: support_room_window(layout, room, assignment)?,
                 external_speed_bonus_pct: meeting_inject,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);

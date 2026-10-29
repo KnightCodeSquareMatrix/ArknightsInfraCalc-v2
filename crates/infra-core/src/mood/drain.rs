@@ -114,3 +114,86 @@ pub fn workable_hours(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
         model.workable_mood() / x
     }
 }
+
+/// 满心情候选房的评估窗口。定时模式继续使用调用方窗口；建议模式
+/// 使用同一净消耗公式，至首人红脸或36小时。tags用于岁同房消耗消除。
+pub(crate) fn room_work_window(
+    layout: &crate::layout::LayoutContext,
+    facility: FacilityKind,
+    recipe: Option<crate::types::RecipeKind>,
+    members: &[(String, u8, Vec<String>, Vec<String>)],
+    fixed_hours: f64,
+) -> crate::error::Result<f64> {
+    if !layout.auto_rotation {
+        return Ok(fixed_hours);
+    }
+    let model = super::default_mood_model()?;
+    let room_ops: Vec<_> = members
+        .iter()
+        .map(|member| (member.0.clone(), member.1))
+        .collect();
+    let recipe = match recipe {
+        Some(crate::types::RecipeKind::Gold) => Some("gold"),
+        Some(crate::types::RecipeKind::BattleRecord) => Some("battle_record"),
+        Some(crate::types::RecipeKind::Originium) => Some("originium"),
+        _ => None,
+    };
+    let mut hours: f64 = 36.0;
+    for (name, elite, _, tags) in members {
+        let mut drain = operator_net_drain_with_sui(
+            model,
+            &DrainInputs {
+                name,
+                elite: *elite,
+                facility,
+                room_ops: &room_ops,
+                full_control: layout.control_operators.len() >= 5,
+                control_ops: &layout.control_operators,
+                recipe,
+            },
+            tags.iter().any(|tag| tag == "cc.g.sui"),
+        );
+        if facility == FacilityKind::ControlCenter {
+            let recovery = members
+                .iter()
+                .any(|member| member.2.iter().any(|buff| buff == "control_mp_aegir1[000]"));
+            let outside = members
+                .iter()
+                .filter(|member| member.3.iter().any(|tag| tag == "cc.g.abyssal"))
+                .count()
+                + layout
+                    .station_presence
+                    .iter()
+                    .filter(|station| station.facility != "dorm" && station.facility != "control")
+                    .flat_map(|station| &station.members)
+                    .filter(|member| member.3.iter().any(|tag| tag == "cc.g.abyssal"))
+                    .count();
+            drain = control_tag_drain(
+                drain,
+                recovery,
+                &members.iter().find(|member| member.0 == *name).unwrap().2,
+                outside,
+            );
+        }
+        if drain > 0.0 {
+            hours = hours.min(model.workable_mood() / drain);
+        }
+    }
+    Ok(hours)
+}
+
+/// 深海中枢修正；ETA与候选房窗口共享，名单统计由调用方提供。
+pub(crate) fn control_tag_drain(
+    mut drain: f64,
+    recovery: bool,
+    buffs: &[String],
+    abyssal_outside_dorm: usize,
+) -> f64 {
+    if recovery {
+        drain -= 0.05;
+    }
+    if buffs.iter().any(|buff| buff == "control_mp_aegir2[010]") {
+        drain += abyssal_outside_dorm as f64 * 0.5;
+    }
+    drain.max(0.0)
+}

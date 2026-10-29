@@ -822,6 +822,391 @@
           "bind_all": true
         }
       ]
+    },
+    {
+      "id": "dorm_silent_echo_pair",
+      "auto_only": true,
+      "priority": 18,
+      "alternatives": [
+        {
+          "id": "silent_echo_blackkey",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "塑心",
+                  "elite": 0
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "黑键",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dorm_perception_pair",
+      "auto_only": true,
+      "priority": 17,
+      "alternatives": [
+        {
+          "id": "alice_blackkey",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "爱丽丝",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "黑键",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "czerny_blackkey",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "车尔尼",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "黑键",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "alice_rosemary",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "爱丽丝",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "factory",
+              "candidates": [
+                {
+                  "name": "迷迭香",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "czerny_rosemary",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "车尔尼",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "factory",
+              "candidates": [
+                {
+                  "name": "迷迭香",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dorm_cuisine_pair",
+      "auto_only": true,
+      "priority": 16,
+      "alternatives": [
+        {
+          "id": "cuisine_chilchuck",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "森西",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "齐尔查克",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cuisine_marcille",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "森西",
+                  "elite": 2
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "factory",
+              "candidates": [
+                {
+                  "name": "玛露西尔",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dorm_presence_pair",
+      "auto_only": true,
+      "priority": 15,
+      "alternatives": [
+        {
+          "id": "ulpianus_sphinx",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "乌尔比安",
+                  "elite": 0
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "深巡",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "vigil_jixing",
+          "roles": [
+            {
+              "id": "support",
+              "facility": "dormitory",
+              "candidates": [
+                {
+                  "name": "伺夜",
+                  "elite": 0
+                }
+              ],
+              "proactive_support": true,
+              "room_level_preference": "highest_level"
+            },
+            {
+              "id": "consumer",
+              "facility": "trade_post",
+              "candidates": [
+                {
+                  "name": "吉星",
+                  "elite": 2
+                }
+              ],
+              "fill_to_capacity": true,
+              "competitive": true,
+              "trade_order": "gold"
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": [
+                "consumer"
+              ],
+              "required_roles": [
+                "support"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -6,19 +6,21 @@ use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
 use crate::layout::context::trade_station_tagged_gte_key;
 use crate::layout::LayoutContext;
 
-/// 真言「精英小队」/风絮「孺子可教」等：会客室（活动室）不计入进驻设施。
-fn facility_counts_for_layout_stats(kind: FacilityKind) -> bool {
-    !matches!(kind, FacilityKind::MeetingRoom)
-}
-
-/// 副手不计入「该设施是否进驻精英干员」判定；控制中枢仅首领位。
-fn operators_for_facility_stat(
-    kind: FacilityKind,
-    ops: &[AssignedOperator],
-) -> &[AssignedOperator] {
+/// 设施成员统计的唯一范围：会客室不计，中枢仅首领位，副手不在房间成员中。
+pub(crate) fn operators_for_facility_stat<T>(kind: FacilityKind, ops: &[T]) -> &[T] {
     match kind {
+        FacilityKind::MeetingRoom => &[],
         FacilityKind::ControlCenter => ops.get(..1).unwrap_or(&[]),
         _ => ops,
+    }
+}
+
+/// 基内成员条件及莱茵/杜林统计的房间范围；训练副手由调用方另行排除。
+pub(crate) fn operators_for_base_presence<T>(kind: FacilityKind, ops: &[T]) -> &[T] {
+    if kind == FacilityKind::MeetingRoom {
+        &[]
+    } else {
+        ops
     }
 }
 
@@ -161,10 +163,7 @@ impl WorkforceIndex {
             }
         }
         for room in &blueprint.rooms {
-            if room.kind == FacilityKind::MeetingRoom {
-                continue;
-            }
-            for op in assignment.operators_in(&room.id) {
+            for op in operators_for_base_presence(room.kind, assignment.operators_in(&room.id)) {
                 if !training_assist.iter().any(|assist| assist == &op.name)
                     && !meeting_names.contains(&op.name)
                     && !effective_base_presence.iter().any(|name| name == &op.name)
@@ -183,8 +182,9 @@ impl WorkforceIndex {
         let assigned_presence: Vec<_> = blueprint
             .rooms
             .iter()
-            .filter(|room| room.kind != FacilityKind::MeetingRoom)
-            .flat_map(|room| assignment.operators_in(&room.id))
+            .flat_map(|room| {
+                operators_for_base_presence(room.kind, assignment.operators_in(&room.id))
+            })
             .filter(|operator| !training_assist.contains(&operator.name))
             .map(|operator| operator.name.clone())
             .collect();
@@ -252,7 +252,6 @@ impl WorkforceIndex {
         blueprint
             .rooms
             .iter()
-            .filter(|room| facility_counts_for_layout_stats(room.kind))
             .filter(|room| {
                 let ops = self
                     .by_room

@@ -104,6 +104,7 @@ pub(super) fn assign_power_rooms_with_instances(
 
     let power_opts = PowerSearchOptions {
         station_count: total_stations.min(255) as u8,
+        station_rooms: Vec::new(),
         mood: options.mood,
         shift_hours: options.shift_hours,
         layout: layout.clone(),
@@ -133,6 +134,7 @@ pub(super) fn assign_power_rooms_with_instances(
     };
     let mut opts = power_opts;
     opts.station_count = empty_rooms.len().min(255) as u8;
+    opts.station_rooms = empty_rooms.iter().map(|room| room.0.clone()).collect();
     let report = search_power_assignment(&sub, table, &opts)?;
     for (room_id, station) in empty_rooms.iter().zip(report.assignments.iter()) {
         let op = pool
@@ -186,12 +188,14 @@ pub(super) fn assign_power_rooms_with_instances(
                 let Some(candidate_eta) = eta.operator_in_room(&entry.name, &room_id.0) else {
                     continue;
                 };
-                if !crate::mood::fits_work_budget(
-                    &mood,
-                    options.mood,
-                    candidate_eta.drain_per_hour,
-                    options.shift_hours,
-                ) {
+                if !options.auto_rotation
+                    && !crate::mood::fits_work_budget(
+                        &mood,
+                        options.mood,
+                        candidate_eta.drain_per_hour,
+                        options.shift_hours,
+                    )
+                {
                     continue;
                 }
                 // Settlement reads the final assignment, including empty power buff IDs.

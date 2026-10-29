@@ -9,7 +9,7 @@ mod power_fill;
 mod producer_fill;
 mod run;
 mod team_fill;
-mod trade_fill;
+pub(crate) mod trade_fill;
 
 pub(crate) use control_fill::assign_control_with_saileach;
 pub(crate) use manufacture_fill::assign_manu_room_with_anchors;
@@ -46,6 +46,8 @@ pub enum TradeRolePreference {
 
 #[derive(Debug, Clone)]
 pub struct AssignBaseOptions {
+    /// 建议模式能力边界，沿用同一 Plan / 搜索 / 完成步骤。
+    pub auto_rotation: bool,
     pub top_k: usize,
     pub mood: f64,
     pub shift_hours: f64,
@@ -80,6 +82,7 @@ pub struct AssignBaseOptions {
 impl Default for AssignBaseOptions {
     fn default() -> Self {
         Self {
+            auto_rotation: false,
             top_k: 20,
             mood: 24.0,
             shift_hours: 24.0,
@@ -287,7 +290,7 @@ pub fn assign_shift_with_plan(
     Ok(result)
 }
 
-fn complete_standalone_assignment(
+pub(crate) fn complete_standalone_assignment(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     instances: &OperatorInstances,
@@ -343,16 +346,19 @@ fn complete_standalone_assignment(
             trial.set_room(room.id.clone(), vec![candidate.clone()]);
             let eta = crate::mood::shift_eta_with_instances(&model, blueprint, &trial, instances);
             if crate::layout::plan_admits_workplace_candidate(&result.plan, &trial, room, candidate)
-                && eta
-                    .operator_in_room(&candidate.name, &room.id.0)
-                    .is_some_and(|entry| {
-                        crate::mood::fits_work_budget(
-                            &model,
-                            options.mood,
-                            entry.drain_per_hour,
-                            options.shift_hours,
-                        )
-                    })
+                && (!options.auto_rotation
+                    || super::admission::assignment_admitted(blueprint, &trial, instances, table))
+                && (options.auto_rotation
+                    || eta
+                        .operator_in_room(&candidate.name, &room.id.0)
+                        .is_some_and(|entry| {
+                            crate::mood::fits_work_budget(
+                                &model,
+                                options.mood,
+                                entry.drain_per_hour,
+                                options.shift_hours,
+                            )
+                        }))
             {
                 result.assignment = trial;
                 break;
@@ -382,6 +388,12 @@ fn complete_standalone_assignment(
             {
                 return false;
             }
+            if options.auto_rotation
+                && !super::admission::assignment_admitted(blueprint, trial, instances, table)
+            {
+                return false;
+            }
+            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
             if room.kind == FacilityKind::Factory {
                 let operators = trial
                     .operators_in(&room.id)
@@ -401,12 +413,22 @@ fn complete_standalone_assignment(
                 if !crate::search::manufacture_combo_allowed_for_shift(
                     &operators,
                     table,
-                    Some(options.shift_hours),
+                    Some(if options.auto_rotation {
+                        eta.per_op
+                            .iter()
+                            .filter(|entry| entry.room_id == room.id.0)
+                            .filter_map(|entry| entry.workable_hours)
+                            .fold(36.0_f64, f64::min)
+                    } else {
+                        options.shift_hours
+                    }),
                 ) {
                     return false;
                 }
             }
-            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
+            if options.auto_rotation {
+                return true;
+            }
             eta.operator_in_room(&candidate.name, &room.id.0)
                 .is_some_and(|entry| {
                     crate::mood::fits_work_budget(
@@ -440,9 +462,29 @@ fn complete_standalone_assignment(
                     })
         },
     )?;
+    refresh_standalone_efficiency(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        &mut result.assignment,
+    )?;
+    annotate_assignment(blueprint, &mut result.assignment);
+    Ok(())
+}
+
+pub(crate) fn refresh_standalone_efficiency(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    assignment: &mut BaseAssignment,
+) -> Result<()> {
     manufacture_fill::refresh_manufacture_efficiency_snapshots(
         blueprint,
-        &mut result.assignment,
+        assignment,
         instances,
         table,
         options,
@@ -450,13 +492,55 @@ fn complete_standalone_assignment(
     )?;
     trade_fill::refresh_trade_efficiency_snapshots(
         blueprint,
-        &mut result.assignment,
+        assignment,
         instances,
         table,
         options,
         Some(operbox.durin_dorm_planning_count(instances)),
     )?;
-    annotate_assignment(blueprint, &mut result.assignment);
+    if options.auto_rotation {
+        let resolved = crate::layout::resolve_base(
+            blueprint,
+            assignment,
+            Some(instances),
+            Some(table),
+            options.mood,
+            None,
+        )?;
+        for room in resolved.power_rooms {
+            let members = vec![(
+                room.operator.name.clone(),
+                room.operator.elite,
+                room.operator.buff_ids.clone(),
+                room.operator.tags.clone(),
+            )];
+            let hours = crate::mood::room_work_window(
+                &room.layout,
+                crate::layout::FacilityKind::PowerPlant,
+                None,
+                &members,
+                options.shift_hours,
+            )?;
+            let solved = crate::power::solve_power(
+                &crate::power::PowerRoomInput {
+                    operator: room.operator,
+                    mood: options.mood,
+                    shift_hours: hours,
+                    layout: room.layout,
+                },
+                table,
+            )?;
+            let operators = assignment.operators_in(&room.id).to_vec();
+            assignment.set_room_with_efficiency(
+                room.id,
+                operators,
+                Some(crate::layout::RoomEfficiencySnapshot {
+                    power_final_efficiency: solved.final_efficiency,
+                    ..Default::default()
+                }),
+            );
+        }
+    }
     Ok(())
 }
 

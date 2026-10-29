@@ -279,12 +279,40 @@ fn assign_control_inner(
                 .collect::<Vec<_>>());
     }
 
-    let combos =
-        search_control_combos_with_eligibility(&filtered_pool, table, &control_opts, eligibility)?;
+    let mode_eligibility = |names: &[String]| {
+        eligibility.is_none_or(|accept| accept(names))
+            && crate::layout::admission::candidate_admitted(
+                layout,
+                "control",
+                names
+                    .iter()
+                    .filter_map(|name| {
+                        filtered_pool.entry(name).map(|entry| {
+                            (
+                                entry.name.clone(),
+                                entry.elite,
+                                entry.buff_ids.clone(),
+                                entry.tags.clone(),
+                            )
+                        })
+                    })
+                    .collect(),
+                table,
+            )
+    };
+    let combos = search_control_combos_with_eligibility(
+        &filtered_pool,
+        table,
+        &control_opts,
+        Some(&mode_eligibility),
+    )?;
     let Some(hit) = pick_control_extending_pins(combos, &must_include, used, &|h| &h.names) else {
         observe!("control_fill no_hit_after_policy");
         if required_all.is_some() {
             return Ok(false);
+        }
+        if options.auto_rotation {
+            return Ok(true);
         }
         return Err(Error::msg(
             format!(

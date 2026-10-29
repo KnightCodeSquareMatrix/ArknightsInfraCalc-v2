@@ -89,6 +89,8 @@ pub struct PowerSearchReport {
 #[derive(Debug, Clone)]
 pub struct PowerSearchOptions {
     pub station_count: u8,
+    /// 调用方本轮实际要填充的房间，顺序与最终 assignment 一致。
+    pub station_rooms: Vec<String>,
     pub mood: f64,
     pub shift_hours: f64,
     pub layout: LayoutContext,
@@ -98,6 +100,7 @@ impl Default for PowerSearchOptions {
     fn default() -> Self {
         Self {
             station_count: 3,
+            station_rooms: Vec::new(),
             mood: 24.0,
             shift_hours: 24.0,
             layout: LayoutContext::search_baseline(),
@@ -118,18 +121,42 @@ pub fn search_power_assignment(
     let mut evaluated = 0u64;
     perf.mark_live_started();
 
+    let mut selected_layout = options.layout.clone();
+    let rooms = options.station_rooms.clone();
     for station in 0..options.station_count as usize {
+        selected_layout.candidate_room = rooms.get(station).cloned();
         let mut best: Option<PowerSearchHit> = None;
         for entry in &pool.entries {
             if used.contains(&entry.name) {
                 continue;
             }
+            let members = vec![(
+                entry.name.clone(),
+                entry.elite,
+                entry.buff_ids.clone(),
+                entry.tags.clone(),
+            )];
+            if !crate::layout::admission::candidate_admitted(
+                &selected_layout,
+                "power",
+                members.clone(),
+                table,
+            ) {
+                continue;
+            }
+            let shift_hours = crate::mood::room_work_window(
+                &options.layout,
+                crate::layout::FacilityKind::PowerPlant,
+                None,
+                &members,
+                options.shift_hours,
+            )?;
             let mut layout = options.layout.clone();
             layout.drone_cap = layout.drone_cap.max(135);
             let input = PowerRoomInput {
                 operator: entry.to_power_operator(),
                 mood: options.mood,
-                shift_hours: options.shift_hours,
+                shift_hours,
                 layout,
             };
             let result = solve_power(&input, table)?;
@@ -153,6 +180,34 @@ pub fn search_power_assignment(
             }
         }
         let Some(hit) = best else { break };
+        if selected_layout.auto_rotation {
+            let entry = pool.entry(&hit.name).expect("selected power pool entry");
+            let members = vec![(
+                entry.name.clone(),
+                entry.progress.elite,
+                entry.buff_ids.clone(),
+                entry.tags.clone(),
+            )];
+            if let Some(room) = rooms.get(station).and_then(|id| {
+                selected_layout
+                    .station_presence
+                    .iter_mut()
+                    .find(|room| room.room == *id)
+            }) {
+                room.members = members;
+            } else {
+                selected_layout
+                    .station_presence
+                    .push(crate::layout::admission::StationPresence {
+                        room: format!("selected_power_{station}"),
+                        kind: crate::layout::FacilityKind::PowerPlant,
+                        level: 3,
+                        facility: "power".into(),
+                        members,
+                        support_dependencies: Vec::new(),
+                    });
+            }
+        }
         used.insert(hit.name.clone());
         assignments.push(PowerStationAssignment {
             station_index: station,

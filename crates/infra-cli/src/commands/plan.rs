@@ -32,6 +32,12 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         return Err(Error::msg("plan does not support --help or -h"));
     }
 
+    if args
+        .windows(2)
+        .any(|value| value[0] == "--rotation" && value[1] == "auto")
+    {
+        return auto_rotation_cmd(args);
+    }
     let rotation_request = super::timed_rotation_request_from_args(args)?;
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = match layout_path_from_args(args) {
@@ -319,6 +325,138 @@ fn ensure_parent_dir(path: &Path) -> Result<(), Error> {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent)?;
         }
+    }
+    Ok(())
+}
+
+fn auto_rotation_cmd(args: &[String]) -> Result<(), Error> {
+    for option in [
+        "--maa-out",
+        "--profile-out",
+        "--baseline",
+        "--prefix-shadow-out",
+        "--fiammetta-candidates-out",
+    ] {
+        if args.iter().any(|arg| arg == option) {
+            return Err(Error::msg(format!("自动轮换建议不支持 {option}")));
+        }
+    }
+    let operbox_path = operbox_path_from_args(args)?;
+    let layout_path = layout_path_from_args(args).unwrap_or(default_layout_243_path()?);
+    let blueprint = BaseBlueprint::load(&layout_path)?;
+    let operbox = OperBox::load(&operbox_path)?;
+    let instances = OperatorInstances::load(&default_instances_path()?)?;
+    let table = SkillTable::load(&default_skill_table_path()?)?;
+    let options = AssignBaseOptions {
+        top_k: args
+            .windows(2)
+            .find(|value| value[0] == "--top")
+            .and_then(|value| value[1].parse().ok())
+            .unwrap_or(20),
+        system_preferences: system_preferences_from_args(args)?,
+        ..AssignBaseOptions::default()
+    };
+    let report = infra_core::schedule::schedule_auto_rotation(
+        &blueprint, &operbox, &instances, &table, &options,
+    )?;
+    if args.iter().any(|arg| arg == "--assert-invariants") {
+        infra_core::schedule::assert_auto_rotation_invariants(
+            &blueprint, &operbox, &instances, &table, &report,
+        )?;
+    }
+    if let Some(path) = rotation_out_from_args(args)
+        .or_else(|| output_dir_from_args(args).map(|dir| dir.join("auto_rotation.json")))
+    {
+        ensure_parent_dir(&path)?;
+        fs::write(
+            &path,
+            format!("{}\n", serde_json::to_string_pretty(&report)?),
+        )?;
+        eprintln!("自动轮换建议 JSON → {}", path.display());
+    }
+    if args.iter().any(|arg| arg == "--json") {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+    println!(
+        "自动轮换建议 · 主力/替补 · {}",
+        if report.complete {
+            "完整"
+        } else {
+            "不完整"
+        }
+    );
+    for room in &report.rooms {
+        let facility = match room.facility {
+            infra_core::layout::FacilityKind::ControlCenter => "控制中枢",
+            infra_core::layout::FacilityKind::TradePost => "贸易站",
+            infra_core::layout::FacilityKind::Factory => "制造站",
+            infra_core::layout::FacilityKind::PowerPlant => "发电站",
+            infra_core::layout::FacilityKind::Office => "人力办公室",
+            infra_core::layout::FacilityKind::MeetingRoom => "会客室",
+            _ => "工作站",
+        };
+        println!("{} {facility}", room.room_id.0);
+        for (label, state) in [("主力", &room.main), ("替补", &room.backup)] {
+            let names = state
+                .operators
+                .iter()
+                .map(|operator| operator.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" / ");
+            let mut efficiency = state
+                .efficiency
+                .as_ref()
+                .map(|snapshot| {
+                    if !snapshot.trade_total_efficiency.is_zero() {
+                        format!("效率 {}", snapshot.trade_total_efficiency)
+                    } else if !snapshot.manufacture_total_efficiency.is_zero() {
+                        format!("效率 {}", snapshot.manufacture_total_efficiency)
+                    } else if !snapshot.power_final_efficiency.is_zero() {
+                        format!("充能 {}", snapshot.power_final_efficiency)
+                    } else {
+                        String::new()
+                    }
+                })
+                .unwrap_or_default();
+            if let Some(speed) = state.support_speed_bonus_pct {
+                efficiency = format!("速度 +{speed:.1}%");
+            }
+            if let Some(effects) = &state.control_effects {
+                efficiency = format!(
+                    "贸易 +{:.1}%，制造赤金/经验/源石 +{:.1}/{:.1}/{:.1}%，办公 +{:.1}%，会客 +{:.1}%",
+                    effects.trade_bonus_pct,
+                    effects.manufacture_gold_bonus_pct,
+                    effects.manufacture_battle_record_bonus_pct,
+                    effects.manufacture_originium_bonus_pct,
+                    effects.office_speed_bonus_pct,
+                    effects.meeting_speed_bonus_pct,
+                );
+            }
+            println!(
+                "  {label}: {names}  {efficiency}  评估 {:.2} 小时{}",
+                state.evaluation_hours,
+                if state.missing_seats > 0 {
+                    format!("，缺 {} 人", state.missing_seats)
+                } else {
+                    String::new()
+                }
+            );
+        }
+    }
+    for (room, operators) in &report.constant_dorm_support {
+        println!(
+            "宿舍 {} 常驻挂件（主备共用）：{}",
+            room.0,
+            operators
+                .iter()
+                .map(|operator| operator.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" / ")
+        );
+    }
+    for warning in &report.warnings {
+        println!("提示：{warning}");
     }
     Ok(())
 }

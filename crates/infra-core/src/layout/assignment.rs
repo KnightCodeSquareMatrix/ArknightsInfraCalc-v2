@@ -83,7 +83,7 @@ fn is_zero_f64(v: &f64) -> bool {
     *v == 0.0
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RoomEfficiencySnapshot {
     /// 统一口径的基础效率：100% + 非 0 心情入驻人数 × 1%。
     #[serde(default, skip_serializing_if = "is_zero_efficiency")]
@@ -194,6 +194,10 @@ pub struct RoomAssignment {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BaseAssignment {
+    #[serde(skip)]
+    pub(crate) auto_rotation: bool,
+    #[serde(skip)]
+    pub(crate) auto_main_presence: Vec<super::admission::StationPresence>,
     #[serde(default)]
     rooms: Vec<RoomAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -373,6 +373,56 @@ fn active_entries<'a>(
     active
 }
 
+/// 成员依赖由技能注册表的同一解锁入口提取，供 Plan/搜索准入消费。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) enum SupportMemberDependency {
+    ControlOperator { consumer: String, partner: String },
+    EliteFacilities { consumer: String },
+    Resource { consumer: String, key: String },
+}
+
+pub(crate) fn member_dependencies(
+    facility: SupportFacility,
+    operators: Vec<SupportOperator>,
+) -> Result<Vec<SupportMemberDependency>> {
+    let registry = SupportRegistry::load_default_shared()?;
+    let input = SupportRoomInput {
+        facility,
+        operators,
+        capacity: 0,
+        extra_recruit_slots: 0,
+        elapsed_hours: 0.0,
+        external_speed_bonus_pct: 0.0,
+        layout: LayoutContext::default(),
+    };
+    let mut dependencies = Vec::new();
+    for entry in active_entries(&input, &registry) {
+        for effect in &entry.effects {
+            match effect {
+                SupportEffect::SpeedIfOperatorInControl { operator, .. } => {
+                    dependencies.push(SupportMemberDependency::ControlOperator {
+                        consumer: entry.operator.clone(),
+                        partner: operator.clone(),
+                    })
+                }
+                SupportEffect::SpeedPerEliteFacility { .. } => {
+                    dependencies.push(SupportMemberDependency::EliteFacilities {
+                        consumer: entry.operator.clone(),
+                    })
+                }
+                SupportEffect::SpeedPerState { state, .. } => {
+                    dependencies.push(SupportMemberDependency::Resource {
+                        consumer: entry.operator.clone(),
+                        key: state.clone(),
+                    })
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(dependencies)
+}
+
 fn unlock_met(operator: &SupportOperator, entry: &SupportSkillEntry) -> bool {
     operator.elite > entry.min_elite
         || (operator.elite == entry.min_elite

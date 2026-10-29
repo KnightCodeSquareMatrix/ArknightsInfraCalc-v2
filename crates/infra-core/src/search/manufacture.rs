@@ -156,7 +156,30 @@ impl ManuSearchOptions {
             .iter()
             .map(|idx| pool.entries[*idx].as_manu_operator_ref())
             .collect();
-        if !manufacture_combo_refs_allowed_for_shift(&operators, table, self.shift_hours) {
+        let members = manufacture_members(&operators);
+        if !crate::layout::admission::candidate_admitted(
+            &self.layout,
+            "manufacture",
+            members.clone(),
+            table,
+        ) {
+            return None;
+        }
+        let shift_hours = if self.layout.auto_rotation {
+            Some(
+                crate::mood::room_work_window(
+                    &self.layout,
+                    crate::layout::FacilityKind::Factory,
+                    Some(recipe),
+                    &members,
+                    self.shift_hours.unwrap_or(24.0),
+                )
+                .ok()?,
+            )
+        } else {
+            self.shift_hours
+        };
+        if !manufacture_combo_refs_allowed_for_shift(&operators, table, shift_hours) {
             return None;
         }
         let layout = manufacture_combo_layout(&self.layout, &operators);
@@ -167,7 +190,7 @@ impl ManuSearchOptions {
             mood: self.mood,
             layout: &layout,
         };
-        evaluate_manufacture_room_view_with_shift(&base, table, recipe, self.shift_hours)
+        evaluate_manufacture_room_view_with_shift(&base, table, recipe, shift_hours)
     }
 
     /// 池内是否有清零同伴产出的干员；Bake 查表在存在这类干员时不可用。
@@ -341,18 +364,19 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     let bake_started = Instant::now();
-    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
-        crate::bake::try_baked_manufacture_search(
-            &sub,
-            table,
-            options,
-            recipe,
-            combinations,
-            start,
-        )?
-    } else {
-        None
-    };
+    let baked_report =
+        if !options.layout.auto_rotation && options.bake_mode != crate::bake::BakeMode::Disabled {
+            crate::bake::try_baked_manufacture_search(
+                &sub,
+                table,
+                options,
+                recipe,
+                combinations,
+                start,
+            )?
+        } else {
+            None
+        };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
         if let Some(key) = memo_key {
@@ -401,7 +425,30 @@ fn search_manufacture_single_recipe(
                 .iter()
                 .map(|i| sub.entries[*i].as_manu_operator_ref())
                 .collect();
-            if !manufacture_combo_refs_allowed_for_shift(&ops, table, options.shift_hours) {
+            let members = manufacture_members(&ops);
+            if !crate::layout::admission::candidate_admitted(
+                &options.layout,
+                "manufacture",
+                members.clone(),
+                table,
+            ) {
+                return None;
+            }
+            let shift_hours = if options.layout.auto_rotation {
+                Some(
+                    crate::mood::room_work_window(
+                        &options.layout,
+                        crate::layout::FacilityKind::Factory,
+                        Some(recipe),
+                        &members,
+                        options.shift_hours.unwrap_or(24.0),
+                    )
+                    .ok()?,
+                )
+            } else {
+                options.shift_hours
+            };
+            if !manufacture_combo_refs_allowed_for_shift(&ops, table, shift_hours) {
                 return None;
             }
             let layout = manufacture_combo_layout(&options.layout, &ops);
@@ -413,7 +460,7 @@ fn search_manufacture_single_recipe(
                 layout: &layout,
             };
             let (eff, storage) =
-                evaluate_manufacture_room_light(&base, table, recipe, options.shift_hours)?;
+                evaluate_manufacture_room_light(&base, table, recipe, shift_hours)?;
             Some(Light {
                 idx: ci,
                 eff,
@@ -468,9 +515,23 @@ fn search_manufacture_single_recipe(
             mood: options.mood,
             layout: &layout,
         };
-        let hit =
-            evaluate_manufacture_room_view_with_shift(&base, table, recipe, options.shift_hours)
-                .expect("lazy manufacture hit must re-evaluate");
+        let members = manufacture_members(&base.operators);
+        let shift_hours = if options.layout.auto_rotation {
+            Some(
+                crate::mood::room_work_window(
+                    &options.layout,
+                    crate::layout::FacilityKind::Factory,
+                    Some(recipe),
+                    &members,
+                    options.shift_hours.unwrap_or(24.0),
+                )
+                .expect("accepted candidate window"),
+            )
+        } else {
+            options.shift_hours
+        };
+        let hit = evaluate_manufacture_room_view_with_shift(&base, table, recipe, shift_hours)
+            .expect("lazy manufacture hit must re-evaluate");
         assert_eq!(
             hit.final_efficiency, light.eff,
             "lazy re-evaluation drifted"
@@ -827,4 +888,20 @@ fn empty_hit() -> ManuSearchHit {
         storage: ManuStorageBreakdown::default(),
         breakdown: ManuEfficiencyBreakdown::default(),
     }
+}
+
+fn manufacture_members(
+    operators: &[ManuOperatorRef<'_>],
+) -> Vec<(String, u8, Vec<String>, Vec<String>)> {
+    operators
+        .iter()
+        .map(|op| {
+            (
+                op.name.to_owned(),
+                op.elite,
+                op.buff_ids.to_vec(),
+                op.tags.to_vec(),
+            )
+        })
+        .collect()
 }

@@ -57,7 +57,7 @@ Worker stdout 必须保持 JSONL，不能混入人类日志。请求解析、未
 
 ## 责任边界
 
-`plan`、`layout team-rotation`、`layout test` 和 `layout analyze` 使用 `--enable-support-combinations` 显式开启主动挂件组合，未指定默认关闭。Worker `plan` 使用顶层布尔参数 `support_combinations_enable`；`plan.compute` v6–v7 使用 `options.support_combinations_enable`，所有入口缺省均为 `false`。本次 v7 WIP 允许 `debug rerun` 携带 topology 时长对象，但未完成 fresh release 验收。旧包未记录该字段时按当前默认关闭重跑，结果差异不等同于旧二进制回归。记录了已删除龙巫 profile 的旧 bundle 会明确失败，不能静默变成普通主备。
+普通定时 `plan`、`layout team-rotation`、`layout test` 和 `layout analyze` 使用 `--enable-support-combinations` 显式开启主动挂件组合，未指定默认关闭。Worker `plan` 使用顶层布尔参数 `support_combinations_enable`；`plan.compute` v6–v7 使用 `options.support_combinations_enable`，所有入口缺省均为 `false`。本次 v7 WIP 允许 `debug rerun` 携带 topology 时长对象，但未完成 fresh release 验收。旧包未记录该字段时按当前默认关闭重跑，结果差异不等同于旧二进制回归。记录了已删除龙巫 profile 的旧 bundle 会明确失败，不能静默变成普通主备。
 
 - `commands/*.rs` 负责参数、文件和协议适配，调用 `infra-core`；
 - `commands/plan_compute.rs` 是 `plan` 与 `plan.compute` 共用的单次编排入口；
@@ -66,3 +66,7 @@ Worker stdout 必须保持 JSONL，不能混入人类日志。请求解析、未
 - `data/` 是运行时载体，不能反向裁决领域语义。
 
 排查结果错误时，先判断是参数/加载、共享编排、core 结算还是输出投影，避免在 CLI 层修机制。
+
+## 自动建议入口
+
+`plan --rotation auto` 在定时请求解析前分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出建议。支持 `--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站建议，`--json`时只输出建议JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚固定关闭。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整建议，准入/结构失败是错误。Worker schema、plan_compute、MAA及网站未扩展。

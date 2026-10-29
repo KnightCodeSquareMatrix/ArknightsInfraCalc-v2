@@ -193,7 +193,7 @@ fn assign_team_trade_meta_rooms(
         for assigned_room in assignment.iter_rooms() {
             current_assignment.set_room_assignment(assigned_room.clone());
         }
-        let current_layout = crate::layout::resolve_base(
+        let mut current_layout = crate::layout::resolve_base(
             blueprint,
             &current_assignment,
             Some(instances),
@@ -202,6 +202,7 @@ fn assign_team_trade_meta_rooms(
             durin_dorm_planning,
         )?
         .layout;
+        current_layout.candidate_room = options.auto_rotation.then(|| room.id.0.clone());
         let order = trade_order_from_room(room)?;
         let hit = pick_trade_meta_then_plain(
             trade_pool,
@@ -284,7 +285,7 @@ fn assign_team_manu_rooms(
         for assigned_room in assignment.iter_rooms() {
             current_assignment.set_room_assignment(assigned_room.clone());
         }
-        let current_layout = crate::layout::resolve_base(
+        let mut current_layout = crate::layout::resolve_base(
             blueprint,
             &current_assignment,
             Some(instances),
@@ -293,6 +294,7 @@ fn assign_team_manu_rooms(
             durin_dorm_planning,
         )?
         .layout;
+        current_layout.candidate_room = options.auto_rotation.then(|| room_id.0.clone());
         let opts = manu_options(&current_layout, options, recipe, room.level);
         if let Some(required) = required_manu_by_room.get(room_id) {
             let anchors = required
