@@ -157,13 +157,8 @@ impl ManuSearchOptions {
             .map(|idx| pool.entries[*idx].as_manu_operator_ref())
             .collect();
         let members = manufacture_members(&operators);
-        if !crate::layout::admission::candidate_admitted(
-            &self.layout,
-            "manufacture",
-            members.clone(),
-            table,
-            true,
-        ) {
+        let admission = crate::layout::admission::CandidateAdmission::new(&self.layout, table);
+        if !admission.admitted("manufacture", members, true) {
             return None;
         }
         let shift_hours = if self.layout.auto_rotation {
@@ -418,6 +413,7 @@ fn search_manufacture_single_recipe(
         storage: i32,
     }
     let k = operator_capacity;
+    let admission = crate::layout::admission::CandidateAdmission::new(&options.layout, table);
     let mut hits: Vec<Light> = evaluate_flat_combinations(
         &flat,
         k,
@@ -428,13 +424,7 @@ fn search_manufacture_single_recipe(
                 .map(|i| sub.entries[*i].as_manu_operator_ref())
                 .collect();
             let members = manufacture_members(&ops);
-            if !crate::layout::admission::candidate_admitted(
-                &options.layout,
-                "manufacture",
-                members.clone(),
-                table,
-                true,
-            ) {
+            if !admission.admitted("manufacture", members, true) {
                 return None;
             }
             let shift_hours = if options.layout.auto_rotation {

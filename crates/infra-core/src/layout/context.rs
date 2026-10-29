@@ -9,6 +9,10 @@ pub type SharedLayout = Arc<LayoutContext>;
 /// 简化假设：全基建宿舍进驻人数恒为满员（243c 基准 20 人）。
 pub const DEFAULT_DORM_OCCUPANT_COUNT: u8 = 20;
 
+fn arc_vec_is_empty<T>(value: &Arc<Vec<T>>) -> bool {
+    value.is_empty()
+}
+
 /// 全基建场景快照（贸易/制造/发电/中控共享的布局假设与全局资源池）。
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct LayoutContext {
@@ -20,10 +24,10 @@ pub struct LayoutContext {
     pub(crate) auto_initial_global: Option<GlobalResourcePool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) candidate_room: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) station_presence: Vec<super::admission::StationPresence>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) auto_other_presence: Vec<super::admission::StationPresence>,
+    #[serde(skip_serializing_if = "arc_vec_is_empty")]
+    pub(crate) station_presence: Arc<Vec<super::admission::StationPresence>>,
+    #[serde(skip_serializing_if = "arc_vec_is_empty")]
+    pub(crate) auto_other_presence: Arc<Vec<super::admission::StationPresence>>,
     pub meeting_max_level: u8,
     pub dorm_level_sum: u16,
     pub manu_recipe_kinds: u8,
@@ -107,8 +111,8 @@ impl Default for LayoutContext {
             work_hours: None,
             auto_initial_global: None,
             candidate_room: None,
-            station_presence: Vec::new(),
-            auto_other_presence: Vec::new(),
+            station_presence: Arc::new(Vec::new()),
+            auto_other_presence: Arc::new(Vec::new()),
             meeting_max_level: 0,
             dorm_level_sum: 0,
             manu_recipe_kinds: 0,

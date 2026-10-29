@@ -185,14 +185,14 @@ fn resolve_base_core(
     layout.auto_rotation = assignment.auto_rotation;
     layout.work_hours = assignment.work_hours;
     layout.auto_initial_global = assignment.auto_rotation.then(|| layout.global.clone());
-    layout.auto_other_presence = assignment.auto_other_presence.clone();
-    layout.station_presence = if assignment.auto_rotation {
+    layout.auto_other_presence = std::sync::Arc::new(assignment.auto_other_presence.clone());
+    layout.station_presence = std::sync::Arc::new(if assignment.auto_rotation {
         instances
             .map(|instances| super::admission::presence(blueprint, assignment, instances))
             .unwrap_or_default()
     } else {
         Vec::new()
-    };
+    });
     layout.elite_facility_count =
         effective_elite_facility_count(blueprint, assignment, &workforce, instances);
     workforce.apply_to_layout(&mut layout);

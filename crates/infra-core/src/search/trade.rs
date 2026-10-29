@@ -395,6 +395,7 @@ fn search_trade_single_order(
     let must_name = filter.must_include_name.clone();
     let hit_filter = filter.hit_filter;
     let forbidden_pairs = &filter.forbidden_pairs;
+    let admission = crate::layout::admission::CandidateAdmission::new(&options.layout, table);
 
     let flat = flat_combinations(n, operator_capacity, &must_indices);
     let prepare_elapsed = setup_elapsed + prepare_started.elapsed();
@@ -424,6 +425,7 @@ fn search_trade_single_order(
                 combo,
                 must_name.as_deref(),
                 override_op.as_ref(),
+                &admission,
             )
         },
         |hit| {
@@ -559,6 +561,28 @@ impl TradeSearchOptions {
         must_name: Option<&str>,
         override_op: Option<&TradeOperator>,
     ) -> Option<(TradeSearchHit, TradeResult)> {
+        let admission = crate::layout::admission::CandidateAdmission::new(&self.layout, table);
+        self.solve_trade_combo_with_admission(
+            pool,
+            table,
+            order_kind,
+            combo,
+            must_name,
+            override_op,
+            &admission,
+        )
+    }
+
+    fn solve_trade_combo_with_admission(
+        &self,
+        pool: &TradePool,
+        table: &SkillTable,
+        order_kind: TradeOrderKind,
+        combo: &[usize],
+        must_name: Option<&str>,
+        override_op: Option<&TradeOperator>,
+        admission: &crate::layout::admission::CandidateAdmission<'_>,
+    ) -> Option<(TradeSearchHit, TradeResult)> {
         let ops = build_trade_combo_operator_refs(pool, combo, must_name, override_op);
         if trade_station_exclusive_violation_refs(&ops, table) {
             return None;
@@ -574,13 +598,7 @@ impl TradeSearchOptions {
                 )
             })
             .collect();
-        if !crate::layout::admission::candidate_admitted(
-            &self.layout,
-            "trade",
-            members.clone(),
-            table,
-            true,
-        ) {
+        if !admission.admitted("trade", members, true) {
             return None;
         }
         let shift_hours = self.layout.evaluation_hours(self.shift_hours).ok()?;
@@ -662,9 +680,18 @@ fn eval_combo_hit(
     combo: &[usize],
     must_name: Option<&str>,
     override_op: Option<&TradeOperator>,
+    admission: &crate::layout::admission::CandidateAdmission<'_>,
 ) -> Option<TradeSearchHit> {
     options
-        .solve_trade_combo(pool, table, order_kind, combo, must_name, override_op)
+        .solve_trade_combo_with_admission(
+            pool,
+            table,
+            order_kind,
+            combo,
+            must_name,
+            override_op,
+            admission,
+        )
         .map(|(hit, _result)| hit)
 }
 

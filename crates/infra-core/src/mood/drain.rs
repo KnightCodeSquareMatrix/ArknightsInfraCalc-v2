@@ -115,9 +115,10 @@ pub fn workable_hours(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
     }
 }
 
-/// 候选房与完整ETA共享净消耗公式；返回首人红脸时间，无工作消耗时无限。
-pub(crate) fn room_workable_hours(
-    layout: &crate::layout::LayoutContext,
+/// 轻量预算入口只接收实际读取的中枢名单与外站深海人数。
+pub(crate) fn room_workable_hours_with_control(
+    control_operators: &[(String, u8)],
+    abyssal_outside_dorm: usize,
     facility: FacilityKind,
     recipe: Option<crate::types::RecipeKind>,
     members: &[(String, u8, Vec<String>, Vec<String>)],
@@ -136,7 +137,7 @@ pub(crate) fn room_workable_hours(
     let control_ops = if facility == FacilityKind::ControlCenter {
         &room_ops
     } else {
-        &layout.control_operators
+        control_operators
     };
     let mut hours: f64 = f64::INFINITY;
     for (name, elite, _, tags) in members {
@@ -161,13 +162,7 @@ pub(crate) fn room_workable_hours(
                 .iter()
                 .filter(|member| member.3.iter().any(|tag| tag == "cc.g.abyssal"))
                 .count()
-                + layout
-                    .station_presence
-                    .iter()
-                    .filter(|station| station.facility != "dorm" && station.facility != "control")
-                    .flat_map(|station| &station.members)
-                    .filter(|member| member.3.iter().any(|tag| tag == "cc.g.abyssal"))
-                    .count();
+                + abyssal_outside_dorm;
             drain = control_tag_drain(
                 drain,
                 recovery,

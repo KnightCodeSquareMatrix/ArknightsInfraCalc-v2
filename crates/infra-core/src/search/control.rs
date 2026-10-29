@@ -831,9 +831,9 @@ fn search_control_in_order(
             table,
         )
     };
+    let admission = crate::layout::admission::CandidateAdmission::new(&options.layout, table);
     let legal = |ops: &[ControlOperator]| {
-        if !crate::layout::admission::candidate_admitted(
-            &options.layout,
+        if !admission.admitted(
             "control",
             ops.iter()
                 .map(|op| {
@@ -845,7 +845,6 @@ fn search_control_in_order(
                     )
                 })
                 .collect(),
-            table,
             false,
         ) {
             return false;

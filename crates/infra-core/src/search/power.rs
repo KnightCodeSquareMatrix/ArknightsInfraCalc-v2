@@ -125,6 +125,7 @@ pub fn search_power_assignment(
     let rooms = options.station_rooms.clone();
     for station in 0..options.station_count as usize {
         selected_layout.candidate_room = rooms.get(station).cloned();
+        let admission = crate::layout::admission::CandidateAdmission::new(&selected_layout, table);
         let mut best: Option<PowerSearchHit> = None;
         for entry in &pool.entries {
             if used.contains(&entry.name) {
@@ -136,13 +137,7 @@ pub fn search_power_assignment(
                 entry.buff_ids.clone(),
                 entry.tags.clone(),
             )];
-            if !crate::layout::admission::candidate_admitted(
-                &selected_layout,
-                "power",
-                members.clone(),
-                table,
-                true,
-            ) {
+            if !admission.admitted("power", members, true) {
                 continue;
             }
             let shift_hours = options.layout.evaluation_hours(options.shift_hours)?;
@@ -183,26 +178,23 @@ pub fn search_power_assignment(
                 entry.buff_ids.clone(),
                 entry.tags.clone(),
             )];
-            if let Some(room) = rooms.get(station).and_then(|id| {
-                selected_layout
-                    .station_presence
-                    .iter_mut()
-                    .find(|room| room.room == *id)
-            }) {
+            let station_presence = std::sync::Arc::make_mut(&mut selected_layout.station_presence);
+            if let Some(room) = rooms
+                .get(station)
+                .and_then(|id| station_presence.iter_mut().find(|room| room.room == *id))
+            {
                 room.members = members;
             } else {
-                selected_layout
-                    .station_presence
-                    .push(crate::layout::admission::StationPresence {
-                        recipe: None,
-                        work_hours: selected_layout.work_hours,
-                        room: format!("selected_power_{station}"),
-                        kind: crate::layout::FacilityKind::PowerPlant,
-                        level: 3,
-                        facility: "power".into(),
-                        members,
-                        support_dependencies: Vec::new(),
-                    });
+                station_presence.push(crate::layout::admission::StationPresence {
+                    recipe: None,
+                    work_hours: selected_layout.work_hours,
+                    room: format!("selected_power_{station}"),
+                    kind: crate::layout::FacilityKind::PowerPlant,
+                    level: 3,
+                    facility: "power".into(),
+                    members,
+                    support_dependencies: Vec::new(),
+                });
             }
         }
         used.insert(hit.name.clone());

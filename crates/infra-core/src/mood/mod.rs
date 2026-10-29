@@ -9,7 +9,7 @@ mod drain;
 mod eta;
 mod recovery;
 
-pub(crate) use drain::room_workable_hours;
+pub(crate) use drain::room_workable_hours_with_control;
 pub use drain::{operator_net_drain, workable_hours, DrainInputs};
 pub use eta::{
     fits_shift_budget, fits_work_budget, shift_eta, shift_eta_in_context, shift_eta_with_instances,
