@@ -114,6 +114,12 @@ pub(crate) fn select_control(
     )
 }
 
+fn fixed_main_backup_error(stage: &str, reason: impl std::fmt::Display) -> Error {
+    Error::msg(format!(
+        "自动轮换：当前固定主力下未找到兼容替补方案（{stage}）；第一次主力保持不变：{reason}"
+    ))
+}
+
 pub fn schedule_auto_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -136,27 +142,9 @@ pub fn schedule_auto_rotation(
     seed.auto_rotation = true;
     seed.work_hours = Some(options.shift_hours);
     select_control(blueprint, &operbox, instances, table, &options, &mut seed)?;
-    let mut backup_options = options.clone();
-    backup_options.shift_hours = timing.shift_hours[1];
-    let mut backup_seed = BaseAssignment::default();
-    backup_seed.auto_rotation = true;
-    backup_seed.work_hours = Some(backup_options.shift_hours);
-    backup_seed.auto_other_presence =
-        crate::layout::admission::presence(blueprint, &seed, instances);
-    select_control(
-        blueprint,
-        &operbox.excluding(&seed.work_position_operator_names(blueprint)),
-        instances,
-        table,
-        &backup_options,
-        &mut backup_seed,
-    )?;
-    seed.auto_other_presence =
-        crate::layout::admission::presence(blueprint, &backup_seed, instances);
-    let main_available = operbox.excluding(&backup_seed.work_position_operator_names(blueprint));
     let main = super::team_rotation::solve_owned_peak_seed(
         blueprint,
-        &main_available,
+        &operbox,
         instances,
         table,
         &options,
@@ -168,13 +156,11 @@ pub fn schedule_auto_rotation(
         plan: main.plan,
     };
     crate::layout::complete_standalone_assignment(
-        blueprint,
-        &main_available,
-        instances,
-        table,
-        &options,
-        &mut main,
+        blueprint, &operbox, instances, table, &options, &mut main,
     )?;
+    // 第一次完整主力的工作名单在此冻结；替补不得预占成员或触发主力回选。
+    let mut backup_options = options.clone();
+    backup_options.shift_hours = timing.shift_hours[1];
     let backup = super::team_rotation::solve_policy_disjoint_backup(
         blueprint,
         &operbox,
@@ -183,7 +169,8 @@ pub fn schedule_auto_rotation(
         &backup_options,
         &main.assignment,
         timing.shift_hours[1],
-    )?;
+    )
+    .map_err(|error| fixed_main_backup_error("替补选人", error))?;
     let available = operbox.excluding(&main.assignment.work_position_operator_names(blueprint));
     let mut backup = AssignShiftResult {
         assignment: backup.assignment,
@@ -196,7 +183,8 @@ pub fn schedule_auto_rotation(
         table,
         &backup_options,
         &mut backup,
-    )?;
+    )
+    .map_err(|error| fixed_main_backup_error("替补补位", error))?;
     // 替补阶段新增的挂件成为两态常驻；其准入已同时检查固定主力。
     for room in blueprint
         .rooms
@@ -234,7 +222,8 @@ pub fn schedule_auto_rotation(
     )?;
     for assignment in [&main.assignment, &backup.assignment] {
         if !crate::layout::admission::assignment_admitted(blueprint, assignment, instances, table) {
-            return Err(Error::msg(
+            return Err(fixed_main_backup_error(
+                "最终协同检查",
                 "auto_cooperation: final assignment cooperation rejected",
             ));
         }
@@ -245,8 +234,9 @@ pub fn schedule_auto_rotation(
         table,
         &crate::layout::layout_from_blueprint(blueprint),
     ) {
-        return Err(Error::msg(
-            "自动轮换各房主备混合配置不能撑满输入时长或不满足协同准入",
+        return Err(fixed_main_backup_error(
+            "各房独立切换检查",
+            "主备混合配置不能撑满输入时长或不满足协同准入",
         ));
     }
     let model = crate::mood::default_mood_model()?;

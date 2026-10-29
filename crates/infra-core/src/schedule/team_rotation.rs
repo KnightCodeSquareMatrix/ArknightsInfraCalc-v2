@@ -9230,28 +9230,20 @@ pub(crate) fn solve_policy_disjoint_backup(
         {
             seed.set_room(room.id.clone(), main.operators_in(&room.id).to_vec());
         }
-        // 自动入口已先确定互斥的两个中枢；备班保留该名单，不重新选型。
-        for room in blueprint
-            .rooms
-            .iter()
-            .filter(|room| room.kind == FacilityKind::ControlCenter)
-        {
-            let selected = main
-                .auto_other_presence
-                .iter()
-                .find(|station| station.room == room.id.0)
-                .ok_or_else(|| Error::msg("auto backup control was not planned"))?;
-            let operators = selected
-                .members
-                .iter()
-                .map(|member| {
-                    available
-                        .progress_of(&member.0)
-                        .map(|progress| AssignedOperator::from_progress(&member.0, progress))
-                        .ok_or_else(|| Error::msg("auto backup control member is unavailable"))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            seed.set_room(room.id.clone(), operators);
+        // 主力已完成并冻结；备中枢只能用剩余工作成员，其候选准入同时检查主力H。
+        super::auto_rotation::select_control(
+            blueprint, &available, instances, table, options, &mut seed,
+        )?;
+        // 普通缺员策略允许中枢候选耗尽后留空；空中枢仍须满足固定主力的预算。
+        if !crate::layout::admission::stations_fit_work_duration(
+            &seed.auto_other_presence,
+            &crate::layout::admission::presence(blueprint, &seed, instances),
+            &crate::layout::layout_from_blueprint(blueprint),
+        ) {
+            return Err(Error::msg(format!(
+                "替补中枢选择后，固定主力无法在实际两中枢下撑满输入时长（主力{}小时、替补{shift_hours}小时）",
+                main.work_hours.unwrap_or(options.shift_hours),
+            )));
         }
         return solve_owned_peak_seed(
             blueprint,
