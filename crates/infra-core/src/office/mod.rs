@@ -32,6 +32,7 @@ pub(crate) fn rank_candidates(
     operbox: &crate::operbox::OperBox,
     layout: &LayoutContext,
     mood: f64,
+    shift_hours: f64,
     excluded: &std::collections::HashSet<String>,
 ) -> Vec<AssignedOperator> {
     let roster = operbox.roster();
@@ -53,10 +54,7 @@ pub(crate) fn rank_candidates(
                 SupportRegistry::load_default_shared()
                     .expect("support registry loads in office candidate build")
             });
-            let members = vec![(name.clone(), progress.elite, Vec::new(), Vec::new())];
-            let hours =
-                crate::mood::room_work_window(layout, FacilityKind::Office, None, &members, 24.0)
-                    .unwrap_or(24.0);
+            let hours = layout.evaluation_hours(shift_hours).ok()?;
             let score = evaluate_office(
                 &SupportRoomInput {
                     facility: SupportFacility::Office,
@@ -144,4 +142,41 @@ fn to_office_operator(
         elite: op.elite,
         buff_ids,
     })
+}
+
+/// 排序由调用方提供；试放始终包含已选成员，模式只负责其准入条件。
+pub(crate) fn fill_vacancies(
+    assignment: &mut BaseAssignment,
+    blueprint: &BaseBlueprint,
+    candidates: &[AssignedOperator],
+    mut admits: impl FnMut(
+        &BaseAssignment,
+        &BaseAssignment,
+        &crate::layout::RoomBlueprint,
+        &AssignedOperator,
+    ) -> bool,
+) {
+    let mut used = assignment.occupied_operator_names();
+    for room in blueprint
+        .rooms
+        .iter()
+        .filter(|room| room.kind == FacilityKind::Office)
+    {
+        for candidate in candidates {
+            if assignment.operators_in(&room.id).len() >= room.operator_capacity() {
+                break;
+            }
+            if used.contains(&candidate.name) {
+                continue;
+            }
+            let mut trial = assignment.clone();
+            let mut operators = trial.operators_in(&room.id).to_vec();
+            operators.push(candidate.clone());
+            trial.set_room(room.id.clone(), operators);
+            if admits(assignment, &trial, room, candidate) {
+                *assignment = trial;
+                used.insert(candidate.name.clone());
+            }
+        }
+    }
 }

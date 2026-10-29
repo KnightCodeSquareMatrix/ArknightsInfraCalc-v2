@@ -15,13 +15,15 @@ pub struct LayoutContext {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) auto_rotation: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) work_hours: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) auto_initial_global: Option<GlobalResourcePool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) candidate_room: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) station_presence: Vec<super::admission::StationPresence>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) auto_main_presence: Vec<super::admission::StationPresence>,
+    pub(crate) auto_other_presence: Vec<super::admission::StationPresence>,
     pub meeting_max_level: u8,
     pub dorm_level_sum: u16,
     pub manu_recipe_kinds: u8,
@@ -102,10 +104,11 @@ impl Default for LayoutContext {
     fn default() -> Self {
         Self {
             auto_rotation: false,
+            work_hours: None,
             auto_initial_global: None,
             candidate_room: None,
             station_presence: Vec::new(),
-            auto_main_presence: Vec::new(),
+            auto_other_presence: Vec::new(),
             meeting_max_level: 0,
             dorm_level_sum: 0,
             manu_recipe_kinds: 0,
@@ -257,6 +260,19 @@ impl LayoutContext {
             power_station_count: 3,
             power_workforce: vec!["Lancet-2".into()],
             ..Self::search_baseline_legacy()
+        }
+    }
+}
+
+impl LayoutContext {
+    /// 建议模式使用请求窗口；定时搜索使用本阶段的明确窗口。
+    pub(crate) fn evaluation_hours(&self, hours: f64) -> crate::error::Result<f64> {
+        if self.auto_rotation {
+            self.work_hours.ok_or_else(|| {
+                crate::error::Error::msg("rotation_work_hours: missing requested work duration")
+            })
+        } else {
+            Ok(hours)
         }
     }
 }

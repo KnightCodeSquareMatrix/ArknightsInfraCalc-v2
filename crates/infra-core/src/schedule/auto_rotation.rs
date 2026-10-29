@@ -63,6 +63,7 @@ impl AutoControlEffects {
 #[derive(Debug, Clone, Serialize)]
 pub struct AutoRotationReport {
     pub mode: &'static str,
+    pub timing: super::AutoRotationTiming,
     pub complete: bool,
     pub rooms: Vec<AutoRoomRecommendation>,
     pub constant_dorm_support: Vec<(RoomId, Vec<AssignedOperator>)>,
@@ -119,37 +120,69 @@ pub fn schedule_auto_rotation(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
+    timing: super::AutoRotationTiming,
 ) -> Result<AutoRotationReport> {
+    timing.validate()?;
     let mut options = options.clone();
     options.auto_rotation = true;
     options.fiammetta_enable = false;
     options.control_work_hours = None;
     options.registry_sustain_hours = None;
     options.skip_standalone_control = true;
-    options.shift_hours = 36.0;
+    options.shift_hours = timing.shift_hours[0];
     options.mood = crate::mood::default_mood_model()?.mood_cap;
     let operbox = operbox.excluding(&["菲亚梅塔".to_string()].into_iter().collect());
     let mut seed = BaseAssignment::default();
     seed.auto_rotation = true;
+    seed.work_hours = Some(options.shift_hours);
     select_control(blueprint, &operbox, instances, table, &options, &mut seed)?;
+    let mut backup_options = options.clone();
+    backup_options.shift_hours = timing.shift_hours[1];
+    let mut backup_seed = BaseAssignment::default();
+    backup_seed.auto_rotation = true;
+    backup_seed.work_hours = Some(backup_options.shift_hours);
+    backup_seed.auto_other_presence =
+        crate::layout::admission::presence(blueprint, &seed, instances);
+    select_control(
+        blueprint,
+        &operbox.excluding(&seed.work_position_operator_names(blueprint)),
+        instances,
+        table,
+        &backup_options,
+        &mut backup_seed,
+    )?;
+    seed.auto_other_presence =
+        crate::layout::admission::presence(blueprint, &backup_seed, instances);
+    let main_available = operbox.excluding(&backup_seed.work_position_operator_names(blueprint));
     let main = super::team_rotation::solve_owned_peak_seed(
-        blueprint, &operbox, instances, table, &options, 36.0, &seed,
+        blueprint,
+        &main_available,
+        instances,
+        table,
+        &options,
+        timing.shift_hours[0],
+        &seed,
     )?;
     let mut main = AssignShiftResult {
         assignment: main.assignment,
         plan: main.plan,
     };
     crate::layout::complete_standalone_assignment(
-        blueprint, &operbox, instances, table, &options, &mut main,
+        blueprint,
+        &main_available,
+        instances,
+        table,
+        &options,
+        &mut main,
     )?;
     let backup = super::team_rotation::solve_policy_disjoint_backup(
         blueprint,
         &operbox,
         instances,
         table,
-        &options,
+        &backup_options,
         &main.assignment,
-        36.0,
+        timing.shift_hours[1],
     )?;
     let available = operbox.excluding(&main.assignment.work_position_operator_names(blueprint));
     let mut backup = AssignShiftResult {
@@ -161,7 +194,7 @@ pub fn schedule_auto_rotation(
         &available,
         instances,
         table,
-        &options,
+        &backup_options,
         &mut backup,
     )?;
     // 替补阶段新增的挂件成为两态常驻；其准入已同时检查固定主力。
@@ -175,6 +208,10 @@ pub fn schedule_auto_rotation(
             backup.assignment.operators_in(&room.id).to_vec(),
         );
     }
+    main.assignment.auto_other_presence =
+        crate::layout::admission::presence(blueprint, &backup.assignment, instances);
+    backup.assignment.auto_other_presence =
+        crate::layout::admission::presence(blueprint, &main.assignment, instances);
     crate::layout::assign::refresh_standalone_efficiency(
         blueprint,
         &operbox,
@@ -195,13 +232,22 @@ pub fn schedule_auto_rotation(
         instances,
         table,
     )?;
+    for assignment in [&main.assignment, &backup.assignment] {
+        if !crate::layout::admission::assignment_admitted(blueprint, assignment, instances, table) {
+            return Err(Error::msg(
+                "auto_cooperation: final assignment cooperation rejected",
+            ));
+        }
+    }
     if !crate::layout::admission::all_station_states_admitted(
         &crate::layout::admission::presence(blueprint, &main.assignment, instances),
         &crate::layout::admission::presence(blueprint, &backup.assignment, instances),
         table,
         &crate::layout::layout_from_blueprint(blueprint),
     ) {
-        return Err(Error::msg("自动轮换各房主备混合配置不满足协同准入"));
+        return Err(Error::msg(
+            "自动轮换各房主备混合配置不能撑满输入时长或不满足协同准入",
+        ));
     }
     let model = crate::mood::default_mood_model()?;
     let main_eta =
@@ -263,12 +309,8 @@ pub fn schedule_auto_rotation(
                         .map(|result| result.total_speed_bonus_pct),
                     control_effects: (room.kind == FacilityKind::ControlCenter)
                         .then(|| AutoControlEffects::from_layout(&resolved.layout)),
-                    evaluation_hours: bottleneck
-                        .as_ref()
-                        .map_or(36.0, |(_, hours)| hours.min(36.0)),
-                    first_red_face: bottleneck
-                        .filter(|(_, hours)| *hours <= 36.0)
-                        .map(|(name, _)| name),
+                    evaluation_hours: assignment.work_hours.expect("auto request work duration"),
+                    first_red_face: bottleneck.map(|(name, _)| name),
                     missing_seats: room.operator_capacity().saturating_sub(members.len()),
                     complete: members.len() == room.operator_capacity(),
                 }
@@ -302,6 +344,7 @@ pub fn schedule_auto_rotation(
         .collect();
     Ok(AutoRotationReport {
         mode: "auto_rotation",
+        timing,
         complete: rooms
             .iter()
             .all(|room| room.main.complete && room.backup.complete),
@@ -324,6 +367,7 @@ pub fn assert_auto_rotation_invariants(
     if report.mode != "auto_rotation" || report.assignment_plans.len() != 2 {
         return Err(Error::msg("assert-invariants auto_report_shape failed"));
     }
+    report.timing.validate()?;
     if !crate::layout::admission::all_station_states_admitted(
         &crate::layout::admission::presence(blueprint, &report.main_assignment, instances),
         &crate::layout::admission::presence(blueprint, &report.backup_assignment, instances),
@@ -387,6 +431,13 @@ pub fn assert_auto_rotation_invariants(
         .into_iter()
         .enumerate()
     {
+        if !assignment.auto_rotation
+            || assignment.work_hours != Some(report.timing.shift_hours[index])
+        {
+            return Err(Error::msg(
+                "assert-invariants auto_work_duration_input failed",
+            ));
+        }
         super::team_rotation::assert_assignment_identity(
             blueprint,
             operbox,
@@ -405,6 +456,18 @@ pub fn assert_auto_rotation_invariants(
                 index + 1
             )));
         }
+        let other = if index == 0 {
+            &report.backup_assignment
+        } else {
+            &report.main_assignment
+        };
+        if !crate::layout::admission::stations_fit_work_duration(
+            &crate::layout::admission::presence(blueprint, assignment, instances),
+            &crate::layout::admission::presence(blueprint, other, instances),
+            &crate::layout::layout_from_blueprint(blueprint),
+        ) {
+            return Err(Error::msg("assert-invariants auto_work_duration failed"));
+        }
         for anchor in &report.assignment_plans[index].anchors {
             if anchor.room_id.as_ref().is_none_or(|room| {
                 !assignment
@@ -417,10 +480,47 @@ pub fn assert_auto_rotation_invariants(
         }
         let model = crate::mood::default_mood_model()?;
         let eta = crate::mood::shift_eta_with_instances(model, blueprint, assignment, instances);
+        // gate 从实际 assignment 独立重建 ETA，不以候选准入谓词代替预算证明。
+        for alternate_control in [false, true] {
+            let mut trial = assignment.clone();
+            if alternate_control {
+                for room in blueprint
+                    .rooms
+                    .iter()
+                    .filter(|room| room.kind == FacilityKind::ControlCenter)
+                {
+                    trial.set_room(room.id.clone(), other.operators_in(&room.id).to_vec());
+                }
+            }
+            let trial_eta =
+                crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
+            for member in &trial_eta.per_op {
+                let room = blueprint
+                    .room(&RoomId::from(member.room_id.as_str()))
+                    .ok_or_else(|| Error::msg("assert-invariants auto_eta_room_owner failed"))?;
+                if alternate_control && room.kind == FacilityKind::ControlCenter {
+                    continue;
+                }
+                if !crate::mood::fits_work_budget(
+                    model,
+                    model.mood_cap,
+                    member.drain_per_hour,
+                    report.timing.shift_hours[index],
+                ) {
+                    return Err(Error::msg(format!(
+                        "assert-invariants auto_eta_work_duration failed: {} {} needs {}h, workable {:?}h",
+                        member.room_id,
+                        member.name,
+                        report.timing.shift_hours[index],
+                        member.workable_hours,
+                    )));
+                }
+            }
+        }
         let options = AssignBaseOptions {
             auto_rotation: true,
             mood: model.mood_cap,
-            shift_hours: 36.0,
+            shift_hours: report.timing.shift_hours[index],
             ..Default::default()
         };
         let mut recalculated = assignment.clone();
@@ -495,17 +595,11 @@ pub fn assert_auto_rotation_invariants(
                 .filter(|entry| entry.room_id == room.id.0)
                 .filter_map(|entry| entry.workable_hours.map(|hours| (&entry.name, hours)))
                 .min_by(|left, right| left.1.total_cmp(&right.1))
-                .filter(|(_, hours)| *hours <= 36.0)
                 .map(|(name, _)| name.clone());
             if state.first_red_face != first {
                 return Err(Error::msg("assert-invariants auto_first_red_face failed"));
             }
-            let hours = eta
-                .per_op
-                .iter()
-                .filter(|entry| entry.room_id == room.id.0)
-                .filter_map(|entry| entry.workable_hours)
-                .fold(36.0_f64, f64::min);
+            let hours = report.timing.shift_hours[index];
             if !state.evaluation_hours.is_finite() || (hours - state.evaluation_hours).abs() > 1e-8
             {
                 return Err(Error::msg("assert-invariants auto_room_window failed"));
@@ -522,11 +616,7 @@ pub fn assert_auto_rotation_invariants(
                         )
                     })
                     .collect::<Vec<_>>();
-                if !crate::search::manufacture_combo_allowed_for_shift(
-                    &operators,
-                    table,
-                    Some(hours),
-                ) {
+                if !crate::search::manufacture_combo_allowed_for_shift(&operators, table, None) {
                     return Err(Error::msg(
                         "assert-invariants auto_manufacture_window_policy failed",
                     ));

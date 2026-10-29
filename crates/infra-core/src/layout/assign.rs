@@ -324,47 +324,37 @@ pub(crate) fn complete_standalone_assignment(
     )?
     .layout;
     excluded.extend(result.assignment.occupied_operator_names());
-    let office_candidates =
-        crate::office::rank_candidates(operbox, &layout, options.mood, &excluded);
-    for room in blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::Office)
-    {
-        if result.assignment.operators_in(&room.id).len() >= room.operator_capacity() {
-            continue;
-        }
-        for candidate in &office_candidates {
-            if result
-                .assignment
-                .occupied_operator_names()
-                .contains(&candidate.name)
-            {
-                continue;
-            }
-            let mut trial = result.assignment.clone();
-            trial.set_room(room.id.clone(), vec![candidate.clone()]);
-            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, &trial, instances);
-            if crate::layout::plan_admits_workplace_candidate(&result.plan, &trial, room, candidate)
+    let office_candidates = crate::office::rank_candidates(
+        operbox,
+        &layout,
+        options.mood,
+        options.shift_hours,
+        &excluded,
+    );
+    crate::office::fill_vacancies(
+        &mut result.assignment,
+        blueprint,
+        &office_candidates,
+        |_, trial, room, candidate| {
+            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
+            crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
                 && (!options.auto_rotation
-                    || super::admission::assignment_admitted(blueprint, &trial, instances, table))
-                && (options.auto_rotation
-                    || eta
-                        .operator_in_room(&candidate.name, &room.id.0)
-                        .is_some_and(|entry| {
-                            crate::mood::fits_work_budget(
-                                &model,
-                                options.mood,
-                                entry.drain_per_hour,
-                                options.shift_hours,
-                            )
-                        }))
-            {
-                result.assignment = trial;
-                break;
-            }
-        }
-    }
+                    || super::admission::assignment_admitted(blueprint, trial, instances, table)
+                        && super::admission::room_work_duration_admitted(
+                            blueprint, trial, &room.id, instances,
+                        ))
+                && eta
+                    .operator_in_room(&candidate.name, &room.id.0)
+                    .is_some_and(|entry| {
+                        crate::mood::fits_work_budget(
+                            &model,
+                            options.mood,
+                            entry.drain_per_hour,
+                            options.shift_hours,
+                        )
+                    })
+        },
+    );
     let roster = operbox.roster_excluding(&excluded);
     let mut candidates: Vec<_> = roster
         .names()
@@ -389,7 +379,10 @@ pub(crate) fn complete_standalone_assignment(
                 return false;
             }
             if options.auto_rotation
-                && !super::admission::assignment_admitted(blueprint, trial, instances, table)
+                && (!super::admission::assignment_admitted(blueprint, trial, instances, table)
+                    || !super::admission::room_work_duration_admitted(
+                        blueprint, trial, &room.id, instances,
+                    ))
             {
                 return false;
             }
@@ -413,21 +406,10 @@ pub(crate) fn complete_standalone_assignment(
                 if !crate::search::manufacture_combo_allowed_for_shift(
                     &operators,
                     table,
-                    Some(if options.auto_rotation {
-                        eta.per_op
-                            .iter()
-                            .filter(|entry| entry.room_id == room.id.0)
-                            .filter_map(|entry| entry.workable_hours)
-                            .fold(36.0_f64, f64::min)
-                    } else {
-                        options.shift_hours
-                    }),
+                    (!options.auto_rotation).then_some(options.shift_hours),
                 ) {
                     return false;
                 }
-            }
-            if options.auto_rotation {
-                return true;
             }
             eta.operator_in_room(&candidate.name, &room.id.0)
                 .is_some_and(|entry| {
@@ -508,19 +490,7 @@ pub(crate) fn refresh_standalone_efficiency(
             None,
         )?;
         for room in resolved.power_rooms {
-            let members = vec![(
-                room.operator.name.clone(),
-                room.operator.elite,
-                room.operator.buff_ids.clone(),
-                room.operator.tags.clone(),
-            )];
-            let hours = crate::mood::room_work_window(
-                &room.layout,
-                crate::layout::FacilityKind::PowerPlant,
-                None,
-                &members,
-                options.shift_hours,
-            )?;
+            let hours = room.layout.evaluation_hours(options.shift_hours)?;
             let solved = crate::power::solve_power(
                 &crate::power::PowerRoomInput {
                     operator: room.operator,
@@ -591,6 +561,15 @@ where
     let _memo_scope = crate::search::ensure_search_memo_scope();
     blueprint.validate()?;
 
+    let mut planning_seed = planning_seed.clone();
+    let mut execution_seed = execution_seed.clone();
+    planning_seed.work_hours = Some(options.shift_hours);
+    execution_seed.work_hours = Some(options.shift_hours);
+    if options.auto_rotation {
+        planning_seed.auto_rotation = true;
+        execution_seed.auto_rotation = true;
+    }
+
     let mut skip_system_ids = skip_system_ids.clone();
     skip_trade_core_registry_systems(&mut skip_system_ids);
     let mut disabled_conditional_packs = HashSet::new();
@@ -611,7 +590,7 @@ where
             options.registry_sustain_hours,
             options.control_work_hours,
             mode,
-            planning_seed,
+            &planning_seed,
             &skip_system_ids,
             &mut disabled_conditional_packs,
         );
@@ -636,7 +615,7 @@ where
             table,
             options,
             mode,
-            execution_seed,
+            &execution_seed,
             &plan,
         );
         let stage_after = crate::profile::solver_perf_snapshot();

@@ -91,4 +91,4 @@ Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不
 
 ## 自动轮换建议分派
 
-`plan --rotation auto`在定时请求解析前转入[自动轮换建议调用链](自动轮换建议.md)，加载同一蓝图、账号与技能数据。主备来源、Plan、搜索、普通完成复用core；输出独立逐站建议JSON/文本，`--json`只打印建议JSON。该入口不经过定时profile、Worker plan_compute或MAA，也不建立换班事件。
+`plan --rotation auto@H1/H2`由公共core模式/时长请求解析后转入[自动轮换建议调用链](自动轮换建议.md)，加载同一蓝图、账号与技能数据。主备来源、Plan、搜索、普通完成复用core；输出独立逐站建议JSON/文本，`--json`只打印建议JSON。该入口不经过定时profile、Worker plan_compute或MAA，也不建立换班事件。

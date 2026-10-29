@@ -215,6 +215,7 @@ fn compile_plan_once(
             table,
             mode,
             mood,
+            shift_hours: seed.work_hours.unwrap_or(24.0),
             preferences,
         },
         seed,
@@ -235,8 +236,7 @@ fn compile_plan_once(
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
     let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
-    let mut admit_all = |claim: &crate::layout::system::RegistrySystemClaim,
-                         trial: &BaseAssignment| {
+    let admit_all = |claim: &crate::layout::system::RegistrySystemClaim, trial: &BaseAssignment| {
         !seed.auto_rotation
             || (claim
                 .slots
@@ -253,7 +253,13 @@ fn compile_plan_once(
                     blueprint, trial, instances, table,
                 ))
     };
-    let admission = mood_admission.as_deref_mut().unwrap_or(&mut admit_all);
+    let mut admission = |claim: &crate::layout::system::RegistrySystemClaim,
+                         trial: &BaseAssignment| {
+        admit_all(claim, trial)
+            && mood_admission
+                .as_deref_mut()
+                .is_none_or(|admit| admit(claim, trial))
+    };
     let registry_claims = crate::layout::system::select_registry_systems_with_admission(
         blueprint,
         operbox,
@@ -263,7 +269,7 @@ fn compile_plan_once(
         &registry_skip,
         &compiled.claimed_exclusive_groups,
         registry_sustain_hours.filter(|_| mode == AssignShiftMode::Peak),
-        admission,
+        &mut admission,
     );
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(
@@ -283,6 +289,7 @@ fn compile_plan_once(
             table,
             mode,
             mood,
+            shift_hours: seed.work_hours.unwrap_or(24.0),
             preferences,
         },
         &scratch,
@@ -346,6 +353,7 @@ fn compile_plan_once(
             table,
             mode,
             mood,
+            shift_hours: seed.work_hours.unwrap_or(24.0),
             preferences: &std::collections::HashMap::new(),
         },
         &late.scratch,
@@ -379,6 +387,7 @@ fn compile_plan_once(
                 table,
                 mode,
                 mood,
+                shift_hours: seed.work_hours.unwrap_or(24.0),
                 preferences: &mujica_preferences,
             },
             &late.scratch,

@@ -13,6 +13,10 @@ pub struct StationPresence {
     pub kind: FacilityKind,
     pub level: u8,
     pub facility: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<crate::types::RecipeKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_hours: Option<f64>,
     pub members: Vec<(String, u8, Vec<String>, Vec<String>)>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub support_dependencies: Vec<crate::support_facility::SupportMemberDependency>,
@@ -49,6 +53,11 @@ pub(crate) fn presence(
                 room.level
             },
             facility: facility_id(room.kind).into(),
+            recipe: match &room.product {
+                Some(crate::layout::RoomProduct::Factory { recipe }) => Some(*recipe),
+                _ => None,
+            },
+            work_hours: assignment.work_hours,
             support_dependencies: match room.kind {
                 FacilityKind::Office | FacilityKind::MeetingRoom => {
                     crate::support_facility::member_dependencies(
@@ -117,7 +126,78 @@ pub(crate) fn assignment_admitted(
     let stations = presence(blueprint, assignment, instances);
     let layout = super::resolve::layout_from_blueprint(blueprint);
     admitted(&stations, table, &layout)
-        && mixed_station_pairs_admitted(&stations, &assignment.auto_main_presence, table, &layout)
+        && mixed_station_pairs_admitted(&stations, &assignment.auto_other_presence, table, &layout)
+}
+
+/// 在完整房间成员上按各自输入时长检查；外站还需适应另一个中枢。
+pub(crate) fn stations_fit_work_duration(
+    stations: &[StationPresence],
+    other: &[StationPresence],
+    base: &LayoutContext,
+) -> bool {
+    stations
+        .iter()
+        .filter(|room| crate::layout::ordinary_workplace(room.kind))
+        .all(|room| station_fits_work_duration(room, stations, other, base))
+}
+
+fn station_fits_work_duration(
+    room: &StationPresence,
+    stations: &[StationPresence],
+    other: &[StationPresence],
+    base: &LayoutContext,
+) -> bool {
+    let Some(hours) = room.work_hours else {
+        return false;
+    };
+    let fits = |control: Option<&StationPresence>| {
+        let mut layout = base.clone();
+        layout.station_presence = stations.to_vec();
+        layout.control_operators = control.map_or_else(Vec::new, |room| {
+            room.members
+                .iter()
+                .map(|member| (member.0.clone(), member.1))
+                .collect()
+        });
+        crate::mood::room_workable_hours(&layout, room.kind, room.recipe, &room.members)
+            .is_ok_and(|workable| hours <= workable + 1e-9)
+    };
+    if room.kind == FacilityKind::ControlCenter {
+        fits(Some(room))
+    } else {
+        fits(
+            stations
+                .iter()
+                .find(|station| station.kind == FacilityKind::ControlCenter),
+        ) && other
+            .iter()
+            .filter(|station| station.kind == FacilityKind::ControlCenter)
+            .all(|control| fits(Some(control)))
+    }
+}
+
+/// 已完成的一房用实际成员和两态中枢检查，其他尚未补齐的房间不参与预算拒绝。
+pub(crate) fn room_work_duration_admitted(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    room_id: &super::RoomId,
+    instances: &OperatorInstances,
+) -> bool {
+    if !assignment.auto_rotation {
+        return true;
+    }
+    let stations = presence(blueprint, assignment, instances);
+    stations
+        .iter()
+        .find(|room| room.room == room_id.0)
+        .is_some_and(|room| {
+            station_fits_work_duration(
+                room,
+                &stations,
+                &assignment.auto_other_presence,
+                &super::resolve::layout_from_blueprint(blueprint),
+            )
+        })
 }
 
 /// 将候选成员从真实快照迁入候选站，再检查全部站点。
@@ -127,6 +207,7 @@ pub(crate) fn candidate_admitted(
     facility: &str,
     members: Vec<(String, u8, Vec<String>, Vec<String>)>,
     table: &SkillTable,
+    complete: bool,
 ) -> bool {
     if !layout.auto_rotation {
         return true;
@@ -155,6 +236,7 @@ pub(crate) fn candidate_admitted(
     let room = room.unwrap_or_else(|| format!("candidate_{facility}"));
     if let Some(station) = stations.iter_mut().find(|station| station.room == room) {
         station.members = members;
+        station.work_hours = layout.work_hours;
         station.support_dependencies.clear();
     } else {
         stations.push(StationPresence {
@@ -168,12 +250,29 @@ pub(crate) fn candidate_admitted(
             },
             level: 3,
             facility: facility.into(),
+            recipe: None,
+            work_hours: layout.work_hours,
             members,
             support_dependencies: Vec::new(),
         });
     }
-    admitted(&stations, table, layout)
-        && mixed_candidate_admitted(&stations, &layout.auto_main_presence, &room, table, layout)
+    // 未补齐的中枢前缀只检查已经确定的协同约束。
+    let work_budget = !complete || {
+        let candidate = stations
+            .iter()
+            .find(|station| station.room == room)
+            .unwrap();
+        station_fits_work_duration(candidate, &stations, &layout.auto_other_presence, layout)
+            && (facility != "control"
+                || stations_fit_work_duration(
+                    &layout.auto_other_presence,
+                    std::slice::from_ref(candidate),
+                    layout,
+                ))
+    };
+    work_budget
+        && admitted(&stations, table, layout)
+        && mixed_candidate_admitted(&stations, &layout.auto_other_presence, &room, table, layout)
 }
 
 /// 独立换班的候选只与其他房可共存的两态比较；不会合并同房主备成员。
@@ -286,7 +385,8 @@ pub(crate) fn all_station_states_admitted(
         layout: &LayoutContext,
     ) -> bool {
         if index == main.len() {
-            return admitted(selected, table, layout);
+            return admitted(selected, table, layout)
+                && stations_fit_work_duration(selected, &[], layout);
         }
         selected.push(main[index].clone());
         if !check(index + 1, main, backup, selected, table, layout) {
@@ -302,6 +402,7 @@ pub(crate) fn all_station_states_admitted(
             };
             if other.members != main[index].members
                 || other.support_dependencies != main[index].support_dependencies
+                || other.work_hours != main[index].work_hours
             {
                 selected.push(other.clone());
                 if !check(index + 1, main, backup, selected, table, layout) {

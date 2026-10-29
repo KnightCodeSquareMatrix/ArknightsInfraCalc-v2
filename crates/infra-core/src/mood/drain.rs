@@ -115,18 +115,13 @@ pub fn workable_hours(model: &MoodModel, inputs: &DrainInputs<'_>) -> f64 {
     }
 }
 
-/// 满心情候选房的评估窗口。定时模式继续使用调用方窗口；建议模式
-/// 使用同一净消耗公式，至首人红脸或36小时。tags用于岁同房消耗消除。
-pub(crate) fn room_work_window(
+/// 候选房与完整ETA共享净消耗公式；返回首人红脸时间，无工作消耗时无限。
+pub(crate) fn room_workable_hours(
     layout: &crate::layout::LayoutContext,
     facility: FacilityKind,
     recipe: Option<crate::types::RecipeKind>,
     members: &[(String, u8, Vec<String>, Vec<String>)],
-    fixed_hours: f64,
 ) -> crate::error::Result<f64> {
-    if !layout.auto_rotation {
-        return Ok(fixed_hours);
-    }
     let model = super::default_mood_model()?;
     let room_ops: Vec<_> = members
         .iter()
@@ -138,7 +133,12 @@ pub(crate) fn room_work_window(
         Some(crate::types::RecipeKind::Originium) => Some("originium"),
         _ => None,
     };
-    let mut hours: f64 = 36.0;
+    let control_ops = if facility == FacilityKind::ControlCenter {
+        &room_ops
+    } else {
+        &layout.control_operators
+    };
+    let mut hours: f64 = f64::INFINITY;
     for (name, elite, _, tags) in members {
         let mut drain = operator_net_drain_with_sui(
             model,
@@ -147,8 +147,8 @@ pub(crate) fn room_work_window(
                 elite: *elite,
                 facility,
                 room_ops: &room_ops,
-                full_control: layout.control_operators.len() >= 5,
-                control_ops: &layout.control_operators,
+                full_control: control_ops.len() >= 5,
+                control_ops,
                 recipe,
             },
             tags.iter().any(|tag| tag == "cc.g.sui"),

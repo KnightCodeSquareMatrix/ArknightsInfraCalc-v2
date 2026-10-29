@@ -846,6 +846,7 @@ fn search_control_in_order(
                 })
                 .collect(),
             table,
+            false,
         ) {
             return false;
         }

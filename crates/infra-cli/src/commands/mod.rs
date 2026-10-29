@@ -21,9 +21,25 @@ pub use verify::verify_cmd;
 fn timed_rotation_request_from_args(
     args: &[String],
 ) -> Result<infra_core::schedule::TimedRotationRequest, infra_core::Error> {
+    match rotation_request_from_args(args)? {
+        infra_core::schedule::RotationRequest::Timed(request) => Ok(request),
+        infra_core::schedule::RotationRequest::Auto(_) => Err(infra_core::Error::msg(
+            "自动轮换建议使用 plan --rotation auto@H1/H2",
+        )),
+    }
+}
+
+fn rotation_request_from_args(
+    args: &[String],
+) -> Result<infra_core::schedule::RotationRequest, infra_core::Error> {
     let Some(index) = args.iter().position(|arg| arg == "--rotation") else {
-        return Ok(infra_core::schedule::TimedRotationRequest::default());
+        return Ok(infra_core::schedule::RotationRequest::default());
     };
+    if args.iter().skip(index + 1).any(|arg| arg == "--rotation") {
+        return Err(infra_core::Error::msg(
+            "--rotation must be supplied only once",
+        ));
+    }
     args.get(index + 1)
         .ok_or_else(|| infra_core::Error::msg("missing --rotation <profile-or-topology@hours>"))?
         .parse()

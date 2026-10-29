@@ -311,6 +311,69 @@ pub enum GenericRotationTiming {
     Abc { shift_hours: [f64; 3] },
 }
 
+/// 建议模式的主力、替补工作时长；不携带定时班次或恢复语义。
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AutoRotationTiming {
+    pub shift_hours: [f64; 2],
+}
+
+impl AutoRotationTiming {
+    pub(crate) fn validate(&self) -> Result<()> {
+        validate_rotation_duration_hours(self.shift_hours).map(|_| ())
+    }
+}
+
+/// 排班入口先确定模式与时长，之后才建立候选和Plan。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RotationRequest {
+    Timed(TimedRotationRequest),
+    Auto(AutoRotationTiming),
+}
+
+impl Default for RotationRequest {
+    fn default() -> Self {
+        Self::Timed(TimedRotationRequest::default())
+    }
+}
+
+impl std::str::FromStr for RotationRequest {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        if value.trim().eq_ignore_ascii_case("auto") {
+            return Err(Error::msg("自动轮换需要主力/替补时长：auto@H1/H2"));
+        }
+        if let Some((mode, durations)) = value.trim().split_once('@') {
+            if mode.trim().eq_ignore_ascii_case("auto") {
+                let timing = AutoRotationTiming {
+                    shift_hours: parse_rotation_hours(durations, "auto")?,
+                };
+                timing.validate()?;
+                return Ok(Self::Auto(timing));
+            }
+        }
+        value.parse().map(Self::Timed)
+    }
+}
+
+fn parse_rotation_hours<const N: usize>(durations: &str, mode: &str) -> Result<[f64; N]> {
+    durations
+        .split('/')
+        .map(|part| {
+            part.trim()
+                .parse::<f64>()
+                .map_err(|_| Error::msg(format!("invalid rotation duration {part:?}")))
+        })
+        .collect::<Result<Vec<_>>>()?
+        .try_into()
+        .map_err(|durations: Vec<f64>| {
+            Error::msg(format!(
+                "{mode} rotation requires {N} ordered durations, got {}",
+                durations.len()
+            ))
+        })
+}
+
 impl Default for TimedRotationRequest {
     fn default() -> Self {
         Self::Named(TimedRotationProfile::default())
@@ -397,31 +460,13 @@ impl std::str::FromStr for TimedRotationRequest {
         let Some((topology, durations)) = value.trim().split_once('@') else {
             return value.parse::<TimedRotationProfile>().map(Self::Named);
         };
-        let parsed: Vec<f64> = durations
-            .split('/')
-            .map(|part| {
-                part.trim()
-                    .parse::<f64>()
-                    .map_err(|_| Error::msg(format!("invalid rotation duration {part:?}")))
-            })
-            .collect::<Result<_>>()?;
         let request = match topology.trim().to_ascii_lowercase().as_str() {
             "main-backup" | "main_backup" => {
-                let shift_hours: [f64; 2] = parsed.try_into().map_err(|durations: Vec<f64>| {
-                    Error::msg(format!(
-                        "main-backup rotation requires 2 ordered durations, got {}",
-                        durations.len()
-                    ))
-                })?;
+                let shift_hours = parse_rotation_hours(durations, "main-backup")?;
                 Self::Generic(GenericRotationTiming::MainBackup { shift_hours })
             }
             "abc" => {
-                let shift_hours: [f64; 3] = parsed.try_into().map_err(|durations: Vec<f64>| {
-                    Error::msg(format!(
-                        "ABC rotation requires 3 ordered durations, got {}",
-                        durations.len()
-                    ))
-                })?;
+                let shift_hours = parse_rotation_hours(durations, "ABC")?;
                 Self::Generic(GenericRotationTiming::Abc { shift_hours })
             }
             _ => {

@@ -435,25 +435,7 @@ pub(super) fn refresh_trade_efficiency_snapshots(
             layout: Arc::new(room.layout),
             active_order_kind: room.order,
         };
-        let members = input
-            .operators
-            .iter()
-            .map(|op| {
-                (
-                    op.name.clone(),
-                    op.elite,
-                    op.buff_ids.clone(),
-                    op.tags.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-        let hours = crate::mood::room_work_window(
-            &input.layout,
-            FacilityKind::TradePost,
-            None,
-            &members,
-            options.shift_hours,
-        )?;
+        let hours = input.layout.evaluation_hours(options.shift_hours)?;
         let solved = crate::trade::solve_trade_with_shift(&input, table, hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
         assignment.set_room_with_efficiency(

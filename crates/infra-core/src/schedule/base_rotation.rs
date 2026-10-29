@@ -24,9 +24,11 @@ pub fn evaluate_base_assignment_efficiencies(
     shift_hours: f64,
     durin_plan: Option<u8>,
 ) -> Result<ShiftEfficiencies> {
+    let mut evaluation_assignment = assignment.clone();
+    evaluation_assignment.work_hours = Some(shift_hours);
     let resolved = resolve_base(
         blueprint,
-        assignment,
+        &evaluation_assignment,
         Some(instances),
         Some(table),
         24.0,

@@ -197,7 +197,9 @@ pub struct BaseAssignment {
     #[serde(skip)]
     pub(crate) auto_rotation: bool,
     #[serde(skip)]
-    pub(crate) auto_main_presence: Vec<super::admission::StationPresence>,
+    pub(crate) work_hours: Option<f64>,
+    #[serde(skip)]
+    pub(crate) auto_other_presence: Vec<super::admission::StationPresence>,
     #[serde(default)]
     rooms: Vec<RoomAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -32,13 +32,12 @@ pub fn plan_cmd(args: &[String]) -> Result<(), Error> {
         return Err(Error::msg("plan does not support --help or -h"));
     }
 
-    if args
-        .windows(2)
-        .any(|value| value[0] == "--rotation" && value[1] == "auto")
-    {
-        return auto_rotation_cmd(args);
-    }
-    let rotation_request = super::timed_rotation_request_from_args(args)?;
+    let rotation_request = match super::rotation_request_from_args(args)? {
+        infra_core::schedule::RotationRequest::Auto(timing) => {
+            return auto_rotation_cmd(args, timing)
+        }
+        infra_core::schedule::RotationRequest::Timed(request) => request,
+    };
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = match layout_path_from_args(args) {
         Some(p) => p,
@@ -329,7 +328,10 @@ fn ensure_parent_dir(path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn auto_rotation_cmd(args: &[String]) -> Result<(), Error> {
+fn auto_rotation_cmd(
+    args: &[String],
+    timing: infra_core::schedule::AutoRotationTiming,
+) -> Result<(), Error> {
     for option in [
         "--maa-out",
         "--profile-out",
@@ -356,9 +358,18 @@ fn auto_rotation_cmd(args: &[String]) -> Result<(), Error> {
         system_preferences: system_preferences_from_args(args)?,
         ..AssignBaseOptions::default()
     };
-    let report = infra_core::schedule::schedule_auto_rotation(
-        &blueprint, &operbox, &instances, &table, &options,
-    )?;
+    let infra_core::schedule::RotationReport::Auto(report) =
+        infra_core::schedule::schedule_rotation(
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &options,
+            infra_core::schedule::RotationRequest::Auto(timing),
+        )?
+    else {
+        unreachable!("auto request produces auto report")
+    };
     if args.iter().any(|arg| arg == "--assert-invariants") {
         infra_core::schedule::assert_auto_rotation_invariants(
             &blueprint, &operbox, &instances, &table, &report,

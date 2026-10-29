@@ -579,17 +579,11 @@ impl TradeSearchOptions {
             "trade",
             members.clone(),
             table,
+            true,
         ) {
             return None;
         }
-        let shift_hours = crate::mood::room_work_window(
-            &self.layout,
-            crate::layout::FacilityKind::TradePost,
-            None,
-            &members,
-            self.shift_hours,
-        )
-        .ok()?;
+        let shift_hours = self.layout.evaluation_hours(self.shift_hours).ok()?;
         let gold_lines = if self.layout.gold_manu_line_count > 0 {
             self.layout.gold_manu_line_count
         } else {

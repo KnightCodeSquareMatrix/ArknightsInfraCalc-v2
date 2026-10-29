@@ -325,4 +325,4 @@
 
 **知识库原文（vault @ 977b6ab0cc0430053194f269d7b3ee0242e7be48）**：`docs/1-基础设定/设施与进驻/心情与宿舍.md`
 
-**验证**：`infra-cli plan --operbox <path> --rotation auto --rotation-out out/auto_rotation.json --assert-invariants`
+**验证**：`infra-cli plan --operbox <path> --rotation auto@24/12 --rotation-out out/auto_rotation.json --assert-invariants`

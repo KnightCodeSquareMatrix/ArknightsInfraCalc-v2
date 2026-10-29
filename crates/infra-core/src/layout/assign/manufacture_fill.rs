@@ -171,25 +171,7 @@ pub(super) fn refresh_manufacture_efficiency_snapshots(
                 room.id.0
             )));
         }
-        let members = input
-            .operators
-            .iter()
-            .map(|op| {
-                (
-                    op.name.clone(),
-                    op.elite,
-                    op.buff_ids.clone(),
-                    op.tags.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-        let hours = crate::mood::room_work_window(
-            &input.layout,
-            FacilityKind::Factory,
-            Some(input.active_recipe),
-            &members,
-            options.shift_hours,
-        )?;
+        let hours = input.layout.evaluation_hours(options.shift_hours)?;
         let solved = crate::manufacture::solve_manufacture_with_shift(&input, table, hours)?;
         let operators = assignment.operators_in(&room.id).to_vec();
         assignment.set_room_with_efficiency(
@@ -512,19 +494,21 @@ fn score_manu_entries(
             )
         })
         .collect::<Vec<_>>();
-    if !crate::layout::admission::candidate_admitted(layout, "manufacture", members.clone(), table)
-    {
+    if !crate::layout::admission::candidate_admitted(
+        layout,
+        "manufacture",
+        members.clone(),
+        table,
+        true,
+    ) {
         return None;
     }
-    let hours = crate::mood::room_work_window(
-        layout,
-        FacilityKind::Factory,
-        Some(recipe),
-        &members,
-        options.shift_hours,
-    )
-    .ok()?;
-    if !manufacture_combo_allowed_for_shift(&operators, table, Some(hours)) {
+    let hours = layout.evaluation_hours(options.shift_hours).ok()?;
+    if !manufacture_combo_allowed_for_shift(
+        &operators,
+        table,
+        (!options.auto_rotation).then_some(hours),
+    ) {
         return None;
     }
     let input = ManuRoomInput {
@@ -589,26 +573,26 @@ pub(super) fn pick_capacity_manu_hit(
     let capacity = station_operator_capacity(room_level);
     let general_pool = filter_general_manufacture_search_pool(pool);
     if options.auto_rotation {
-        let mut entries = Vec::new();
-        let mut best = None;
-        for entry in general_pool
+        let mut ready_pool = general_pool;
+        ready_pool
             .entries
-            .iter()
-            .filter(|entry| !used.contains(&entry.name))
-        {
-            let mut trial = entries.clone();
-            trial.push(entry.clone());
-            if let Some(hit) =
-                score_manu_entries(&trial, table, layout, options, recipe, room_level)
-            {
-                entries = trial;
-                best = Some(hit);
-                if entries.len() == capacity {
-                    break;
-                }
+            .retain(|entry| !used.contains(&entry.name));
+        // 缺员兜底也枚举最终名单；单人前缀撑不满，不能推出补齐后撑不满。
+        for count in (1..=capacity.min(ready_pool.entries.len())).rev() {
+            let mut opts = manu_options(layout, options, recipe, room_level);
+            opts.operator_capacity = count;
+            if let Ok(hit) = search_manu_hit_in_pool(
+                &ready_pool,
+                table,
+                opts,
+                used,
+                options.top_k,
+                "partial manufacture pool",
+            ) {
+                return Ok(hit);
             }
         }
-        return best.ok_or_else(|| Error::msg("no admitted partial manufacture candidate"));
+        return Err(Error::msg("no admitted partial manufacture candidate"));
     }
     let entries: Vec<_> = general_pool
         .entries

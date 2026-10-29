@@ -146,7 +146,7 @@ fn assign_control_inner(
                 "control: pinned operators contain conflicting global recovery owners",
             ));
         }
-        if solve_control(&ControlRoomInput::with_operators(operators), table)
+        if solve_control(&ControlRoomInput::with_operators(operators.clone()), table)
             .effect_ledger
             .has_conflicting_effect_sources()
         {
@@ -165,7 +165,14 @@ fn assign_control_inner(
                     >= usize::from(group.min_count)
             })
             && excluded.is_none_or(|excluded| pinned.is_disjoint(excluded))
-            && eligibility.is_none_or(|accept| accept(&names));
+            && eligibility.is_none_or(|accept| accept(&names))
+            && crate::layout::admission::candidate_admitted(
+                layout,
+                "control",
+                operators_for_presence(pool, &names),
+                table,
+                true,
+            );
         if observe_control {
             let pinned_log: std::collections::BTreeSet<_> = pinned.iter().collect();
             let required_log: Option<std::collections::BTreeSet<_>> =
@@ -298,6 +305,7 @@ fn assign_control_inner(
                     })
                     .collect(),
                 table,
+                true,
             )
     };
     let combos = search_control_combos_with_eligibility(
@@ -308,11 +316,16 @@ fn assign_control_inner(
     )?;
     let Some(hit) = pick_control_extending_pins(combos, &must_include, used, &|h| &h.names) else {
         observe!("control_fill no_hit_after_policy");
+        if options.auto_rotation {
+            // 候选耗尽允许留下缺位；既有钉选或必需角色仍不能静默放行。
+            return Ok(pinned.is_empty()
+                && required_all.is_none_or(HashSet::is_empty)
+                && candidate_requirements
+                    .iter()
+                    .all(|group| group.min_count == 0));
+        }
         if required_all.is_some() {
             return Ok(false);
-        }
-        if options.auto_rotation {
-            return Ok(true);
         }
         return Err(Error::msg(
             format!(
@@ -473,4 +486,23 @@ fn commit_control_combo(
         .collect::<Result<Vec<_>>>()?;
     assignment.set_room(room_id.clone(), ops);
     Ok(())
+}
+
+fn operators_for_presence(
+    pool: &ControlPool,
+    names: &[String],
+) -> Vec<(String, u8, Vec<String>, Vec<String>)> {
+    names
+        .iter()
+        .filter_map(|name| {
+            pool.entry(name).map(|entry| {
+                (
+                    entry.name.clone(),
+                    entry.elite,
+                    entry.buff_ids.clone(),
+                    entry.tags.clone(),
+                )
+            })
+        })
+        .collect()
 }

@@ -179,23 +179,34 @@ pub(super) fn assign_power_rooms_with_instances(
                     continue;
                 }
                 let op = AssignedOperator::from_progress(&entry.name, entry.progress);
-                let mut trial = coexist_assignment.cloned().unwrap_or_default();
+                let mut trial = coexist_assignment
+                    .cloned()
+                    .unwrap_or_else(|| assignment.clone());
                 for room in assignment.iter_rooms() {
                     trial.set_room(room.room_id.clone(), room.operators.clone());
                 }
                 trial.set_room(room_id.clone(), vec![op.clone()]);
+                if options.auto_rotation
+                    && instances.is_some_and(|instances| {
+                        !crate::layout::admission::assignment_admitted(
+                            blueprint, &trial, instances, table,
+                        ) || !crate::layout::admission::room_work_duration_admitted(
+                            blueprint, &trial, room_id, instances,
+                        )
+                    })
+                {
+                    continue;
+                }
                 let eta = crate::mood::shift_eta_in_context(&mood, blueprint, &trial, instances);
                 let Some(candidate_eta) = eta.operator_in_room(&entry.name, &room_id.0) else {
                     continue;
                 };
-                if !options.auto_rotation
-                    && !crate::mood::fits_work_budget(
-                        &mood,
-                        options.mood,
-                        candidate_eta.drain_per_hour,
-                        options.shift_hours,
-                    )
-                {
+                if !crate::mood::fits_work_budget(
+                    &mood,
+                    options.mood,
+                    candidate_eta.drain_per_hour,
+                    options.shift_hours,
+                ) {
                     continue;
                 }
                 // Settlement reads the final assignment, including empty power buff IDs.

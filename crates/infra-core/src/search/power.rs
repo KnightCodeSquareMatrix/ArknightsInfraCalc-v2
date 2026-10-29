@@ -141,16 +141,11 @@ pub fn search_power_assignment(
                 "power",
                 members.clone(),
                 table,
+                true,
             ) {
                 continue;
             }
-            let shift_hours = crate::mood::room_work_window(
-                &options.layout,
-                crate::layout::FacilityKind::PowerPlant,
-                None,
-                &members,
-                options.shift_hours,
-            )?;
+            let shift_hours = options.layout.evaluation_hours(options.shift_hours)?;
             let mut layout = options.layout.clone();
             layout.drone_cap = layout.drone_cap.max(135);
             let input = PowerRoomInput {
@@ -199,6 +194,8 @@ pub fn search_power_assignment(
                 selected_layout
                     .station_presence
                     .push(crate::layout::admission::StationPresence {
+                        recipe: None,
+                        work_hours: selected_layout.work_hours,
                         room: format!("selected_power_{station}"),
                         kind: crate::layout::FacilityKind::PowerPlant,
                         level: 3,

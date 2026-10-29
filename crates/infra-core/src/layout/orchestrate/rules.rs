@@ -274,6 +274,7 @@ pub(super) struct RuleCompileContext<'a> {
     pub table: &'a SkillTable,
     pub mode: AssignShiftMode,
     pub mood: f64,
+    pub shift_hours: f64,
     pub preferences: &'a HashMap<String, String>,
 }
 
@@ -869,7 +870,7 @@ fn dynamic_gates_match(
                     top_k: 20,
                     gold_production_lines: resolved.gold_manu_line_count(),
                     layout: Arc::new(resolved.layout.clone()),
-                    shift_hours: 24.0,
+                    shift_hours: ctx.shift_hours,
                     order_mode: crate::trade::input::TradeSearchOrderMode::Single(*order),
                     bake_mode: crate::bake::BakeMode::Disabled,
                     full_pool: true,
@@ -1351,7 +1352,7 @@ fn manufacture_objective_candidates<'a>(
                 mood: ctx.mood,
                 layout: Arc::clone(&layout),
             };
-            crate::search::evaluate_manufacture_room(&input, ctx.table, *recipe)
+            crate::search::evaluate_manufacture_room(&input, ctx.table, *recipe, ctx.shift_hours)
                 .map(|hit| (candidate, hit))
         })
         .collect();
@@ -1621,7 +1622,7 @@ fn complete_manufacture_role(
         operator_capacity: room.operator_capacity(),
         top_k: 20,
         mood: ctx.mood,
-        shift_hours: None,
+        shift_hours: Some(ctx.shift_hours),
         layout: Arc::new(candidate_resolved.layout),
         recipe_mode: crate::manufacture::ManuSearchRecipeMode::Single(recipe),
         must_include_name: Some(required[0].clone()),
@@ -1777,7 +1778,7 @@ fn score_completed_manufacture(
             operator_capacity: room.operator_capacity(),
             top_k: 20,
             mood: ctx.mood,
-            shift_hours: None,
+            shift_hours: Some(ctx.shift_hours),
             layout: Arc::new(resolved.layout),
             recipe_mode: crate::manufacture::ManuSearchRecipeMode::Single(*recipe),
             must_include_name: None,
@@ -1818,18 +1819,6 @@ fn score_completed_manufacture(
         .iter()
         .filter(|room| !room.operators.is_empty())
         .map(|room| {
-            let members = room
-                .operators
-                .iter()
-                .map(|op| {
-                    (
-                        op.name.clone(),
-                        op.elite,
-                        op.buff_ids.clone(),
-                        op.tags.clone(),
-                    )
-                })
-                .collect::<Vec<_>>();
             let input = crate::manufacture::ManuRoomInput {
                 level: room.level,
                 operators: room.operators.clone(),
@@ -1837,23 +1826,9 @@ fn score_completed_manufacture(
                 mood: ctx.mood,
                 layout: Arc::new(room.layout.clone()),
             };
-            if room.layout.auto_rotation {
-                let hours = crate::mood::room_work_window(
-                    &room.layout,
-                    FacilityKind::Factory,
-                    Some(room.recipe),
-                    &members,
-                    24.0,
-                )
-                .ok()?;
-                crate::manufacture::solve_manufacture_with_shift(&input, ctx.table, hours)
-                    .map(|result| result.final_efficiency)
-                    .ok()
-            } else {
-                crate::manufacture::solve_manufacture(&input, ctx.table)
-                    .map(|result| result.final_efficiency)
-                    .ok()
-            }
+            crate::manufacture::solve_manufacture_with_shift(&input, ctx.table, ctx.shift_hours)
+                .map(|result| result.final_efficiency)
+                .ok()
         })
         .collect::<Option<Vec<_>>>()
         .map(|scores| scores.into_iter().sum())
@@ -1919,19 +1894,7 @@ fn score_completed_power(
                 &crate::power::PowerRoomInput {
                     operator: power.operator.clone(),
                     mood: power.operator.work_mood.unwrap_or(ctx.mood),
-                    shift_hours: crate::mood::room_work_window(
-                        &power.layout,
-                        FacilityKind::PowerPlant,
-                        None,
-                        &[(
-                            power.operator.name.clone(),
-                            power.operator.elite,
-                            power.operator.buff_ids.clone(),
-                            power.operator.tags.clone(),
-                        )],
-                        24.0,
-                    )
-                    .ok()?,
+                    shift_hours: power.layout.evaluation_hours(ctx.shift_hours).ok()?,
                     layout: power.layout.clone(),
                 },
                 ctx.table,
@@ -1964,19 +1927,7 @@ fn score_completed_power(
                 &crate::power::PowerRoomInput {
                     operator: room.operator.clone(),
                     mood: room.operator.work_mood.unwrap_or(ctx.mood),
-                    shift_hours: crate::mood::room_work_window(
-                        &room.layout,
-                        FacilityKind::PowerPlant,
-                        None,
-                        &[(
-                            room.operator.name.clone(),
-                            room.operator.elite,
-                            room.operator.buff_ids.clone(),
-                            room.operator.tags.clone(),
-                        )],
-                        24.0,
-                    )
-                    .ok()?,
+                    shift_hours: room.layout.evaluation_hours(ctx.shift_hours).ok()?,
                     layout: room.layout.clone(),
                 },
                 ctx.table,
@@ -2142,6 +2093,7 @@ fn complete_trade_role(
     let options = crate::layout::AssignBaseOptions {
         auto_rotation: assignment.auto_rotation,
         mood: ctx.mood,
+        shift_hours: ctx.shift_hours,
         ..Default::default()
     };
     let Ok(hit) = crate::layout::assign::trade_fill::pick_trade_meta_then_plain(

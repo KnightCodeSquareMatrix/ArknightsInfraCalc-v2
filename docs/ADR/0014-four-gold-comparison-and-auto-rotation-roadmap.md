@@ -9,7 +9,7 @@
 
 > 日期：2026-10-26
 > 决策状态：proposed
-> 实现状态：四赤金完整比较仍暂缓；自动轮换已接入 `plan --rotation auto`，本轮实施与验收见自动轮换实现记录。下文调查事实保留其原基线。
+> 实现状态：四赤金完整比较仍暂缓；自动轮换已接入 `plan --rotation auto@H1/H2`，当前行为归自动轮换canonical；本轮时长统一及验收见排班入口与时长统一记录。下文调查事实、路线与问答保留原基线，时长最新裁决见末节。
 
 ## 背景与范围
 
@@ -118,7 +118,7 @@
 - 本轮不接网站、MAA 或部署；1+1 与 `support_combinations_enable` 只作实现兼容核对。
 - **自动轮换中禁用四赤金（2026-10-28 裁决）**：结构化问答问“自动轮换模式里，四赤金能不能用？10-11 的裁决是‘禁止其他跨站协同，只保留宿舍挂件 1+1 与发电＋制造自动化’。四赤金依赖全基建杜林人数和跨贸易房的虚拟赤金线。”，用户答“禁用”（2026-10-28 结构化问答；原始会话 `0b5face2` L963；本轮原话汇编 G 段）。U7 分类表与 U8 接线都必须把 `pozyomka_durin` 及其角色/alternative 标为禁止；不得以“四赤金是 trade_core 候选”为由放行。
 
-### 2.2 现状事实
+### 2.2 历史现状事实（db0755b）
 
 - 没有 `auto_rotation` 标识符（已核对 `contracts/`、`crates/`、`data/` 无命中，只有文档提到）。`--rotation` 只接受 `named | main-backup@H1/H2 | abc@H1/H2/H3`（`rotation_types.rs:392-458`）；Worker `plan.compute` v7 的 `rotation` 是六个命名 profile 加通用 topology（`contracts/plan-compute-v7.schema.json:45-90`），`v1–v6` 为闭集（`docs/接口/CLI与Worker.md:54`）。
 - [排班模式.md](../排班模式.md) 第 30 行要求自动轮换定义自己的状态，且不能靠给 `timed_rotation` 加布尔开关冒充。因此不扩展 `TimedRotationProfile`（枚举定义见 `rotation_types.rs:195-225`），也不复用 `TeamRotationReport`（`rotation_types.rs:573-593`：profile、teams、shifts、按周期归一的 `daily`、`peak_mood_eta` 等定时语义会一并带入）。
@@ -140,7 +140,7 @@
 4. 门禁是整块的。`assert_final_rotation_invariants_with_mood`（`team_rotation.rs:4863`）以 `TeamRotationReport` 为输入；现有主备互斥检查只有 `assert_main_backup_24_24_final_state`（`:6274`，其中 `main_backup_24_24_work_disjoint` 在 `:6434`），只覆盖 24/24 一个 profile，没有对任意主备两态的通用检查。需要新增针对自动轮换的最终态检查；批量脚本已通过 `--rotation` 透传（`scripts/assert_rotation_invariants.py:86、127`），新入口只需透传标记，不重写机制。
 5. 周期心情硬门禁：已由 2026-10-28 结构化问答关闭——不做硬门禁、不模拟恢复，只要求满心情能上满评估时长（见第三节第 7 项）。
 
-### 2.4 设计（拟）
+### 2.4 历史设计（拟）
 
 - 独立类型：新增 `AutoRotationReport`（每房主力、替补、效率、评估时长、自动化关联、宿舍挂件常驻说明、缺员位），不进入 `export/maa.rs`，不进入 `BoxProfile`。
 - 入口：先挂 `layout auto-rotation` 子命令（只排班，不出 profile 与 MAA，与 `layout team-rotation` 同级）。Worker 方法与 schema 版本待用户需要网站时再定。
@@ -236,3 +236,7 @@ python3 scripts/codex/check_repository_facts.py
 ## 五、2026-10-29 实施接续
 
 用户要求完整排班的成员互斥、挂件安排和搜索复用已有 owner，不新增事件主体。入口改为 `plan --rotation auto`，core 独立建议报告；沿公共 Peak、互斥替补、Plan 角色竞争、设施搜索、普通补位及真实依赖检查。历史拟设计的逐条人工分类表由 Plan 能力限制及运行时 atom/委托/支援注册表来源准入取代，分类不依赖混合含义的 `tier` 标签；不会修改技能效果。四赤金与性能后续方向继续暂缓。实现与统一验收见 [交付记录](../ARCHIVE/done/自动轮换实现记录-20261029.md)。
+
+### 2026-10-29 时长裁决更新
+
+本会话用户答“主力、替补分别给时长（推荐）”“要求撑满24小时；收益也统一只算24小时”，取代上文历史首人红脸/36小时窗口。当前入口为`auto@H1/H2`，候选和基线按输入H比较，完整组合必须撑满H；ETA不再决定收益窗口。普通两/三班Plan早期时长断点一并修正。该更新不恢复四赤金，主体协同、互斥、菲亚关闭与建议报告边界见[自动轮换](../自动轮换.md#27-2026-10-29-输入时长与候选试算)。

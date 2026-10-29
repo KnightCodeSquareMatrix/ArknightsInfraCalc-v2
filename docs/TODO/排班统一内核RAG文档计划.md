@@ -107,3 +107,7 @@
 - active-change 的计划、checkpoint、未决项不会出现在 current 文档的事实段；
 - `generate_agent_index.py --check`、`docs_inventory.py --check` 和 `check_repository_facts.py` 的失败必须如实记录，不以删页或伪造索引消除；
 - 文档更新只吸收已经验证的当前行为，未验证的设计保留在 TODO/ADR。
+
+## 2026-10-29 本轮落实
+
+用户授权总结项目逻辑内核，并找回旧知识库讨论。已新增[项目逻辑内核](../项目逻辑内核.md)作为current-reference解释有限组合、统一量纲、Plan/execute/fill/resolve/schedule责任和维护入口，接入INDEX；核对的旧会话原话同页保存。这只落实该解释入口与单事实owner，不表示本proposal所有元数据、重构和RAG服务均已批准或完成。

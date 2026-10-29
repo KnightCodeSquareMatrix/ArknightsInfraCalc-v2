@@ -16,11 +16,38 @@ mod team_rotation;
 
 pub use base_rotation::evaluate_base_assignment_efficiencies;
 pub use rotation_types::{
-    DailyProduction, DailyTotals, DormRestPlan, DroneAction, FacilityHalf, FiammettaShiftAction,
-    GenericRotationTiming, RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies,
-    ShiftTransition, TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult,
-    TimedRotationProfile, TimedRotationRequest,
+    AutoRotationTiming, DailyProduction, DailyTotals, DormRestPlan, DroneAction, FacilityHalf,
+    FiammettaShiftAction, GenericRotationTiming, RoomEfficiencyLine, RotationRequest,
+    RuntimeShiftBind, ShiftEfficiencies, ShiftTransition, TeamAssignment, TeamLabel,
+    TeamRotationReport, TeamShiftResult, TimedRotationProfile, TimedRotationRequest,
 };
+
+/// 两种输出分别保留其领域合同，共用模式/时长分派入口。
+pub enum RotationReport {
+    Timed(TeamRotationReport),
+    Auto(AutoRotationReport),
+}
+
+pub fn schedule_rotation(
+    blueprint: &crate::layout::BaseBlueprint,
+    operbox: &crate::operbox::OperBox,
+    instances: &crate::instances::OperatorInstances,
+    table: &crate::skill_table::SkillTable,
+    options: &crate::layout::AssignBaseOptions,
+    request: RotationRequest,
+) -> crate::error::Result<RotationReport> {
+    let _memo_scope = crate::search::ensure_search_memo_scope();
+    match request {
+        RotationRequest::Timed(request) => team_rotation::execute_timed_rotation_request(
+            blueprint, operbox, instances, table, options, request,
+        )
+        .map(RotationReport::Timed),
+        RotationRequest::Auto(timing) => {
+            schedule_auto_rotation(blueprint, operbox, instances, table, options, timing)
+                .map(RotationReport::Auto)
+        }
+    }
+}
 pub use shift_bind::{
     align_shift_binds_in_halves, bound_operator_names, operator_in_shift, resting_shift_index,
     shift_binds_from_plan, team_of_operator, verify_shift_binds,

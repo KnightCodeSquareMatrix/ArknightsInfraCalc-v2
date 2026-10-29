@@ -183,8 +183,9 @@ fn resolve_base_core(
     let phase_started = Instant::now();
     let mut layout = layout_from_blueprint(blueprint);
     layout.auto_rotation = assignment.auto_rotation;
+    layout.work_hours = assignment.work_hours;
     layout.auto_initial_global = assignment.auto_rotation.then(|| layout.global.clone());
-    layout.auto_main_presence = assignment.auto_main_presence.clone();
+    layout.auto_other_presence = assignment.auto_other_presence.clone();
     layout.station_presence = if assignment.auto_rotation {
         instances
             .map(|instances| super::admission::presence(blueprint, assignment, instances))
@@ -222,7 +223,7 @@ fn resolve_base_core(
             &power_ops,
             table,
             mood,
-            24.0,
+            assignment.work_hours.unwrap_or(24.0),
             &workforce,
             instances,
         )?;
@@ -452,19 +453,6 @@ pub(crate) fn resolve_control_input_layout(
     .map(|core| core.layout)
 }
 
-fn support_room_window(
-    layout: &LayoutContext,
-    room: &crate::layout::RoomBlueprint,
-    assignment: &BaseAssignment,
-) -> Result<f64> {
-    let members = assignment
-        .operators_in(&room.id)
-        .iter()
-        .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
-        .collect::<Vec<_>>();
-    crate::mood::room_work_window(layout, room.kind, None, &members, 24.0)
-}
-
 fn support_office_hire_speed(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
@@ -497,7 +485,7 @@ fn support_office_hire_speed(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: support_room_window(layout, room, assignment)?,
+                elapsed_hours: layout.work_hours.unwrap_or(24.0),
                 external_speed_bonus_pct: 0.0,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
@@ -549,7 +537,7 @@ fn build_support_rooms(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: support_room_window(layout, room, assignment)?,
+                elapsed_hours: layout.work_hours.unwrap_or(24.0),
                 external_speed_bonus_pct: 0.0,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);
@@ -587,7 +575,7 @@ fn build_support_rooms(
                 operators,
                 capacity: room.operator_capacity(),
                 extra_recruit_slots,
-                elapsed_hours: support_room_window(layout, room, assignment)?,
+                elapsed_hours: layout.work_hours.unwrap_or(24.0),
                 external_speed_bonus_pct: meeting_inject,
                 layout: {
                     crate::profile::record_resolve_construction(0, 1, 0, 0, 1);

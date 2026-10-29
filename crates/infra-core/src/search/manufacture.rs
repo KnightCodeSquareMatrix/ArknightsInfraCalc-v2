@@ -162,24 +162,26 @@ impl ManuSearchOptions {
             "manufacture",
             members.clone(),
             table,
+            true,
         ) {
             return None;
         }
         let shift_hours = if self.layout.auto_rotation {
             Some(
-                crate::mood::room_work_window(
-                    &self.layout,
-                    crate::layout::FacilityKind::Factory,
-                    Some(recipe),
-                    &members,
-                    self.shift_hours.unwrap_or(24.0),
-                )
-                .ok()?,
+                self.layout
+                    .evaluation_hours(self.shift_hours.unwrap_or(24.0))
+                    .ok()?,
             )
         } else {
             self.shift_hours
         };
-        if !manufacture_combo_refs_allowed_for_shift(&operators, table, shift_hours) {
+        if !manufacture_combo_refs_allowed_for_shift(
+            &operators,
+            table,
+            (!self.layout.auto_rotation)
+                .then_some(shift_hours)
+                .flatten(),
+        ) {
             return None;
         }
         let layout = manufacture_combo_layout(&self.layout, &operators);
@@ -431,24 +433,27 @@ fn search_manufacture_single_recipe(
                 "manufacture",
                 members.clone(),
                 table,
+                true,
             ) {
                 return None;
             }
             let shift_hours = if options.layout.auto_rotation {
                 Some(
-                    crate::mood::room_work_window(
-                        &options.layout,
-                        crate::layout::FacilityKind::Factory,
-                        Some(recipe),
-                        &members,
-                        options.shift_hours.unwrap_or(24.0),
-                    )
-                    .ok()?,
+                    options
+                        .layout
+                        .evaluation_hours(options.shift_hours.unwrap_or(24.0))
+                        .ok()?,
                 )
             } else {
                 options.shift_hours
             };
-            if !manufacture_combo_refs_allowed_for_shift(&ops, table, shift_hours) {
+            if !manufacture_combo_refs_allowed_for_shift(
+                &ops,
+                table,
+                (!options.layout.auto_rotation)
+                    .then_some(shift_hours)
+                    .flatten(),
+            ) {
                 return None;
             }
             let layout = manufacture_combo_layout(&options.layout, &ops);
@@ -515,17 +520,12 @@ fn search_manufacture_single_recipe(
             mood: options.mood,
             layout: &layout,
         };
-        let members = manufacture_members(&base.operators);
         let shift_hours = if options.layout.auto_rotation {
             Some(
-                crate::mood::room_work_window(
-                    &options.layout,
-                    crate::layout::FacilityKind::Factory,
-                    Some(recipe),
-                    &members,
-                    options.shift_hours.unwrap_or(24.0),
-                )
-                .expect("accepted candidate window"),
+                options
+                    .layout
+                    .evaluation_hours(options.shift_hours.unwrap_or(24.0))
+                    .expect("accepted candidate window"),
             )
         } else {
             options.shift_hours
@@ -788,11 +788,12 @@ pub(crate) fn compare_manufacture_hits(a: &ManuSearchHit, b: &ManuSearchHit) -> 
 }
 
 pub(crate) fn evaluate_manufacture_room(
-    base: &ManuRoomInput,
+    input: &ManuRoomInput,
     table: &SkillTable,
     recipe: RecipeKind,
+    shift_hours: f64,
 ) -> Option<ManuSearchHit> {
-    evaluate_manufacture_room_view_with_shift(&base.as_view(), table, recipe, None)
+    evaluate_manufacture_room_view_with_shift(&input.as_view(), table, recipe, Some(shift_hours))
 }
 
 fn evaluate_manufacture_room_view_with_shift(

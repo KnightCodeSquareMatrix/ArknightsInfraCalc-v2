@@ -824,7 +824,7 @@ fn assign_meeting_rooms(
         .map(|room| room.level.saturating_sub(1))
         .max()
         .unwrap_or(0);
-    let elapsed_hours = options.shift_hours.max(1.0);
+    let elapsed_hours = options.shift_hours;
     let layout = crate::layout::resolve::resolve_base(
         blueprint,
         assignment,
@@ -952,23 +952,15 @@ fn assign_meeting_rooms(
                         let mut trial = assignment.clone();
                         trial.set_room(room.id.clone(), members.clone());
                         if options.auto_rotation
-                            && !crate::layout::admission::assignment_admitted(
+                            && (!crate::layout::admission::assignment_admitted(
                                 blueprint, &trial, instances, table,
-                            )
+                            ) || !crate::layout::admission::room_work_duration_admitted(
+                                blueprint, &trial, &room.id, instances,
+                            ))
                         {
                             continue;
                         }
-                        let members = members
-                            .iter()
-                            .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
-                            .collect::<Vec<_>>();
-                        let candidate_hours = crate::mood::room_work_window(
-                            &layout,
-                            FacilityKind::MeetingRoom,
-                            None,
-                            &members,
-                            elapsed_hours,
-                        )?;
+                        let candidate_hours = layout.evaluation_hours(elapsed_hours)?;
                         let score = crate::meeting::evaluate_meeting(
                             &crate::support_facility::SupportRoomInput {
                                 facility: crate::support_facility::SupportFacility::Meeting,
@@ -1062,23 +1054,15 @@ fn assign_meeting_rooms(
                 let mut trial = assignment.clone();
                 trial.set_room(room.id.clone(), members.clone());
                 if options.auto_rotation
-                    && !crate::layout::admission::assignment_admitted(
+                    && (!crate::layout::admission::assignment_admitted(
                         blueprint, &trial, instances, table,
-                    )
+                    ) || !crate::layout::admission::room_work_duration_admitted(
+                        blueprint, &trial, &room.id, instances,
+                    ))
                 {
                     continue;
                 }
-                let members = members
-                    .iter()
-                    .map(|op| (op.name.clone(), op.elite, Vec::new(), Vec::new()))
-                    .collect::<Vec<_>>();
-                let candidate_hours = crate::mood::room_work_window(
-                    &layout,
-                    FacilityKind::MeetingRoom,
-                    None,
-                    &members,
-                    elapsed_hours,
-                )?;
+                let candidate_hours = layout.evaluation_hours(elapsed_hours)?;
                 let score = crate::meeting::evaluate_meeting(
                     &crate::support_facility::SupportRoomInput {
                         facility: crate::support_facility::SupportFacility::Meeting,
@@ -1218,7 +1202,7 @@ fn best_available_office_pct(
                 }],
                 capacity: 1,
                 extra_recruit_slots,
-                elapsed_hours: 24.0,
+                elapsed_hours: run.options.shift_hours,
                 external_speed_bonus_pct: 0.0,
                 layout: producer_layout.clone(),
             },

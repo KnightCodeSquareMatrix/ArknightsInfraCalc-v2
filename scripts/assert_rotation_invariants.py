@@ -125,13 +125,13 @@ def main() -> int:
                 output.mkdir(parents=True)
             command = [str(binary), "plan", "--operbox", str(box_path),
                        "--rotation", args.rotation, "--assert-invariants"]
-            if args.rotation != "auto":
+            if not args.rotation.startswith("auto@"):
                 command.extend(["--profile-out", str(output / "profile.json")])
             if args.layout:
                 command.extend(["--layout", str(args.layout)])
             if args.output_dir:
                 command.extend(["--rotation-out", str(output / "rotation.json")])
-                if args.rotation != "auto":
+                if not args.rotation.startswith("auto@"):
                     command.extend(["--maa-out", str(output / "maa.json")])
             if args.enable_support_combinations:
                 command.append("--enable-support-combinations")

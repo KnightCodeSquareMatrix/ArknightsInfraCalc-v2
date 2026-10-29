@@ -69,4 +69,6 @@ Worker stdout 必须保持 JSONL，不能混入人类日志。请求解析、未
 
 ## 自动建议入口
 
-`plan --rotation auto` 在定时请求解析前分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出建议。支持 `--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站建议，`--json`时只输出建议JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚固定关闭。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整建议，准入/结构失败是错误。Worker schema、plan_compute、MAA及网站未扩展。
+`plan --rotation auto@H1/H2` 通过公共模式/时长请求解析后分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出建议。支持 `--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站建议，`--json`时只输出建议JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚固定关闭。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整建议，准入/结构失败是错误。Worker schema、plan_compute、MAA及网站未扩展。
+
+自动建议明确输入主力/替补两段时长，裸 `auto` 返回补时长错误；例如 `auto@24/12`。输出 `timing.shift_hours`保存输入，两态的`evaluation_hours`分别为H1/H2，ETA首人只解释可工作时间。CLI模式/时长解析共用core请求，Worker仍只接受既有定时合同。
