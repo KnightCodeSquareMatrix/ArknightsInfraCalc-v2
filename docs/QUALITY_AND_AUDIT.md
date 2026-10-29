@@ -80,7 +80,7 @@
 | `UNRESOLVED_EVIDENCE_DISPUTE` | 独立 reviewer 的实质分歧无法由 canonical、最终状态 assertion、真实入口或 batch 结果裁决。 |
 | `EXTERNAL_OR_IRREVERSIBLE_EFFECT` | 修复将部署、迁移 / 删除数据、覆盖用户工作区改动、改变公共接口，或产生其他不可逆外部副作用。 |
 
-自动循环的任务包必须声明：目标、用户已授权范围、canonical 路径、允许 changed paths、保证等级、required proof obligations、最大轮数和外部动作策略。默认上限是同一 finding 两次自动修复、整个任务四个修复单元；达到任一上限时以 `UNRESOLVED_EVIDENCE_DISPUTE` 暂停并保留 checkpoint，不得无界重试。每轮 final status 只能是：
+自动循环的任务包必须声明：目标及可观察的完成条件、用户已授权范围、canonical 路径、允许 changed paths、保证等级、required proof obligations、最大轮数和外部动作策略。完成条件先于实施方案，局部修复可由已确认的复现及其验收表达；任务完成后不自动开启旁支。默认上限是同一 finding 两次自动修复、整个任务四个修复单元；达到任一上限时以 `UNRESOLVED_EVIDENCE_DISPUTE` 暂停并保留 checkpoint，不得无界重试。每轮 final status 只能是：
 
 ```text
 AUTO_STATUS: CONTINUE | PAUSED_FOR_USER | COMPLETED
