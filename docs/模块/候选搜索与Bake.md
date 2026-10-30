@@ -43,3 +43,9 @@ Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金�
 黑键—巫恋产品禁配只在读取已验证完整的贸易 Bake 表时过滤，先排除非法行再取前 K 条；它本身不造成 `Required` miss。其他未表示的同站禁配仍由 `Auto` 回 live、`Required` 报错。catalog 的可执行文件指纹失效时照常 miss，需另行重建，不能拿旧表证明命中。
 
 核验：`bake validate`、`bake verify`、`infra-cli verify`，并记录输入、组合数、evaluated 和命中模式。候选/剪枝/Bake 改动还要运行最终 assignment invariant gate。
+
+制造体系试排另使用按实际 Box 技能与实时上下文生成的完整条件响应缓存，入口位于
+`search/manufacture/runtime_bake.rs`。它与磁盘 E2 静态散件 catalog 分开：首次仍以原完整搜索
+生成全部合法响应，后续按人员位集和必选成员筛选，完整保留原排序与候选集合。缓存随加载的
+技能表存活、容量受限；上下文或候选顺序不兼容则重算。适用范围和键覆盖见
+[搜索性能与 Bake 边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的条件响应缓存2026-10-30)。

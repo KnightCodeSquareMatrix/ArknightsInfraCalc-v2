@@ -20,7 +20,7 @@ pub(crate) use control::{
 };
 pub(crate) use manufacture::{
     compare_manufacture_hits, evaluate_manufacture_room, manufacture_combo_allowed_for_shift,
-    manufacture_operator_has_mood_gap_decay, manufacture_peers_compatible,
+    manufacture_operator_has_mood_gap_decay, manufacture_peers_compatible, ManufactureSearchBake,
     MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS,
 };
 pub use manufacture::{

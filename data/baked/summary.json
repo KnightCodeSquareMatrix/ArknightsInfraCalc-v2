@@ -1,5 +1,5 @@
 {
-  "out_dir": "data/baked",
+  "out_dir": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/baked",
   "schema_version": 15,
   "operator_count": 110,
   "trade_signatures": 6,
@@ -12,8 +12,8 @@
   "generator": {
     "kind": "infra-cli-exe",
     "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/target/release/infra-cli",
-    "bytes": 15875464,
-    "hash64": "e37afe6ee5cac040"
+    "bytes": 15894896,
+    "hash64": "0ea9d261dd69dfd7"
   },
-  "elapsed_ms": 772
+  "elapsed_ms": 876
 }

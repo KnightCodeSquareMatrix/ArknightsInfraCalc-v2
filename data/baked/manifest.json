@@ -5,14 +5,14 @@
   "generator": {
     "kind": "infra-cli-exe",
     "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/target/release/infra-cli",
-    "bytes": 15875464,
-    "hash64": "e37afe6ee5cac040"
+    "bytes": 15894896,
+    "hash64": "0ea9d261dd69dfd7"
   },
   "inputs": [
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/base_systems.json",
-      "bytes": 7424,
-      "hash64": "7dc6a813b0990409"
+      "bytes": 6708,
+      "hash64": "b48bc9035568676d"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/layout/243_use_this_.json",
@@ -21,13 +21,13 @@
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/operator_instances.json",
-      "bytes": 167288,
-      "hash64": "06be67c07c3091c3"
+      "bytes": 167346,
+      "hash64": "2cc74b5fdb6da5df"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/skill_table.json",
-      "bytes": 168619,
-      "hash64": "4f40c5fcb491aed3"
+      "bytes": 168612,
+      "hash64": "b10172e308eb577c"
     },
     {
       "path": "/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127/data/standalone_roster.json",
@@ -53,8 +53,8 @@
     "layout_model": "single room signatures; gold trade keeps gold line count in key"
   },
   "combo_table": {
-    "bytes": 20298489,
-    "hash64": "b2eef3a9e7a33b95",
+    "bytes": 20300101,
+    "hash64": "f18366cd234bf11d",
     "rows_by_signature": {
       "manufacture:level1:cap1:recipe_battlerecord": 22,
       "manufacture:level1:cap1:recipe_gold": 15,

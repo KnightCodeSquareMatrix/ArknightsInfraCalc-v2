@@ -197,6 +197,10 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
 
 当前工作区旧 catalog 与代码 schema 的具体状态见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)。当前 loader 已校验 `combo_table.bin` 的 bytes、内容 hash 和每个物理 signature 的行数；非白名单反序列化错误仍可能作为错误返回，而不是无条件 fallback；生成物也尚未采用完整 generation-id 原子切换。因此不能把下面的未来要求写成当前能力。
 
+制造 Plan 试排另使用有界的运行时完整条件响应表，支持真实混合练度和动态上下文；它不放宽
+上述磁盘 catalog 的兼容门禁。键覆盖、纯单房结果复用和 miss 重算边界见
+[PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md#制造体系试排的条件响应缓存2026-10-30)。
+
 ### 6.2 下一代 catalog 必须补齐
 
 - 在已有 bytes、内容 hash 和逐 signature 行数校验之外，补齐 index checksum。

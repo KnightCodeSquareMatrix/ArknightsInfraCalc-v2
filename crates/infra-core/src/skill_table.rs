@@ -18,6 +18,7 @@ pub struct SkillTableFile {
 pub struct SkillTable {
     by_id: HashMap<String, SkillDef>,
     skills: Vec<SkillDef>,
+    manufacture_bake: std::sync::Arc<crate::search::ManufactureSearchBake>,
 }
 
 impl SkillTable {
@@ -55,7 +56,12 @@ impl SkillTable {
         Ok(Self {
             by_id,
             skills: file.skills,
+            manufacture_bake: Default::default(),
         })
+    }
+
+    pub(crate) fn manufacture_bake(&self) -> &crate::search::ManufactureSearchBake {
+        &self.manufacture_bake
     }
 
     pub fn get(&self, id: &str) -> Option<&SkillDef> {

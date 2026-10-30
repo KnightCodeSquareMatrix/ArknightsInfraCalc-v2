@@ -21,6 +21,9 @@ use crate::skill_table::SkillTable;
 use crate::types::{Action, Condition, EffectAtom, RecipeKind, SkillDef};
 use crate::FacilityKind;
 
+mod runtime_bake;
+pub(crate) use runtime_bake::ManufactureSearchBake;
+
 /// 制造站直接效率分解，所有数值均为无量纲小数效率。
 ///
 /// 制造评分公式：

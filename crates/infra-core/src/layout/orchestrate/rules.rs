@@ -1550,7 +1550,9 @@ fn complete_manufacture_role(
         bake_mode: crate::bake::BakeMode::Disabled,
     };
     let Ok(candidate_report) =
-        crate::search::search_manufacture_triples(&candidate_pool, ctx.table, &candidate_options)
+        ctx.table
+            .manufacture_bake()
+            .search(&candidate_pool, ctx.table, &candidate_options)
     else {
         return false;
     };
@@ -1694,7 +1696,10 @@ fn score_completed_manufacture(
             full_pool: true,
             bake_mode: crate::bake::BakeMode::Disabled,
         };
-        let Ok(report) = crate::search::search_manufacture_triples(&sub, ctx.table, &options)
+        let Ok(report) = ctx
+            .table
+            .manufacture_bake()
+            .search(&sub, ctx.table, &options)
         else {
             continue;
         };
