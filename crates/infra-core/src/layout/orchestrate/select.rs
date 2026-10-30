@@ -235,42 +235,30 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
-    let admit_all = |claim: &crate::layout::system::RegistrySystemClaim, trial: &BaseAssignment| {
-        !seed.auto_rotation
-            || (claim
-                .slots
-                .iter()
-                .map(|slot| &slot.room_id)
-                .collect::<std::collections::HashSet<_>>()
-                .len()
-                <= 1
-                && !claim
-                    .slots
-                    .iter()
-                    .any(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
-                && crate::layout::admission::assignment_admitted(
-                    blueprint, trial, instances, table,
-                ))
-    };
-    let mut admission = |claim: &crate::layout::system::RegistrySystemClaim,
-                         trial: &BaseAssignment| {
-        admit_all(claim, trial)
-            && mood_admission
+    let registry_claims: Vec<crate::layout::system::RegistrySystemClaim> = if seed.auto_rotation {
+        // Auto's restricted catalog has already removed the searchable systems; retrying the
+        // legacy registry can only prepare and reject the remaining cross/same-station entries.
+        Vec::new()
+    } else {
+        let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
+        let mut admission = |claim: &crate::layout::system::RegistrySystemClaim,
+                             trial: &BaseAssignment| {
+            mood_admission
                 .as_deref_mut()
                 .is_none_or(|admit| admit(claim, trial))
+        };
+        crate::layout::system::select_registry_systems_with_admission(
+            blueprint,
+            operbox,
+            mode,
+            &scratch,
+            &used,
+            &registry_skip,
+            &compiled.claimed_exclusive_groups,
+            registry_sustain_hours.filter(|_| mode == AssignShiftMode::Peak),
+            &mut admission,
+        )
     };
-    let registry_claims = crate::layout::system::select_registry_systems_with_admission(
-        blueprint,
-        operbox,
-        mode,
-        &scratch,
-        &used,
-        &registry_skip,
-        &compiled.claimed_exclusive_groups,
-        registry_sustain_hours.filter(|_| mode == AssignShiftMode::Peak),
-        &mut admission,
-    );
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(
             blueprint,

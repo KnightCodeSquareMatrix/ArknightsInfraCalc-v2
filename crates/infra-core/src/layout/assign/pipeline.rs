@@ -2,8 +2,9 @@
 //!
 //! 阶段顺序与 resolve 时机的唯一事实源。facade（`assign.rs`）只负责构建
 //! `skip_system_ids` 与 `build_plan`，随后委托给本模块。
-//! Peak 会从同一 execute seed 比较普通中枢与可选动态贸易 producer 的完整生产前缀；
-//! 每个贸易站在前站提交后重新 resolve，制造只消费胜出的前缀。
+//! Peak 普通模式会从同一 execute seed 比较普通中枢与可选动态 producer 的完整生产前缀；
+//! 自动模式不搜索 producer 组合，只用一次公共生产填充。每个贸易站在前站提交后重新
+//! resolve，制造只消费选中的前缀。
 
 use std::collections::HashSet;
 
@@ -187,107 +188,136 @@ fn run_shift_pipeline_with_producer_pruning(
 
     match mode {
         AssignShiftMode::Peak => {
-            let dynamic_producers = if options.auto_rotation {
-                Vec::new()
-            } else {
-                dynamic_producer_candidates(&control_pool, &trade_pool, &manu_pool, table)?
-            };
-            if dynamic_producers.len() >= usize::BITS as usize {
-                return Err(Error::msg(
-                    "too many deferred producer presence combinations",
-                ));
-            }
-            let all_dynamic: HashSet<_> = dynamic_producers.iter().cloned().collect();
-            let producer_layout = run.resolve_snapshot(false)?;
-            let mut prepared = Vec::new();
-            for mask in 0..(1usize << dynamic_producers.len()) {
-                let required: HashSet<_> = dynamic_producers
-                    .iter()
-                    .enumerate()
-                    .filter(|(index, _)| mask & (1usize << index) != 0)
-                    .map(|(_, producer)| producer.clone())
-                    .collect();
-                let excluded: HashSet<_> = all_dynamic.difference(&required).cloned().collect();
-                if observe_control {
-                    let mut required_log: Vec<_> = required.iter().cloned().collect();
-                    required_log.sort();
-                    let mut excluded_log: Vec<_> = excluded.iter().cloned().collect();
-                    excluded_log.sort();
-                    observe!("producer_mask mask={mask} required={required_log:?} excluded={excluded_log:?}");
+            if options.auto_rotation {
+                // Plan controls are already in the assignment; only fill missing slots before
+                // entering the single production fill shared with the ordinary prefix path.
+                if run.assignment.control_operators().len() < 5 {
+                    let producer_layout = run.resolve_snapshot(false)?;
+                    let saileach_best_office_pct =
+                        best_available_office_pct(&run, &producer_layout)?;
+                    if !fill_peak_control(
+                        &mut run,
+                        plan,
+                        &control_pool,
+                        &producer_layout,
+                        &control_exclusions,
+                        None,
+                        saileach_best_office_pct,
+                        0,
+                    )? {
+                        return Err(Error::msg("auto peak control has no legal fill"));
+                    }
                 }
-                if let Some(candidate) = prepare_peak_control_candidate(
-                    run.clone(),
-                    plan,
-                    &control_pool,
-                    &producer_layout,
-                    &control_exclusions,
-                    Some((&required, &excluded)),
-                    mask,
-                )? {
-                    prepared.push(candidate);
-                } else {
-                    observe!("prepare_return_none mask={mask}");
-                }
-            }
-            prepared.sort_by(|left, right| {
-                right
-                    .policy_upper_bound
-                    .partial_cmp(&left.policy_upper_bound)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| left.stable_order.cmp(&right.stable_order))
-            });
-            timer.mark("peak_prepare_control");
-            let mut best = None;
-            for prepared in prepared {
-                if should_prune_peak_candidate(
-                    enable_producer_pruning,
-                    best.as_ref()
-                        .map(|best: &PeakPrefixCandidate<'_>| best.policy_sort_key),
-                    prepared.policy_upper_bound,
-                ) {
-                    observe!(
-                        "peak_prefix mask={} result=pruned_by_policy_upper_bound upper_bound={:?}",
-                        prepared.stable_order,
-                        prepared.policy_upper_bound
-                    );
-                    continue;
-                }
-                let stable_order = prepared.stable_order;
-                let Some(candidate) = finish_peak_prefix_candidate(
-                    prepared.run,
+                timer.mark("peak_prepare_control");
+                run = finish_peak_prefix(
+                    run,
                     plan,
                     &trade_pool,
                     &manu_pool,
                     &power_pool,
                     gold_lines,
                     &forbid_same_room,
-                    stable_order,
-                )?
-                else {
-                    continue;
-                };
-                if best.as_ref().is_none_or(|best: &PeakPrefixCandidate<'_>| {
-                    candidate.policy_sort_key > best.policy_sort_key
-                        || (candidate.policy_sort_key == best.policy_sort_key
-                            && candidate.stable_order < best.stable_order)
-                }) {
-                    best = Some(candidate);
+                )?;
+            } else {
+                let dynamic_producers =
+                    dynamic_producer_candidates(&control_pool, &trade_pool, &manu_pool, table)?;
+                if dynamic_producers.len() >= usize::BITS as usize {
+                    return Err(Error::msg(
+                        "too many deferred producer presence combinations",
+                    ));
                 }
+                let all_dynamic: HashSet<_> = dynamic_producers.iter().cloned().collect();
+                let producer_layout = run.resolve_snapshot(false)?;
+                let mut prepared = Vec::new();
+                for mask in 0..(1usize << dynamic_producers.len()) {
+                    let required: HashSet<_> = dynamic_producers
+                        .iter()
+                        .enumerate()
+                        .filter(|(index, _)| mask & (1usize << index) != 0)
+                        .map(|(_, producer)| producer.clone())
+                        .collect();
+                    let excluded: HashSet<_> = all_dynamic.difference(&required).cloned().collect();
+                    if observe_control {
+                        let mut required_log: Vec<_> = required.iter().cloned().collect();
+                        required_log.sort();
+                        let mut excluded_log: Vec<_> = excluded.iter().cloned().collect();
+                        excluded_log.sort();
+                        observe!("producer_mask mask={mask} required={required_log:?} excluded={excluded_log:?}");
+                    }
+                    if let Some(candidate) = prepare_peak_control_candidate(
+                        run.clone(),
+                        plan,
+                        &control_pool,
+                        &producer_layout,
+                        &control_exclusions,
+                        Some((&required, &excluded)),
+                        mask,
+                    )? {
+                        prepared.push(candidate);
+                    } else {
+                        observe!("prepare_return_none mask={mask}");
+                    }
+                }
+                prepared.sort_by(|left, right| {
+                    right
+                        .policy_upper_bound
+                        .partial_cmp(&left.policy_upper_bound)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| left.stable_order.cmp(&right.stable_order))
+                });
+                timer.mark("peak_prepare_control");
+                let mut best = None;
+                for prepared in prepared {
+                    if should_prune_peak_candidate(
+                        enable_producer_pruning,
+                        best.as_ref()
+                            .map(|best: &PeakPrefixCandidate<'_>| best.policy_sort_key),
+                        prepared.policy_upper_bound,
+                    ) {
+                        observe!(
+                            "peak_prefix mask={} result=pruned_by_policy_upper_bound upper_bound={:?}",
+                            prepared.stable_order,
+                            prepared.policy_upper_bound
+                        );
+                        continue;
+                    }
+                    let stable_order = prepared.stable_order;
+                    let Some(candidate) = finish_peak_prefix_candidate(
+                        prepared.run,
+                        plan,
+                        &trade_pool,
+                        &manu_pool,
+                        &power_pool,
+                        gold_lines,
+                        &forbid_same_room,
+                        stable_order,
+                    )?
+                    else {
+                        continue;
+                    };
+                    if best.as_ref().is_none_or(|best: &PeakPrefixCandidate<'_>| {
+                        candidate.policy_sort_key > best.policy_sort_key
+                            || (candidate.policy_sort_key == best.policy_sort_key
+                                && candidate.stable_order < best.stable_order)
+                    }) {
+                        best = Some(candidate);
+                    }
+                }
+                let best =
+                    best.ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?;
+                observe!(
+                    "peak_prefix_winner mask={} policy_sort_key={:?} control={:?}",
+                    best.stable_order,
+                    best.policy_sort_key,
+                    best.run
+                        .assignment
+                        .control_operators()
+                        .iter()
+                        .map(|op| op.name.as_str())
+                        .collect::<Vec<_>>()
+                );
+                run = best.run;
             }
-            let best =
-                best.ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?;
-            observe!(
-                "peak_prefix_winner mask={} policy_sort_key={:?} control={:?}",
-                best.stable_order,
-                best.policy_sort_key,
-                best.run
-                    .assignment
-                    .control_operators()
-                    .iter()
-                    .map(|op| op.name.as_str())
-                    .collect::<Vec<_>>()
-            );
-            run = best.run;
             // 只对最终 winner 做一次夜烟 trade/manufacture 归属比较；候选循环内不再
             // 为每个中枢候选重算整套生产填充。候选循环使用含喀兰杰市场的 trade_pool，
             // 这里的比较必须使用同一池，否则重填结果会与 winner 原结果漂移。
@@ -953,11 +983,9 @@ fn assign_meeting_rooms(
                         let mut trial = assignment.clone();
                         trial.set_room(room.id.clone(), members.clone());
                         if options.auto_rotation
-                            && (!crate::layout::admission::assignment_admitted(
-                                blueprint, &trial, instances, table,
-                            ) || !crate::layout::admission::room_work_duration_admitted(
+                            && !super::super::work_budget::room_work_duration_fits(
                                 blueprint, &trial, &room.id, instances,
-                            ))
+                            )
                         {
                             continue;
                         }
@@ -1055,11 +1083,9 @@ fn assign_meeting_rooms(
                 let mut trial = assignment.clone();
                 trial.set_room(room.id.clone(), members.clone());
                 if options.auto_rotation
-                    && (!crate::layout::admission::assignment_admitted(
-                        blueprint, &trial, instances, table,
-                    ) || !crate::layout::admission::room_work_duration_admitted(
+                    && !super::super::work_budget::room_work_duration_fits(
                         blueprint, &trial, &room.id, instances,
-                    ))
+                    )
                 {
                     continue;
                 }
@@ -1238,6 +1264,57 @@ fn prepare_peak_control_candidate<'a>(
             }
         };
     }
+    let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
+    if !fill_peak_control(
+        &mut run,
+        plan,
+        control_pool,
+        producer_layout,
+        control_exclusions,
+        dynamic_set,
+        saileach_best_office_pct,
+        stable_order,
+    )? {
+        return Ok(None);
+    }
+
+    let control_layout = control_layout_for_upper_bound(&run, producer_layout);
+    Ok(Some(PreparedPeakControlCandidate {
+        policy_upper_bound: control_inject_policy_sort_key_upper_bound(
+            &control_layout,
+            run.blueprint,
+            run.table,
+        ),
+        stable_order,
+        run,
+    }))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fill_peak_control(
+    run: &mut AssignmentRun<'_>,
+    plan: &AssignmentPlan,
+    control_pool: &ControlPool,
+    producer_layout: &crate::layout::LayoutContext,
+    control_exclusions: &HashSet<String>,
+    dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
+    saileach_best_office_pct: Option<f64>,
+    stable_order: usize,
+) -> Result<bool> {
+    let observe_control =
+        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
+    macro_rules! observe {
+        ($($arg:tt)*) => {
+            if observe_control {
+                use std::io::Write as _;
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "[INFRA-CONTROL-OBSERVE] {}",
+                    format_args!($($arg)*)
+                );
+            }
+        };
+    }
     let control_names: HashSet<String> = run
         .assignment
         .control_operators()
@@ -1254,7 +1331,6 @@ fn prepare_peak_control_candidate<'a>(
                     && requirement.candidates.len() == 1
                     && requirement.candidates.iter().any(|name| name == "琴柳")
             });
-    let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
     if run.assignment.control_operators().len() < 5 {
         if let Some((required, excluded)) = dynamic_set {
             if !assign_control_matching_dynamic_set_with_saileach(
@@ -1275,7 +1351,7 @@ fn prepare_peak_control_candidate<'a>(
                 observe!(
                     "prepare_return_none mask={stable_order} reason=dynamic_control_no_legal_fill"
                 );
-                return Ok(None);
+                return Ok(false);
             }
         } else {
             assign_control_with_saileach(
@@ -1293,12 +1369,6 @@ fn prepare_peak_control_candidate<'a>(
             )?;
         }
     }
-    let selected_names: Vec<_> = run
-        .assignment
-        .control_operators()
-        .into_iter()
-        .map(|operator| operator.name)
-        .collect();
     if let Some((required, excluded)) = dynamic_set {
         let control_names: HashSet<String> = run
             .assignment
@@ -1307,28 +1377,24 @@ fn prepare_peak_control_candidate<'a>(
             .map(|op| op.name)
             .collect();
         if !required.is_subset(&control_names) || !control_names.is_disjoint(excluded) {
+            let selected_names: Vec<_> = run
+                .assignment
+                .control_operators()
+                .into_iter()
+                .map(|operator| operator.name)
+                .collect();
             observe!("prepare_return_none mask={stable_order} reason=dynamic_presence_mismatch selected={selected_names:?} missing_required={:?} present_excluded={:?}",
                 required.difference(&control_names).collect::<std::collections::BTreeSet<_>>(),
                 control_names.intersection(excluded).collect::<std::collections::BTreeSet<_>>());
-            return Ok(None);
+            return Ok(false);
         }
     }
-
-    let control_layout = control_layout_for_upper_bound(&run, producer_layout);
-    Ok(Some(PreparedPeakControlCandidate {
-        policy_upper_bound: control_inject_policy_sort_key_upper_bound(
-            &control_layout,
-            run.blueprint,
-            run.table,
-        ),
-        stable_order,
-        run,
-    }))
+    Ok(true)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn finish_peak_prefix_candidate<'a>(
-    mut run: AssignmentRun<'a>,
+    run: AssignmentRun<'a>,
     plan: &AssignmentPlan,
     base_trade_pool: &TradePool,
     manu_pool: &crate::pool::ManuPool,
@@ -1337,6 +1403,69 @@ fn finish_peak_prefix_candidate<'a>(
     forbid_same_room: &[(String, String)],
     stable_order: usize,
 ) -> Result<Option<PeakPrefixCandidate<'a>>> {
+    let mut run = finish_peak_prefix(
+        run,
+        plan,
+        base_trade_pool,
+        manu_pool,
+        power_pool,
+        gold_lines,
+        forbid_same_room,
+    )?;
+    let policy_sort_key = match run.options.dynamic_producer_policy {
+        ScoringPolicyId::ControlInjectRawSumV0 => {
+            let final_layout = run.resolve_snapshot(true)?;
+            control_inject_policy_sort_key_for_assignment(
+                &final_layout,
+                run.blueprint,
+                &run.assignment,
+                run.instances,
+            )
+        }
+        ScoringPolicyId::TradeManufactureWeightedEfficiencyV1 => {
+            refresh_manufacture_efficiency_snapshots(
+                run.blueprint,
+                &mut run.assignment,
+                run.instances,
+                run.table,
+                run.options,
+                Some(run.durin_plan),
+            )?;
+            refresh_trade_efficiency_snapshots(
+                run.blueprint,
+                &mut run.assignment,
+                run.instances,
+                run.table,
+                run.options,
+                Some(run.durin_plan),
+            )?;
+            let (trade_total, manufacture_total) =
+                trade_manufacture_efficiency_totals(&run.assignment);
+            evaluate_trade_manufacture_weighted_efficiency(
+                trade_total,
+                manufacture_total,
+                run.options.trade_manufacture_weights,
+            )
+            .sort_key_millis as f64
+        }
+    };
+    Ok(Some(PeakPrefixCandidate {
+        policy_sort_key,
+        stable_order,
+        run,
+    }))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_peak_prefix<'a>(
+    mut run: AssignmentRun<'a>,
+    plan: &AssignmentPlan,
+    base_trade_pool: &TradePool,
+    manu_pool: &crate::pool::ManuPool,
+    power_pool: &PowerPool,
+    gold_lines: u32,
+    forbid_same_room: &[(String, String)],
+) -> Result<AssignmentRun<'a>> {
     place_system_producers(
         run.blueprint,
         run.operbox,
@@ -1401,49 +1530,7 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
-
-    let policy_sort_key = match run.options.dynamic_producer_policy {
-        ScoringPolicyId::ControlInjectRawSumV0 => {
-            let final_layout = run.resolve_snapshot(true)?;
-            control_inject_policy_sort_key_for_assignment(
-                &final_layout,
-                run.blueprint,
-                &run.assignment,
-                run.instances,
-            )
-        }
-        ScoringPolicyId::TradeManufactureWeightedEfficiencyV1 => {
-            refresh_manufacture_efficiency_snapshots(
-                run.blueprint,
-                &mut run.assignment,
-                run.instances,
-                run.table,
-                run.options,
-                Some(run.durin_plan),
-            )?;
-            refresh_trade_efficiency_snapshots(
-                run.blueprint,
-                &mut run.assignment,
-                run.instances,
-                run.table,
-                run.options,
-                Some(run.durin_plan),
-            )?;
-            let (trade_total, manufacture_total) =
-                trade_manufacture_efficiency_totals(&run.assignment);
-            evaluate_trade_manufacture_weighted_efficiency(
-                trade_total,
-                manufacture_total,
-                run.options.trade_manufacture_weights,
-            )
-            .sort_key_millis as f64
-        }
-    };
-    Ok(Some(PeakPrefixCandidate {
-        policy_sort_key,
-        stable_order,
-        run,
-    }))
+    Ok(run)
 }
 
 fn operator_is_in_normal_base(
