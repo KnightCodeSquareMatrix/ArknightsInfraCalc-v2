@@ -389,6 +389,9 @@ pub fn control_entry_deferred_trade_tags(
             continue;
         };
         for atom in &skill.atoms {
+            if matches!(atom.action, Action::GlobalInjectKarlanPrecision { .. }) {
+                tags.insert("cc.g.karlan".to_string());
+            }
             if let Some(
                 Selector::TaggedCountInTradeSum { tag }
                 | Selector::TaggedCountInCurrentTradeRoom { tag }
@@ -720,6 +723,11 @@ pub(crate) fn control_inject_policy_sort_key_upper_bound(
     blueprint: &crate::layout::BaseBlueprint,
     table: &SkillTable,
 ) -> f64 {
+    // Precision gain is settled by the trade interpreter on the selected
+    // workforce. The old positive-inject bound cannot bound that interaction.
+    if layout.global_inject.karlan_precision().is_some() {
+        return f64::INFINITY;
+    }
     let support_dependent = layout.global_inject.active_source_buffs().any(|buff_id| {
         table.get(buff_id).is_some_and(|skill| {
             skill.atoms.iter().any(|atom| {

@@ -56,16 +56,6 @@ CURATED_SYSTEMS = [
         ],
     },
     {
-        "id": "ling_jie_karlan",
-        "label": "喀兰中枢：灵知 E2；贸易侧由 L1 自然搜索",
-        "priority": 18,
-        "exclusive_group": "meta_chain",
-        "shift_modes": ["peak"],
-        "slots": [
-            {"facility": "control", "operators": [{"name": "灵知", "elite": 2}]},
-        ],
-    },
-    {
         "id": "witch_long_beta",
         "label": "巫恋组：巫恋Ⅱ+龙舌兰Ⅱ+裁缝β（138%贸+46%金）",
         "priority": 16,

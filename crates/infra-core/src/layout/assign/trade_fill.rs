@@ -33,7 +33,6 @@ const GOLD_ORDER_CORE_NAMES: [&str; 4] = [
     WITCH_TRADE_NAME,
     TEQUILA_TRADE_NAME,
 ];
-const KARLAN_JIE_TRADE_NAME: &str = "孑";
 /// 这些 `base_systems` 条目是 L3/兼容锚点或贸易 role 目录，不再由 registry fixed 早占岗位。
 /// 主路径的可露希尔/但书 required anchor 来自 `orchestration_rules.json`；
 /// 这里只跳过仍由贸易 role 搜索消费的旧 registry 条目，不声明跨体系总优先级。
@@ -490,7 +489,7 @@ pub(super) fn skip_trade_core_registry_systems(skip: &mut HashSet<String>) {
     }
 }
 
-/// 未被 plan 认领的金单贸易站：但书 -> 可露希尔 -> 完整龙巫 -> 巫恋兜底 -> 喀兰 -> 企鹅 -> 普通散件。
+/// 未被 plan 认领的金单贸易站：但书 -> 可露希尔 -> 完整龙巫 -> 巫恋兜底 -> 企鹅 -> 普通散件。
 ///
 /// Peak 的首个但书 / 一贸可露希尔通常已由 Plan 落位；同一入口也供 gamma fill 使用。
 pub(super) fn pick_trade_meta_then_plain(
@@ -641,31 +640,6 @@ pub(super) fn pick_trade_meta_then_plain(
             required_names,
         ) {
             if hit.names.iter().any(|n| n == WITCH_TRADE_NAME) {
-                return Ok(hit);
-            }
-        }
-    }
-    if order == TradeOrderKind::Gold
-        && karlan_precision_active(&layout.global_inject)
-        && !role_used.contains(KARLAN_JIE_TRADE_NAME)
-    {
-        if let Ok(hit) = pick_trade_role_hit_requiring(
-            "karlan",
-            pool,
-            table,
-            trade_room_options(
-                layout,
-                gold_lines,
-                options,
-                TradeOrderKind::Gold,
-                room_level,
-            ),
-            layout,
-            &role_used,
-            options.top_k,
-            required_names,
-        ) {
-            if hit.names.iter().any(|n| n == KARLAN_JIE_TRADE_NAME) {
                 return Ok(hit);
             }
         }

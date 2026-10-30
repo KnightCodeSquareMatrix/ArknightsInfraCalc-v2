@@ -36,6 +36,16 @@
 
 中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；source 只有实际 assignment 在场时才进入 manifest。producer 变化应触发 resolve 和下一阶段搜索，不能靠标签存在或 export 补偿。
 
+## 灵知可选协同（2026-10-30）
+
+用户裁决采用部分搜索：“它的队友落选就丢弃掉”。灵知不再由 `ling_jie_karlan` registry 提前认领中枢、孑和喀兰成员，旧 registry 及其生成脚本模板已删除。`trade_karlan_precision` 在 producer 目录声明为 deferred optional；普通中枢补位仍排除该技能，仅显式试算分支或既有硬 pin 可以进入。
+
+Peak 复用动态中枢 presence 枚举，每个分支按当前贸易 role/房间顺序选人，不固定孑、银灰或第三人。移除喀兰 role 可用就优先返回的补位路径；贸易填完后，实际同房没有市井孑与喀兰成员的可选灵知分支直接淘汰，不重排其他房间、不回头抢队友。实际 Box 练度固定。第三人不要求喀兰；缺银灰的低档合法协同也不按技能非法排除。
+
+`ControlInjectRawSumV0` 保留原注入比较项，并加入灵知在完整实际贸易名单上的边际 final 效率百分点：同一名单分别由贸易 solver 按有/无精密计算结算，差值求和。该差值不是队友重新优化收益，也不代表全基建机会成本；`TradeManufactureWeightedEfficiencyV1` 保留原比较口径。旧正注入上界不覆盖此交互，有精密计算的分支不走该上界剪枝。整体仍是 **heuristic / 部分搜索**，不声称全局最优。
+
+胜出名单由 `resolve_actual_producer_dependencies` 派生 `trade_karlan_precision` 实际依赖，精密计算来源与实际市井孑、喀兰受益成员沿既有 exact-presence 同班；同站关系随既有生产组件轮换。独立第三人（如但书、可露希尔）不额外绑同休，可按其原有连续工作或菲亚规则继续在岗。夜烟归属重算若破坏该已选协同，其替代结果不提交。终态 gate 的 `karlan_precision_selected_team` 在最终 assignment 检查在岗来源对应的实际贸易成员同房，既有 `karlan_trade_requires_control_source` 和 bind cycle 检查反向来源与同班。旧 `scripts/check_karlan_rotation.py` 入口转调统一批量 runner，始终运行 Rust 终态 gate，不再用 Python 重写 registry 认领或上下班判断。
+
 ## 核验
 
 检查 control trace、ledger records、global inject explanation、最终 assignment invariant。固定候选用 `layout eval --explain-json`；整班用 `plan --assert-invariants` 和 243/high-owned fixture。中枢技能原文与同种效果规则回知识库引用，本文只记录实现责任和状态流。

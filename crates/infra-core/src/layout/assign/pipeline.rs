@@ -259,6 +259,7 @@ fn run_shift_pipeline_with_producer_pruning(
                     gold_lines,
                     &forbid_same_room,
                     stable_order,
+                    prepared.optional_precision,
                 )?
                 else {
                     continue;
@@ -284,6 +285,7 @@ fn run_shift_pipeline_with_producer_pruning(
                     .map(|op| op.name.as_str())
                     .collect::<Vec<_>>()
             );
+            let optional_precision = best.optional_precision;
             run = best.run;
             // 只对最终 winner 做一次夜烟 trade/manufacture 归属比较；候选循环内不再
             // 为每个中枢候选重算整套生产填充。候选循环使用含喀兰杰市场的 trade_pool，
@@ -305,8 +307,17 @@ fn run_shift_pipeline_with_producer_pruning(
                 gold_lines,
                 &forbid_same_room,
             )? {
-                run.assignment = assignment;
-                run.used = used;
+                if !optional_precision
+                    || !crate::response_dependency::karlan_precision_consumer_rooms(
+                        blueprint,
+                        &assignment,
+                        instances,
+                    )
+                    .is_empty()
+                {
+                    run.assignment = assignment;
+                    run.used = used;
+                }
             }
             timer.mark("peak_prefixes");
         }
@@ -1047,12 +1058,14 @@ struct PeakPrefixCandidate<'a> {
     run: AssignmentRun<'a>,
     policy_sort_key: f64,
     stable_order: usize,
+    optional_precision: bool,
 }
 
 struct PreparedPeakControlCandidate<'a> {
     run: AssignmentRun<'a>,
     policy_upper_bound: f64,
     stable_order: usize,
+    optional_precision: bool,
 }
 
 fn should_prune_peak_candidate(
@@ -1105,6 +1118,7 @@ fn run_peak_prefix_candidate<'a>(
         gold_lines,
         forbid_same_room,
         stable_order,
+        prepared.optional_precision,
     )
 }
 
@@ -1299,6 +1313,16 @@ fn prepare_peak_control_candidate<'a>(
     }
 
     let control_layout = control_layout_for_upper_bound(&run, producer_layout);
+    let optional_precision = run.assignment.control_operators().iter().any(|op| {
+        !control_names.contains(&op.name)
+            && crate::response_dependency::control_buffs_have_karlan_precision(
+                run.table,
+                run.instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .map(String::as_str),
+            )
+    });
     Ok(Some(PreparedPeakControlCandidate {
         policy_upper_bound: control_inject_policy_sort_key_upper_bound(
             &control_layout,
@@ -1306,6 +1330,7 @@ fn prepare_peak_control_candidate<'a>(
             run.table,
         ),
         stable_order,
+        optional_precision,
         run,
     }))
 }
@@ -1320,6 +1345,7 @@ fn finish_peak_prefix_candidate<'a>(
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
     stable_order: usize,
+    optional_precision: bool,
 ) -> Result<Option<PeakPrefixCandidate<'a>>> {
     place_system_producers(
         run.blueprint,
@@ -1368,6 +1394,19 @@ fn finish_peak_prefix_candidate<'a>(
         &mut run.assignment,
         &mut run.used,
     )?;
+    if optional_precision
+        && crate::response_dependency::karlan_precision_consumer_rooms(
+            run.blueprint,
+            &run.assignment,
+            run.instances,
+        )
+        .is_empty()
+    {
+        if std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1") {
+            eprintln!("[INFRA-CONTROL-OBSERVE] peak_prefix mask={stable_order} result=discarded_precision_teammates_lost");
+        }
+        return Ok(None);
+    }
     cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut run.assignment, &mut run.used);
 
     let manu_layout = run.resolve_snapshot(true)?;
@@ -1387,12 +1426,17 @@ fn finish_peak_prefix_candidate<'a>(
     let policy_sort_key = match run.options.dynamic_producer_policy {
         ScoringPolicyId::ControlInjectRawSumV0 => {
             let final_layout = run.resolve_snapshot(true)?;
+            let precision_gain = if final_layout.global_inject.karlan_precision().is_some() {
+                karlan_precision_trade_gain_pct(&run)?
+            } else {
+                0.0
+            };
             control_inject_policy_sort_key_for_assignment(
                 &final_layout,
                 run.blueprint,
                 &run.assignment,
                 run.instances,
-            )
+            ) + precision_gain
         }
         ScoringPolicyId::TradeManufactureWeightedEfficiencyV1 => {
             refresh_manufacture_efficiency_snapshots(
@@ -1424,8 +1468,53 @@ fn finish_peak_prefix_candidate<'a>(
     Ok(Some(PeakPrefixCandidate {
         policy_sort_key,
         stable_order,
+        optional_precision,
         run,
     }))
+}
+
+/// ControlInjectRawSumV0 extension for precision: settle the same actual
+/// workforce with and without its coefficients, and add the final trade gain
+/// in percentage points. No teammate search or opportunity-cost claim here.
+fn karlan_precision_trade_gain_pct(run: &AssignmentRun<'_>) -> Result<f64> {
+    let resolved = crate::layout::resolve_base(
+        run.blueprint,
+        &run.assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?;
+    if resolved.layout.global_inject.karlan_precision().is_none() {
+        return Ok(0.0);
+    }
+    let gold_lines = resolved.gold_manu_line_count();
+    let mut gain = crate::Efficiency::ZERO;
+    for room in resolved.trade_rooms {
+        if room.operators.is_empty() {
+            continue;
+        }
+        let mut input = crate::trade::TradeRoomInput {
+            level: room.level,
+            operators: room.operators,
+            order_count: None,
+            mood: run.options.mood,
+            gold_production_lines: Some(gold_lines),
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: std::sync::Arc::new(room.layout),
+            active_order_kind: room.order,
+        };
+        let actual =
+            crate::trade::solve_trade_with_shift(&input, run.table, run.options.shift_hours)?;
+        std::sync::Arc::make_mut(&mut input.layout)
+            .global_inject
+            .clear_karlan_precision();
+        let without =
+            crate::trade::solve_trade_with_shift(&input, run.table, run.options.shift_hours)?;
+        gain += actual.efficiency.final_efficiency - without.efficiency.final_efficiency;
+    }
+    Ok(gain.as_f64() * 100.0)
 }
 
 fn operator_is_in_normal_base(
@@ -1481,10 +1570,15 @@ fn dynamic_producer_candidates(
         .collect();
     let mut producers = Vec::new();
     for entry in &control_pool.entries {
+        let precision = crate::response_dependency::control_buffs_have_karlan_precision(
+            table,
+            entry.buff_ids.iter().map(String::as_str),
+        );
         if crate::response_dependency::control_buff_is_automatically_excluded(
             table,
             entry.buff_ids.iter().map(String::as_str),
-        )? {
+        )? && !precision
+        {
             continue;
         }
         let trade_match = control_entry_deferred_trade_tags(entry, table)?

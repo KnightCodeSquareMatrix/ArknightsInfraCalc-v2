@@ -22,6 +22,8 @@
 
 候选闭包中的 `upper_bound`、prefix pruning 和 shadow branch 是剪枝或 policy；除非对应代码证明等价，文档和输出不得称为全局最优。完整池模式只改变候选范围，不改变域公式。
 
+灵知可选前缀（用户 2026-10-30 裁决）在 `ControlInjectRawSumV0` 中额外计入实际贸易组合有/无精密计算的 `final_efficiency` 差值，统一转为百分点后求和。两次结算复用贸易 solver，固定队友，不重新选人。队友自然选中才保留候选；既有中枢效果依然按原 policy 比较。这是局部启发式增益，不是所有贸易房联合最优或完整机会成本。该分支上界为无穷，避免用不含此交互的旧上界误剪。V1 仍按其原纸面权重口径，未借此修改。
+
 ## tie-break 和失败
 
 同分时使用稳定的名称/组合排序。中枢效果相同值只允许消费 `ControlEffectLedger` 记录的 `Winner`/`TiedWinner` 来源；被更高值覆盖的 `Suppressed` 来源不产生偏好。输入不合法、互斥冲突或 required anchor 缺失应返回错误/无解，不通过匿名分数悄悄降级。

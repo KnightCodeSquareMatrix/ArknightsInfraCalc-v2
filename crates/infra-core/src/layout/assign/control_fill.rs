@@ -235,6 +235,7 @@ fn assign_control_inner(
         table,
         used,
         &pinned,
+        &must_include,
         excluded.unwrap_or(&empty_excluded),
     )?;
     let protected_mood_candidates: HashSet<String> = candidate_requirements
@@ -335,6 +336,7 @@ fn filter_control_pool_for_fill(
     table: &SkillTable,
     used: &HashSet<String>,
     pinned: &HashSet<String>,
+    admitted: &HashSet<String>,
     excluded: &HashSet<String>,
 ) -> Result<ControlPool> {
     let automatically_excluded: HashSet<_> = pool
@@ -355,9 +357,10 @@ fn filter_control_pool_for_fill(
             .filter(|e| {
                 (pinned.contains(&e.name)
                     || (!excluded.contains(&e.name)
-                        && !automatically_excluded
-                            .iter()
-                            .any(|(name, excluded)| *excluded && *name == e.name)))
+                        && (admitted.contains(&e.name)
+                            || !automatically_excluded
+                                .iter()
+                                .any(|(name, excluded)| *excluded && *name == e.name))))
                     && (!used.contains(&e.name) || pinned.contains(&e.name))
             })
             .cloned()
@@ -469,6 +472,7 @@ mod tests {
             &HashSet::new(),
             &HashSet::new(),
             &HashSet::new(),
+            &HashSet::new(),
         )
         .unwrap();
 
@@ -477,7 +481,8 @@ mod tests {
 
         let pinned = HashSet::from(["阿米娅".to_string()]);
         let filtered =
-            filter_control_pool_for_fill(&pool, &table, &HashSet::new(), &pinned, &pinned).unwrap();
+            filter_control_pool_for_fill(&pool, &table, &HashSet::new(), &pinned, &pinned, &pinned)
+                .unwrap();
         assert_eq!(filtered.entries.len(), 1);
     }
 }

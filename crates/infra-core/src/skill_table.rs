@@ -519,7 +519,7 @@ mod tests {
         let catalog =
             crate::response_dependency::load_producer_rule_catalog(&producer_path, &table).unwrap();
 
-        assert_eq!(catalog.rules.len(), 4);
+        assert_eq!(catalog.rules.len(), 5);
         assert!(catalog
             .rules
             .iter()

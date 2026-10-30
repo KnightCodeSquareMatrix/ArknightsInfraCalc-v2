@@ -1250,7 +1250,7 @@ mod tests {
             "红松林走 orchestration_rules，不进 registry"
         );
         assert!(ids.contains("lungmen_manu_pair"));
-        assert!(ids.contains("ling_jie_karlan"));
+        assert!(!ids.contains("ling_jie_karlan"));
         assert!(
             !ids.contains("gongsun_greyy2_power_line") && !ids.contains("automation_group"),
             "自动化组及发电线已迁入 orchestration_rules，不得保留 legacy registry"
@@ -1298,7 +1298,7 @@ mod tests {
     }
 
     #[test]
-    fn registry_claims_ling_jie_karlan_trade_pair() {
+    fn registry_does_not_preclaim_ling_jie_karlan_trade_pair() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let operbox = OperBox::from_entries(
             ideal_e2_operbox()
@@ -1318,29 +1318,9 @@ mod tests {
             &HashSet::new(),
             None,
         );
-        let ling = claims
+        assert!(!claims
             .iter()
-            .find(|claim| claim.system_id == "ling_jie_karlan")
-            .expect("灵知 E2 应由 registry 认领中枢位");
-        assert_eq!(ling.slots.len(), 2);
-        assert_eq!(ling.slots[0].facility, FacilityKind::ControlCenter);
-        assert_eq!(
-            ling.slots[0]
-                .operators
-                .iter()
-                .map(|op| op.name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["灵知"]
-        );
-        assert_eq!(ling.slots[1].facility, FacilityKind::TradePost);
-        assert_eq!(
-            ling.slots[1]
-                .operators
-                .iter()
-                .map(|op| op.name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["孑", "银灰"]
-        );
+            .any(|claim| claim.system_id == "ling_jie_karlan"));
     }
 
     #[test]

@@ -5429,6 +5429,44 @@ fn assert_final_rotation_invariants_with_mood(
                 actual_cuisine,
             )));
         }
+        for dependency in report
+            .assignment_plans
+            .get(shift.plan_index)
+            .into_iter()
+            .flat_map(|plan| &plan.resolved_producer_dependencies)
+            .filter(|dependency| dependency.rule_id == "trade_karlan_precision")
+        {
+            let source_active = shift
+                .assignment
+                .control_operators()
+                .iter()
+                .any(|op| dependency.producers.contains(&op.name));
+            if source_active {
+                let same_trade_room = blueprint.rooms.iter().any(|room| {
+                    room.kind == FacilityKind::TradePost
+                        && dependency.consumers.iter().all(|name| {
+                            shift
+                                .assignment
+                                .operators_in(&room.id)
+                                .iter()
+                                .any(|op| &op.name == name)
+                        })
+                });
+                if !same_trade_room
+                    || crate::response_dependency::karlan_precision_consumer_rooms(
+                        blueprint,
+                        &shift.assignment,
+                        instances,
+                    )
+                    .is_empty()
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants karlan_precision_selected_team failed in shift {}: producer without its selected trade room",
+                        shift.index + 1,
+                    )));
+                }
+            }
+        }
         for room in shift.assignment.iter_rooms() {
             if blueprint
                 .room(&room.room_id)
@@ -15403,7 +15441,7 @@ mod tests {
     }
 
     #[test]
-    fn team_rotation_keeps_claimed_gnosis_karlan_chain_and_excludes_rin() {
+    fn team_rotation_keeps_selected_gnosis_karlan_chain_and_excludes_rin() {
         let mut blueprint = BaseBlueprint::template_snhunt().unwrap();
         blueprint.scenario.initial_global.clear();
         let base = OperBox::load(&default_operbox_full_e2_path().unwrap()).unwrap();
@@ -15423,14 +15461,11 @@ mod tests {
         )
         .unwrap();
 
-        assert!(
-            report
-                .peak_plan
-                .registry_claims
-                .iter()
-                .any(|claim| claim.system_id == "ling_jie_karlan"),
-            "fixture 应由正式 System 认领灵知喀兰链"
-        );
+        assert!(report
+            .peak_plan
+            .registry_claims
+            .iter()
+            .all(|claim| claim.system_id != "ling_jie_karlan"));
         let mut gnosis_shifts = 0;
         for shift in &report.shifts {
             if !shift
@@ -15459,7 +15494,16 @@ mod tests {
                 "灵知上岗班必须存在孑+谢拉格成员的实际贸易消费房"
             );
         }
-        assert_eq!(gnosis_shifts, 2, "peak System 应按上2休1运行");
+        if report
+            .peak_plan
+            .resolved_producer_dependencies
+            .iter()
+            .any(|dependency| dependency.rule_id == "trade_karlan_precision")
+        {
+            assert_eq!(gnosis_shifts, 2, "胜出的灵知协同按上2休1运行");
+        } else {
+            assert_eq!(gnosis_shifts, 0, "未选中的灵知不得由后续补位重新引入");
+        }
         assert!(
             report.shifts.iter().all(|shift| !shift
                 .assignment
