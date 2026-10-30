@@ -195,7 +195,7 @@
             }
           },
           "phase": "limit",
-          "phase_order": 40
+          "phase_order": 60
         },
         {
           "selector": "order_count",
@@ -2286,8 +2286,8 @@
               "cap": 100.0
             }
           },
-          "phase": "limit_var",
-          "phase_order": 10
+          "phase": "limit",
+          "phase_order": 50
         }
       ]
     },

@@ -471,7 +471,15 @@ fn apply_atom(ctx: &mut TradeContext, atom: &EffectAtom, owner: &str) {
         Phase::Constant | Phase::PeerShare | Phase::EffVar | Phase::OrderVar | Phase::LimitVar => {
             apply_eff_action(ctx, atom, owner);
         }
-        Phase::Limit => apply_limit_action(ctx, atom, owner),
+        Phase::Limit => {
+            // Contributed-limit efficiency settles after limit modifiers and
+            // before efficiency-based compression, ordered by the runtime atoms.
+            if matches!(atom.action, Action::AddBucketEffFromSelector { .. }) {
+                apply_eff_action(ctx, atom, owner);
+            } else {
+                apply_limit_action(ctx, atom, owner);
+            }
+        }
         Phase::OrderMechanic => {
             apply_order_mechanic(ctx, atom);
             if matches!(atom.action, Action::AddFlatEff { .. }) {
@@ -658,9 +666,12 @@ fn resolve_selector_value(ctx: &TradeContext, selector: Option<&Selector>, owner
             .iter()
             .filter(|o| o.tags.iter().any(|t| t == tag))
             .count() as f64,
-        Some(Selector::LimitContribSum) => {
-            ctx.operators.iter().map(|o| o.limit_contrib).sum::<i32>() as f64
-        }
+        Some(Selector::LimitContribSum) => ctx
+            .operators
+            .iter()
+            .map(|o| o.limit_contrib)
+            .sum::<i32>()
+            .max(0) as f64,
         Some(Selector::MeetingMaxLevel) => f64::from(ctx.layout.meeting_max_level),
         Some(Selector::DormLevelSum) => f64::from(ctx.layout.dorm_level_sum),
         Some(Selector::ManuRecipeKinds) => f64::from(ctx.layout.manu_recipe_kinds),
@@ -2011,6 +2022,65 @@ mod tests {
                 ((r.efficiency.paper.paper_efficiency.as_f64() - 1.0) * 100.0)
             );
         }
+    }
+
+    #[test]
+    fn degenbrecher_champion_efficiency_precedes_market_compression() {
+        let table = load_table();
+        let instances = crate::instances::OperatorInstances::load(
+            &crate::instances::default_instances_path().unwrap(),
+        )
+        .unwrap();
+        let degenbrecher = TradeOperator {
+            name: "锏".into(),
+            elite: 2,
+            buff_ids: instances.resolve_trade_buff_ids("锏", crate::tier::PromotionTier::TierUp),
+            tags: instances.tags_for("锏", crate::tier::PromotionTier::TierUp),
+            ..Default::default()
+        };
+        let members = [jie_market_op(), silverash_karlan_op(), degenbrecher];
+        for (precision, expected_eff, expected_limit) in [(true, 121.0, 14), (false, 61.0, 4)] {
+            for permutation in [
+                [0, 1, 2],
+                [0, 2, 1],
+                [1, 0, 2],
+                [1, 2, 0],
+                [2, 0, 1],
+                [2, 1, 0],
+            ] {
+                for compiled in [false, true] {
+                    for order_count in [None, Some(0), Some(5), Some(100)] {
+                        let mut input = ling_jie_input(members[2].clone());
+                        input.operators = permutation.iter().map(|i| members[*i].clone()).collect();
+                        input.order_count = order_count;
+                        if !precision {
+                            input.layout = Default::default();
+                        }
+                        if compiled {
+                            for op in &mut input.operators {
+                                op.compiled_atoms =
+                                    crate::pool::compile_operator_atoms(&op.buff_ids, &table);
+                            }
+                        }
+                        let mut ctx = TradeContext::from_room(&input);
+                        apply_trade_phases(&mut ctx, &table);
+                        assert_eq!(ctx.final_order_limit, expected_limit);
+                        assert_eq!(ctx.order_eff_skill(), expected_eff);
+                    }
+                }
+            }
+        }
+
+        // E0 Jaye has no compression: 20 gross orders give an 80% peak,
+        // in addition to SilverAsh's 5% and Degenbrecher's 10% + 50%.
+        let mut input = ling_jie_input(members[2].clone());
+        input.operators[0].buff_ids = vec!["trade_ord_limit_diff[000]".into()];
+        input.operators[0].elite = 0;
+        input.order_count = Some(0);
+        let mut ctx = TradeContext::from_room(&input);
+        apply_trade_phases(&mut ctx, &table);
+        assert_eq!(ctx.final_order_limit, 20);
+        assert_eq!(ctx.order_eff_skill(), 145.0);
     }
 
     #[test]
