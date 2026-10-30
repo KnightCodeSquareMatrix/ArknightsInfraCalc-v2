@@ -3194,7 +3194,10 @@ fn finalize_timed_rotation(
     let total_before = crate::profile::solver_perf_snapshot();
     let stage_started = Instant::now();
     let stage_before = total_before;
-    for shift in &report.shifts {
+    for shift in &mut report.shifts {
+        // Vacancy completion can append a gold-flow member after its reader. Normalize
+        // before dorm finalization also consumes this order; preserve dorm order itself.
+        shift.assignment.sort_trade_gold_flow_operators(blueprint);
         print_trade_rotation_debug(
             &format!("finalize shift {} input", shift.index + 1),
             &shift.assignment,

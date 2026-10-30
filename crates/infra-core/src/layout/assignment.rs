@@ -390,6 +390,23 @@ impl BaseAssignment {
         }
     }
 
+    /// Normalize gold-flow entry order only in trade rooms, preserving other facilities' order.
+    pub fn sort_trade_gold_flow_operators(&mut self, blueprint: &BaseBlueprint) {
+        for room in &mut self.rooms {
+            if blueprint
+                .room(&room.room_id)
+                .is_some_and(|blueprint_room| blueprint_room.kind == FacilityKind::TradePost)
+                && crate::trade::gold_flow::has_ordered_gold_flow(
+                    room.operators.iter().map(|operator| operator.name.as_str()),
+                )
+            {
+                room.operators.sort_by_key(|operator| {
+                    crate::trade::gold_flow::ordered_trio_priority(&operator.name)
+                });
+            }
+        }
+    }
+
     pub fn control_operators(&self) -> Vec<AssignedOperator> {
         self.rooms
             .iter()
