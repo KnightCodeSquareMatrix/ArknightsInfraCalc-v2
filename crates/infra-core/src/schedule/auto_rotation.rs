@@ -352,14 +352,7 @@ pub fn assert_auto_rotation_invariants(
     }
     crate::layout::assert_suggestion_plan_policy(&report.assignment_plans)?;
     report.timing.validate()?;
-    if !crate::layout::work_budget::assignments_fit(
-        blueprint,
-        &report.main_assignment,
-        &report.backup_assignment,
-        instances,
-    ) {
-        return Err(Error::msg("assert-invariants auto_work_duration failed"));
-    }
+    assert_auto_work_duration(blueprint, instances, report)?;
     validate_explicit_supports(
         blueprint,
         [&report.main_assignment, &report.backup_assignment],
@@ -437,11 +430,6 @@ pub fn assert_auto_rotation_invariants(
             &report.assignment_plans[index],
         )
         .map_err(Error::msg)?;
-        let other = if index == 0 {
-            &report.backup_assignment
-        } else {
-            &report.main_assignment
-        };
         for anchor in &report.assignment_plans[index].anchors {
             if anchor.room_id.as_ref().is_none_or(|room| {
                 !assignment
@@ -454,43 +442,6 @@ pub fn assert_auto_rotation_invariants(
         }
         let model = crate::mood::default_mood_model()?;
         let eta = crate::mood::shift_eta_with_instances(model, blueprint, assignment, instances);
-        // gate 从实际 assignment 独立重建 ETA，不以候选准入谓词代替预算证明。
-        for alternate_control in [false, true] {
-            let mut trial = assignment.clone();
-            if alternate_control {
-                for room in blueprint
-                    .rooms
-                    .iter()
-                    .filter(|room| room.kind == FacilityKind::ControlCenter)
-                {
-                    trial.set_room(room.id.clone(), other.operators_in(&room.id).to_vec());
-                }
-            }
-            let trial_eta =
-                crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
-            for member in &trial_eta.per_op {
-                let room = blueprint
-                    .room(&RoomId::from(member.room_id.as_str()))
-                    .ok_or_else(|| Error::msg("assert-invariants auto_eta_room_owner failed"))?;
-                if alternate_control && room.kind == FacilityKind::ControlCenter {
-                    continue;
-                }
-                if !crate::mood::fits_work_budget(
-                    model,
-                    model.mood_cap,
-                    member.drain_per_hour,
-                    report.timing.shift_hours[index],
-                ) {
-                    return Err(Error::msg(format!(
-                        "assert-invariants auto_eta_work_duration failed: {} {} needs {}h, workable {:?}h",
-                        member.room_id,
-                        member.name,
-                        report.timing.shift_hours[index],
-                        member.workable_hours,
-                    )));
-                }
-            }
-        }
         let options = AssignBaseOptions {
             auto_rotation: true,
             mood: model.mood_cap,
@@ -625,6 +576,103 @@ pub fn assert_auto_rotation_invariants(
             .all(|room| room.main.complete && room.backup.complete)
     {
         return Err(Error::msg("assert-invariants auto_complete failed"));
+    }
+    Ok(())
+}
+
+/// 显式 gate 用实际名单走完整 ETA，独立于生产 work_budget 的分解谓词。
+fn assert_auto_work_duration(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    report: &AutoRotationReport,
+) -> Result<()> {
+    let model = crate::mood::default_mood_model()?;
+    let assignments = [&report.main_assignment, &report.backup_assignment];
+    // 当前唯一外站心情项是深海人数加耗：逐房取人数最多的真实名单，构造可共存混搭。
+    let mut worst_outside = BaseAssignment::default();
+    for room in &blueprint.rooms {
+        if matches!(
+            room.kind,
+            FacilityKind::ControlCenter | FacilityKind::Dormitory
+        ) {
+            continue;
+        }
+        let members = assignments
+            .iter()
+            .map(|assignment| assignment.operators_in(&room.id))
+            .max_by_key(|members| {
+                members
+                    .iter()
+                    .filter(|op| {
+                        instances
+                            .tags_for(&op.name, op.tier())
+                            .iter()
+                            .any(|tag| tag == "cc.g.abyssal")
+                    })
+                    .count()
+            })
+            .unwrap();
+        worst_outside.set_room(room.id.clone(), members.to_vec());
+    }
+    for (index, assignment) in assignments.into_iter().enumerate() {
+        let hours = report.timing.shift_hours[index];
+        // 非中枢成员只依赖本房与当时中枢；检查本态名单在两个实际中枢下的 ETA。
+        for control in assignments {
+            let mut trial = assignment.clone();
+            for room in blueprint
+                .rooms
+                .iter()
+                .filter(|room| room.kind == FacilityKind::ControlCenter)
+            {
+                trial.set_room(room.id.clone(), control.operators_in(&room.id).to_vec());
+            }
+            let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
+            for member in &eta.per_op {
+                if blueprint
+                    .room(&RoomId::from(member.room_id.as_str()))
+                    .is_some_and(|room| room.kind == FacilityKind::ControlCenter)
+                {
+                    continue;
+                }
+                if !crate::mood::fits_work_budget(
+                    model,
+                    model.mood_cap,
+                    member.drain_per_hour,
+                    hours,
+                ) {
+                    return Err(Error::msg(format!(
+                        "assert-invariants auto_eta_work_duration failed: {} {} needs {hours}h, workable {:?}h",
+                        member.room_id, member.name, member.workable_hours,
+                    )));
+                }
+            }
+        }
+        let mut trial = worst_outside.clone();
+        for room in blueprint
+            .rooms
+            .iter()
+            .filter(|room| room.kind == FacilityKind::ControlCenter)
+        {
+            trial.set_room(room.id.clone(), assignment.operators_in(&room.id).to_vec());
+        }
+        let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
+        for member in &eta.per_op {
+            if blueprint
+                .room(&RoomId::from(member.room_id.as_str()))
+                .is_some_and(|room| room.kind == FacilityKind::ControlCenter)
+                && !crate::mood::fits_work_budget(
+                    model,
+                    model.mood_cap,
+                    member.drain_per_hour,
+                    hours,
+                )
+            {
+                return Err(Error::msg(format!(
+                    "assert-invariants auto_mixed_control_work_duration failed: {} needs {hours}h, workable {:?}h",
+                    member.name, member.workable_hours,
+                )));
+            }
+        }
     }
     Ok(())
 }
