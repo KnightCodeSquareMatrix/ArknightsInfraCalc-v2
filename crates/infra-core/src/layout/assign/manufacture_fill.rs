@@ -65,7 +65,7 @@ pub(super) fn assign_manufacture_lines(
             Some(RoomProduct::Factory { recipe }) => *recipe,
             _ => continue,
         };
-        let mut current_layout = crate::layout::resolve_base(
+        let current_layout = crate::layout::resolve_base(
             blueprint,
             assignment,
             Some(instances),
@@ -74,7 +74,6 @@ pub(super) fn assign_manufacture_lines(
             Some(operbox.durin_dorm_planning_count(instances)),
         )?
         .layout;
-        current_layout.candidate_room = options.auto_rotation.then(|| room.id.0.clone());
         let opts = manu_options(&current_layout, options, recipe, room.level);
         let existing = assignment.operators_in(&room.id);
         if existing.len() > 1 {
@@ -494,12 +493,11 @@ fn score_manu_entries(
             )
         })
         .collect::<Vec<_>>();
-    if !crate::layout::admission::candidate_admitted(
+    if !crate::layout::work_budget::candidate_fits(
         layout,
-        "manufacture",
-        members.clone(),
-        table,
-        true,
+        FacilityKind::Factory,
+        Some(recipe),
+        &members,
     ) {
         return None;
     }

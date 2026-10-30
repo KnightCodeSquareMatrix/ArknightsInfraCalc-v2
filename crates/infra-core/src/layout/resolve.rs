@@ -137,8 +137,8 @@ pub fn resolve_base_with_trace(
     result
 }
 
-/// 蓝图的静态场景输入；结算与候选准入共用，真实成员统计由各自快照填入。
-pub(crate) fn layout_from_blueprint(blueprint: &BaseBlueprint) -> LayoutContext {
+/// 蓝图的静态场景输入；实际成员统计在后续结算时填入。
+fn layout_from_blueprint(blueprint: &BaseBlueprint) -> LayoutContext {
     LayoutContext {
         meeting_max_level: blueprint.meeting_max_level(),
         training_room_level: blueprint.training_room_max_level(),
@@ -184,15 +184,15 @@ fn resolve_base_core(
     let mut layout = layout_from_blueprint(blueprint);
     layout.auto_rotation = assignment.auto_rotation;
     layout.work_hours = assignment.work_hours;
-    layout.auto_initial_global = assignment.auto_rotation.then(|| layout.global.clone());
-    layout.auto_other_presence = std::sync::Arc::new(assignment.auto_other_presence.clone());
-    layout.station_presence = std::sync::Arc::new(if assignment.auto_rotation {
-        instances
-            .map(|instances| super::admission::presence(blueprint, assignment, instances))
-            .unwrap_or_default()
+    layout.auto_work_budget = if assignment.auto_rotation {
+        instances.map(|instances| {
+            std::sync::Arc::new(super::work_budget::context(
+                blueprint, assignment, instances,
+            ))
+        })
     } else {
-        Vec::new()
-    });
+        None
+    };
     layout.elite_facility_count =
         effective_elite_facility_count(blueprint, assignment, &workforce, instances);
     workforce.apply_to_layout(&mut layout);

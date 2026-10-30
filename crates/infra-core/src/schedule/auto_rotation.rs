@@ -185,7 +185,7 @@ pub fn schedule_auto_rotation(
         &mut backup,
     )
     .map_err(|error| fixed_main_backup_error("替补补位", error))?;
-    // 替补阶段新增的挂件成为两态常驻；其准入已同时检查固定主力。
+    // 替补阶段新增的显式挂件成为两态常驻；归属继承固定主力的工作房。
     for room in blueprint
         .rooms
         .iter()
@@ -196,10 +196,6 @@ pub fn schedule_auto_rotation(
             backup.assignment.operators_in(&room.id).to_vec(),
         );
     }
-    main.assignment.auto_other_presence =
-        crate::layout::admission::presence(blueprint, &backup.assignment, instances);
-    backup.assignment.auto_other_presence =
-        crate::layout::admission::presence(blueprint, &main.assignment, instances);
     crate::layout::assign::refresh_standalone_efficiency(
         blueprint,
         &operbox,
@@ -220,25 +216,22 @@ pub fn schedule_auto_rotation(
         instances,
         table,
     )?;
-    for assignment in [&main.assignment, &backup.assignment] {
-        if !crate::layout::admission::assignment_admitted(blueprint, assignment, instances, table) {
-            return Err(fixed_main_backup_error(
-                "最终协同检查",
-                "auto_cooperation: final assignment cooperation rejected",
-            ));
-        }
-    }
-    if !crate::layout::admission::all_station_states_admitted(
-        &crate::layout::admission::presence(blueprint, &main.assignment, instances),
-        &crate::layout::admission::presence(blueprint, &backup.assignment, instances),
-        table,
-        &crate::layout::layout_from_blueprint(blueprint),
+    if !crate::layout::work_budget::assignments_fit(
+        blueprint,
+        &main.assignment,
+        &backup.assignment,
+        instances,
     ) {
         return Err(fixed_main_backup_error(
-            "各房独立切换检查",
-            "主备混合配置不能撑满输入时长或不满足协同准入",
+            "最终工时检查",
+            "主备配置不能在两中枢下撑满输入时长",
         ));
     }
+    validate_explicit_supports(
+        blueprint,
+        [&main.assignment, &backup.assignment],
+        [&main.plan, &backup.plan],
+    )?;
     let model = crate::mood::default_mood_model()?;
     let main_eta =
         crate::mood::shift_eta_with_instances(model, blueprint, &main.assignment, instances);
@@ -357,17 +350,21 @@ pub fn assert_auto_rotation_invariants(
     if report.mode != "auto_rotation" || report.assignment_plans.len() != 2 {
         return Err(Error::msg("assert-invariants auto_report_shape failed"));
     }
+    crate::layout::assert_suggestion_plan_policy(&report.assignment_plans)?;
     report.timing.validate()?;
-    if !crate::layout::admission::all_station_states_admitted(
-        &crate::layout::admission::presence(blueprint, &report.main_assignment, instances),
-        &crate::layout::admission::presence(blueprint, &report.backup_assignment, instances),
-        table,
-        &crate::layout::layout_from_blueprint(blueprint),
+    if !crate::layout::work_budget::assignments_fit(
+        blueprint,
+        &report.main_assignment,
+        &report.backup_assignment,
+        instances,
     ) {
-        return Err(Error::msg(
-            "assert-invariants auto_independent_station_states failed",
-        ));
+        return Err(Error::msg("assert-invariants auto_work_duration failed"));
     }
+    validate_explicit_supports(
+        blueprint,
+        [&report.main_assignment, &report.backup_assignment],
+        [&report.assignment_plans[0], &report.assignment_plans[1]],
+    )?;
     let expected_rooms = blueprint
         .rooms
         .iter()
@@ -440,24 +437,11 @@ pub fn assert_auto_rotation_invariants(
             &report.assignment_plans[index],
         )
         .map_err(Error::msg)?;
-        if !crate::layout::admission::assignment_admitted(blueprint, assignment, instances, table) {
-            return Err(Error::msg(format!(
-                "assert-invariants auto_cooperation_admission failed in state {}",
-                index + 1
-            )));
-        }
         let other = if index == 0 {
             &report.backup_assignment
         } else {
             &report.main_assignment
         };
-        if !crate::layout::admission::stations_fit_work_duration(
-            &crate::layout::admission::presence(blueprint, assignment, instances),
-            &crate::layout::admission::presence(blueprint, other, instances),
-            &crate::layout::layout_from_blueprint(blueprint),
-        ) {
-            return Err(Error::msg("assert-invariants auto_work_duration failed"));
-        }
         for anchor in &report.assignment_plans[index].anchors {
             if anchor.room_id.as_ref().is_none_or(|room| {
                 !assignment
@@ -641,6 +625,40 @@ pub fn assert_auto_rotation_invariants(
             .all(|room| room.main.complete && room.backup.complete)
     {
         return Err(Error::msg("assert-invariants auto_complete failed"));
+    }
+    Ok(())
+}
+
+/// 独立从两个最终 Plan 和实际岗位重建显式挂件归属。
+fn validate_explicit_supports(
+    blueprint: &BaseBlueprint,
+    assignments: [&BaseAssignment; 2],
+    plans: [&AssignmentPlan; 2],
+) -> Result<()> {
+    let mut claims = std::collections::BTreeMap::new();
+    for (assignment, plan) in assignments.into_iter().zip(plans) {
+        claims = crate::layout::claim_support_rooms(
+            assignment,
+            &plan.anchors,
+            &plan.active_dependencies,
+            &claims,
+        )
+        .ok_or_else(|| Error::msg("assert-invariants auto_explicit_support_ownership failed"))?;
+        for support in claims.keys() {
+            if !blueprint
+                .rooms
+                .iter()
+                .filter(|room| room.kind == FacilityKind::Dormitory)
+                .any(|room| {
+                    assignment
+                        .operators_in(&room.id)
+                        .iter()
+                        .any(|op| op.name == *support)
+                })
+            {
+                return Err(Error::msg("assert-invariants auto_constant_support failed"));
+            }
+        }
     }
     Ok(())
 }

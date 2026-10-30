@@ -340,10 +340,9 @@ pub(crate) fn complete_standalone_assignment(
             let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
             crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
                 && (!options.auto_rotation
-                    || super::admission::assignment_admitted(blueprint, trial, instances, table)
-                        && super::admission::room_work_duration_admitted(
-                            blueprint, trial, &room.id, instances,
-                        ))
+                    || super::work_budget::room_work_duration_fits(
+                        blueprint, trial, &room.id, instances,
+                    ))
                 && eta
                     .operator_in_room(&candidate.name, &room.id.0)
                     .is_some_and(|entry| {
@@ -380,10 +379,9 @@ pub(crate) fn complete_standalone_assignment(
                 return false;
             }
             if options.auto_rotation
-                && (!super::admission::assignment_admitted(blueprint, trial, instances, table)
-                    || !super::admission::room_work_duration_admitted(
-                        blueprint, trial, &room.id, instances,
-                    ))
+                && !super::work_budget::room_work_duration_fits(
+                    blueprint, trial, &room.id, instances,
+                )
             {
                 return false;
             }

@@ -122,7 +122,7 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
         .collect();
 
     while let Some(room) = take_next_trade_room(&mut rooms, pool, assignment, used) {
-        let mut current_layout = crate::layout::resolve_base(
+        let current_layout = crate::layout::resolve_base(
             blueprint,
             assignment,
             Some(instances),
@@ -131,7 +131,6 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
             durin_dorm_planning,
         )?
         .layout;
-        current_layout.candidate_room = options.auto_rotation.then(|| room.id.0.clone());
         let order = trade_order_from_room(room)?;
         let existing = assignment.operators_in(&room.id);
         let anchors: Vec<_> = existing.iter().map(|op| op.name.clone()).collect();

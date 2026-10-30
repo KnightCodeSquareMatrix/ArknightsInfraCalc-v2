@@ -104,7 +104,6 @@ pub(super) fn assign_power_rooms_with_instances(
 
     let power_opts = PowerSearchOptions {
         station_count: total_stations.min(255) as u8,
-        station_rooms: Vec::new(),
         mood: options.mood,
         shift_hours: options.shift_hours,
         layout: layout.clone(),
@@ -134,7 +133,6 @@ pub(super) fn assign_power_rooms_with_instances(
     };
     let mut opts = power_opts;
     opts.station_count = empty_rooms.len().min(255) as u8;
-    opts.station_rooms = empty_rooms.iter().map(|room| room.0.clone()).collect();
     let report = search_power_assignment(&sub, table, &opts)?;
     for (room_id, station) in empty_rooms.iter().zip(report.assignments.iter()) {
         let op = pool
@@ -188,9 +186,7 @@ pub(super) fn assign_power_rooms_with_instances(
                 trial.set_room(room_id.clone(), vec![op.clone()]);
                 if options.auto_rotation
                     && instances.is_some_and(|instances| {
-                        !crate::layout::admission::assignment_admitted(
-                            blueprint, &trial, instances, table,
-                        ) || !crate::layout::admission::room_work_duration_admitted(
+                        !crate::layout::work_budget::room_work_duration_fits(
                             blueprint, &trial, room_id, instances,
                         )
                     })

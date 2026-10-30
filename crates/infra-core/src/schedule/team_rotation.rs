@@ -9222,7 +9222,10 @@ pub(crate) fn solve_policy_disjoint_backup(
         let mut seed = BaseAssignment::default();
         seed.auto_rotation = true;
         seed.work_hours = Some(shift_hours);
-        seed.auto_other_presence = crate::layout::admission::presence(blueprint, main, instances);
+        seed.auto_dorm_support_rooms = main.auto_dorm_support_rooms.clone();
+        seed.auto_main_work_budget = Some(std::sync::Arc::new(
+            crate::layout::work_budget::work_state(blueprint, main, instances),
+        ));
         for room in blueprint
             .rooms
             .iter()
@@ -9235,11 +9238,7 @@ pub(crate) fn solve_policy_disjoint_backup(
             blueprint, &available, instances, table, options, &mut seed,
         )?;
         // 普通缺员策略允许中枢候选耗尽后留空；空中枢仍须满足固定主力的预算。
-        if !crate::layout::admission::stations_fit_work_duration(
-            &seed.auto_other_presence,
-            &crate::layout::admission::presence(blueprint, &seed, instances),
-            &crate::layout::layout_from_blueprint(blueprint),
-        ) {
+        if !crate::layout::work_budget::fixed_main_fits(&seed) {
             return Err(Error::msg(format!(
                 "替补中枢选择后，固定主力无法在实际两中枢下撑满输入时长（主力{}小时、替补{shift_hours}小时）",
                 main.work_hours.unwrap_or(options.shift_hours),

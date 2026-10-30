@@ -317,6 +317,42 @@ pub(super) fn default_rule_catalog_path() -> Result<std::path::PathBuf> {
     crate::skill_table::data_path("orchestration_rules.json")
 }
 
+/// 仅显式 gate 检查 Plan 的来源，不在生产候选中重新证明协同。
+pub(crate) fn assert_suggestion_plan_policy(plans: &[super::plan::AssignmentPlan]) -> Result<()> {
+    let mut catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
+    restrict_suggestion_catalog(&mut catalog);
+    for plan in plans {
+        if !plan.auto_rotation || !plan.registry_claims.is_empty() {
+            return Err(Error::msg(
+                "assert-invariants auto_plan_capability failed: registry or mode",
+            ));
+        }
+        for selected in &plan.selected_rules {
+            let allowed = catalog
+                .rules
+                .iter()
+                .find(|rule| rule.id == selected.rule_id)
+                .and_then(|rule| {
+                    rule.alternatives
+                        .iter()
+                        .find(|alt| alt.id == selected.alternative_id)
+                });
+            if allowed.is_none_or(|alt| {
+                selected
+                    .conditional_pack_id
+                    .as_ref()
+                    .is_some_and(|id| !alt.conditional_packs.iter().any(|pack| pack.id == *id))
+            }) {
+                return Err(Error::msg(format!(
+                    "assert-invariants auto_plan_capability failed: {}={}",
+                    selected.rule_id, selected.alternative_id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn assert_support_combination_policy(
     plans: &[super::plan::AssignmentPlan],
     shifts: &[crate::schedule::TeamShiftResult],
@@ -543,7 +579,7 @@ pub(super) fn compile_rules(
                 break;
             }
             let Some((
-                candidate_assignment,
+                mut candidate_assignment,
                 _candidate_used,
                 candidate_anchors,
                 candidate_constraints,
@@ -555,6 +591,34 @@ pub(super) fn compile_rules(
                 continue;
             };
 
+            let candidate_dependencies = compile_active_dependencies(
+                &alternative.active_dependencies,
+                &candidate_roles,
+                &candidate_anchors,
+            );
+            if seed.auto_rotation {
+                let anchors: Vec<_> = out
+                    .anchors
+                    .iter()
+                    .chain(&candidate_anchors)
+                    .cloned()
+                    .collect();
+                let dependencies: Vec<_> = out
+                    .active_dependencies
+                    .iter()
+                    .chain(&candidate_dependencies)
+                    .cloned()
+                    .collect();
+                let Some(claims) = super::auto_support::claim_support_rooms(
+                    &candidate_assignment,
+                    &anchors,
+                    &dependencies,
+                    &seed.auto_dorm_support_rooms,
+                ) else {
+                    continue;
+                };
+                candidate_assignment.auto_dorm_support_rooms = claims;
+            }
             let operators: Vec<String> = candidate_anchors
                 .iter()
                 .map(|anchor: &SystemAnchor| anchor.operator.clone())
@@ -600,13 +664,7 @@ pub(super) fn compile_rules(
                     });
                 }
             }
-            for dependency in compile_active_dependencies(
-                &alternative.active_dependencies,
-                &candidate_roles,
-                &candidate_anchors,
-            ) {
-                out.active_dependencies.push(dependency);
-            }
+            out.active_dependencies.extend(candidate_dependencies);
             if alternative.continuous || !alternative.continuous_role_ids.is_empty() {
                 let continuous_names: HashSet<_> = selected_operators_for_roles(
                     &alternative.continuous_role_ids,
@@ -1520,16 +1578,6 @@ fn complete_domain_roles(
             return None;
         }
     }
-    if state.assignment.auto_rotation
-        && !crate::layout::admission::assignment_admitted(
-            ctx.blueprint,
-            &state.assignment,
-            ctx.instances,
-            ctx.table,
-        )
-    {
-        return None;
-    }
     Some(state)
 }
 
@@ -1624,7 +1672,7 @@ fn complete_manufacture_role(
     if optional_dorm_support {
         search_assignment.set_room(room.id.clone(), Vec::new());
     }
-    let Ok(mut candidate_resolved) = crate::layout::resolve_base(
+    let Ok(candidate_resolved) = crate::layout::resolve_base(
         ctx.blueprint,
         &search_assignment,
         Some(ctx.instances),
@@ -1634,7 +1682,6 @@ fn complete_manufacture_role(
     ) else {
         return false;
     };
-    candidate_resolved.layout.candidate_room = assignment.auto_rotation.then(|| room.id.0.clone());
     let candidate_options = crate::search::ManuSearchOptions {
         level: room.level,
         operator_capacity: room.operator_capacity(),
@@ -1743,7 +1790,7 @@ fn power_role_selected_with_support(
     let pool = crate::layout::assign::filter_power_pool(&pool, &excluded);
     let mut search_assignment = assignment.clone();
     search_assignment.set_room(room.id.clone(), Vec::new());
-    let Ok(mut resolved) = crate::layout::resolve_base(
+    let Ok(resolved) = crate::layout::resolve_base(
         ctx.blueprint,
         &search_assignment,
         Some(ctx.instances),
@@ -1753,13 +1800,11 @@ fn power_role_selected_with_support(
     ) else {
         return false;
     };
-    resolved.layout.candidate_room = Some(room.id.0.clone());
     crate::search::search_power_assignment(
         &pool,
         ctx.table,
         &crate::search::PowerSearchOptions {
             station_count: 1,
-            station_rooms: vec![room.id.0.clone()],
             mood: ctx.mood,
             shift_hours: ctx.shift_hours,
             layout: resolved.layout,
@@ -1830,7 +1875,7 @@ fn score_completed_manufacture(
         let Some(RoomProduct::Factory { recipe }) = room.product.as_ref() else {
             continue;
         };
-        let mut resolved = crate::layout::resolve_base(
+        let resolved = crate::layout::resolve_base(
             ctx.blueprint,
             &scratch,
             Some(ctx.instances),
@@ -1839,7 +1884,6 @@ fn score_completed_manufacture(
             None,
         )
         .ok()?;
-        resolved.layout.candidate_room = assignment.auto_rotation.then(|| room.id.0.clone());
         let sub = crate::pool::filter_manufacture_pool(&pool, &used);
         let options = crate::search::ManuSearchOptions {
             level: room.level,
@@ -1944,16 +1988,6 @@ fn score_completed_power(
                 None,
             )
             .ok()?;
-            if scratch.auto_rotation
-                && !crate::layout::admission::assignment_admitted(
-                    ctx.blueprint,
-                    &trial,
-                    ctx.instances,
-                    ctx.table,
-                )
-            {
-                continue;
-            }
             let power = resolved
                 .power_rooms
                 .iter()
@@ -2156,7 +2190,7 @@ fn complete_trade_role(
             search_used.remove(name);
         }
     }
-    let Ok(mut layout) = crate::layout::resolve_base(
+    let Ok(layout) = crate::layout::resolve_base(
         ctx.blueprint,
         &search_assignment,
         Some(ctx.instances),
@@ -2166,7 +2200,6 @@ fn complete_trade_role(
     ) else {
         return false;
     };
-    layout.layout.candidate_room = assignment.auto_rotation.then(|| room.id.0.clone());
     let options = crate::layout::AssignBaseOptions {
         auto_rotation: assignment.auto_rotation,
         mood: ctx.mood,
@@ -2195,7 +2228,7 @@ fn complete_trade_role(
         return false;
     }
     if role.competitive && !optional_dorm_support {
-        let Ok(mut baseline) = crate::layout::resolve_base(
+        let Ok(baseline) = crate::layout::resolve_base(
             ctx.blueprint,
             alternative_baseline,
             Some(ctx.instances),
@@ -2205,7 +2238,6 @@ fn complete_trade_role(
         ) else {
             return false;
         };
-        baseline.layout.candidate_room = assignment.auto_rotation.then(|| room.id.0.clone());
         let mut baseline_used = alternative_baseline.operator_names();
         if let Ok(ordinary) = crate::layout::assign::trade_fill::pick_trade_meta_then_plain(
             &pool,

@@ -3,11 +3,12 @@
 //! `select` 汇合高优先声明式规则、兼容 registry 与 late competitive 规则；
 //! `execute` 只消费已解析 placement，不按体系 id 重判。
 
+pub(crate) mod auto_support;
 mod execute;
 mod plan;
 mod rules;
 mod select;
-pub(crate) use rules::assert_support_combination_policy;
+pub(crate) use rules::{assert_suggestion_plan_policy, assert_support_combination_policy};
 
 pub use execute::{execute_plan, ExecuteResult};
 pub(crate) use plan::pack_production_components;

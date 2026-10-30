@@ -1,10 +1,11 @@
-pub(crate) mod admission;
 pub(crate) mod assign;
 mod assignment;
 mod blueprint;
 mod context;
 mod orchestrate;
-pub(crate) use orchestrate::assert_support_combination_policy;
+pub(crate) mod work_budget;
+pub(crate) use orchestrate::auto_support::claim_support_rooms;
+pub(crate) use orchestrate::{assert_suggestion_plan_policy, assert_support_combination_policy};
 mod resolve;
 mod shift;
 mod system;
@@ -64,5 +65,3 @@ pub use workforce::{
     is_elite_operator, is_platform_operator, WorkforceIndex, TAG_DURIN, TAG_ELITE_OPERATOR,
     TAG_KNIGHT, TAG_PINUS, TAG_RHINE,
 };
-
-pub(crate) use resolve::layout_from_blueprint;

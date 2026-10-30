@@ -208,6 +208,11 @@ fn run_shift_pipeline_with_producer_pruning(
                         return Err(Error::msg("auto peak control has no legal fill"));
                     }
                 }
+                if !crate::layout::work_budget::fixed_main_fits(&run.assignment) {
+                    return Err(Error::msg(
+                        "auto_fixed_main_work_duration: control fill cannot sustain frozen main",
+                    ));
+                }
                 timer.mark("peak_prepare_control");
                 run = finish_peak_prefix(
                     run,
@@ -515,7 +520,7 @@ fn probe_shadow_pair(
     else {
         return Ok(None);
     };
-    let mut layout = if run.options.auto_rotation {
+    let layout = if run.options.auto_rotation {
         crate::layout::resolve::resolve_layout_snapshot(
             run.blueprint,
             assignment,
@@ -527,7 +532,6 @@ fn probe_shadow_pair(
     } else {
         run.resolve_snapshot(true)?
     };
-    layout.candidate_room = run.options.auto_rotation.then(|| trade_room.id.0.clone());
     let mut probe_used = used.clone();
     let trade_hit = pick_trade_meta_then_plain(
         trade_pool,
@@ -547,7 +551,6 @@ fn probe_shadow_pair(
     if !trade_takes_night_smoke {
         return Ok(None);
     }
-    layout.candidate_room = run.options.auto_rotation.then(|| manu_room.id.0.clone());
     let manu_hit = pick_shadow_manufacture(
         run,
         manu_pool,
@@ -1250,20 +1253,6 @@ fn prepare_peak_control_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
-    let observe_control =
-        std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1");
-    macro_rules! observe {
-        ($($arg:tt)*) => {
-            if observe_control {
-                use std::io::Write as _;
-                let _ = writeln!(
-                    std::io::stderr().lock(),
-                    "[INFRA-CONTROL-OBSERVE] {}",
-                    format_args!($($arg)*)
-                );
-            }
-        };
-    }
     let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
     if !fill_peak_control(
         &mut run,

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::control::{solve_control, ControlRoomInput};
 use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
-use crate::layout::blueprint::{FacilityKind, RoomId};
+use crate::layout::blueprint::RoomId;
 use crate::layout::context::LayoutContext;
 use crate::mood::{default_mood_model, fits_work_budget, operator_net_drain, DrainInputs};
 use crate::pool::{try_filter_standalone, ControlPool};
@@ -166,12 +166,11 @@ fn assign_control_inner(
             })
             && excluded.is_none_or(|excluded| pinned.is_disjoint(excluded))
             && eligibility.is_none_or(|accept| accept(&names))
-            && crate::layout::admission::candidate_admitted(
+            && crate::layout::work_budget::candidate_fits(
                 layout,
-                "control",
-                operators_for_presence(pool, &names),
-                table,
-                true,
+                crate::layout::FacilityKind::ControlCenter,
+                None,
+                &operators_for_presence(pool, &names),
             );
         if observe_control {
             let pinned_log: std::collections::BTreeSet<_> = pinned.iter().collect();
@@ -229,7 +228,8 @@ fn assign_control_inner(
         if options.skip_standalone_control || !pinned.is_empty() || required_all.is_some() {
             pool.clone()
         } else {
-            let preferred = try_filter_standalone(pool, FacilityKind::ControlCenter, 1);
+            let preferred =
+                try_filter_standalone(pool, crate::layout::FacilityKind::ControlCenter, 1);
             if preferred.entries.len() >= MAX_CONTROL {
                 preferred
             } else {
@@ -288,10 +288,11 @@ fn assign_control_inner(
 
     let mode_eligibility = |names: &[String]| {
         eligibility.is_none_or(|accept| accept(names))
-            && crate::layout::admission::candidate_admitted(
+            && crate::layout::work_budget::candidate_fits(
                 layout,
-                "control",
-                names
+                crate::layout::FacilityKind::ControlCenter,
+                None,
+                &names
                     .iter()
                     .filter_map(|name| {
                         filtered_pool.entry(name).map(|entry| {
@@ -303,9 +304,7 @@ fn assign_control_inner(
                             )
                         })
                     })
-                    .collect(),
-                table,
-                true,
+                    .collect::<Vec<_>>(),
             )
     };
     let combos = search_control_combos_with_eligibility(
@@ -431,7 +430,7 @@ fn filter_control_pool_for_mood(
             let inputs = DrainInputs {
                 name: &entry.name,
                 elite: entry.progress.elite,
-                facility: FacilityKind::ControlCenter,
+                facility: crate::layout::FacilityKind::ControlCenter,
                 room_ops: &room_ops,
                 full_control: true,
                 control_ops: &[],

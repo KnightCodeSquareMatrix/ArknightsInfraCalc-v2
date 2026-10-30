@@ -98,5 +98,16 @@ pub fn execute_plan(
             .flat_map(|reserve| reserve.operators.iter().cloned()),
     );
 
+    if plan.auto_rotation {
+        assignment.auto_dorm_support_rooms = super::auto_support::claim_support_rooms(
+            &assignment,
+            &plan.anchors,
+            &plan.active_dependencies,
+            &seed.auto_dorm_support_rooms,
+        )
+        .ok_or_else(|| {
+            crate::error::Error::msg("auto_explicit_support_ownership: conflicting dorm roles")
+        })?;
+    }
     Ok(ExecuteResult { assignment, used })
 }

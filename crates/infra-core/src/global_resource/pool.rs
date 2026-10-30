@@ -128,24 +128,6 @@ impl GlobalResourcePool {
 
     /// 按 `CONVERSIONS` 注册表执行全局资源转化（固定点迭代）。
     pub fn run_conversions(&mut self, active_buffs: &HashSet<(String, String)>) {
-        self.run_conversions_recording(active_buffs, |_| {});
-    }
-
-    /// 来源检查只消费实际执行的边；分母、数量与固定点仍由原执行器裁决。
-    pub(crate) fn run_conversions_with_trace(
-        &mut self,
-        active_buffs: &HashSet<(String, String)>,
-    ) -> Vec<super::registry::GlobalResourceConversion> {
-        let mut fired = Vec::new();
-        self.run_conversions_recording(active_buffs, |conversion| fired.push(*conversion));
-        fired
-    }
-
-    fn run_conversions_recording(
-        &mut self,
-        active_buffs: &HashSet<(String, String)>,
-        mut record: impl FnMut(&super::registry::GlobalResourceConversion),
-    ) {
         loop {
             let mut changed = false;
             for conv in CONVERSIONS {
@@ -170,7 +152,6 @@ impl GlobalResourcePool {
                 let produce = times * conv.to_per;
                 self.add(conv.from, -consume);
                 self.add(conv.to, produce);
-                record(conv);
                 changed = true;
             }
             if !changed {

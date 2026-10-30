@@ -16,9 +16,7 @@ mod collector;
 mod interpreter;
 
 pub use collector::collect_global_atoms;
-pub(crate) use collector::GlobalAtomEntry;
 pub use interpreter::orchestrate_global_atoms;
-pub(crate) use interpreter::orchestrate_global_atoms_with_writes;
 
 use crate::global_resource::GlobalInjectManifest;
 use crate::global_resource::GlobalResourcePool;

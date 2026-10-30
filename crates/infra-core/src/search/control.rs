@@ -831,24 +831,7 @@ fn search_control_in_order(
             table,
         )
     };
-    let admission = crate::layout::admission::CandidateAdmission::new(&options.layout, table);
     let legal = |ops: &[ControlOperator]| {
-        if !admission.admitted(
-            "control",
-            ops.iter()
-                .map(|op| {
-                    (
-                        op.name.clone(),
-                        op.elite,
-                        op.buff_ids.clone(),
-                        op.tags.clone(),
-                    )
-                })
-                .collect(),
-            false,
-        ) {
-            return false;
-        }
         let control: Vec<_> = ops.iter().map(|op| (op.name.clone(), op.elite)).collect();
         !model.control_global_recovery_has_conflict(&control)
             && !evaluate(ops).effect_ledger.has_conflicting_effect_sources()
