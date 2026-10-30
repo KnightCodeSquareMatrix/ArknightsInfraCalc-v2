@@ -66,7 +66,6 @@ pub fn build_plan_with_runtime(
         mood,
         preferences,
         &std::collections::HashSet::new(),
-        &std::collections::HashSet::new(),
         false,
         None,
         None,
@@ -87,7 +86,6 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     table: &SkillTable,
     mood: f64,
     preferences: &std::collections::HashMap<String, String>,
-    skipped_optional_control_roles: &std::collections::HashSet<(String, String, String)>,
     skipped_optional_trade_roles: &std::collections::HashSet<(String, String, String)>,
     support_combinations_enable: bool,
     registry_sustain_hours: Option<f64>,
@@ -109,28 +107,6 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
                 alternative.roles.retain(|role| !role.proactive_support);
                 for pack in &mut alternative.conditional_packs {
                     pack.roles.retain(|role| !role.proactive_support);
-                }
-            }
-        }
-    }
-    for rule in &mut catalog.rules {
-        for alternative in &mut rule.alternatives {
-            for role in alternative.roles.iter_mut().chain(
-                alternative
-                    .conditional_packs
-                    .iter_mut()
-                    .flat_map(|pack| &mut pack.roles),
-            ) {
-                if role.min_count == 0
-                    && role.facility == crate::layout::FacilityKind::ControlCenter
-                {
-                    role.candidates.retain(|candidate| {
-                        !skipped_optional_control_roles.contains(&(
-                            rule.id.clone(),
-                            role.id.clone(),
-                            candidate.name.clone(),
-                        ))
-                    });
                 }
             }
         }

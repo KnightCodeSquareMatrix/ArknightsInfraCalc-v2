@@ -329,15 +329,6 @@ pub(crate) struct ControlShiftAdmission {
 }
 
 impl ControlShiftAdmission {
-    pub(crate) fn is_required_or_group_member(&self, name: &str) -> bool {
-        self.closure.candidates.get(name).is_some_and(|candidate| {
-            matches!(
-                candidate.origin,
-                CandidateOrigin::PlanRequired | CandidateOrigin::Group { .. }
-            )
-        })
-    }
-
     pub(crate) fn allows(&self, name: &str) -> bool {
         self.closure
             .candidates

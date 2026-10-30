@@ -45,7 +45,6 @@ mod tests {
             24.0,
             &std::collections::HashMap::new(),
             &std::collections::HashSet::new(),
-            &std::collections::HashSet::new(),
             true,
             None,
             None,

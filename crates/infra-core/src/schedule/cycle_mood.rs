@@ -7,39 +7,6 @@ use crate::mood::{default_mood_model, shift_eta_with_instances};
 
 use super::rotation_types::TeamRotationReport;
 
-#[derive(Debug)]
-pub(crate) enum CycleMoodFailure {
-    BudgetExceeded {
-        failures: Vec<CycleMoodOperatorFailure>,
-        message: String,
-    },
-    Other(Error),
-}
-
-#[derive(Debug)]
-pub(crate) struct CycleMoodOperatorFailure {
-    pub(crate) operator: String,
-    pub(crate) message: String,
-}
-
-impl std::fmt::Display for CycleMoodFailure {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::BudgetExceeded { message, .. } => formatter.write_str(message),
-            Self::Other(error) => write!(formatter, "{error}"),
-        }
-    }
-}
-
-impl CycleMoodFailure {
-    fn into_error(self) -> Error {
-        match self {
-            Self::BudgetExceeded { message, .. } => Error::msg(message),
-            Self::Other(error) => error,
-        }
-    }
-}
-
 #[derive(Clone)]
 struct WorkCost {
     room_id: String,
@@ -61,34 +28,7 @@ pub(crate) fn validate_cycle_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
-    validate_cycle_mood_for_rotation(blueprint, instances, report, initial_mood)
-        .map_err(CycleMoodFailure::into_error)
-}
-
-pub(crate) fn validate_cycle_mood_for_rotation(
-    blueprint: &BaseBlueprint,
-    instances: &OperatorInstances,
-    report: &TeamRotationReport,
-    initial_mood: f64,
-) -> std::result::Result<(), CycleMoodFailure> {
-    let mut budget_failure = None;
-    match validate_cycle_mood_scope(
-        blueprint,
-        instances,
-        report,
-        initial_mood,
-        None,
-        &mut budget_failure,
-    ) {
-        Ok(()) => Ok(()),
-        Err(error) => match budget_failure {
-            Some(failures) => Err(CycleMoodFailure::BudgetExceeded {
-                failures,
-                message: error.to_string(),
-            }),
-            None => Err(CycleMoodFailure::Other(error)),
-        },
-    }
+    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, None)
 }
 
 pub(crate) fn validate_operator_cycle_mood(
@@ -98,15 +38,7 @@ pub(crate) fn validate_operator_cycle_mood(
     initial_mood: f64,
     name: &str,
 ) -> Result<()> {
-    let mut budget_failure = None;
-    validate_cycle_mood_scope(
-        blueprint,
-        instances,
-        report,
-        initial_mood,
-        Some(name),
-        &mut budget_failure,
-    )
+    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, Some(name))
 }
 
 fn validate_cycle_mood_scope(
@@ -115,7 +47,6 @@ fn validate_cycle_mood_scope(
     report: &TeamRotationReport,
     initial_mood: f64,
     operator_scope: Option<&str>,
-    budget_failure: &mut Option<Vec<CycleMoodOperatorFailure>>,
 ) -> Result<()> {
     let model = default_mood_model()?;
     let count = report.shifts.len();
@@ -203,8 +134,6 @@ fn validate_cycle_mood_scope(
     }
 
     let capacity = model.workable_mood();
-    let mut first_budget_message = None;
-    let mut budget_failures = Vec::new();
     for (name, entries) in work {
         let restores = |index: usize| {
             entries[index].is_none()
@@ -271,18 +200,8 @@ fn validate_cycle_mood_scope(
         }
 
         if let Some(message) = failure {
-            budget_failures.push(CycleMoodOperatorFailure {
-                operator: name,
-                message: message.clone(),
-            });
-            if first_budget_message.is_none() {
-                first_budget_message = Some(message);
-            }
+            return Err(Error::msg(message));
         }
-    }
-    if let Some(message) = first_budget_message {
-        *budget_failure = Some(budget_failures);
-        return Err(Error::msg(message));
     }
     Ok(())
 }

@@ -1027,9 +1027,6 @@ fn place_role_recursive(
                 operator: candidate.name.clone(),
                 proactive_support: role.proactive_support,
                 optional_trade_role: role.optional_trade_recommendation.then(|| role.id.clone()),
-                optional_control_role: (role.min_count == 0
-                    && role.facility == FacilityKind::ControlCenter)
-                    .then(|| role.id.clone()),
                 elite: progress.elite,
                 facility: ctx
                     .blueprint
@@ -1606,7 +1603,6 @@ fn complete_manufacture_role(
                 operator: name.clone(),
                 proactive_support: role.proactive_support,
                 optional_trade_role: None,
-                optional_control_role: None,
                 elite: operator.elite,
                 facility: FacilityKind::Factory,
                 room_id: Some(room.id.clone()),

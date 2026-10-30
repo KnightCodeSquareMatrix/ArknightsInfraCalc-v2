@@ -47,10 +47,7 @@ use crate::trade::solve_trade_with_shift;
 
 use super::base_rotation::evaluate_base_assignment_efficiencies;
 use super::control_rotation::{assert_final_control_rotation, ControlRotationClosure};
-use super::cycle_mood::{
-    is_budget_rejection, validate_cycle_mood, validate_cycle_mood_for_rotation,
-    validate_operator_cycle_mood, CycleMoodFailure,
-};
+use super::cycle_mood::{is_budget_rejection, validate_cycle_mood, validate_operator_cycle_mood};
 use super::dorm_finalizer;
 use super::fiammetta_events;
 use super::room_admission::{
@@ -69,9 +66,6 @@ use super::shift_bind::{shift_binds_from_plan, team_of_operator, validate_final_
 const FIAMMETTA_NAME: &str = "菲亚梅塔";
 const SPHINX_NAME: &str = "深巡";
 const ULPIANUS_NAME: &str = "乌尔比安";
-const PEAK_PREFIX_CANDIDATE_EXHAUSTION: &str = "all peak prefix candidates are infeasible";
-const DISJOINT_BACKUP_ERROR_PREFIX: &str =
-    "no solution under current-main complete-state-disjoint backup policy: ";
 // ABC admission uses this state only for ETA; it does not choose beds or change
 // production assignments. A 12/12/12 off-shift is the approved full-rest approximation;
 // any other off-shift recovers at the lowest dormitory base rate (no skill bonus, no
@@ -544,8 +538,8 @@ fn abc_control_work_hours(team: TeamLabel, shift_hours: [f64; 3]) -> f64 {
 }
 
 /// Freeze optional ABC control candidates with one-person, full-control mood
-/// admission before the shift loop. Required policy members stay visible so
-/// their existing failure/fallback path remains authoritative.
+/// admission before the shift loop. Required policy members remain governed by
+/// Plan admission; final cycle diagnostics never rebuild these cohorts.
 fn freeze_abc_control_roster(
     team_ctrl: &mut HashMap<TeamLabel, Vec<String>>,
     pool: &crate::pool::ControlPool,
@@ -828,7 +822,6 @@ fn assign_office_for_shift_with_mood(
     shift_hours: f64,
     instances: Option<&OperatorInstances>,
     mood_state: Option<(&HashMap<String, f64>, &HashMap<String, f64>)>,
-    mut eta_failure: Option<&mut Option<String>>,
 ) -> Result<()> {
     let model = default_mood_model()?;
     let fits_candidate =
@@ -895,15 +888,6 @@ fn assign_office_for_shift_with_mood(
             assignment.operators_in(room_id).len() < *capacity
                 && fits_candidate(assignment, room_id, candidate)
         }) else {
-            if mood_state.is_some()
-                && office_rooms
-                    .iter()
-                    .any(|(room_id, capacity)| assignment.operators_in(room_id).len() < *capacity)
-            {
-                if let Some(failure) = eta_failure.as_deref_mut() {
-                    *failure = Some(name.clone());
-                }
-            }
             return Err(Error::msg(format!(
                 "active bound office operator {name} cannot cover the current shift ETA"
             )));
@@ -949,7 +933,6 @@ fn assign_office_for_shift(
         bound_names,
         candidates,
         shift_hours,
-        None,
         None,
         None,
     )
@@ -3110,75 +3093,6 @@ fn complete_timed_rotation(
     )
 }
 
-fn is_control_required_or_group_mood_failure(
-    report: &TeamRotationReport,
-    operator: &str,
-) -> Result<bool> {
-    if !(report.profile.is_ordinary_abc() || report.profile.is_ordinary_main_backup()) {
-        return Ok(false);
-    }
-
-    for shift in &report.shifts {
-        if !shift
-            .assignment
-            .control_operators()
-            .iter()
-            .any(|member| member.name == operator)
-        {
-            continue;
-        }
-        if let Some(admission) = &shift.assignment.control_rotation_admission {
-            if admission.is_required_or_group_member(operator) {
-                return Ok(true);
-            }
-            continue;
-        }
-        if report.profile.is_ordinary_abc() {
-            return Err(Error::msg(format!(
-                "control_rotation_mood_attribution: missing Control admission for shift {}",
-                shift.index + 1
-            )));
-        }
-
-        // Main/backup assignments retain their own Plan, not ABC's frozen
-        // Control admission metadata. Use the Plan owned by this exact shift.
-        let plan = report
-            .assignment_plans
-            .get(shift.plan_index)
-            .ok_or_else(|| {
-                Error::msg(format!(
-                    "control_rotation_mood_attribution: missing Plan for shift {}",
-                    shift.index + 1
-                ))
-            })?;
-        let group_sources = plan.control_requirement_sources()?;
-        let is_group_member = group_sources
-            .iter()
-            .zip(&plan.control_candidate_requirements)
-            .any(|(_, group)| group.candidates.iter().any(|name| name == operator));
-        let is_fixed_control_member = plan.anchors.iter().any(|anchor| {
-            anchor.facility == FacilityKind::ControlCenter && anchor.operator == operator
-        }) || plan
-            .activated
-            .iter()
-            .flat_map(|system| &system.slots)
-            .any(|slot| {
-                matches!(
-                    slot,
-                    SlotFill::Fixed {
-                        operator: name,
-                        facility: FacilityKind::ControlCenter,
-                        ..
-                    } if name == operator
-                )
-            });
-        if is_group_member || is_fixed_control_member {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 fn finalize_timed_rotation(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -3363,23 +3277,10 @@ fn finalize_timed_rotation(
             .warnings
             .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
-    if let Err(error) =
-        validate_cycle_mood_for_rotation(blueprint, instances, &report, initial_mood)
-    {
-        match error {
-            CycleMoodFailure::BudgetExceeded { failures, message } => {
-                for failure in failures {
-                    if is_control_required_or_group_mood_failure(&report, &failure.operator)? {
-                        return Err(Error::ControlRotationMoodRejected {
-                            operator: failure.operator,
-                            message: failure.message,
-                        });
-                    }
-                }
-                return Err(Error::with_rotation(&report, message));
-            }
-            CycleMoodFailure::Other(error) => return Err(Error::with_rotation(&report, error)),
-        }
+    if let Err(error) = validate_cycle_mood(blueprint, instances, &report, initial_mood) {
+        report
+            .warnings
+            .push(format!("{FINAL_INVARIANT_WARNING_PREFIX} {error}"));
     }
     stage_after = crate::profile::solver_perf_snapshot();
     crate::profile::emit_solver_stage(
@@ -6850,13 +6751,10 @@ fn reject_fiammetta_candidate(error: Error) -> Result<()> {
     // Only known candidate feasibility failures may be skipped. Invalid inputs,
     // unsupported activity and broken internal state retain their failure boundary.
     let candidate_failure = is_budget_rejection(&error)
-        || is_control_rotation_mood_rejection(&error)
         || message == "no ready fiammetta target action"
         || message.starts_with("fiammetta_ready failed")
         || [
             "control: NO_CANDIDATE_UNDER_POLICY",
-            "control rotation ETA candidate budget exhausted",
-            "nonproduction rotation ETA cannot cover",
             "fiammetta_continuous_target_present failed",
             "all peak prefix candidates are infeasible",
             "no solution under ",
@@ -6868,50 +6766,6 @@ fn reject_fiammetta_candidate(error: Error) -> Result<()> {
     } else {
         Err(error)
     }
-}
-
-fn is_control_rotation_mood_rejection(error: &Error) -> bool {
-    matches!(
-        error,
-        Error::ControlRotationMoodRejected { .. }
-            | Error::ControlRotationMoodRetriesExhausted { .. }
-    )
-}
-
-fn finish_abc_candidate_with_control_rebuilds<F, G>(
-    candidate: &str,
-    mut build: F,
-    mut finish: G,
-) -> Result<TeamRotationReport>
-where
-    F: FnMut(usize) -> Result<TeamRotationReport>,
-    G: FnMut(TeamRotationReport) -> Result<TeamRotationReport>,
-{
-    let mut last_failure = None;
-    for control_attempt in 0..=3 {
-        let report = build(control_attempt)?;
-        match finish(report) {
-            Ok(report) => return Ok(report),
-            Err(Error::ControlRotationMoodRejected { operator, message }) => {
-                eprintln!(
-                    "[rotation-mood] reject ABC candidate {candidate} and rebuild Control roster attempt {} for {operator}: {message}",
-                    control_attempt + 1
-                );
-                last_failure = Some((operator, message));
-            }
-            Err(error) => return Err(error),
-        }
-    }
-    let Some((operator, message)) = last_failure else {
-        return Err(Error::msg(format!(
-            "control_rotation_mood: candidate {candidate} had no completed roster attempt"
-        )));
-    };
-    Err(Error::ControlRotationMoodRetriesExhausted {
-        message: format!(
-            "control_rotation_mood: ABC candidate {candidate} exhausted full roster rebuilds after {operator}: {message}"
-        ),
-    })
 }
 
 /// ABC 三班菲亚固定策略分支适配层。
@@ -6977,54 +6831,42 @@ fn schedule_abc_rotation_candidates_with_timing(
     if !options.fiammetta_enable || !operbox.owns(FIAMMETTA_NAME) || (!a_eligible && !b_eligible) {
         let mut baseline_options = options.clone();
         baseline_options.fiammetta_enable = false;
-        let report = finish_abc_candidate_with_control_rebuilds(
-            "N",
-            |control_attempt| {
-                schedule_abc_rotation_from_control_attempt(
-                    blueprint,
-                    operbox,
-                    instances,
-                    table,
-                    &baseline_options,
-                    shift_hours,
-                    false,
-                    AbyssalShortShiftPolicy::default_for(profile),
-                    profile,
-                    &[],
-                    &[],
-                    true,
-                    control_attempt,
-                )
-            },
-            |report| finish_candidate(report, false),
-        )?;
+        let report = schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &baseline_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &[],
+            &[],
+            true,
+        )
+        .and_then(|report| finish_candidate(report, false))?;
         write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &report);
         return Ok(report);
     }
 
     let mut baseline_options = options.clone();
     baseline_options.fiammetta_enable = false;
-    let baseline_result = finish_abc_candidate_with_control_rebuilds(
-        "N",
-        |control_attempt| {
-            schedule_abc_rotation_from_control_attempt(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &baseline_options,
-                shift_hours,
-                false,
-                AbyssalShortShiftPolicy::default_for(profile),
-                profile,
-                &[],
-                &[],
-                true,
-                control_attempt,
-            )
-        },
-        |report| finish_candidate(report, false),
-    );
+    let baseline_result = schedule_abc_rotation(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        &baseline_options,
+        shift_hours,
+        false,
+        AbyssalShortShiftPolicy::default_for(profile),
+        profile,
+        &[],
+        &[],
+        true,
+    )
+    .and_then(|report| finish_candidate(report, false));
     let (mut winner, baseline_error) = match baseline_result {
         Ok(baseline) => {
             write_candidate_report(options.fiammetta_candidates_out.as_deref(), "N", &baseline);
@@ -7038,7 +6880,7 @@ fn schedule_abc_rotation_candidates_with_timing(
             );
             (Some(baseline), None)
         }
-        Err(error) if is_budget_rejection(&error) || is_control_rotation_mood_rejection(&error) => {
+        Err(error) if is_budget_rejection(&error) => {
             eprintln!(
                 "[fiammetta-candidate] N {} rejected reason={error}",
                 profile.cli_name()
@@ -7071,37 +6913,31 @@ fn schedule_abc_rotation_candidates_with_timing(
         } else {
             vec!["可露希尔"]
         };
-        match finish_abc_candidate_with_control_rebuilds(
-            "A",
-            |control_attempt| {
-                schedule_abc_rotation_from_control_attempt(
-                    blueprint,
-                    operbox,
-                    instances,
-                    table,
-                    &a_options,
-                    shift_hours,
-                    false,
-                    AbyssalShortShiftPolicy::default_for(profile),
-                    profile,
-                    &relaxed,
-                    &[],
-                    true,
-                    control_attempt,
-                )
-            },
-            |mut candidate| {
-                attach_fiammetta_target_actions(
-                    blueprint,
-                    operbox,
-                    instances,
-                    profile,
-                    &a_targets,
-                    &mut candidate.shifts,
-                )
-                .and_then(|_| finish_candidate(candidate, true))
-            },
-        ) {
+        match schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &a_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &relaxed,
+            &[],
+            true,
+        )
+        .and_then(|mut candidate| {
+            attach_fiammetta_target_actions(
+                blueprint,
+                operbox,
+                instances,
+                profile,
+                &a_targets,
+                &mut candidate.shifts,
+            )
+            .and_then(|_| finish_candidate(candidate, true))
+        }) {
             Ok(candidate) => {
                 write_candidate_report(
                     options.fiammetta_candidates_out.as_deref(),
@@ -7140,37 +6976,31 @@ fn schedule_abc_rotation_candidates_with_timing(
         let mut b_options = options.clone();
         b_options.trade_role_preference = Some(TradeRolePreference::Witch);
         let relaxed: Vec<&str> = vec!["巫恋", "龙舌兰"];
-        match finish_abc_candidate_with_control_rebuilds(
-            "B",
-            |control_attempt| {
-                schedule_abc_rotation_from_control_attempt(
-                    blueprint,
-                    operbox,
-                    instances,
-                    table,
-                    &b_options,
-                    shift_hours,
-                    false,
-                    AbyssalShortShiftPolicy::default_for(profile),
-                    profile,
-                    &relaxed,
-                    &["trade_core"],
-                    true,
-                    control_attempt,
-                )
-            },
-            |mut candidate| {
-                attach_fiammetta_target_actions(
-                    blueprint,
-                    operbox,
-                    instances,
-                    profile,
-                    &relaxed,
-                    &mut candidate.shifts,
-                )
-                .and_then(|_| finish_candidate(candidate, true))
-            },
-        ) {
+        match schedule_abc_rotation(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            &b_options,
+            shift_hours,
+            false,
+            AbyssalShortShiftPolicy::default_for(profile),
+            profile,
+            &relaxed,
+            &["trade_core"],
+            true,
+        )
+        .and_then(|mut candidate| {
+            attach_fiammetta_target_actions(
+                blueprint,
+                operbox,
+                instances,
+                profile,
+                &relaxed,
+                &mut candidate.shifts,
+            )
+            .and_then(|_| finish_candidate(candidate, true))
+        }) {
             Ok(candidate) => {
                 write_candidate_report(
                     options.fiammetta_candidates_out.as_deref(),
@@ -7608,16 +7438,6 @@ fn restore_input_shift_order(
     Ok(())
 }
 
-fn is_peak_prefix_candidate_exhaustion(error: &Error) -> bool {
-    let Error::Msg(message) = error else {
-        return false;
-    };
-    let message = message
-        .strip_prefix(DISJOINT_BACKUP_ERROR_PREFIX)
-        .unwrap_or(message);
-    message == PEAK_PREFIX_CANDIDATE_EXHAUSTION
-}
-
 fn schedule_generic_main_backup(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -7627,7 +7447,7 @@ fn schedule_generic_main_backup(
     input_hours: [f64; 2],
 ) -> Result<TeamRotationReport> {
     let (ordered_hours, alpha_offset) = rotate_shift_hours_to_alpha(input_hours);
-    let result = schedule_main_backup_profile(
+    let (mut report, _) = schedule_main_backup_profile(
         TimedRotationProfile::GenericMainBackup,
         &ordered_hours,
         blueprint,
@@ -7635,30 +7455,7 @@ fn schedule_generic_main_backup(
         instances,
         table,
         options,
-        true,
-    );
-    let (mut report, _) = match result {
-        Ok(result) => result,
-        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
-            let mut fallback_options = options.clone();
-            fallback_options.control_work_hours = None;
-            let (mut report, diagnostic) = schedule_main_backup_profile(
-                TimedRotationProfile::GenericMainBackup,
-                &ordered_hours,
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &fallback_options,
-                false,
-            )?;
-            report.warnings.push(format!(
-                "{FINAL_INVARIANT_WARNING_PREFIX} generic main/backup constrained peak candidate set exhausted; ordinary assignments retained: {error}"
-            ));
-            (report, diagnostic)
-        }
-        Err(error) => return Err(error),
-    };
+    )?;
     restore_input_shift_order(&mut report, alpha_offset)?;
     complete_timed_rotation(
         blueprint,
@@ -7708,29 +7505,6 @@ impl AbyssalShortShiftPolicy {
     }
 }
 
-struct AbcRotationEtaFailure {
-    optional_control_role: Option<(String, String, String)>,
-}
-
-impl AbcRotationEtaFailure {
-    fn for_operator(plan: &AssignmentPlan, failed: &str) -> Self {
-        Self {
-            optional_control_role: plan.anchors.iter().find_map(|anchor| {
-                if anchor.operator != failed {
-                    return None;
-                }
-                anchor.optional_control_role.as_ref().map(|role| {
-                    (
-                        anchor.system_id.clone(),
-                        role.clone(),
-                        anchor.operator.clone(),
-                    )
-                })
-            }),
-        }
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn schedule_abc_rotation(
     blueprint: &BaseBlueprint,
@@ -7746,7 +7520,7 @@ fn schedule_abc_rotation(
     skip_systems: &[&str],
     enable_originium_pair: bool,
 ) -> Result<TeamRotationReport> {
-    schedule_abc_rotation_from_control_attempt(
+    match schedule_abc_rotation_once(
         blueprint,
         operbox,
         instances,
@@ -7759,102 +7533,33 @@ fn schedule_abc_rotation(
         gamma_relaxed,
         skip_systems,
         enable_originium_pair,
-        0,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn schedule_abc_rotation_from_control_attempt(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    shift_hours: [f64; 3],
-    enable_fiammetta_return: bool,
-    abyssal_policy: AbyssalShortShiftPolicy,
-    profile: TimedRotationProfile,
-    gamma_relaxed: &[&str],
-    skip_systems: &[&str],
-    enable_originium_pair: bool,
-    initial_control_team_attempt: usize,
-) -> Result<TeamRotationReport> {
-    let mut retry_options = options.clone();
-    let mut reversed_halves = false;
-    let mut control_team_attempt = initial_control_team_attempt;
-    loop {
-        let mut eta_failure = None;
-        let mut originium_pair_active = false;
-        let result = schedule_abc_rotation_once(
-            blueprint,
-            operbox,
-            instances,
-            table,
-            &retry_options,
-            shift_hours,
-            enable_fiammetta_return,
-            abyssal_policy,
-            profile,
-            gamma_relaxed,
-            skip_systems,
-            reversed_halves,
-            control_team_attempt,
-            &mut eta_failure,
-            &mut originium_pair_active,
-            enable_originium_pair,
-        );
-        match result {
-            Err(error @ Error::ControlRotationRequiredAnchorsExceedCapacity { .. })
-                if !skip_systems.contains(&"pozyomka_durin") =>
-            {
-                let mut fallback_skip = skip_systems.to_vec();
-                fallback_skip.push("pozyomka_durin");
-                eprintln!(
-                    "[rotation-fallback] retry ordinary trade Plan after the four-gold core made required control anchors infeasible: {error}"
-                );
-                return schedule_abc_rotation_from_control_attempt(
-                    blueprint,
-                    operbox,
-                    instances,
-                    table,
-                    &retry_options,
-                    shift_hours,
-                    enable_fiammetta_return,
-                    abyssal_policy,
-                    profile,
-                    gamma_relaxed,
-                    &fallback_skip,
-                    enable_originium_pair,
-                    control_team_attempt,
-                );
-            }
-            Err(error) => {
-                let Some(failure) = eta_failure else {
-                    return Err(error);
-                };
-                if !reversed_halves && !originium_pair_active {
-                    reversed_halves = true;
-                    eprintln!("[rotation-eta] retry ABC with reversed production halves: {error}");
-                    continue;
-                }
-                if control_team_attempt < 3 {
-                    control_team_attempt += 1;
-                    reversed_halves = false;
-                    eprintln!("[rotation-eta] replay full cycle with mood-cohort attempt {control_team_attempt}: {error}");
-                    continue;
-                }
-                let Some(role) = failure.optional_control_role else {
-                    return Err(error);
-                };
-                if !retry_options.skipped_optional_control_roles.insert(role) {
-                    return Err(error);
-                }
-                reversed_halves = false;
-                control_team_attempt = 0;
-                eprintln!("[rotation-eta] retry peak Plan without optional control role: {error}");
-            }
-            result => return result,
+    ) {
+        Err(error @ Error::ControlRotationRequiredAnchorsExceedCapacity { .. })
+            if !skip_systems.contains(&"pozyomka_durin") =>
+        {
+            // Preserve the separate optional four-gold Plan fallback. This is
+            // capacity admission, not a mood-driven roster rebuild.
+            let mut fallback_skip = skip_systems.to_vec();
+            fallback_skip.push("pozyomka_durin");
+            eprintln!(
+                "[rotation-fallback] ordinary trade Plan after the four-gold core made required control anchors infeasible: {error}"
+            );
+            schedule_abc_rotation_once(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                options,
+                shift_hours,
+                enable_fiammetta_return,
+                abyssal_policy,
+                profile,
+                gamma_relaxed,
+                &fallback_skip,
+                enable_originium_pair,
+            )
         }
+        result => result,
     }
 }
 
@@ -7871,13 +7576,8 @@ fn schedule_abc_rotation_once(
     profile: TimedRotationProfile,
     gamma_relaxed: &[&str],
     skip_systems: &[&str],
-    reversed_halves: bool,
-    control_team_attempt: usize,
-    eta_failure: &mut Option<AbcRotationEtaFailure>,
-    originium_pair_active: &mut bool,
     enable_originium_pair: bool,
 ) -> Result<TeamRotationReport> {
-    *originium_pair_active = false;
     let t0 = Instant::now();
     let m0 = crate::profile::solver_perf_snapshot();
     let cycle_hours: f64 = shift_hours.iter().sum();
@@ -7961,7 +7661,6 @@ fn schedule_abc_rotation_once(
             )));
         }
     }
-    *originium_pair_active = originium_pair.room_id().is_some();
     let mut shift_binds = shift_binds_from_plan(&peak_plan);
     let peak_office_names = peak_office_operators(blueprint, &peak);
     let rotating_anchor_names = bound_rotating_anchor_operators(blueprint, &peak, &shift_binds);
@@ -8052,8 +7751,7 @@ fn schedule_abc_rotation_once(
         &peak_plan.rotation_reserves,
         &originium_pair,
     )?;
-    // Retry the two intact halves in the other work/rest orientation. Gamma and
-    // every dependent cohort are rebuilt below; no bind component is moved or split.
+    // The preclaimed pair belongs to Alpha; preserve that initial placement.
     if let Some(room_id) = originium_pair.room_id() {
         let alpha_half = halves
             .iter()
@@ -8067,8 +7765,6 @@ fn schedule_abc_rotation_once(
         if alpha_half != 0 {
             halves.swap(0, alpha_half);
         }
-    } else if reversed_halves {
-        halves.swap(0, 1);
     }
     let [h1, h2] = halves;
     let required_manu_by_room = active_dependency_required_manu_by_room(
@@ -8329,28 +8025,6 @@ fn schedule_abc_rotation_once(
     for names in team_ctrl.values_mut() {
         names.sort();
         names.dedup();
-    }
-    if control_team_attempt > 0 {
-        // A bounded ordering heuristic, never a new bind: ordinary members of
-        // one modeled faction are tried in one cohort before splitting them.
-        let target = TeamLabel::ALL[control_team_attempt - 1];
-        let mut fixed = system_ctrl_names.clone();
-        fixed.extend(
-            shift_binds
-                .iter()
-                .flat_map(|bind| bind.operators.iter())
-                .cloned(),
-        );
-        for faction in &mood_model.control_faction_recovery {
-            for name in &faction.members {
-                if fixed.contains(name) || production_team_by_name.contains_key(name) {
-                    continue;
-                }
-                if team_ctrl.values().any(|names| names.contains(name)) {
-                    move_control_operator_to_team(&mut team_ctrl, name, target);
-                }
-            }
-        }
     }
     let mut rotation_team_by_name = production_team_by_name.clone();
     for team in TeamLabel::ALL {
@@ -8624,7 +8298,7 @@ fn schedule_abc_rotation_once(
         let admission = Some((&rotation_mood, &first_consumption));
         // Control candidates were admitted and frozen before entering the shift loop.
         control_options.mood = options.mood;
-        let mut assign_ctrl =
+        let assign_ctrl =
             |a: &mut BaseAssignment, used: &mut HashSet<String>, extra_control_pins: &[&str]| {
                 let control_admission =
                     control_closure.admission(index, &active, extra_control_pins)?;
@@ -8652,7 +8326,6 @@ fn schedule_abc_rotation_once(
                     used,
                 )?;
                 control_admission.validate(a).and_then(|()| {
-                    let mut office_eta_failure = None;
                     assign_office_for_shift_with_mood(
                         a,
                         blueprint,
@@ -8670,7 +8343,6 @@ fn schedule_abc_rotation_once(
                         hours,
                         Some(instances),
                         admission,
-                        Some(&mut office_eta_failure),
                     )?;
                     assign_rotating_meetings_with_context(
                         a,
@@ -8701,24 +8373,6 @@ fn schedule_abc_rotation_once(
                         instances,
                         admission,
                     );
-                    if let Some(name) = office_eta_failure.or_else(|| {
-                        noncontrol_eta_failure(
-                            &mood_model,
-                            blueprint,
-                            instances,
-                            a,
-                            &rotation_mood,
-                            hours,
-                            first_shift,
-                        )
-                    }) {
-                        *eta_failure = Some(AbcRotationEtaFailure::for_operator(&peak_plan, &name));
-                        return Err(Error::msg(format!(
-                            "nonproduction rotation ETA cannot cover shift {} for {}",
-                            index + 1,
-                            name
-                        )));
-                    }
                     Ok(())
                 })
             };
@@ -8921,22 +8575,6 @@ fn schedule_abc_rotation_once(
             });
         }
         let assignment = &shifts.last().expect("shift just appended").assignment;
-        if let Some(name) = noncontrol_eta_failure(
-            &mood_model,
-            blueprint,
-            instances,
-            assignment,
-            &rotation_mood,
-            hours,
-            first_shift,
-        ) {
-            *eta_failure = Some(AbcRotationEtaFailure::for_operator(&peak_plan, &name));
-            return Err(Error::msg(format!(
-                "nonproduction rotation ETA cannot cover shift {} for {}",
-                index + 1,
-                name
-            )));
-        }
         advance_rotation_mood(
             &mood_model,
             blueprint,
@@ -9186,7 +8824,6 @@ fn assign_originium_pair_peak(
                     operator: name.to_string(),
                     proactive_support: false,
                     optional_trade_role: None,
-                    optional_control_role: None,
                     elite,
                     facility: FacilityKind::Factory,
                     room_id: Some(room_id.clone()),
@@ -9387,69 +9024,6 @@ fn solve_policy_disjoint_backup(
             "no solution under current-main complete-state-disjoint backup policy: {error}"
         ))
     })
-}
-
-fn solve_disjoint_backup_with_budget_fallback(
-    profile: TimedRotationProfile,
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    main: &BaseAssignment,
-    shift_hours: f64,
-) -> Result<(OwnedRotationAssignment, Option<String>)> {
-    match solve_policy_disjoint_backup(
-        blueprint,
-        operbox,
-        instances,
-        table,
-        options,
-        main,
-        shift_hours,
-    ) {
-        Ok(backup) => Ok((backup, None)),
-        Err(error)
-            if options.control_work_hours.is_some()
-                && matches!(
-                    profile,
-                    TimedRotationProfile::MainBackup12_12
-                        | TimedRotationProfile::MainBackup24_24
-                        | TimedRotationProfile::GenericMainBackup
-                        | TimedRotationProfile::Abyssal7_5_7_5
-                )
-                && is_peak_prefix_candidate_exhaustion(&error) =>
-        {
-            let mut fallback_options = options.clone();
-            fallback_options.control_work_hours = None;
-            let backup = solve_policy_disjoint_backup(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &fallback_options,
-                main,
-                shift_hours,
-            )?;
-            let warning = match profile {
-                TimedRotationProfile::MainBackup12_12 => format!(
-                    "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_12_12 constrained backup candidate set exhausted; ordinary 12h backup retained: {error}"
-                ),
-                TimedRotationProfile::MainBackup24_24 => format!(
-                    "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_24_24 constrained backup candidate set exhausted; ordinary 24h backup retained: {error}"
-                ),
-                TimedRotationProfile::GenericMainBackup => format!(
-                    "{FINAL_INVARIANT_WARNING_PREFIX} generic main/backup constrained backup candidate set exhausted; ordinary {shift_hours}h backup retained: {error}"
-                ),
-                TimedRotationProfile::Abyssal7_5_7_5 => format!(
-                    "{FINAL_INVARIANT_WARNING_PREFIX} abyssal_7_5_7_5 constrained backup candidate set exhausted; ordinary 5h backup retained: {error}"
-                ),
-                _ => unreachable!("only main/backup profiles use this fallback"),
-            };
-            Ok((backup, Some(warning)))
-        }
-        Err(error) => Err(error),
-    }
 }
 
 fn trade_post_room_for_operator(
@@ -9675,7 +9249,6 @@ fn fill_owner_office_seats(
         shift_hours,
         None,
         None,
-        None,
     )?;
     Ok(())
 }
@@ -9794,7 +9367,7 @@ fn schedule_main_backup_12_12(
 ) -> Result<TeamRotationReport> {
     let mut profile_options = options.clone();
     profile_options.control_work_hours = Some(12.0);
-    let result = schedule_main_backup_profile(
+    schedule_main_backup_profile(
         TimedRotationProfile::MainBackup12_12,
         &[12.0, 12.0],
         blueprint,
@@ -9802,30 +9375,8 @@ fn schedule_main_backup_12_12(
         instances,
         table,
         &profile_options,
-        false,
-    );
-    match result {
-        Ok((report, _)) => Ok(report),
-        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
-            let mut fallback_options = options.clone();
-            fallback_options.control_work_hours = None;
-            let (mut report, _) = schedule_main_backup_profile(
-                TimedRotationProfile::MainBackup12_12,
-                &[12.0, 12.0],
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &fallback_options,
-                false,
-            )?;
-            report.warnings.push(format!(
-                "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_12_12 constrained peak candidate set exhausted; ordinary 12h assignments retained: {error}"
-            ));
-            Ok(report)
-        }
-        Err(error) => Err(error),
-    }
+    )
+    .map(|(report, _)| report)
 }
 
 fn schedule_main_backup_24_24(
@@ -9837,7 +9388,7 @@ fn schedule_main_backup_24_24(
 ) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
     let mut profile_options = options.clone();
     profile_options.control_work_hours = Some(24.0);
-    let result = schedule_main_backup_profile(
+    schedule_main_backup_profile(
         TimedRotationProfile::MainBackup24_24,
         &[24.0, 24.0],
         blueprint,
@@ -9845,33 +9396,7 @@ fn schedule_main_backup_24_24(
         instances,
         table,
         &profile_options,
-        false,
-    );
-    match result {
-        Ok(result) => Ok(result),
-        Err(error) if is_peak_prefix_candidate_exhaustion(&error) => {
-            // ETA remains the candidate policy.  If it rejects every candidate,
-            // preserve the requested 24/24 product shape and expose the quality
-            // loss to normal callers; the explicit invariant gate still fails.
-            let mut fallback_options = options.clone();
-            fallback_options.control_work_hours = None;
-            let (mut report, diagnostic) = schedule_main_backup_profile(
-                TimedRotationProfile::MainBackup24_24,
-                &[24.0, 24.0],
-                blueprint,
-                operbox,
-                instances,
-                table,
-                &fallback_options,
-                false,
-            )?;
-            report.warnings.push(format!(
-                "{FINAL_INVARIANT_WARNING_PREFIX} main_backup_24_24 constrained peak candidate set exhausted; ordinary 24h assignments retained: {error}"
-            ));
-            Ok((report, diagnostic))
-        }
-        Err(error) => Err(error),
-    }
+    )
 }
 
 #[derive(Debug)]
@@ -9930,14 +9455,13 @@ fn schedule_main_backup_profile(
     instances: &OperatorInstances,
     table: &SkillTable,
     options: &AssignBaseOptions,
-    enforce_generic_control_eta: bool,
 ) -> Result<(TeamRotationReport, Option<MainBackup24FiammettaDiagnostic>)> {
     let started = Instant::now();
     let main_hours = state_hours[0];
     let backup_hours = state_hours[1];
     let owner_options = |hours: f64| {
         let mut owner_options = options.clone();
-        if profile == TimedRotationProfile::GenericMainBackup && enforce_generic_control_eta {
+        if profile == TimedRotationProfile::GenericMainBackup {
             owner_options.control_work_hours = Some(hours);
         }
         owner_options
@@ -10039,7 +9563,6 @@ fn schedule_main_backup_profile(
     let mut fiammetta_reentered_searches = 0;
     let mut fiammetta_action_search_path = None;
     let mut backup_candidate = None;
-    let mut backup_budget_fallback_warning = None;
 
     if profile == TimedRotationProfile::MainBackup24_24 && fiammetta_enabled {
         let selected_main_targets = main_backup_24_24_fiammetta_targets(blueprint, &main);
@@ -10194,18 +9717,15 @@ fn schedule_main_backup_profile(
         }
 
         if backup_candidate.is_none() {
-            let (mut disjoint_backup, fallback_warning) =
-                solve_disjoint_backup_with_budget_fallback(
-                    profile,
-                    blueprint,
-                    operbox,
-                    instances,
-                    table,
-                    &backup_options,
-                    &main.assignment,
-                    backup_hours,
-                )?;
-            backup_budget_fallback_warning = fallback_warning;
+            let mut disjoint_backup = solve_policy_disjoint_backup(
+                blueprint,
+                operbox,
+                instances,
+                table,
+                &backup_options,
+                &main.assignment,
+                backup_hours,
+            )?;
             fill_owner_office_seats(
                 blueprint,
                 operbox,
@@ -10319,8 +9839,7 @@ fn schedule_main_backup_profile(
     let mut backup = match selected_backup {
         Some(backup) => backup,
         None => {
-            let (backup, fallback_warning) = solve_disjoint_backup_with_budget_fallback(
-                profile,
+            let backup = solve_policy_disjoint_backup(
                 blueprint,
                 operbox,
                 instances,
@@ -10329,7 +9848,6 @@ fn schedule_main_backup_profile(
                 &main.assignment,
                 backup_hours,
             )?;
-            backup_budget_fallback_warning = fallback_warning;
             backup
         }
     };
@@ -10446,9 +9964,6 @@ fn schedule_main_backup_profile(
     if let Some(warning) = originium_pair.warning() {
         report.warnings.push(warning);
     }
-    if let Some(warning) = backup_budget_fallback_warning {
-        report.warnings.push(warning);
-    }
     let fiammetta_24_diagnostic = (profile == TimedRotationProfile::MainBackup24_24
         && fiammetta_enabled)
         .then(|| MainBackup24FiammettaDiagnostic {
@@ -10492,7 +10007,6 @@ fn schedule_ordinary_profile_fallback(
         instances,
         table,
         options,
-        false,
     )?;
     report.warnings.push(format!(
         "{FINAL_INVARIANT_WARNING_PREFIX} {reason}; special claims unavailable, ordinary assignments retain requested {} timing",
@@ -10725,7 +10239,6 @@ fn augment_abyssal_profile_plan(
         operator: producer.to_string(),
         proactive_support: false,
         optional_trade_role: None,
-        optional_control_role: None,
         elite: producer_progress.elite,
         facility: FacilityKind::ControlCenter,
         room_id: Some(control_room_id.clone()),
@@ -10746,7 +10259,6 @@ fn augment_abyssal_profile_plan(
             operator: operator.clone(),
             proactive_support: false,
             optional_trade_role: None,
-            optional_control_role: None,
             elite: progress.elite,
             facility: FacilityKind::Factory,
             room_id: Some(room_id.clone()),
@@ -11114,8 +10626,7 @@ fn schedule_abyssal_7_5_7_5(
     let main_forbidden: HashSet<String> = main.assignment.operator_names();
     let mut backup_options = options.clone();
     backup_options.control_work_hours = Some(5.0);
-    let (mut backup, backup_budget_warning) = solve_disjoint_backup_with_budget_fallback(
-        TimedRotationProfile::Abyssal7_5_7_5,
+    let mut backup = solve_policy_disjoint_backup(
         blueprint,
         operbox,
         instances,
@@ -11204,9 +10715,6 @@ fn schedule_abyssal_7_5_7_5(
         report.warnings.push(format!(
             "{FINAL_INVARIANT_WARNING_PREFIX} abyssal-7575 requires one single-target and one group dorm manager who can fully recover the control producer during each 5h rest; no unproven recovery group emitted"
         ));
-    }
-    if let Some(warning) = backup_budget_warning {
-        report.warnings.push(warning);
     }
     Ok(report)
 }
