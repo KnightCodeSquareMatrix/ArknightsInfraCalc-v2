@@ -85,8 +85,6 @@ pub struct ManuOperatorRuntime<'a> {
     /// 按基建设施数量结算的生产力（不被他人归零技能清零）。
     pub layout_eff: RecipeEff,
     pub limit: RecipeLimit,
-    /// 技能面仓库贡献（赤金/源石/战斗记录共用；分段仓库→% 只看此项）。
-    pub limit_contrib: i32,
     pub mood_drain_delta: f64,
     /// 从满心情起已消耗的心情值。
     pub mood_gap: f64,
@@ -533,10 +531,6 @@ fn apply_eff_action<const TIMED: bool, O: ManuObserver>(
     target.add(recipe, value);
 }
 
-fn limit_delta_counts_as_contrib(recipe: &Option<RecipeKind>) -> bool {
-    matches!(recipe, None | Some(RecipeKind::All))
-}
-
 fn apply_limit_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str) {
     let Some(idx) = ctx.operators.iter().position(|o| o.name == owner) else {
         return;
@@ -544,15 +538,11 @@ fn apply_limit_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str)
     match &atom.action {
         Action::AddLimitDelta { delta, recipe } => {
             ctx.operators[idx].limit.add(*recipe, *delta);
-            if limit_delta_counts_as_contrib(recipe) {
-                ctx.operators[idx].limit_contrib += delta;
-            }
         }
         Action::AddLimitFromSelector { multiplier } => {
             let base = resolve_selector_value(ctx, atom.selector.as_ref(), owner);
             let add = (base * multiplier).round() as i32;
             ctx.operators[idx].limit.add(None, add);
-            ctx.operators[idx].limit_contrib += add;
         }
         Action::AddLimitFromState { key, multiplier } => {
             let Some(sk) = StateKey::parse(key) else {
@@ -561,7 +551,6 @@ fn apply_limit_action(ctx: &mut ManuContext<'_>, atom: &EffectAtom, owner: &str)
             let state = ctx.state_pool[sk];
             let add = (state.floor() * multiplier).round() as i32;
             ctx.operators[idx].limit.add(None, add);
-            ctx.operators[idx].limit_contrib += add;
         }
         _ => {}
     }
@@ -663,7 +652,7 @@ fn resolve_eff_value<const TIMED: bool, O: ManuObserver>(
         Action::AddEffFromLimitContribSum { rate } => {
             ctx.operators
                 .iter()
-                .map(|o| o.limit_contrib.max(0))
+                .map(|o| o.limit.for_recipe(ctx.active_recipe).max(0))
                 .sum::<i32>() as f64
                 * rate
         }
@@ -675,7 +664,12 @@ fn resolve_eff_value<const TIMED: bool, O: ManuObserver>(
             .operators
             .iter()
             .map(|o| {
-                eff_from_limit_contrib_tiered(o.limit_contrib, *threshold, *low_rate, *high_rate)
+                eff_from_limit_contrib_tiered(
+                    o.limit.for_recipe(ctx.active_recipe),
+                    *threshold,
+                    *low_rate,
+                    *high_rate,
+                )
             })
             .sum(),
         Action::AddEffRamp {
@@ -817,9 +811,11 @@ fn resolve_selector_value(ctx: &ManuContext<'_>, selector: Option<&Selector>, ow
             ctx.operators.iter().filter(|o| o.name != owner).count() as f64
         }
         Some(Selector::RoomOperatorCount) => ctx.operators.len() as f64,
-        Some(Selector::LimitContribSum) => {
-            ctx.operators.iter().map(|o| o.limit_contrib).sum::<i32>() as f64
-        }
+        Some(Selector::LimitContribSum) => ctx
+            .operators
+            .iter()
+            .map(|o| o.limit.for_recipe(ctx.active_recipe))
+            .sum::<i32>() as f64,
         Some(Selector::PeerSkillEffSum) => ctx
             .operators
             .iter()

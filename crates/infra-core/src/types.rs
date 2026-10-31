@@ -326,11 +326,11 @@ pub enum Action {
         ret_per_step: f64,
         cap: f64,
     },
-    /// 同房 `limit_contrib` 总和 × `rate`% → 站级生产力（红云·回收利用）。
+    /// 当前配方逐人净仓容增加量截零后求和 × `rate`%（红云·回收利用）。
     AddEffFromLimitContribSum {
         rate: f64,
     },
-    /// 同房每人 `limit_contrib` 分段 × rate → 站级生产力（泡泡·大就是好）。
+    /// 当前配方逐人净仓容增加量截零后分段 × rate（泡泡·大就是好）。
     AddEffFromLimitContribTiered {
         threshold: i32,
         low_rate: f64,
