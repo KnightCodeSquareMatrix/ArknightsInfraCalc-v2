@@ -7,7 +7,7 @@
     ],
     "allowed_consumers": [],
     "proof_paths": [
-      "scripts/codex/tests/**"
+      "target/codex-runs/**"
     ],
     "explicitly_deferred": [
       "crates/**",

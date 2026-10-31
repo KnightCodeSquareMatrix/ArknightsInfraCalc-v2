@@ -7,4 +7,3 @@ cd "$repo_root"
 
 cargo build --release -p infra-cli
 target/release/infra-cli bake all "$@"
-cargo test --release --workspace

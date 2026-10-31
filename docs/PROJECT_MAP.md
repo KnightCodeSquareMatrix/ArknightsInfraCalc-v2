@@ -202,7 +202,8 @@ layout / operbox / runtime data
 
 | 层级 | 主要入口 |
 |---|---|
-| Rust 单元/集成 | 各模块 `mod tests`；按 owner 运行 `cargo test -p infra-core <filter>` |
+| 生产构建 | `cargo build --release -p infra-cli`；不新增、保留或运行源码测试 |
+| 终态不变量 / 批量 Box | `plan --assert-invariants`；`scripts/assert_rotation_invariants.py --binary target/release/infra-cli --group all` |
 | CLI 回归 | `infra-cli verify` + `data/REGRESSION_CASES.csv` + `data/UNIT_OUTPUT_ANCHORS.csv` |
 | 真实 layout/plan | `data/fixtures/243/` + `plan` / `layout test` / `layout team-rotation` |
 | 文档 lifecycle/link/命令地图 | `docs_inventory.py --check`、`check_repository_facts.py` |

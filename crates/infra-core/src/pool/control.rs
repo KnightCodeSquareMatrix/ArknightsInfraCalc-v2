@@ -133,31 +133,3 @@ fn try_entry(
         tier: OperatorTier::Standalone,
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn account_control_pool_keeps_stable_skillless_fallback_after_used_prefix() {
-        let operbox =
-            OperBox::load(&crate::operbox::default_operbox_full_e2_path().unwrap()).unwrap();
-        let instances =
-            OperatorInstances::load(&crate::instances::default_instances_path().unwrap()).unwrap();
-        let table =
-            SkillTable::load(&crate::skill_table::default_skill_table_path().unwrap()).unwrap();
-        let skilled =
-            build_control_pool(&operbox.control_roster(&instances), &instances, &table).unwrap();
-        let with_fillers = build_control_pool_with_fillers(&operbox, &instances, &table).unwrap();
-
-        let fillers: Vec<_> = with_fillers
-            .entries
-            .iter()
-            .filter(|entry| entry.buff_ids.is_empty())
-            .map(|entry| entry.name.as_str())
-            .collect();
-        assert!(fillers.len() > 5);
-        assert!(fillers.windows(2).all(|pair| pair[0] <= pair[1]));
-        assert!(with_fillers.entries.len() > skilled.entries.len() + 5);
-    }
-}

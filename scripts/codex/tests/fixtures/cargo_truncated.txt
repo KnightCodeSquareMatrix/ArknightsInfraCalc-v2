@@ -1,3 +1,0 @@
-running 2 tests
-test suite::alpha ... ok
-test suite::beta ... FAILED

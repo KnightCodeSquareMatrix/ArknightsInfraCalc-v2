@@ -1,2 +1,0 @@
-Compiling infra-core v0.1.0
-error: could not compile infra-core

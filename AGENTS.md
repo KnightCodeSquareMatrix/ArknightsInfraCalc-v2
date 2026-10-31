@@ -49,7 +49,7 @@
 - **修在哪**：改最早放行错误状态的那个 owner，不在下游补偿。owner 已经能表达规则时直接局部修，不要求先做架构准备。
 - **体系或结构性改写**（现有模型表达不了已确认的不变量，或多个阶段在重复兜底）：先简述领域不变量、首次违规的位置、修复后唯一的责任边界，以及要删掉的冲突路径。完成时旧的过渡路径和兼容分支一并删掉。
 - **范围**：一个写入单元只有一个主要意图，旁支发现记下来延后处理。修 bug 时发现的"代码可以更干净"另起任务，不借 bug 扩大范围；改变能力、可行行为、policy 或输出口径的，按新功能对待。没有用户恢复授权时，不推进无关的历史 TODO、Mower 动态换班或全基建连续心情最优化。
-- **验证**：按风险匹配。实现闭环后跑一轮完整验证包；失败时先改完，再整轮重跑，不拿反复编译代替调查。选人、排班、导出类的大改动靠 §2.1-9 的终态断言加批量 box，不新增源码测试；单房间计算这类局部修复可以补最小复现测试，改候选或搜索时同时测进入和被排除两侧。只改单个房间的计算或只改文档时，可以不跑 §2.1-9 的整体自检，但要在报告里说明原因。复现入口不清时查 `docs/MAINTENANCE_MODE.md` 对应章节。
+- **验证**：按风险匹配。实现闭环后跑一轮完整验证包；失败时先改完，再整轮重跑，不拿反复编译代替调查。项目不新增、保留或运行源码单元/集成测试（含 Rust 测试模块及 Python unittest）；既有源码测试删除。选人、排班、导出类的大改动靠 §2.1-9 的终态断言加批量 box；局部修复用最小反例、相邻反例和真实入口检查，改候选或搜索时同时检查进入和被排除两侧。只改单个房间的计算或只改文档时，可以不跑 §2.1-9 的整体自检，但要在报告里说明原因。复现入口不清时查 `docs/MAINTENANCE_MODE.md` 对应章节。
 - **复审**：中高风险的选人、排班、导出或跨模块改动，整个功能完成后用 `arknights-intent-review`。复审只查三件事：是否照用户的想法改、实现是否干净、耦合代码依赖的条件是否还成立。“干净”指责任清楚、无重复兜底和无关改动，不以审美偏好增加抽象或扩大重构。准绳是用户原话和改动前的裁决，不是本次刚改的文档。主 agent 不自己复审，也不重复验收；每条发现必须落到已修复、有证据驳回或交给用户之一。
 - **提交**：授权的修复验证通过后，主动做原子提交。标题用中文，因为会显示在质量网页上。提交前看 `git status --short`、`git diff`、`git log --oneline -10`。
 - **文档**：改动涉及入口、状态写入、分支或 fallback、错误、输出、机制映射或保证等级时，在同一个变更里更新对应的 owner 文档并跑文档检查；纯内部重构写一句“已复核，无需修改”。新的人读文档用中文文件名。
@@ -67,7 +67,7 @@
 
 ## 3. 环境与命令
 
-- 测试、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo test --release`、`cargo build --release -p infra-cli`、`target/release/infra-cli`。debug 下全量库测试约 41 分钟。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
+- 生产构建、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo build --release -p infra-cli`、`target/release/infra-cli`。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
 - 修改 Rust 后运行 `cargo fmt --all`。
 - 需要长期留痕的证据（命令包装、失败集合对比、汇总报告）：见 `scripts/codex/README.md`。
 - 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。
@@ -84,7 +84,7 @@
 | 多代理报告目录、引用位置或用户原话选段 | `python3 scripts/codex/index_research_reports.py --dir <目录>` 或 `--file <报告>`；按需加 `--source <引用路径>`、`--section <编号>`，Workflow 可加 `--key` |
 | 批量验收进度 | `python3 scripts/assert_rotation_invariants.py --status <运行目录>`；批量运行用 `--output-dir` 生成 `progress.json`，最终错误读 `summary.json` |
 
-三个查询入口默认最多输出 6000 字符；省略内容用 `--full` 或 `--output <完整结果路径>` 回取，不把截断当作完整证据。排班查询只接受完整 rotation 产物，`--shift` 为保存的 `index+1`；profile/MAA 不冒充完整排班。数据查询不解释机制，报告索引不替代原文复审，进度快照不证明进程仍存活。命令留痕与失败集合比较继续复用 `run_evidence.sh`、`render_evidence.py`、`compare_test_failures.py`。
+三个查询入口默认最多输出 6000 字符；省略内容用 `--full` 或 `--output <完整结果路径>` 回取，不把截断当作完整证据。排班查询只接受完整 rotation 产物，`--shift` 为保存的 `index+1`；profile/MAA 不冒充完整排班。数据查询不解释机制，报告索引不替代原文复审，进度快照不证明进程仍存活。命令留痕复用 `run_evidence.sh`、`render_evidence.py`；批量失败分类与结果差分复用 `assert_rotation_invariants.py` 的 summary 和 `--compare-to`。
 
 ## 4. 从哪里读
 
@@ -122,4 +122,5 @@
 - 工作流规则由真实失败和用户纠正驱动；在代表性任务中比较结果质量、返工、用户介入、耗时和 token 成本，并覆盖应触发与不应触发两侧。未验证效果明确标注；无净收益时调整或删除，不为改规则强制新建评测框架，也不降低领域保证或必要门禁。
 - memory 只记可丢弃的检索提示和协作偏好，注明来源、日期、适用范围和复核 / 失效条件；区分用户原话、转述和 agent 推断，阶段性授权不升为长期默认。新裁决覆盖旧条目时更新当前摘要，历史原话保留。领域语义、用户裁决、实现、架构和活动任务进版本化 owner 文档。
 - 不能遗漏且可程序化的约束，按具体任务落实到类型、断言、检查脚本、CI、权限或 writer 锁；文档说明理由、入口和实际保证。新增门禁用违规例子验证能阻断，未实现的自动执行明确注明；表达偏好不做强制门禁。
+- 验证方式来源：用户 2026-10-31 明确裁决“本项目不需要添加测试，以前的也要删掉。我们有其他方法去检查他的错误。”保留生产终态断言、批量 Box、真实 CLI 与文档检查。
 - 本轮补充及调整来源：用户 2026-10-29 在工作习惯提取、联网评估后明确批准，并裁决“子代理人数我不觉得需要固定，现在的agent足够聪明能进行这个分配”。

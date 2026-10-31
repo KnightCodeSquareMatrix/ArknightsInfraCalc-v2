@@ -5,8 +5,6 @@ mod power;
 mod role_pick;
 mod trade;
 
-#[cfg(test)]
-pub(crate) use control::control_inject_components_for_assignment;
 pub use control::{
     control_efficiency_fill_sort_weight, control_entry_core_inject_fill,
     control_entry_deferred_trade_tags, control_entry_dynamic_trade_tags,

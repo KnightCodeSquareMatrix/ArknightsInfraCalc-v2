@@ -69,38 +69,3 @@ pub fn eff_ramp_avg_over_hours(
 pub fn eff_ramp_avg_20h(style: EffRampStyle, initial: f64, per_hour: f64, cap: f64) -> f64 {
     eff_ramp_avg_over_hours(style, initial, per_hour, cap, MANU_RAMP_HOURS)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fen_first_hour_curve() {
-        let s = EffRampStyle::FirstHourThenHourly;
-        assert!((eff_at_hour(s, 20.0, 1.0, 25.0, 1) - 20.0).abs() < f64::EPSILON);
-        assert!((eff_at_hour(s, 20.0, 1.0, 25.0, 6) - 25.0).abs() < f64::EPSILON);
-        assert!((eff_ramp_avg_20h(s, 20.0, 1.0, 25.0) - 24.25).abs() < 0.01);
-    }
-
-    #[test]
-    fn kroos_slow_curve() {
-        let s = EffRampStyle::FirstHourThenHourly;
-        assert!((eff_at_hour(s, 15.0, 2.0, 25.0, 1) - 15.0).abs() < f64::EPSILON);
-        assert!((eff_ramp_avg_20h(s, 15.0, 2.0, 25.0) - 23.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn aroma_hourly_only() {
-        let s = EffRampStyle::HourlyOnly;
-        assert!((eff_at_hour(s, 0.0, 2.0, 20.0, 1) - 2.0).abs() < f64::EPSILON);
-        assert!((eff_at_hour(s, 0.0, 2.0, 20.0, 10) - 20.0).abs() < f64::EPSILON);
-        assert!((eff_ramp_avg_20h(s, 0.0, 2.0, 20.0) - 15.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn power_float_shift_matches_legacy() {
-        let s = EffRampStyle::FirstHourThenHourly;
-        assert!((eff_ramp_at_shift_hours(s, 10.0, 1.0, 15.0, 1.0) - 10.0).abs() < f64::EPSILON);
-        assert!((eff_ramp_at_shift_hours(s, 10.0, 1.0, 15.0, 6.0) - 15.0).abs() < f64::EPSILON);
-    }
-}

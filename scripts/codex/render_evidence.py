@@ -12,9 +12,8 @@ from typing import Any
 
 
 CATEGORY_GROUPS = [
-    ("Build", {"build", "test-build"}),
-    ("定向测试", {"targeted-test"}),
-    ("Full suite", {"full-suite"}),
+    ("Build", {"build"}),
+    ("终态断言与批量 Box", {"invariants", "batch"}),
     ("真实 CLI", {"cli"}),
     ("性能", {"performance", "benchmark"}),
 ]
@@ -131,12 +130,6 @@ def render(manifest: dict[str, Any]) -> str:
         selected = [run for run in runs if run.get("category") in categories]
         if selected:
             value = _run_links(selected)
-            if label == "Full suite":
-                comparisons = [a for a in artifacts if a.get("kind") == "failure-comparison"]
-                if comparisons:
-                    value += "；" + "；".join(
-                        _link("失败集合比较", str(artifact["path"])) for artifact in comparisons
-                    )
             lines.append(f"- {label}：{value}")
         else:
             lines.append(f"- {label}：未跑（manifest 未登记该类别）")
