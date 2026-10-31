@@ -41,6 +41,8 @@ ManuRoomInput
 
 ## 搜索与排班
 
+工程机器人保留“设施等级产生资源 → 机械辅助读取资源”的结算链。机器人消费产生的效率归入设施派生效率 `layout_eff`，仍计入至简自身总生产力，但不进入槐琥的其他干员技能面读数，也不被同房清零清除；其他资源读取仍沿用原分类。来源：用户 2026-10-31 裁决槐琥误读属于至简工程机器人概念简化的问题，并要求一并修复。α 每 16 个、β 每 8 个机器人加 5%，整档向下取整；设施等级 producer 上限 64。
+
 `build_manufacture_pool` 将 OperBox 的 facility binding、tier 和 `SkillTable` 映射为 `ManuPoolEntry`；缺失实例/buff 记录 skip，不是白板高效技能。`search_manufacture_triples` 先按 `full_pool` 过滤，再对单配方做 `C(n,3)` 组合；`ManuSearchRecipeMode::Lines` 分别求赤金和作战记录线并按线数合并。排班填房使用 `manu_options`、Plan anchor、`used` 和最新 resolve 快照。
 
 ## 失败与回退

@@ -481,6 +481,10 @@ fn eff_target_is_layout(atom: &EffectAtom) -> bool {
         Some(Selector::TradeStationCount)
             | Some(Selector::PowerStationCount)
             | Some(Selector::PlatformCountInPower)
+    ) || matches!(
+        &atom.action,
+        Action::StateConsumeToEff { key, .. }
+            if StateKey::parse(key) == Some(StateKey::EngineeringRobot)
     )
 }
 
