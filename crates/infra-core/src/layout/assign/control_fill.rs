@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{FacilityKind, RoomId};
 use crate::layout::context::LayoutContext;
-use crate::mood::{default_mood_model, fits_work_budget, operator_net_drain, DrainInputs};
+use crate::mood::default_mood_model;
 use crate::pool::{try_filter_standalone, ControlPool};
 use crate::search::{
     search_control_combos_with_eligibility, ControlFillPolicy, ControlSearchOptions,
@@ -36,7 +36,7 @@ pub(crate) fn assign_control_with_saileach(
     eligibility: Option<&(dyn Fn(&[String]) -> bool + Sync)>,
     used: &mut HashSet<String>,
 ) -> Result<()> {
-    assign_control_inner(
+    let result = assign_control_inner(
         assignment,
         pool,
         table,
@@ -49,9 +49,21 @@ pub(crate) fn assign_control_with_saileach(
         saileach_required,
         eligibility,
         used,
-    )?
-    .then_some(())
-    .ok_or_else(|| Error::msg("control: no legal fill combo"))
+    );
+    match result {
+        Ok(true) => Ok(()),
+        Ok(false) => {
+            assignment
+                .construction_warnings
+                .push("control: no legal fill combo".into());
+            Ok(())
+        }
+        Err(Error::NoCandidate(message)) => {
+            assignment.construction_warnings.push(message);
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
 }
 
 pub(crate) fn assign_control_matching_dynamic_set_with_saileach(
@@ -238,21 +250,13 @@ fn assign_control_inner(
         &must_include,
         excluded.unwrap_or(&empty_excluded),
     )?;
-    let protected_mood_candidates: HashSet<String> = candidate_requirements
-        .iter()
-        .flat_map(|requirement| requirement.candidates.iter().cloned())
-        .chain(pinned.iter().cloned())
-        .chain(
-            required_all
-                .into_iter()
-                .flat_map(|required| required.iter().cloned()),
-        )
-        .collect();
+    // Fixed pins were admitted by Plan. Search-group choices and dynamic
+    // required members still need individual admission before being promised.
     let filtered_pool = filter_control_pool_for_mood(
         &filtered_pool,
         options.control_work_hours,
         options.mood,
-        &protected_mood_candidates,
+        &pinned,
     )?;
 
     if observe_control {
@@ -287,7 +291,7 @@ fn assign_control_inner(
         if required_all.is_some() {
             return Ok(false);
         }
-        return Err(Error::msg(
+        return Err(Error::no_candidate(
             format!(
                 "control: NO_CANDIDATE_UNDER_POLICY LayeredFill; no combo extending pins after pool filter; pinned={:?} must_include={:?} pool={} filtered={} requirements={:?}",
                 pinned,
@@ -389,20 +393,11 @@ fn filter_control_pool_for_mood(
             if protected.contains(&entry.name) {
                 return true;
             }
-            let room_ops = vec![(entry.name.clone(), entry.progress.elite)];
-            let inputs = DrainInputs {
-                name: &entry.name,
-                elite: entry.progress.elite,
-                facility: FacilityKind::ControlCenter,
-                room_ops: &room_ops,
-                full_control: true,
-                control_ops: &[],
-                recipe: None,
-            };
-            fits_work_budget(
+            crate::mood::control_roster_fits(
                 &model,
-                initial_mood.min(model.mood_cap),
-                operator_net_drain(&model, &inputs),
+                &entry.name,
+                entry.progress.elite,
+                initial_mood,
                 work_hours,
             )
         })

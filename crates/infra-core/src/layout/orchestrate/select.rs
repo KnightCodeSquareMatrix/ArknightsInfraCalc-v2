@@ -111,6 +111,38 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             }
         }
     }
+    // Admit each possible fixed Rule member before a concrete alternative is
+    // claimed. Removing an unqualified choice does not dismantle a live bind.
+    if let Some(hours) = control_work_hours.or(registry_sustain_hours) {
+        let model = crate::mood::default_mood_model()?;
+        for rule in &mut catalog.rules {
+            for alternative in &mut rule.alternatives {
+                for role in alternative.roles.iter_mut().chain(
+                    alternative
+                        .conditional_packs
+                        .iter_mut()
+                        .flat_map(|pack| &mut pack.roles),
+                ) {
+                    if role.facility != crate::layout::FacilityKind::ControlCenter {
+                        continue;
+                    }
+                    role.candidates.retain(|candidate| {
+                        operbox
+                            .progress_of(&candidate.name)
+                            .is_some_and(|progress| {
+                                crate::mood::control_roster_fits(
+                                    &model,
+                                    &candidate.name,
+                                    progress.elite,
+                                    mood,
+                                    hours,
+                                )
+                            })
+                    });
+                }
+            }
+        }
+    }
     loop {
         for rule in &mut catalog.rules {
             for alternative in &mut rule.alternatives {
@@ -206,8 +238,13 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
-    let mut admit_all = |_: &crate::layout::system::RegistrySystemClaim, _: &BaseAssignment| true;
+    let mut mood_admission = registry_mood_admission(
+        control_work_hours.or(registry_sustain_hours),
+        instances,
+        mood,
+    )?;
+    let mut admit_all =
+        |_: &mut crate::layout::system::RegistrySystemClaim, _: &BaseAssignment| true;
     let admission = mood_admission.as_deref_mut().unwrap_or(&mut admit_all);
     let registry_claims = crate::layout::system::select_registry_systems_with_admission(
         blueprint,
@@ -446,7 +483,10 @@ fn registry_mood_admission<'a>(
     initial_mood: f64,
 ) -> Result<
     Option<
-        Box<dyn FnMut(&crate::layout::system::RegistrySystemClaim, &BaseAssignment) -> bool + 'a>,
+        Box<
+            dyn FnMut(&mut crate::layout::system::RegistrySystemClaim, &BaseAssignment) -> bool
+                + 'a,
+        >,
     >,
 > {
     let Some(hours) = hours else {
@@ -455,6 +495,30 @@ fn registry_mood_admission<'a>(
     let model = crate::mood::default_mood_model()?;
     const ABYSSAL_CONTROL_DRAIN_BUFF: &str = "control_mp_aegir2[010]";
     Ok(Some(Box::new(move |claim, _trial| {
+        // Search groups promise a count, not every name. Filter choices before
+        // committing the claim; later control fill consumes this qualified set.
+        for slot in claim.slots.iter_mut().filter(|slot| {
+            slot.facility == crate::layout::FacilityKind::ControlCenter
+                && slot.fill == SlotFillMode::Search
+        }) {
+            slot.operators.retain(|op| {
+                let contextual = instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .any(|id| id == ABYSSAL_CONTROL_DRAIN_BUFF);
+                contextual
+                    || crate::mood::control_roster_fits(
+                        &model,
+                        &op.name,
+                        op.elite,
+                        initial_mood,
+                        hours,
+                    )
+            });
+            if slot.operators.len() < usize::from(slot.required_count) {
+                return false;
+            }
+        }
         let control_claims: Vec<_> = claim
             .slots
             .iter()
@@ -466,15 +530,10 @@ fn registry_mood_admission<'a>(
         {
             return true;
         }
-        if control_claims
-            .iter()
-            .any(|slot| slot.fill == SlotFillMode::Search)
-        {
-            return true;
-        }
         let available = initial_mood.min(model.mood_cap);
         control_claims
             .iter()
+            .filter(|slot| slot.fill != SlotFillMode::Search)
             .flat_map(|slot| &slot.operators)
             .all(|op| {
                 // Abyssal drain depends on outside-dorm presence, which is not
@@ -486,22 +545,7 @@ fn registry_mood_admission<'a>(
                 {
                     return true;
                 }
-                let room_ops = vec![(op.name.clone(), op.elite)];
-                let inputs = crate::mood::DrainInputs {
-                    name: &op.name,
-                    elite: op.elite,
-                    facility: crate::layout::FacilityKind::ControlCenter,
-                    room_ops: &room_ops,
-                    full_control: true,
-                    control_ops: &[],
-                    recipe: None,
-                };
-                crate::mood::fits_work_budget(
-                    &model,
-                    available,
-                    crate::mood::operator_net_drain(&model, &inputs),
-                    hours,
-                )
+                crate::mood::control_roster_fits(&model, &op.name, op.elite, available, hours)
             })
     })))
 }
@@ -619,7 +663,7 @@ mod tests {
     fn guarded_pack_rejects_two_targets_naturally_packed_into_one_half() {
         let blueprint = BaseBlueprint::template_243_use_this().unwrap();
         let mut assignment = BaseAssignment::default();
-        let bound_rooms = ["manu_1", "manu_2", "manu_3", "manu_4", "power_1"];
+        let bound_rooms = ["trade_1", "trade_2", "manu_1"];
         let bound_operators: Vec<_> = bound_rooms
             .iter()
             .enumerate()
@@ -674,8 +718,8 @@ mod tests {
                 trade_target_count(&halves[0]),
                 trade_target_count(&halves[1])
             ],
-            [0, 2],
-            "counterexample requires two independent trade targets in one natural half"
+            [2, 0],
+            "counterexample binds both trade targets into one production component"
         );
         assert_eq!(
             guarded_pack_violation(&blueprint, &assignment, &plan).unwrap(),

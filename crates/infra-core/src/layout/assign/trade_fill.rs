@@ -177,6 +177,12 @@ pub(super) fn assign_trade_remainder_with_plan_anchors(
                         ),
                     });
                 }
+                if let Error::NoCandidate(message) = error {
+                    assignment
+                        .construction_warnings
+                        .push(format!("trade {}: {message}", room.id.0));
+                    continue;
+                }
                 return Err(Error::msg(format!("trade {}: {error}", room.id.0)));
             }
         };
@@ -508,7 +514,7 @@ pub(super) fn pick_trade_meta_then_plain(
             .iter()
             .any(|name| GOLD_ORDER_CORE_NAMES.contains(&name.as_str()))
     {
-        return Err(Error::msg(
+        return Err(Error::no_candidate(
             "originium trade room cannot contain a gold-order core operator",
         ));
     }
@@ -562,8 +568,10 @@ pub(super) fn pick_trade_meta_then_plain(
             required_names,
         ) {
             Ok(hit) => return Ok(hit),
-            Err(error) if required_names.iter().any(|name| name == DOCUS_TRADE_NAME) => {
-                return Err(Error::msg(format!(
+            Err(Error::NoCandidate(error))
+                if required_names.iter().any(|name| name == DOCUS_TRADE_NAME) =>
+            {
+                return Err(Error::no_candidate(format!(
                     "required docus core has no legal teammate combination: {error}"
                 )));
             }
@@ -733,7 +741,7 @@ pub(super) fn pick_trade_hit(
                 breakdown: None,
             });
         }
-        return Err(Error::msg(format!(
+        return Err(Error::no_candidate(format!(
             "trade pool has {} ready operators (need {})",
             sub.entries.len(),
             search_opts.operator_capacity

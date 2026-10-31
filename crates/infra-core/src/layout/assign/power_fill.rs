@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::layout::assignment::{AssignedOperator, BaseAssignment};
 use crate::layout::blueprint::{BaseBlueprint, FacilityKind, RoomId};
 use crate::layout::context::LayoutContext;
@@ -140,10 +140,11 @@ pub(super) fn assign_power_rooms_with_instances(
             .map(|e| AssignedOperator::from_progress(&station.hit.name, e.progress))
             .unwrap_or_else(|| AssignedOperator::new(&station.hit.name, 0));
         if !used.insert(station.hit.name.clone()) {
-            return Err(Error::msg(format!(
+            assignment.construction_warnings.push(format!(
                 "power {}: duplicate {}",
                 room_id.0, station.hit.name
-            )));
+            ));
+            continue;
         }
         assignment.set_room_with_efficiency(
             room_id.clone(),

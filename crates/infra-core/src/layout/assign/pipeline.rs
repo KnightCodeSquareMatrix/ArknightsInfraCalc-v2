@@ -272,8 +272,28 @@ fn run_shift_pipeline_with_producer_pruning(
                     best = Some(candidate);
                 }
             }
-            let best =
-                best.ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?;
+            // Continue from the executed Plan, not a failed mask's partial
+            // assignment. No new roster solve or weakened admission is used.
+            let best = match best {
+                Some(best) => best,
+                None => {
+                    run.assignment.construction_warnings.push("control: no peak prefix satisfied the admitted Plan; ordinary vacancies retained".into());
+                    let candidate = finish_peak_prefix_candidate(
+                        run,
+                        plan,
+                        &trade_pool,
+                        &manu_pool,
+                        &power_pool,
+                        gold_lines,
+                        &forbid_same_room,
+                        0,
+                        false,
+                    )?;
+                    candidate.ok_or_else(|| {
+                        Error::msg("ordinary prefix unexpectedly requires optional precision")
+                    })?
+                }
+            };
             observe!(
                 "peak_prefix_winner mask={} policy_sort_key={:?} control={:?}",
                 best.stable_order,
@@ -452,13 +472,11 @@ fn apply_shadow_trade_manufacture_pair(
                 manu
             }
         }
-        (Ok(trade), Err(_)) => trade,
-        (Err(_), Ok(manu)) => manu,
-        (Err(trade_error), Err(manu_error)) => {
-            return Err(Error::msg(format!(
-                "shadow pair has no feasible disjoint branch: trade-first={trade_error}; manufacture-first={manu_error}"
-            )))
-        }
+        (Ok(trade), Err(Error::NoCandidate(_))) => trade,
+        (Err(Error::NoCandidate(_)), Ok(manu)) => manu,
+        (Ok(_), Err(error)) | (Err(error), Ok(_)) => return Err(error),
+        (Err(Error::NoCandidate(_)), Err(Error::NoCandidate(_))) => return Ok(None),
+        (Err(error), Err(_)) => return Err(error),
     };
     Ok(Some((winner.assignment, winner.used)))
 }
@@ -512,14 +530,18 @@ fn probe_shadow_pair(
     if !trade_takes_night_smoke {
         return Ok(None);
     }
-    let manu_hit = pick_shadow_manufacture(
+    let manu_hit = match pick_shadow_manufacture(
         run,
         manu_pool,
         &layout,
         room_recipe(manu_room)?,
         manu_room.level,
         used,
-    )?;
+    ) {
+        Ok(hit) => hit,
+        Err(Error::NoCandidate(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
     let manu_takes_night_smoke = manu_hit_names(&manu_hit)
         .iter()
         .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
@@ -1236,6 +1258,28 @@ fn prepare_peak_control_candidate<'a>(
             }
         };
     }
+    if let (Some(hours), Some((required, _))) = (
+        run.options
+            .control_work_hours
+            .or(run.options.registry_sustain_hours),
+        dynamic_set,
+    ) {
+        let model = crate::mood::default_mood_model()?;
+        if required.iter().any(|name| {
+            control_pool.entry(name).is_none_or(|entry| {
+                !crate::mood::control_roster_fits(
+                    &model,
+                    name,
+                    entry.progress.elite,
+                    run.options.mood,
+                    hours,
+                )
+            })
+        }) {
+            observe!("prepare_return_none mask={stable_order} reason=dynamic_control_work_budget");
+            return Ok(None);
+        }
+    }
     let control_names: HashSet<String> = run
         .assignment
         .control_operators()
@@ -1253,7 +1297,7 @@ fn prepare_peak_control_candidate<'a>(
                     && requirement.candidates.iter().any(|name| name == "琴柳")
             });
     let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
-    if run.assignment.control_operators().len() < 5 {
+    {
         if let Some((required, excluded)) = dynamic_set {
             if !assign_control_matching_dynamic_set_with_saileach(
                 &mut run.assignment,
@@ -1351,6 +1395,7 @@ fn finish_peak_prefix_candidate<'a>(
         run.blueprint,
         run.operbox,
         &plan.producers,
+        run.options,
         &mut run.assignment,
         &mut run.used,
     )?;

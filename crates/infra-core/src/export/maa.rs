@@ -219,9 +219,7 @@ pub fn build_from_team_rotation(
                 // 二班没有逐班的宿舍恢复推演：休息队伍的住宿由 MAA 自动填充，
                 // 其他 profile 只在床位不足 warning 时才请求填充。
                 dorm_autofill: report.profile.maa_uses_rest_team_dorm_autofill()
-                    || report.warnings.iter().any(|warning| {
-                        warning.starts_with(&format!("shift {} 宿舍普通休息候选", shift.index + 1))
-                    }),
+                    || shift.assignment.dorm_autofill,
                 fiammetta_target: shift
                     .fiammetta
                     .as_ref()

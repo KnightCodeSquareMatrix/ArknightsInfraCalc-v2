@@ -16,6 +16,16 @@ pub enum Error {
     /// Domain, unsupported-state, or contextualized failure with reader-facing context.
     #[error("{0}")]
     Msg(String),
+    /// A normal search exhausted its legal candidates. Timed construction
+    /// retains its state and continues ordinary completion.
+    #[error("{0}")]
+    NoCandidate(String),
+    /// A calculable construction inconsistency; the owning stage retains its state.
+    #[error("{0}")]
+    ScheduleQuality(String),
+    /// A specialized Fiammetta candidate has not fulfilled its action dependency.
+    #[error("{0}")]
+    FiammettaCandidateUnavailable(String),
     /// Filesystem or stream failure.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -61,6 +71,14 @@ impl Error {
     /// Construct a domain, unsupported-state, or contextualized error.
     pub fn msg(s: impl Into<String>) -> Self {
         Self::Msg(s.into())
+    }
+
+    pub(crate) fn no_candidate(message: impl Into<String>) -> Self {
+        Self::NoCandidate(message.into())
+    }
+
+    pub(crate) fn schedule_quality(message: impl Into<String>) -> Self {
+        Self::ScheduleQuality(message.into())
     }
 
     /// Retain a report when a downstream rotation stage fails after construction.

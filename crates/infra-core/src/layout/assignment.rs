@@ -203,6 +203,15 @@ pub struct BaseAssignment {
     pub base_workforce: Vec<String>,
     #[serde(skip)]
     pub(crate) note_facts: crate::notes::NoteFacts,
+    /// Construction diagnostics retained until the complete cycle is settled.
+    #[serde(skip)]
+    pub(crate) construction_warnings: Vec<String>,
+    /// Execution fact submitted by dorm completion; wording never controls MAA.
+    #[serde(skip)]
+    pub(crate) dorm_autofill: bool,
+    /// Room permutations committed by warmup continuity during construction.
+    #[serde(skip)]
+    pub(crate) rotation_room_moves: std::collections::HashMap<RoomId, RoomId>,
     /// Frozen scheduling inputs for the final-state control gate; not a second
     /// selected-members list and never part of the public assignment protocol.
     #[serde(skip)]

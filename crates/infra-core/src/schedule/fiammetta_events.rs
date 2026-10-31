@@ -207,18 +207,3 @@ pub(super) fn try_accept_action(
         instances,
     )
 }
-
-pub(super) fn accept_proposals(
-    shifts: &mut [TeamShiftResult],
-    proposals: &[Option<FiammettaShiftAction>],
-    model: &MoodModel,
-    blueprint: &BaseBlueprint,
-    instances: &OperatorInstances,
-) {
-    for (index, proposal) in proposals.iter().enumerate() {
-        let Some(action) = proposal else {
-            continue;
-        };
-        let _ = try_accept(shifts, index, action.clone(), model, blueprint, instances);
-    }
-}

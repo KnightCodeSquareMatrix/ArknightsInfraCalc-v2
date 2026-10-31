@@ -67,6 +67,7 @@ pub(crate) struct ControlRotationClosure {
     requirements: Vec<ResolvedRequirement>,
     capacity: usize,
     room_id: RoomId,
+    issues: Vec<String>,
 }
 
 impl ControlRotationClosure {
@@ -100,6 +101,7 @@ impl ControlRotationClosure {
             requirements: Vec::new(),
             capacity: room.operator_capacity(),
             room_id: room.id.clone(),
+            issues: Vec::new(),
         };
         for team in TeamLabel::ALL {
             for name in team_ctrl.get(&team).into_iter().flatten() {
@@ -118,26 +120,24 @@ impl ControlRotationClosure {
                 {
                     continue;
                 }
-                if closure
-                    .candidates
-                    .insert(
-                        name.clone(),
-                        Candidate {
-                            entry: entry.clone(),
-                            scope: WorkScope::Team(team),
-                            origin: if is_required {
-                                CandidateOrigin::PlanRequired
-                            } else {
-                                CandidateOrigin::Ordinary
-                            },
-                        },
-                    )
-                    .is_some()
-                {
-                    return Err(Error::msg(format!(
+                if closure.candidates.contains_key(name) {
+                    closure.issues.push(format!(
                         "control_rotation_membership: duplicate team for {name}"
-                    )));
+                    ));
+                    continue;
                 }
+                closure.candidates.insert(
+                    name.clone(),
+                    Candidate {
+                        entry: entry.clone(),
+                        scope: WorkScope::Team(team),
+                        origin: if is_required {
+                            CandidateOrigin::PlanRequired
+                        } else {
+                            CandidateOrigin::Ordinary
+                        },
+                    },
+                );
             }
         }
         for name in &shared_control {
@@ -157,9 +157,9 @@ impl ControlRotationClosure {
         }
         for name in &closure.required {
             if !closure.candidates.contains_key(name) {
-                return Err(Error::msg(format!(
+                closure.issues.push(format!(
                     "control_plan_requirement: required {name} has no frozen scope"
-                )));
+                ));
             }
         }
         let bound_names: HashSet<_> = binds
@@ -179,10 +179,10 @@ impl ControlRotationClosure {
                 .filter(|op| requirement.candidates.contains(&op.name))
                 .collect();
             if peak_members.len() < usize::from(requirement.min_count) {
-                return Err(Error::msg(format!(
+                closure.issues.push(format!(
                     "control_plan_requirement: peak violates {}/slot {}",
                     claim.system_id, slot_index
-                )));
+                ));
             }
             // Actual non-control roles own the work scope when available. Pure
             // control groups inherit their preassigned actual peak cohort.
@@ -213,12 +213,13 @@ impl ControlRotationClosure {
             } else if owners.len() == 1 {
                 WorkScope::Team(*owners.iter().next().expect("one owner"))
             } else {
-                return Err(Error::msg(format!(
+                closure.issues.push(format!(
                     "control_requirement_scope_unresolved: {}/slot {} has {} cohorts",
                     claim.system_id,
                     slot_index,
                     owners.len()
-                )));
+                ));
+                continue;
             };
             for name in &requirement.candidates {
                 let Some(candidate) = closure.candidates.get_mut(name) else {
@@ -234,7 +235,7 @@ impl ControlRotationClosure {
                                 == Some(false)
                         })
                     {
-                        return Err(Error::msg(format!("control_requirement_scope_unresolved: group member {name} has no admitted or unavailable role")));
+                        closure.issues.push(format!("control_requirement_scope_unresolved: group member {name} has no admitted or unavailable role"));
                     }
                     continue;
                 };
@@ -243,9 +244,10 @@ impl ControlRotationClosure {
                         || bound_names.contains(name)
                         || matches!(candidate.origin, CandidateOrigin::Group { .. }))
                 {
-                    return Err(Error::msg(format!(
+                    closure.issues.push(format!(
                         "control_requirement_scope_unresolved: conflicting ownership for {name}"
-                    )));
+                    ));
+                    continue;
                 }
                 candidate.scope = scope;
                 candidate.origin = CandidateOrigin::Group {
@@ -381,7 +383,7 @@ impl ControlShiftAdmission {
             .iter()
             .find(|name| occupied.contains(name.as_str()) || rejected.contains(*name))
         {
-            return Err(Error::msg(format!(
+            return Err(Error::schedule_quality(format!(
                 "control_rotation_admission: required {name} is occupied or rejected"
             )));
         }
@@ -419,6 +421,9 @@ impl ControlShiftAdmission {
     }
 
     pub(crate) fn validate(&self, assignment: &BaseAssignment) -> Result<()> {
+        if !self.closure.issues.is_empty() {
+            return Err(Error::schedule_quality(self.closure.issues.join("; ")));
+        }
         let operators = assignment.operators_in(&self.closure.room_id);
         let names: HashSet<_> = operators.iter().map(|op| op.name.clone()).collect();
         if operators.len() > self.closure.capacity || names.len() != operators.len() {
@@ -587,55 +592,84 @@ pub(crate) fn assert_final_control_rotation(
 
 /// Data-contract witnesses for the sources repaired in this change. These run
 /// in the final Rust gate, using the same model and instances as the report.
-pub(crate) fn assert_control_mood_mapping(
+pub(crate) fn collect_control_mood_mapping_issues(
     blueprint: &BaseBlueprint,
     instances: &OperatorInstances,
     table: &SkillTable,
     report: &TeamRotationReport,
-) -> Result<()> {
-    let model = crate::mood::default_mood_model()?;
-    assert_control_pair_recovery(blueprint, instances, table, report, model)?;
-    let rainbow = model
-        .control_faction_recovery
-        .iter()
-        .find(|entry| entry.id == "rainbow_six")
-        .ok_or_else(|| {
-            Error::msg("assert-invariants control_mood_projection: missing rainbow mapping")
-        })?;
-    let providers: HashSet<_> = rainbow.providers.iter().map(String::as_str).collect();
-    let members: HashSet<_> = rainbow.members.iter().map(String::as_str).collect();
-    if providers != HashSet::from(["灰烬", "战车", "闪击", "霜华"])
-        || members
-            != HashSet::from([
-                "灰烬",
-                "战车",
-                "闪击",
-                "霜华",
-                "艾拉",
-                "医生",
-                "双月",
-                "导火索",
-            ])
-        || providers.len() != rainbow.providers.len()
-        || members.len() != rainbow.members.len()
-        || (rainbow.per_member - 0.05).abs() > 1e-9
-    {
-        return Err(Error::msg(
-            "assert-invariants control_mood_projection: provider/member contract mismatch",
-        ));
+) -> Vec<super::RotationIssue> {
+    let mut issues = Vec::new();
+    macro_rules! check {
+        ($rule:literal, $body:block) => {
+            if let Err(error) = (|| -> Result<()> {
+                $body;
+                Ok(())
+            })() {
+                issues.push(super::RotationIssue {
+                    rule: $rule,
+                    message: error.to_string(),
+                });
+            }
+        };
     }
-    let smiley = model.control_smiley_recovery.as_ref().ok_or_else(|| {
-        Error::msg("assert-invariants control_mood_projection: missing smiley mapping")
-    })?;
-    if smiley
-        .providers
-        .iter()
-        .any(|provider| provider.name == "三角初华")
-    {
-        return Err(Error::msg(
+    let model = crate::mood::default_mood_model();
+    check!("control_pair_mapping", {
+        let model = model.as_ref().map_err(|error| {
+            Error::msg(format!("cannot evaluate control pair mapping: {error}"))
+        })?;
+        assert_control_pair_recovery(blueprint, instances, table, report, model)?;
+    });
+    check!("control_rainbow_mapping", {
+        let model = model.as_ref().map_err(|error| {
+            Error::msg(format!("cannot evaluate control rainbow mapping: {error}"))
+        })?;
+        let rainbow = model
+            .control_faction_recovery
+            .iter()
+            .find(|entry| entry.id == "rainbow_six")
+            .ok_or_else(|| {
+                Error::msg("assert-invariants control_mood_projection: missing rainbow mapping")
+            })?;
+        let providers: HashSet<_> = rainbow.providers.iter().map(String::as_str).collect();
+        let members: HashSet<_> = rainbow.members.iter().map(String::as_str).collect();
+        if providers != HashSet::from(["灰烬", "战车", "闪击", "霜华"])
+            || members
+                != HashSet::from([
+                    "灰烬",
+                    "战车",
+                    "闪击",
+                    "霜华",
+                    "艾拉",
+                    "医生",
+                    "双月",
+                    "导火索",
+                ])
+            || providers.len() != rainbow.providers.len()
+            || members.len() != rainbow.members.len()
+            || (rainbow.per_member - 0.05).abs() > 1e-9
+        {
+            return Err(Error::msg(
+                "assert-invariants control_mood_projection: provider/member contract mismatch",
+            ));
+        }
+    });
+    check!("control_smiley_mapping", {
+        let model = model.as_ref().map_err(|error| {
+            Error::msg(format!("cannot evaluate control smiley mapping: {error}"))
+        })?;
+        let smiley = model.control_smiley_recovery.as_ref().ok_or_else(|| {
+            Error::msg("assert-invariants control_mood_projection: missing smiley mapping")
+        })?;
+        if smiley
+            .providers
+            .iter()
+            .any(|provider| provider.name == "三角初华")
+        {
+            return Err(Error::msg(
             "assert-invariants control_mood_projection: dorm recovery treated as control smiley",
         ));
-    }
+        }
+    });
     let delegated = [
         "control_mp_cost[000]",
         "control_mp_cost[001]",
@@ -650,65 +684,83 @@ pub(crate) fn assert_control_mood_mapping(
         "control_mp_cost[014]",
         "control_mp_cost&faction[900]",
     ];
-    for id in delegated {
-        if table
-            .get(id)
-            .is_none_or(|skill| skill.facility != "control" || !skill.atoms.is_empty())
-        {
-            return Err(Error::msg(format!(
-                "assert-invariants control_mood_projection: missing delegated source {id}"
-            )));
-        }
-    }
-    let witness = ["灰烬", "战车", "闪击", "医生", "双月"].map(|name| (name.to_string(), 0));
-    if (model.control_faction_recovery_value(&witness) - 0.75).abs() > 1e-9
-        || model
-            .control_smiley_recovery_value(&[("三角初华".to_string(), 2)])
-            .abs()
-            > 1e-9
-        || model
-            .control_smiley_recovery_for_facility(
-                FacilityKind::Dormitory,
-                &[("玛恩纳".to_string(), 2), ("临光".to_string(), 0)],
-            )
-            .abs()
-            > 1e-9
-    {
-        return Err(Error::msg("assert-invariants control_mood_projection: provider/member or target scope witness failed"));
-    }
-    for shift in &report.shifts {
-        let actual: Vec<_> = shift
-            .assignment
-            .control_operators()
-            .iter()
-            .map(|op| (op.name.clone(), op.elite))
-            .collect();
-        for room in &blueprint.rooms {
-            if crate::mood::facility_key(room.kind).is_none() {
-                continue;
-            }
-            let projection = model.control_uniform_recovery_for_facility(room.kind, &actual);
-            if !projection.is_finite() || projection < 0.0 {
+    check!("control_delegated_mapping", {
+        for id in delegated {
+            if table
+                .get(id)
+                .is_none_or(|skill| skill.facility != "control" || !skill.atoms.is_empty())
+            {
                 return Err(Error::msg(format!(
-                    "assert-invariants control_mood_projection: invalid shift {} target {}",
-                    shift.index + 1,
-                    room.id.0
+                    "assert-invariants control_mood_projection: missing delegated source {id}"
                 )));
             }
         }
-        for op in shift.assignment.control_operators() {
-            if instances
-                .resolve_control_buff_ids(&op.name, op.tier())
+    });
+    check!("control_scope_witness", {
+        let model = model.as_ref().map_err(|error| {
+            Error::msg(format!("cannot evaluate control scope witness: {error}"))
+        })?;
+        let witness = ["灰烬", "战车", "闪击", "医生", "双月"].map(|name| (name.to_string(), 0));
+        if (model.control_faction_recovery_value(&witness) - 0.75).abs() > 1e-9
+            || model
+                .control_smiley_recovery_value(&[("三角初华".to_string(), 2)])
+                .abs()
+                > 1e-9
+            || model
+                .control_smiley_recovery_for_facility(
+                    FacilityKind::Dormitory,
+                    &[("玛恩纳".to_string(), 2), ("临光".to_string(), 0)],
+                )
+                .abs()
+                > 1e-9
+        {
+            return Err(Error::msg("assert-invariants control_mood_projection: provider/member or target scope witness failed"));
+        }
+    });
+    check!("control_actual_projection", {
+        let model = model.as_ref().map_err(|error| {
+            Error::msg(format!(
+                "cannot evaluate control actual projection: {error}"
+            ))
+        })?;
+        for shift in &report.shifts {
+            let actual: Vec<_> = shift
+                .assignment
+                .control_operators()
                 .iter()
-                .any(|id| delegated.contains(&id.as_str()) && table.get(id).is_none())
-            {
-                return Err(Error::msg(
-                    "assert-invariants control_mood_projection: unresolved actual source",
-                ));
+                .map(|op| (op.name.clone(), op.elite))
+                .collect();
+            for room in &blueprint.rooms {
+                if crate::mood::facility_key(room.kind).is_none() {
+                    continue;
+                }
+                let projection = model.control_uniform_recovery_for_facility(room.kind, &actual);
+                if !projection.is_finite() || projection < 0.0 {
+                    return Err(Error::msg(format!(
+                        "assert-invariants control_mood_projection: invalid shift {} target {}",
+                        shift.index + 1,
+                        room.id.0
+                    )));
+                }
             }
         }
-    }
-    Ok(())
+    });
+    check!("control_actual_sources", {
+        for shift in &report.shifts {
+            for op in shift.assignment.control_operators() {
+                if instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .any(|id| delegated.contains(&id.as_str()) && table.get(id).is_none())
+                {
+                    return Err(Error::msg(
+                        "assert-invariants control_mood_projection: unresolved actual source",
+                    ));
+                }
+            }
+        }
+    });
+    issues
 }
 
 fn assert_control_pair_recovery(

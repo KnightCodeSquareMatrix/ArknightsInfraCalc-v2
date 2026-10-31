@@ -61,13 +61,49 @@ pub(crate) fn finalize_dorms(
             .cloned()
             .collect();
 
-        if let Some(warning) =
-            finalize_shift_dorm(blueprint, operbox, &ordinary_rest, &mut shifts[index])?
-        {
+        let (rooms, warning) =
+            match plan_shift_dorm(blueprint, operbox, &ordinary_rest, &shifts[index]) {
+                Ok(plan) => plan,
+                Err(Error::ScheduleQuality(message)) => {
+                    shifts[index].assignment.construction_warnings.push(message);
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+        for (room_id, operators) in rooms {
+            shifts[index].assignment.set_room(room_id, operators);
+        }
+        shifts[index].assignment.dorm_autofill = warning.is_some();
+        if let Some(warning) = warning {
             warnings.push(warning);
         }
     }
 
+    Ok(warnings)
+}
+
+pub(crate) fn warnings(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    shifts: &[TeamShiftResult],
+) -> Result<Vec<DormFinalizerWarning>> {
+    let work: Vec<_> = shifts
+        .iter()
+        .map(|shift| working_operators(blueprint, &shift.assignment))
+        .collect();
+    let mut warnings = Vec::new();
+    for (index, shift) in shifts.iter().enumerate() {
+        let previous = (index + shifts.len() - 1) % shifts.len();
+        let current: HashSet<_> = work[index].iter().map(|op| op.name.as_str()).collect();
+        let ordinary: Vec<_> = work[previous]
+            .iter()
+            .filter(|op| !current.contains(op.name.as_str()))
+            .cloned()
+            .collect();
+        if let (_, Some(warning)) = plan_shift_dorm(blueprint, operbox, &ordinary, shift)? {
+            warnings.push(warning);
+        }
+    }
     Ok(warnings)
 }
 
@@ -78,26 +114,32 @@ fn working_operators(
     unique_operators(assignment.work_position_operators(blueprint).cloned())
 }
 
-fn finalize_shift_dorm(
+fn plan_shift_dorm(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     ordinary_rest: &[AssignedOperator],
-    shift: &mut TeamShiftResult,
-) -> Result<Option<DormFinalizerWarning>> {
+    shift: &TeamShiftResult,
+) -> Result<(
+    Vec<(RoomId, Vec<AssignedOperator>)>,
+    Option<DormFinalizerWarning>,
+)> {
     let dorms = blueprint.rooms_of(FacilityKind::Dormitory);
     if dorms.is_empty() {
         return if ordinary_rest.is_empty() {
-            Ok(None)
+            Ok((Vec::new(), None))
         } else {
-            Ok(Some(DormFinalizerWarning {
-                shift_index: shift.index,
-                available_beds: 0,
-                candidate_count: ordinary_rest.len(),
-                omitted_names: ordinary_rest
-                    .iter()
-                    .map(|operator| operator.name.clone())
-                    .collect(),
-            }))
+            Ok((
+                Vec::new(),
+                Some(DormFinalizerWarning {
+                    shift_index: shift.index,
+                    available_beds: 0,
+                    candidate_count: ordinary_rest.len(),
+                    omitted_names: ordinary_rest
+                        .iter()
+                        .map(|operator| operator.name.clone())
+                        .collect(),
+                }),
+            ))
         };
     }
 
@@ -136,7 +178,7 @@ fn finalize_shift_dorm(
                 .iter()
                 .position(|room| room.id == plan.room_id)
                 .ok_or_else(|| {
-                    Error::msg(format!(
+                    Error::schedule_quality(format!(
                         "shift {} dorm recovery room {} is not a dormitory",
                         shift.index + 1,
                         plan.room_id.0
@@ -146,7 +188,7 @@ fn finalize_shift_dorm(
         .transpose()?;
     if let (Some(index), Some(special)) = (special_room_index, special.as_ref()) {
         if special.len() > capacities[index] {
-            return Err(Error::msg(format!(
+            return Err(Error::schedule_quality(format!(
                 "shift {} dorm recovery group exceeds room {} capacity",
                 shift.index + 1,
                 dorms[index].id.0
@@ -170,7 +212,7 @@ fn finalize_shift_dorm(
             })
             .unwrap_or(0);
     if protected_count > total_capacity {
-        return Err(Error::msg(format!(
+        return Err(Error::schedule_quality(format!(
             "shift {} existing dorm occupants and recovery group exceed total dorm capacity",
             shift.index + 1
         )));
@@ -191,6 +233,7 @@ fn finalize_shift_dorm(
         });
     }
     let mut remaining = resting.into_iter();
+    let mut placements = Vec::new();
     for (index, room) in dorms.iter().enumerate() {
         let mut occupants = Vec::new();
         if Some(index) == special_room_index {
@@ -204,33 +247,37 @@ fn finalize_shift_dorm(
             };
             occupants.push(operator);
         }
-        shift.assignment.set_room(room.id.clone(), occupants);
+        placements.push((room.id.clone(), occupants));
     }
 
     let omitted_names: Vec<String> = ordinary_rest
         .iter()
         .filter(|operator| {
             !dorms.iter().any(|room| {
-                shift
-                    .assignment
-                    .operators_in(&room.id)
+                placements
                     .iter()
-                    .any(|placed| placed.name == operator.name)
+                    .find(|(id, _)| id == &room.id)
+                    .is_some_and(|(_, members)| {
+                        members.iter().any(|placed| placed.name == operator.name)
+                    })
             })
         })
         .map(|operator| operator.name.clone())
         .collect();
     if omitted_names.is_empty() {
-        return Ok(None);
+        return Ok((placements, None));
     }
 
     let available_beds = total_capacity.saturating_sub(protected_count);
-    Ok(Some(DormFinalizerWarning {
-        shift_index: shift.index,
-        available_beds,
-        candidate_count: ordinary_names.len(),
-        omitted_names,
-    }))
+    Ok((
+        placements,
+        Some(DormFinalizerWarning {
+            shift_index: shift.index,
+            available_beds,
+            candidate_count: ordinary_names.len(),
+            omitted_names,
+        }),
+    ))
 }
 
 fn dorm_occupants(
@@ -253,7 +300,7 @@ fn special_rest_operators(
     let names = [&plan.single_manager, &plan.group_manager, &plan.target];
     let unique_names: HashSet<&str> = names.iter().map(|name| name.as_str()).collect();
     if unique_names.len() != names.len() {
-        return Err(Error::msg(format!(
+        return Err(Error::schedule_quality(format!(
             "shift {} dorm recovery group contains duplicate members",
             shift.index + 1
         )));
@@ -272,7 +319,7 @@ fn special_rest_operators(
                         .map(|progress| AssignedOperator::from_progress(name, progress))
                 })
                 .ok_or_else(|| {
-                    Error::msg(format!(
+                    Error::schedule_quality(format!(
                         "shift {} dorm recovery member {} is absent",
                         shift.index + 1,
                         name

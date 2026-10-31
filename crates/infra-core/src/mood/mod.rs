@@ -640,3 +640,32 @@ mod tests {
         assert!(skills.iter().any(|s| s.kind == "single" && s.value == 0.65));
     }
 }
+
+/// Fixed roster admission: full control occupancy and the operator's own
+/// modeled skills only. Actual combinations remain a final-cycle check.
+pub(crate) fn control_roster_fits(
+    model: &MoodModel,
+    name: &str,
+    elite: u8,
+    initial_mood: f64,
+    hours: f64,
+) -> bool {
+    let room_ops = vec![(name.to_string(), elite)];
+    fits_work_budget(
+        model,
+        initial_mood.min(model.mood_cap),
+        operator_net_drain(
+            model,
+            &DrainInputs {
+                name,
+                elite,
+                facility: FacilityKind::ControlCenter,
+                room_ops: &room_ops,
+                full_control: true,
+                control_ops: &[],
+                recipe: None,
+            },
+        ),
+        hours,
+    )
+}

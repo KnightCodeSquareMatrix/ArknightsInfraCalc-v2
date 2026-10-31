@@ -58,7 +58,7 @@ schedule 的 drone_action 只在实际产品为赤金的制造房且 transition 
 
 ## 宿舍与岗位
 
-build_dorm_slots 按最终 assignment 生成宿舍槽位。若轮换 warning 表示普通休息候选不足，build_plan 将宿舍设为 skip=false、autofill=true；这不表示 solver 重新选人。办公室字段名是 hire，会客室为 meeting，加工站为 processing。
+build_dorm_slots 按最终 assignment 生成宿舍槽位。普通休息短缺的 autofill 是宿舍完成提交的内部执行事实；二班休班队的既有 autofill policy 继续生效。export 不读取 warning 文案决定执行方式，不重新选人。办公室字段名为 hire，会客室为 meeting，加工站为 processing。
 
 ## 读回链
 
@@ -79,5 +79,5 @@ build_dorm_slots 按最终 assignment 生成宿舍槽位。若轮换 warning 表
 | plans 数量不对 | build_from_team_rotation 与 report.shifts |
 | 菲亚目标错 | TeamShiftResult.fiammetta、resolve_scheduled_fiammetta |
 | 无人机房错 | drone_action 的 RoomProduct、resolve_drones |
-| 宿舍被补人 | rotation warnings、build_plan.dorm_autofill |
+| 宿舍被补人 | 最终 assignment 的 dorm_autofill、二班休班队 policy、build_plan |
 | 导入练度错 | assignment_from_maa_plan 的 OperBox elite 查询 |

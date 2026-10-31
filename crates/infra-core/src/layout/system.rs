@@ -587,7 +587,7 @@ pub fn select_registry_systems(
     inherited_exclusive_groups: &HashSet<String>,
     sustain_hours: Option<f64>,
 ) -> Vec<RegistrySystemClaim> {
-    let mut admit_all = |_: &RegistrySystemClaim, _: &BaseAssignment| true;
+    let mut admit_all = |_: &mut RegistrySystemClaim, _: &BaseAssignment| true;
     select_registry_systems_with_admission(
         blueprint,
         operbox,
@@ -610,7 +610,7 @@ pub(crate) fn select_registry_systems_with_admission(
     skip_system_ids: &HashSet<String>,
     inherited_exclusive_groups: &HashSet<String>,
     sustain_hours: Option<f64>,
-    admission: &mut dyn FnMut(&RegistrySystemClaim, &BaseAssignment) -> bool,
+    admission: &mut dyn FnMut(&mut RegistrySystemClaim, &BaseAssignment) -> bool,
 ) -> Vec<RegistrySystemClaim> {
     let Some(cache) = base_systems_cache() else {
         return Vec::new();
@@ -721,7 +721,7 @@ fn select_tier(
     claimed_groups: &mut HashSet<String>,
     skip_system_ids: &HashSet<String>,
     sustain_hours: Option<f64>,
-    admission: &mut dyn FnMut(&RegistrySystemClaim, &BaseAssignment) -> bool,
+    admission: &mut dyn FnMut(&mut RegistrySystemClaim, &BaseAssignment) -> bool,
     out: &mut Vec<RegistrySystemClaim>,
 ) {
     for system in systems_by_tier_and_priority(cache, tier) {
@@ -736,7 +736,7 @@ fn select_tier(
                 continue;
             }
         }
-        let Ok(plan) =
+        let Ok(mut plan) =
             plan_registry_system_detailed(blueprint, operbox, scratch, scratch_used, system)
         else {
             continue;
@@ -749,7 +749,7 @@ fn select_tier(
         let mut trial = scratch.clone();
         let mut trial_used = scratch_used.clone();
         apply_registry_claim_to_assignment(&plan.claim, &mut trial, &mut trial_used);
-        if !admission(&plan.claim, &trial) {
+        if !admission(&mut plan.claim, &trial) {
             continue;
         }
         apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
@@ -920,7 +920,7 @@ pub fn apply_registry_system_claim(
             .iter()
             .map(|op| {
                 if !used.insert(op.name.clone()) {
-                    return Err(Error::msg(format!(
+                    return Err(Error::schedule_quality(format!(
                         "system {} duplicate {}",
                         claim.system_id, op.name
                     )));
@@ -932,7 +932,7 @@ pub fn apply_registry_system_claim(
         if slot.facility == FacilityKind::ControlCenter {
             let mut existing = assignment.control_operators();
             if existing.len() + ops.len() > 5 {
-                return Err(Error::msg(format!(
+                return Err(Error::schedule_quality(format!(
                     "system {} control capacity exceeded",
                     claim.system_id
                 )));
@@ -948,7 +948,7 @@ pub fn apply_registry_system_claim(
             })?;
             let mut existing = assignment.operators_in(&slot.room_id).to_vec();
             if existing.len() + ops.len() > room.operator_capacity() {
-                return Err(Error::msg(format!(
+                return Err(Error::schedule_quality(format!(
                     "system {} room {} capacity exceeded",
                     claim.system_id, slot.room_id.0
                 )));

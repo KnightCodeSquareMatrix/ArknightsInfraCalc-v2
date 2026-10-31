@@ -53,7 +53,7 @@ JSON request line → handle_request → method handler → JSON response line
 
 支持 `ping`、`plan`、`plan.compute`。本次 WIP 源码的 `ping` 返回协议版本、支持的 schema 版本（v1–v7）、每版本契约 hash、solver 可执行文件 hash、构建 commit 和时间；部署消费者仍须以实际响应为准。`plan.compute` v7 保留 v6 named rotation 字符串，并增加普通主备/ABC 的 topology + `shift_hours` 对象；v1–v6 schema 文件与 wire 含义不变，v6 保持闭集。v3–v5 历史 schema 可结构解析旧龙巫 wire，但解码后会在求解前明确返回 `PLAN_FAILED`，不等于该 profile 仍受支持，也不会走普通主备 fallback；v1/v2 未包含该枚举。空白行跳过；EOF 正常退出；单行超过 8 MiB 返回 `FRAME_TOO_LARGE` 后继续读取下一行；非 UTF-8 返回 `INVALID_UTF8`。
 
-Worker stdout 必须保持 JSONL，不能混入人类日志。请求解析、未知方法和协议错误没有业务 result；`plan.compute` 的求解失败通常在外层 `error` 同时保留结构化 result，详见[错误与诊断](错误与诊断.md)。
+Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 warnings 返回，profile、MAA、rotation summary 和练卡建议读取同一完整结果。半成品不进入练卡建议；`PartialRotation` 仅保留已完成报告之后真实评估故障的诊断用途。协议、输入、资源/执行故障与显式 assert-invariants 失败沿原 error/PLAN_FAILED 边界，详见[错误与诊断](错误与诊断.md)。
 
 ## 责任边界
 

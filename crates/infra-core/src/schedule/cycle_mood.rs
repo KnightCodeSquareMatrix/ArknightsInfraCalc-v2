@@ -13,15 +13,6 @@ struct WorkCost {
     cost: f64,
 }
 
-pub(crate) fn is_budget_rejection(error: &Error) -> bool {
-    match error {
-        Error::Msg(message) | Error::PartialRotation { message, .. } => {
-            message.starts_with("rotation_cycle_mood failed:")
-        }
-        _ => false,
-    }
-}
-
 pub(crate) fn validate_cycle_mood(
     blueprint: &BaseBlueprint,
     instances: &OperatorInstances,

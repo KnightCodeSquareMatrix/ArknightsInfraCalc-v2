@@ -20,6 +20,7 @@ pub(super) fn place_system_producers(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     producers: &[crate::layout::orchestrate::ProducerSlot],
+    options: &super::AssignBaseOptions,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
 ) -> Result<()> {
@@ -39,6 +40,24 @@ pub(super) fn place_system_producers(
                     .progress_of(name)
                     .map(|p| AssignedOperator::from_progress(name, p))
                     .unwrap_or_else(|| AssignedOperator::new(name, producer.elite));
+                if options
+                    .control_work_hours
+                    .or(options.registry_sustain_hours)
+                    .is_some_and(|hours| {
+                        !crate::mood::control_roster_fits(
+                            &mood_model,
+                            name,
+                            op.elite,
+                            options.mood,
+                            hours,
+                        )
+                    })
+                {
+                    assignment.construction_warnings.push(format!(
+                        "control producer {name} did not meet the committed work window"
+                    ));
+                    continue;
+                }
                 let mut ops = control;
                 ops.push(op);
                 let control_operators = ops
@@ -49,10 +68,11 @@ pub(super) fn place_system_producers(
                     if producer.optional {
                         continue;
                     }
-                    return Err(crate::error::Error::msg(format!(
+                    assignment.construction_warnings.push(format!(
                         "control producer {} conflicts with an existing global recovery owner",
                         producer.operator
-                    )));
+                    ));
+                    continue;
                 }
                 used.insert(name.into());
                 assignment.set_room(RoomId::from("control"), ops);

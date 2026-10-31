@@ -428,7 +428,7 @@ fn search_trade_single_order(
     let sort_started = Instant::now();
     hits.sort_by(|a, b| trade_efficiency_sort_key(b).cmp(&trade_efficiency_sort_key(a)));
     let best = hits.first().cloned().ok_or_else(|| {
-        crate::error::Error::msg(
+        crate::error::Error::no_candidate(
             if filter.hit_filter.is_some()
                 || filter.has_must_include()
                 || !filter.forbidden_pairs.is_empty()

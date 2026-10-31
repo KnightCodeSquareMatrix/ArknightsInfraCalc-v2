@@ -418,7 +418,7 @@ fn originium_pair_short_third_member_is_a_warning_not_a_hard_gate() {
     let rotation = read_json(&directory.join("short-rotation.json"));
     assert_plan_timing_and_teams(&rotation, &[12.0, 12.0, 12.0]);
     let s1 = room_operator_names(&rotation, 0, "manu_4");
-    let s2 = room_operator_names(&rotation, 1, "manu_4");
+    let s2 = room_operator_names(&rotation, 2, "manu_4");
     assert_eq!(s1, vec!["泡泡", "火神"]);
     assert_eq!(s2, vec!["泡泡", "火神"]);
     let warnings = rotation["warnings"].as_array().expect("warnings array");
@@ -435,7 +435,7 @@ fn originium_pair_short_third_member_is_a_warning_not_a_hard_gate() {
 
     let maa = read_json(&directory.join("short-maa.json"));
     let source_index = room_index(&layout, "manu_4");
-    for (shift_index, expected) in [(0usize, ["泡泡", "火神"]), (1usize, ["泡泡", "火神"])]
+    for (shift_index, expected) in [(0usize, ["泡泡", "火神"]), (2usize, ["泡泡", "火神"])]
     {
         let exported: Vec<&str> = maa["plans"][shift_index]["rooms"]["manufacture"][source_index]
             ["operators"]
@@ -476,7 +476,7 @@ fn abc_12_6_6_h1_originium_pair_reaches_12h_shift() {
 fn abc_12_6_6_h2_originium_pair_reaches_12h_shift() {
     let directory = write_temp_dir();
     let layout = write_h2_layout(&directory);
-    assert_pair_success(&directory, &layout, "abc_12_6_6", "manu_5", [0, 1], 2);
+    assert_pair_success(&directory, &layout, "abc_12_6_6", "manu_5", [0, 2], 1);
 }
 
 #[test]
@@ -490,7 +490,7 @@ fn abc_12_12_12_h1_originium_pair_keeps_two_work_one_rest() {
 fn abc_12_12_12_h2_originium_pair_keeps_two_work_one_rest() {
     let directory = write_temp_dir();
     let layout = write_h2_layout(&directory);
-    assert_pair_success(&directory, &layout, "abc_12_12_12", "manu_5", [0, 1], 2);
+    assert_pair_success(&directory, &layout, "abc_12_12_12", "manu_5", [0, 2], 1);
 }
 
 #[test]
