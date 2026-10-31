@@ -402,27 +402,33 @@ pub(crate) fn assign_manu_room_with_anchors(
     } else {
         vec![max_filler_count]
     };
+    let score_layout = Arc::new(layout.clone());
     for filler_count in filler_counts {
-        let mut combos = Vec::new();
-        collect_manu_filler_combos(&fillers, filler_count, 0, &mut Vec::new(), &mut combos);
-        best_hit = combos
-            .into_iter()
-            .filter_map(|mut combo| {
-                let mut entries = anchors.clone();
-                entries.append(&mut combo);
-                score_manu_entries(&entries, table, layout, options, recipe, room_level)
-            })
-            .max_by(|a, b| {
-                a.final_efficiency
-                    .cmp(&b.final_efficiency)
+        let mut entries: Vec<_> = anchors.iter().collect();
+        visit_manu_filler_combos(&fillers, filler_count, 0, &mut entries, &mut |entries| {
+            let Some(hit) =
+                score_manu_entries(entries, table, &score_layout, options, recipe, room_level)
+            else {
+                return;
+            };
+            let replace = best_hit.as_ref().is_none_or(|best: &ManuSearchHit| {
+                let ordering = hit
+                    .final_efficiency
+                    .cmp(&best.final_efficiency)
                     .then_with(|| {
-                        a.storage
+                        hit.storage
                             .gold
-                            .max(a.storage.battle_record)
-                            .cmp(&b.storage.gold.max(b.storage.battle_record))
+                            .max(hit.storage.battle_record)
+                            .cmp(&best.storage.gold.max(best.storage.battle_record))
                     })
-                    .then_with(|| b.names.cmp(&a.names))
+                    .then_with(|| best.names.cmp(&hit.names));
+                // Iterator::max_by retains the last equal maximum.
+                ordering != std::cmp::Ordering::Less
             });
+            if replace {
+                best_hit = Some(hit);
+            }
+        });
         if best_hit.is_some() {
             break;
         }
@@ -456,42 +462,38 @@ pub(crate) fn assign_manu_room_with_anchors(
     commit_manu_room(assignment, room_id, &hit, &commit_pool, used)
 }
 
-fn collect_manu_filler_combos(
-    entries: &[ManuPoolEntry],
+fn visit_manu_filler_combos<'a>(
+    entries: &'a [ManuPoolEntry],
     need: usize,
     start: usize,
-    current: &mut Vec<ManuPoolEntry>,
-    out: &mut Vec<Vec<ManuPoolEntry>>,
+    current: &mut Vec<&'a ManuPoolEntry>,
+    visit: &mut impl FnMut(&[&'a ManuPoolEntry]),
 ) {
-    if current.len() == need {
-        out.push(current.clone());
-        return;
-    }
     if need == 0 {
-        out.push(Vec::new());
+        visit(current);
         return;
     }
     for idx in start..entries.len() {
-        if current.len() + entries.len().saturating_sub(idx) < need {
+        if entries.len().saturating_sub(idx) < need {
             break;
         }
-        current.push(entries[idx].clone());
-        collect_manu_filler_combos(entries, need, idx + 1, current, out);
+        current.push(&entries[idx]);
+        visit_manu_filler_combos(entries, need - 1, idx + 1, current, visit);
         current.pop();
     }
 }
 
 fn score_manu_entries(
-    entries: &[ManuPoolEntry],
+    entries: &[&ManuPoolEntry],
     table: &SkillTable,
-    layout: &LayoutContext,
+    layout: &Arc<LayoutContext>,
     options: &AssignBaseOptions,
     recipe: RecipeKind,
     room_level: u8,
 ) -> Option<ManuSearchHit> {
     let operators = entries
         .iter()
-        .map(ManuPoolEntry::to_manu_operator)
+        .map(|entry| entry.to_manu_operator())
         .collect::<Vec<_>>();
     if !crate::search::manufacture_peers_compatible(&operators, table) {
         return None;
@@ -502,7 +504,7 @@ fn score_manu_entries(
         operators,
         active_recipe: recipe,
         mood: options.mood,
-        layout: Arc::new(layout.clone()),
+        layout: Arc::clone(layout),
     };
     let result = crate::manufacture::solve_manufacture_with_shift(&input, table, hours).ok()?;
     let names = entries.iter().map(|entry| entry.name.clone()).collect();
