@@ -88,7 +88,9 @@ pub(crate) fn select_control(
     {
         return Ok(());
     }
-    let mut pool = crate::pool::build_control_pool_with_fillers(operbox, instances, table)?;
+    let control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
+    let mut pool =
+        crate::pool::build_control_pool_with_fillers(&control_operbox, instances, table)?;
     crate::pool::admit_control_roster(
         &mut pool,
         options.control_work_hours,

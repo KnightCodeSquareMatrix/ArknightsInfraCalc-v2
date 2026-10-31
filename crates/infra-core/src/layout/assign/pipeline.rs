@@ -163,7 +163,14 @@ fn run_shift_pipeline_with_producer_pruning(
     timer.mark("plan_execute");
 
     // 建池（中枢 / 贸易 / 制造 / 发电）+ tier 标注 + anchor 注入。
-    let mut control_pool = build_control_pool_with_fillers(operbox, instances, table)?;
+    let control_operbox;
+    let control_source = if options.auto_rotation {
+        control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
+        &control_operbox
+    } else {
+        operbox
+    };
+    let mut control_pool = build_control_pool_with_fillers(control_source, instances, table)?;
     crate::pool::admit_control_roster(
         &mut control_pool,
         options.control_work_hours,

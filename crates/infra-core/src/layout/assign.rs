@@ -328,6 +328,18 @@ pub(crate) fn complete_standalone_assignment(
     options: &AssignBaseOptions,
     result: &mut AssignShiftResult,
 ) -> Result<()> {
+    let control_operbox;
+    let forbidden_control_names = if options.auto_rotation {
+        control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
+        operbox
+            .owned
+            .keys()
+            .filter(|name| !control_operbox.owns(name))
+            .cloned()
+            .collect::<HashSet<_>>()
+    } else {
+        HashSet::new()
+    };
     let mut excluded: HashSet<_> = result.plan.excluded_operators.iter().cloned().collect();
     excluded.extend(
         result
@@ -385,6 +397,11 @@ pub(crate) fn complete_standalone_assignment(
         instances,
         table,
         |trial, room, candidate| {
+            if room.kind == FacilityKind::ControlCenter
+                && forbidden_control_names.contains(&candidate.name)
+            {
+                return false;
+            }
             crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
         },
     )?;

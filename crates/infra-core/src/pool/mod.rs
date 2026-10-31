@@ -5,7 +5,7 @@ mod power;
 mod standalone;
 mod trade;
 
-pub(crate) use control::admit_control_roster;
+pub(crate) use control::{admit_control_roster, auto_rotation_control_roster};
 
 pub use base::{filter_pool, HasName, HasProgress, PoolCore, TierTagged};
 pub use control::{

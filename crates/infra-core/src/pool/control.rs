@@ -130,6 +130,37 @@ pub(crate) fn admit_control_roster(
     Ok(())
 }
 
+/// 自动轮换建议在建池前从 roster 删除依赖指定生产站消费方的中枢角色。
+///
+/// 这些 deferred producer 需要主动寻找跨设施搭档，属于自动轮换明确禁用的
+/// 跨站组合。按干员身份删除所有练度档，避免低档从 filler 路径重新进入中枢。
+pub(crate) fn auto_rotation_control_roster(
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<OperBox> {
+    let catalog = crate::response_dependency::producer_rule_catalog(table)?;
+    let mut forbidden_names = HashSet::new();
+    // 低练度档没有 producer buff，但自动轮换按干员身份禁用该体系角色；否则同一
+    // 干员会从 filler 路径重新进入中枢。用完整实例表补齐账号当前档位未暴露的来源。
+    for (_, instance) in instances.iter() {
+        let name = &instance.name;
+        for tier in [PromotionTier::Tier0, PromotionTier::TierUp] {
+            let buff_ids = instances.resolve_control_buff_ids(name, tier);
+            if buff_ids.iter().any(|buff_id| {
+                catalog.rules.iter().any(|rule| {
+                    rule.source_buff_id == *buff_id
+                        && rule.admission
+                            == crate::response_dependency::ProducerAdmission::DeferredOptional
+                })
+            }) {
+                forbidden_names.insert(name.clone());
+            }
+        }
+    }
+    Ok(operbox.excluding(&forbidden_names))
+}
+
 fn try_entry(
     name: &str,
     progress: crate::roster::OperatorProgress,
