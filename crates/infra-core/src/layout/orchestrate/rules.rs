@@ -1574,28 +1574,6 @@ fn complete_domain_roles(
             return None;
         }
     }
-    // 所有声明角色和domain补齐完成后再承诺Plan；固定贸易锚点等也必须经过预算。
-    // 未补齐的角色前缀不作为最终名单试算，避免提前排除可由同房技能补齐的组合。
-    if state.assignment.auto_rotation
-        && state
-            .anchors
-            .iter()
-            .filter(|anchor| anchor.system_id == rule_id)
-            .filter_map(|anchor| anchor.room_id.as_ref())
-            .filter_map(|room| ctx.blueprint.room(room))
-            .any(|room| {
-                crate::layout::ordinary_workplace(room.kind)
-                    && room.kind != FacilityKind::ControlCenter
-                    && !crate::layout::work_budget::room_work_duration_fits(
-                        ctx.blueprint,
-                        &state.assignment,
-                        &room.id,
-                        ctx.instances,
-                    )
-            })
-    {
-        return None;
-    }
     Some(state)
 }
 

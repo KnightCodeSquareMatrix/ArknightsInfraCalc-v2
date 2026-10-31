@@ -88,7 +88,17 @@ pub(crate) fn select_control(
     {
         return Ok(());
     }
-    let pool = crate::pool::build_control_pool_with_fillers(operbox, instances, table)?;
+    let mut pool = crate::pool::build_control_pool_with_fillers(operbox, instances, table)?;
+    crate::pool::admit_control_roster(
+        &mut pool,
+        options.control_work_hours,
+        options.mood,
+        &seed
+            .control_operators()
+            .into_iter()
+            .map(|op| op.name)
+            .collect(),
+    )?;
     let layout = crate::layout::resolve_base(
         blueprint,
         seed,
@@ -217,14 +227,6 @@ pub fn schedule_auto_rotation(
         instances,
         table,
     )?;
-    if let Some(reason) = crate::layout::work_budget::assignment_budget_failure(
-        blueprint,
-        &main.assignment,
-        &backup.assignment,
-        instances,
-    ) {
-        return Err(fixed_main_backup_error("最终工时检查", reason));
-    }
     validate_explicit_supports(
         blueprint,
         [&main.assignment, &backup.assignment],
@@ -323,7 +325,7 @@ pub fn schedule_auto_rotation(
             (!members.is_empty()).then(|| (room.id.clone(), members.to_vec()))
         })
         .collect();
-    Ok(AutoRotationReport {
+    let mut report = AutoRotationReport {
         mode: "auto_rotation",
         timing,
         complete: rooms
@@ -335,7 +337,11 @@ pub fn schedule_auto_rotation(
         backup_assignment: backup.assignment,
         assignment_plans: vec![main.plan, backup.plan],
         warnings,
-    })
+    };
+    report
+        .warnings
+        .extend(auto_work_duration_issues(blueprint, instances, &report)?);
+    Ok(report)
 }
 
 pub fn assert_auto_rotation_invariants(
@@ -350,7 +356,6 @@ pub fn assert_auto_rotation_invariants(
     }
     crate::layout::assert_suggestion_plan_policy(&report.assignment_plans)?;
     report.timing.validate()?;
-    assert_auto_work_duration(blueprint, instances, report)?;
     validate_explicit_supports(
         blueprint,
         [&report.main_assignment, &report.backup_assignment],
@@ -539,15 +544,15 @@ pub fn assert_auto_rotation_invariants(
                         )
                     })
                     .collect::<Vec<_>>();
-                if !crate::search::manufacture_combo_allowed_for_shift(&operators, table, None) {
+                if !crate::search::manufacture_peers_compatible(&operators, table) {
                     return Err(Error::msg(
-                        "assert-invariants auto_manufacture_window_policy failed",
+                        "assert-invariants auto_manufacture_peer_group failed",
                     ));
                 }
             }
         }
     }
-    let expected_warnings = report
+    let mut expected_warnings = report
         .rooms
         .iter()
         .flat_map(|room| {
@@ -562,9 +567,10 @@ pub fn assert_auto_rotation_invariants(
                 })
         })
         .collect::<Vec<_>>();
+    expected_warnings.extend(auto_work_duration_issues(blueprint, instances, report)?);
     if report.warnings != expected_warnings {
         return Err(Error::msg(
-            "assert-invariants auto_shortfall_annotation failed",
+            "assert-invariants auto_quality_annotations failed",
         ));
     }
     if report.complete
@@ -578,13 +584,14 @@ pub fn assert_auto_rotation_invariants(
     Ok(())
 }
 
-/// 显式 gate 用实际名单走完整 ETA，独立于生产 work_budget 的分解谓词。
-fn assert_auto_work_duration(
+/// 显式质量检查以实际两态名单重建完整 ETA，不参与选人。
+fn auto_work_duration_issues(
     blueprint: &BaseBlueprint,
     instances: &OperatorInstances,
     report: &AutoRotationReport,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     let model = crate::mood::default_mood_model()?;
+    let mut issues = Vec::new();
     let assignments = [&report.main_assignment, &report.backup_assignment];
     // 当前唯一外站心情项是深海人数加耗：逐房取人数最多的真实名单，构造可共存混搭。
     let mut worst_outside = BaseAssignment::default();
@@ -638,10 +645,10 @@ fn assert_auto_work_duration(
                     member.drain_per_hour,
                     hours,
                 ) {
-                    return Err(Error::msg(format!(
-                        "assert-invariants auto_eta_work_duration failed: {} {} needs {hours}h, workable {:?}h",
+                    issues.push(format!(
+                        "自动轮换心情不足：{} {} 需工作 {hours} 小时，预计可工作 {:?} 小时",
                         member.room_id, member.name, member.workable_hours,
-                    )));
+                    ));
                 }
             }
         }
@@ -665,14 +672,16 @@ fn assert_auto_work_duration(
                     hours,
                 )
             {
-                return Err(Error::msg(format!(
-                    "assert-invariants auto_mixed_control_work_duration failed: {} needs {hours}h, workable {:?}h",
+                issues.push(format!(
+                    "自动轮换混搭中枢心情不足：{} 需工作 {hours} 小时，预计可工作 {:?} 小时",
                     member.name, member.workable_hours,
-                )));
+                ));
             }
         }
     }
-    Ok(())
+    issues.sort();
+    issues.dedup();
+    Ok(issues)
 }
 
 /// 独立从两个最终 Plan 和实际岗位重建显式挂件归属。

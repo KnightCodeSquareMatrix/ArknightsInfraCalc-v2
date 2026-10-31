@@ -16,8 +16,6 @@ pub struct LayoutContext {
     pub(crate) auto_rotation: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) work_hours: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) auto_work_budget: Option<Arc<super::work_budget::WorkBudgetContext>>,
     pub meeting_max_level: u8,
     pub dorm_level_sum: u16,
     pub manu_recipe_kinds: u8,
@@ -99,7 +97,6 @@ impl Default for LayoutContext {
         Self {
             auto_rotation: false,
             work_hours: None,
-            auto_work_budget: None,
             meeting_max_level: 0,
             dorm_level_sum: 0,
             manu_recipe_kinds: 0,

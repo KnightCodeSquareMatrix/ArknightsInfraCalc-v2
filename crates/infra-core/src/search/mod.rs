@@ -21,9 +21,7 @@ pub(crate) use control::{
     search_control_combos_with_eligibility,
 };
 pub(crate) use manufacture::{
-    compare_manufacture_hits, evaluate_manufacture_room, manufacture_combo_allowed_for_shift,
-    manufacture_operator_has_mood_gap_decay, manufacture_peers_compatible,
-    MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS,
+    compare_manufacture_hits, evaluate_manufacture_room, manufacture_peers_compatible,
 };
 pub use manufacture::{
     search_manufacture_triples, ManuEfficiencyBreakdown, ManuSearchHit, ManuSearchOptions,

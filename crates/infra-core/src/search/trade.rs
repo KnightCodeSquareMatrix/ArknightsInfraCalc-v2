@@ -563,25 +563,6 @@ impl TradeSearchOptions {
         if trade_station_exclusive_violation_refs(&ops, table) {
             return None;
         }
-        let members: Vec<_> = ops
-            .iter()
-            .map(|op| {
-                (
-                    op.name.to_owned(),
-                    op.elite,
-                    op.buff_ids.to_vec(),
-                    op.tags.to_vec(),
-                )
-            })
-            .collect();
-        if !crate::layout::work_budget::candidate_fits(
-            &self.layout,
-            crate::layout::FacilityKind::TradePost,
-            None,
-            &members,
-        ) {
-            return None;
-        }
         let shift_hours = self.layout.evaluation_hours(self.shift_hours).ok()?;
         let gold_lines = if self.layout.gold_manu_line_count > 0 {
             self.layout.gold_manu_line_count

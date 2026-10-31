@@ -106,8 +106,6 @@ pub struct ManuSearchReport {
     pub battle_record_line: Option<ManuSearchHit>,
 }
 
-pub(crate) const MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS: f64 = 12.0;
-
 #[derive(Debug, Clone)]
 pub struct ManuSearchOptions {
     pub level: u8,
@@ -141,7 +139,7 @@ impl Default for ManuSearchOptions {
 }
 
 impl ManuSearchOptions {
-    /// 单个组合的 live 命中构造（含同房兼容、候选投影与班次门槛）。
+    /// 单个组合的 live 命中构造（含同房兼容、候选投影与实际窗口结算）。
     ///
     /// 实时搜索、Bake 行生成与 Bake 行级对账共用同一入口，保证三者对同一组合
     /// 产出的 `ManuSearchHit` 逐字段一致。
@@ -156,15 +154,6 @@ impl ManuSearchOptions {
             .iter()
             .map(|idx| pool.entries[*idx].as_manu_operator_ref())
             .collect();
-        let members = manufacture_members(&operators);
-        if !crate::layout::work_budget::candidate_fits(
-            &self.layout,
-            crate::layout::FacilityKind::Factory,
-            Some(recipe),
-            &members,
-        ) {
-            return None;
-        }
         let shift_hours = if self.layout.auto_rotation {
             Some(
                 self.layout
@@ -174,15 +163,6 @@ impl ManuSearchOptions {
         } else {
             self.shift_hours
         };
-        if !manufacture_combo_refs_allowed_for_shift(
-            &operators,
-            table,
-            (!self.layout.auto_rotation)
-                .then_some(shift_hours)
-                .flatten(),
-        ) {
-            return None;
-        }
         let layout = manufacture_combo_layout(&self.layout, &operators);
         let base = ManuRoomView {
             level: self.level,
@@ -426,15 +406,6 @@ fn search_manufacture_single_recipe(
                 .iter()
                 .map(|i| sub.entries[*i].as_manu_operator_ref())
                 .collect();
-            let members = manufacture_members(&ops);
-            if !crate::layout::work_budget::candidate_fits(
-                &options.layout,
-                crate::layout::FacilityKind::Factory,
-                Some(recipe),
-                &members,
-            ) {
-                return None;
-            }
             let shift_hours = if options.layout.auto_rotation {
                 Some(
                     options
@@ -445,15 +416,6 @@ fn search_manufacture_single_recipe(
             } else {
                 options.shift_hours
             };
-            if !manufacture_combo_refs_allowed_for_shift(
-                &ops,
-                table,
-                (!options.layout.auto_rotation)
-                    .then_some(shift_hours)
-                    .flatten(),
-            ) {
-                return None;
-            }
             let layout = manufacture_combo_layout(&options.layout, &ops);
             let base = ManuRoomView {
                 level: options.level,
@@ -569,31 +531,6 @@ fn search_manufacture_single_recipe(
     Ok(report)
 }
 
-pub(crate) fn manufacture_combo_allowed_for_shift(
-    operators: &[ManuOperator],
-    table: &SkillTable,
-    shift_hours: Option<f64>,
-) -> bool {
-    let operators: SmallVec<[_; 5]> = operators.iter().map(ManuOperator::as_ref).collect();
-    manufacture_combo_refs_allowed_for_shift(&operators, table, shift_hours)
-}
-
-fn manufacture_combo_refs_allowed_for_shift(
-    operators: &[ManuOperatorRef<'_>],
-    table: &SkillTable,
-    shift_hours: Option<f64>,
-) -> bool {
-    if !manufacture_peer_refs_compatible(operators, table) {
-        return false;
-    }
-    if !shift_hours.is_some_and(|hours| hours >= MOOD_GAP_DECAY_SHIFT_LIMIT_HOURS) {
-        return true;
-    }
-    !operators
-        .iter()
-        .any(|operator| manufacture_operator_ref_has_mood_gap_decay(operator, table))
-}
-
 pub(crate) fn manufacture_peers_compatible(operators: &[ManuOperator], table: &SkillTable) -> bool {
     let operators: SmallVec<[_; 5]> = operators.iter().map(ManuOperator::as_ref).collect();
     manufacture_peer_refs_compatible(&operators, table)
@@ -615,31 +552,6 @@ fn manufacture_operator_resets_peers(operator: &ManuOperatorRef<'_>, table: &Ski
                 && skill.atoms.iter().any(|atom| {
                     matches!(&atom.action, Action::PeerEffAbsorb { rate_per_peer } if *rate_per_peer == 0.0)
                 })
-        })
-    })
-}
-
-pub(crate) fn manufacture_operator_has_mood_gap_decay(
-    operator: &ManuOperator,
-    table: &SkillTable,
-) -> bool {
-    manufacture_operator_ref_has_mood_gap_decay(&operator.as_ref(), table)
-}
-
-fn manufacture_operator_ref_has_mood_gap_decay(
-    operator: &ManuOperatorRef<'_>,
-    table: &SkillTable,
-) -> bool {
-    operator.buff_ids.iter().any(|buff_id| {
-        table.get(buff_id).is_some_and(|skill| {
-            skill.atoms.iter().any(|atom| {
-                atom.selector == Some(crate::types::Selector::OwnerMoodGap)
-                    && matches!(
-                        &atom.action,
-                        Action::AddBucketEffFromSelector { ret_per_step, .. }
-                            if *ret_per_step < 0.0
-                    )
-            })
         })
     })
 }
@@ -887,20 +799,4 @@ fn empty_hit() -> ManuSearchHit {
         storage: ManuStorageBreakdown::default(),
         breakdown: ManuEfficiencyBreakdown::default(),
     }
-}
-
-fn manufacture_members(
-    operators: &[ManuOperatorRef<'_>],
-) -> Vec<(String, u8, Vec<String>, Vec<String>)> {
-    operators
-        .iter()
-        .map(|op| {
-            (
-                op.name.to_owned(),
-                op.elite,
-                op.buff_ids.to_vec(),
-                op.tags.to_vec(),
-            )
-        })
-        .collect()
 }

@@ -13,10 +13,7 @@ use crate::operbox::OperBox;
 use crate::pool::{
     filter_general_manufacture_search_pool, filter_manufacture_pool, ManuPool, ManuPoolEntry,
 };
-use crate::search::{
-    manufacture_combo_allowed_for_shift, search_manufacture_triples, ManuSearchHit,
-    ManuSearchOptions,
-};
+use crate::search::{search_manufacture_triples, ManuSearchHit, ManuSearchOptions};
 use crate::skill_table::SkillTable;
 use crate::types::RecipeKind;
 
@@ -496,33 +493,10 @@ fn score_manu_entries(
         .iter()
         .map(ManuPoolEntry::to_manu_operator)
         .collect::<Vec<_>>();
-    let members = operators
-        .iter()
-        .map(|op| {
-            (
-                op.name.clone(),
-                op.elite,
-                op.buff_ids.clone(),
-                op.tags.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-    if !crate::layout::work_budget::candidate_fits(
-        layout,
-        FacilityKind::Factory,
-        Some(recipe),
-        &members,
-    ) {
+    if !crate::search::manufacture_peers_compatible(&operators, table) {
         return None;
     }
     let hours = layout.evaluation_hours(options.shift_hours).ok()?;
-    if !manufacture_combo_allowed_for_shift(
-        &operators,
-        table,
-        (!options.auto_rotation).then_some(hours),
-    ) {
-        return None;
-    }
     let input = ManuRoomInput {
         level: room_level,
         operators,
@@ -612,13 +586,6 @@ pub(super) fn pick_capacity_manu_hit(
         .entries
         .iter()
         .filter(|entry| !used.contains(&entry.name))
-        .filter(|entry| {
-            manufacture_combo_allowed_for_shift(
-                &[entry.to_manu_operator()],
-                table,
-                Some(options.shift_hours),
-            )
-        })
         .take(capacity)
         .cloned()
         .collect();

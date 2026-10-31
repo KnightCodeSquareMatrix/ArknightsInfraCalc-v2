@@ -184,15 +184,6 @@ fn resolve_base_core(
     let mut layout = layout_from_blueprint(blueprint);
     layout.auto_rotation = assignment.auto_rotation;
     layout.work_hours = assignment.work_hours;
-    layout.auto_work_budget = if assignment.auto_rotation {
-        instances.map(|instances| {
-            std::sync::Arc::new(super::work_budget::context(
-                blueprint, assignment, instances,
-            ))
-        })
-    } else {
-        None
-    };
     layout.elite_facility_count =
         effective_elite_facility_count(blueprint, assignment, &workforce, instances);
     workforce.apply_to_layout(&mut layout);

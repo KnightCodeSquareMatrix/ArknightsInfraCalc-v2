@@ -130,7 +130,6 @@ pub fn assign_team_gamma_half(
         assignment,
         used,
         Some(instances),
-        Some(coexist_assignment),
     )?;
     clear_team_trade_snapshots(assignment, trade_rooms);
     Ok(())

@@ -164,6 +164,16 @@ fn run_shift_pipeline_with_producer_pruning(
 
     // 建池（中枢 / 贸易 / 制造 / 发电）+ tier 标注 + anchor 注入。
     let mut control_pool = build_control_pool_with_fillers(operbox, instances, table)?;
+    crate::pool::admit_control_roster(
+        &mut control_pool,
+        options.control_work_hours,
+        options.mood,
+        &run.assignment
+            .control_operators()
+            .into_iter()
+            .map(|op| op.name)
+            .collect(),
+    )?;
     let mut trade_pool = build_trade_pool(&operbox.trade_roster(instances), instances, table)?;
     let mut manu_pool =
         build_manufacture_pool(&operbox.manufacture_roster(instances), instances, table)?;
@@ -209,11 +219,6 @@ fn run_shift_pipeline_with_producer_pruning(
                     )? {
                         return Err(Error::msg("auto peak control has no legal fill"));
                     }
-                }
-                if !crate::layout::work_budget::fixed_main_fits(&run.assignment) {
-                    return Err(Error::msg(
-                        "auto_fixed_main_work_duration: control fill cannot sustain frozen main",
-                    ));
                 }
                 timer.mark("peak_prepare_control");
                 run = finish_peak_prefix(
@@ -1006,25 +1011,6 @@ fn assign_meeting_rooms(
                                 mood: options.mood.max(0.0),
                             },
                         ];
-                        let members = vec![
-                            crate::layout::AssignedOperator::from_progress(
-                                left_name,
-                                *left_progress,
-                            ),
-                            crate::layout::AssignedOperator::from_progress(
-                                right_name,
-                                *right_progress,
-                            ),
-                        ];
-                        let mut trial = assignment.clone();
-                        trial.set_room(room.id.clone(), members.clone());
-                        if options.auto_rotation
-                            && !super::super::work_budget::room_work_duration_fits(
-                                blueprint, &trial, &room.id, instances,
-                            )
-                        {
-                            continue;
-                        }
                         let candidate_hours = layout.evaluation_hours(elapsed_hours)?;
                         let score = crate::meeting::evaluate_meeting(
                             &crate::support_facility::SupportRoomInput {
@@ -1116,15 +1102,6 @@ fn assign_meeting_rooms(
                 members.push(crate::layout::AssignedOperator::from_progress(
                     name, progress,
                 ));
-                let mut trial = assignment.clone();
-                trial.set_room(room.id.clone(), members.clone());
-                if options.auto_rotation
-                    && !super::super::work_budget::room_work_duration_fits(
-                        blueprint, &trial, &room.id, instances,
-                    )
-                {
-                    continue;
-                }
                 let candidate_hours = layout.evaluation_hours(elapsed_hours)?;
                 let score = crate::meeting::evaluate_meeting(
                     &crate::support_facility::SupportRoomInput {
@@ -1356,28 +1333,6 @@ fn fill_peak_control(
             }
         };
     }
-    if let (Some(hours), Some((required, _))) = (
-        run.options
-            .control_work_hours
-            .or(run.options.registry_sustain_hours),
-        dynamic_set,
-    ) {
-        let model = crate::mood::default_mood_model()?;
-        if required.iter().any(|name| {
-            control_pool.entry(name).is_none_or(|entry| {
-                !crate::mood::control_roster_fits(
-                    &model,
-                    name,
-                    entry.progress.elite,
-                    run.options.mood,
-                    hours,
-                )
-            })
-        }) {
-            observe!("prepare_return_none mask={stable_order} reason=dynamic_control_work_budget");
-            return Ok(false);
-        }
-    }
     let control_names: HashSet<String> = run
         .assignment
         .control_operators()
@@ -1553,7 +1508,6 @@ fn finish_peak_prefix<'a>(
         run.blueprint,
         run.operbox,
         &plan.producers,
-        run.options,
         &mut run.assignment,
         &mut run.used,
     )?;

@@ -124,20 +124,6 @@ pub fn search_power_assignment(
             if used.contains(&entry.name) {
                 continue;
             }
-            let members = vec![(
-                entry.name.clone(),
-                entry.elite,
-                entry.buff_ids.clone(),
-                entry.tags.clone(),
-            )];
-            if !crate::layout::work_budget::candidate_fits(
-                &options.layout,
-                crate::layout::FacilityKind::PowerPlant,
-                None,
-                &members,
-            ) {
-                continue;
-            }
             let shift_hours = options.layout.evaluation_hours(options.shift_hours)?;
             let mut layout = options.layout.clone();
             layout.drone_cap = layout.drone_cap.max(135);

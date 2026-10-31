@@ -3,7 +3,6 @@ mod assignment;
 mod blueprint;
 mod context;
 mod orchestrate;
-pub(crate) mod work_budget;
 pub(crate) use orchestrate::auto_support::claim_support_rooms;
 pub(crate) use orchestrate::{assert_suggestion_plan_policy, assert_support_combination_policy};
 mod resolve;

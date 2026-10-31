@@ -319,11 +319,7 @@ pub(super) fn read_validated(
                     .iter()
                     .map(|id| manu_pool.entries[*id].to_manu_operator())
                     .collect::<Vec<_>>();
-                if !crate::search::manufacture_combo_allowed_for_shift(
-                    &operators,
-                    skill_table,
-                    None,
-                ) {
+                if !crate::search::manufacture_peers_compatible(&operators, skill_table) {
                     return Err(Error::msg("illegal baked manufacture combo"));
                 }
                 state_indices(
@@ -427,11 +423,7 @@ pub(super) fn read_validated(
                     .iter()
                     .map(|id| manu_pool.entries[*id].to_manu_operator())
                     .collect::<Vec<_>>();
-                if !crate::search::manufacture_combo_allowed_for_shift(
-                    &operators,
-                    skill_table,
-                    None,
-                ) {
+                if !crate::search::manufacture_peers_compatible(&operators, skill_table) {
                     continue;
                 }
                 state_indices(

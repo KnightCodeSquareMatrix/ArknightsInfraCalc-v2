@@ -105,6 +105,31 @@ pub fn filter_control_pool(pool: &ControlPool, exclude: &HashSet<String>) -> Con
     filter_pool(pool, exclude)
 }
 
+/// Initial single-operator ETA admission. Called while building the roster,
+/// before search; fixed Plan members have already passed Plan admission.
+pub(crate) fn admit_control_roster(
+    pool: &mut ControlPool,
+    work_hours: Option<f64>,
+    initial_mood: f64,
+    protected: &HashSet<String>,
+) -> Result<()> {
+    let Some(hours) = work_hours else {
+        return Ok(());
+    };
+    let model = crate::mood::default_mood_model()?;
+    pool.entries.retain(|entry| {
+        protected.contains(&entry.name)
+            || crate::mood::control_roster_fits(
+                model,
+                &entry.name,
+                entry.elite,
+                initial_mood,
+                hours,
+            )
+    });
+    Ok(())
+}
+
 fn try_entry(
     name: &str,
     progress: crate::roster::OperatorProgress,

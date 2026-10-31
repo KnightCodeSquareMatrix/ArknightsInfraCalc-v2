@@ -45,7 +45,7 @@ pub fn assign_power_rooms(
     used: &mut HashSet<String>,
 ) -> Result<()> {
     assign_power_rooms_with_instances(
-        blueprint, pool, table, layout, options, rooms, assignment, used, None, None,
+        blueprint, pool, table, layout, options, rooms, assignment, used, None,
     )
 }
 
@@ -76,7 +76,6 @@ pub(super) fn assign_power_stations_with_instances(
         assignment,
         used,
         Some(instances),
-        None,
     )
 }
 
@@ -91,7 +90,6 @@ pub(super) fn assign_power_rooms_with_instances(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
     instances: Option<&crate::instances::OperatorInstances>,
-    coexist_assignment: Option<&BaseAssignment>,
 ) -> Result<()> {
     let total_stations = blueprint
         .rooms
@@ -153,7 +151,6 @@ pub(super) fn assign_power_rooms_with_instances(
         );
     }
     if report.assignments.len() < empty_rooms.len() {
-        let mood = crate::mood::default_mood_model()?;
         let mut fillers: Vec<_> = pool
             .entries
             .iter()
@@ -178,34 +175,6 @@ pub(super) fn assign_power_rooms_with_instances(
                     continue;
                 }
                 let op = AssignedOperator::from_progress(&entry.name, entry.progress);
-                let mut trial = coexist_assignment
-                    .cloned()
-                    .unwrap_or_else(|| assignment.clone());
-                for room in assignment.iter_rooms() {
-                    trial.set_room(room.room_id.clone(), room.operators.clone());
-                }
-                trial.set_room(room_id.clone(), vec![op.clone()]);
-                if options.auto_rotation
-                    && instances.is_some_and(|instances| {
-                        !crate::layout::work_budget::room_work_duration_fits(
-                            blueprint, &trial, room_id, instances,
-                        )
-                    })
-                {
-                    continue;
-                }
-                let eta = crate::mood::shift_eta_in_context(&mood, blueprint, &trial, instances);
-                let Some(candidate_eta) = eta.operator_in_room(&entry.name, &room_id.0) else {
-                    continue;
-                };
-                if !crate::mood::fits_work_budget(
-                    &mood,
-                    options.mood,
-                    candidate_eta.drain_per_hour,
-                    options.shift_hours,
-                ) {
-                    continue;
-                }
                 // Settlement reads the final assignment, including empty power buff IDs.
                 assignment.set_room(room_id.clone(), vec![op]);
                 used.insert(entry.name.clone());

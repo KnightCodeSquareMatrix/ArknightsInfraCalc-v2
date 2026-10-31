@@ -10,10 +10,9 @@ mod eta;
 mod recovery;
 
 pub use drain::{operator_net_drain, workable_hours, DrainInputs};
-pub(crate) use drain::{room_workable_hours_with_control, room_workable_hours_without_control};
 pub use eta::{
-    fits_shift_budget, fits_work_budget, shift_eta, shift_eta_in_context, shift_eta_with_instances,
-    OperatorEta, ShiftEta,
+    fits_work_budget, shift_eta, shift_eta_in_context, shift_eta_with_instances, OperatorEta,
+    ShiftEta,
 };
 pub use recovery::{dorm_recovery_rates, DormOccupant};
 
@@ -551,7 +550,7 @@ pub fn default_mood_model() -> Result<&'static MoodModel> {
 }
 
 /// Fixed roster admission: full control occupancy and the operator's own
-/// modeled skills only. Actual combinations remain a final-cycle check.
+/// modeled skills only. Actual combinations are diagnosed without re-admission.
 pub(crate) fn control_roster_fits(
     model: &MoodModel,
     name: &str,

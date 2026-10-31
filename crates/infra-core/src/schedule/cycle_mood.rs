@@ -19,26 +19,6 @@ pub(crate) fn validate_cycle_mood(
     report: &TeamRotationReport,
     initial_mood: f64,
 ) -> Result<()> {
-    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, None)
-}
-
-pub(crate) fn validate_operator_cycle_mood(
-    blueprint: &BaseBlueprint,
-    instances: &OperatorInstances,
-    report: &TeamRotationReport,
-    initial_mood: f64,
-    name: &str,
-) -> Result<()> {
-    validate_cycle_mood_scope(blueprint, instances, report, initial_mood, Some(name))
-}
-
-fn validate_cycle_mood_scope(
-    blueprint: &BaseBlueprint,
-    instances: &OperatorInstances,
-    report: &TeamRotationReport,
-    initial_mood: f64,
-    operator_scope: Option<&str>,
-) -> Result<()> {
     let model = default_mood_model()?;
     let count = report.shifts.len();
     if count == 0 || !initial_mood.is_finite() || initial_mood < model.rest_threshold {
@@ -71,9 +51,6 @@ fn validate_cycle_mood_scope(
                 continue;
             }
             for operator in &room.operators {
-                if operator_scope.is_some_and(|name| name != operator.name) {
-                    continue;
-                }
                 // Workshop and training-room occupancy has no hourly cost, but is not a
                 // rest boundary. The assignment carries no training task, so a training
                 // room seat is a pure support placement without a training activity.

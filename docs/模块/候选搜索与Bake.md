@@ -30,7 +30,7 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 `ControlFillPolicy::LayeredFill` 当前走中枢专用顺序入口：先满足适用候选组，再按贸易、制造、训练（没有专精上下文时保持 `Unsupported`）、办公室、会客室、心情和普通补位逐位消费“当前已选 + 当前候选”。前序席位锁定后，后序候选不能用匿名加权分数替换它。`build_control_pool_with_fillers` 只增加真实没有设施技能的干员；带未建模 buff 的干员留在 `skipped`，不会被清空技能后重新加入。
 
-该顺序入口的贸易/制造区只读取冻结 `ControlEffectLedger` 的静态全局 key；按人数缩放、当前房间、deferred producer 和动态 projection 留给后续 resolve，不得提前成为中枢区 winner。调用方提供的 ETA eligibility 在候选组、每个效果区、统一心情区和普通补位每次形成满容量候选时都会检查。候选组逐组贪心仍是具名 policy，不能把 `NO_CANDIDATE_UNDER_POLICY` 或预算耗尽解释成 canonical `INFEASIBLE`。
+该顺序入口的贸易/制造区只读取冻结 `ControlEffectLedger` 的静态全局 key；按人数缩放、当前房间、deferred producer 和动态 projection 留给后续 resolve，不得提前成为中枢区 winner。调用方提供的结构eligibility 在候选组、每个效果区、统一心情区和普通补位每次形成满容量候选时都会检查。候选组逐组贪心仍是具名 policy，不能把 `NO_CANDIDATE_UNDER_POLICY` 或候选耗尽解释成 canonical `INFEASIBLE`。
 
 ## 请求内搜索 memo
 
@@ -92,7 +92,7 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 自动模式在Plan入口删除禁用组合，整体跳过兼容registry与动态producer前缀竞争；允许域沿普通设施搜索、局部禁配、required和used。已删除CandidateAdmission、全站技能presence、资源来源复演及任意主备混搭穷举。按用户2026-10-30删减裁决，不再保证零散成员/任意混搭没有偶发禁用协同，此项属于approximation；没有新top-K或有限精查策略。
 
-本房候选用实际配方、成员、H与两中枢检查时长，备中枢额外检查冻结主力；由`layout/work_budget.rs`调用原mood公式。H与实际预算上下文随收益layout进入memo身份；不以搜索已通过标记替代终态检查。自动制造取消≥12小时负心情差身份排除，保留实际积分与暖机。自动仍用live，普通Bake与兼容规则不变。
+所有排班模式仅保留最初中枢名单ETA试算；搜索不再做本房、双中枢或固定主力预算准入，memo移除这些状态，仅保留数值收益layout、模式与H。制造≥12小时负心情差身份排除已删除，真实积分与暖机保留。自动仍用live，普通Bake兼容门禁不变。
 
 终态只核对实际结构、Plan、显式挂件归属、工时和快照；每房两名单×两中枢及当前外站深海人数最大值覆盖工时，不再枚举全站协同。详见[自动轮换](../自动轮换.md)。
-制造体系试排直接调用原实时制造搜索，保留请求memo与完整实际预算。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。
+制造体系试排直接调用原实时制造搜索，保留请求memo与实际收益上下文。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。

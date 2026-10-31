@@ -85,19 +85,6 @@ impl ShiftEta {
     }
 }
 
-/// Rotation budget: an operator with `available_mood` may work `hours` at
-/// `drain_per_hour` and still sit at the rest threshold plus `reserve_drain`
-/// (mood consumed by a following shift) afterwards. Not clamped at the threshold.
-pub fn fits_shift_budget(
-    model: &MoodModel,
-    available_mood: f64,
-    drain_per_hour: f64,
-    hours: f64,
-    reserve_drain: f64,
-) -> bool {
-    available_mood + 1e-9 >= model.rest_threshold + drain_per_hour * hours + reserve_drain
-}
-
 /// Single-shift work budget: mood above the rest threshold (clamped at 0) must
 /// cover `drain_per_hour * hours`.
 pub fn fits_work_budget(

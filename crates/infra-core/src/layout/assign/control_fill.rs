@@ -177,13 +177,7 @@ fn assign_control_inner(
                     >= usize::from(group.min_count)
             })
             && excluded.is_none_or(|excluded| pinned.is_disjoint(excluded))
-            && eligibility.is_none_or(|accept| accept(&names))
-            && crate::layout::work_budget::candidate_fits(
-                layout,
-                crate::layout::FacilityKind::ControlCenter,
-                None,
-                &operators_for_presence(pool, &names),
-            );
+            && eligibility.is_none_or(|accept| accept(&names));
         if observe_control {
             let pinned_log: std::collections::BTreeSet<_> = pinned.iter().collect();
             let required_log: Option<std::collections::BTreeSet<_>> =
@@ -257,15 +251,6 @@ fn assign_control_inner(
         &must_include,
         excluded.unwrap_or(&empty_excluded),
     )?;
-    // Fixed pins were admitted by Plan. Search-group choices and dynamic
-    // required members still need individual admission before being promised.
-    let filtered_pool = filter_control_pool_for_mood(
-        &filtered_pool,
-        options.control_work_hours,
-        options.mood,
-        &pinned,
-    )?;
-
     if observe_control {
         let mut pins_log: Vec<_> = pinned.iter().cloned().collect();
         pins_log.sort();
@@ -291,27 +276,7 @@ fn assign_control_inner(
                 .collect::<Vec<_>>());
     }
 
-    let mode_eligibility = |names: &[String]| {
-        eligibility.is_none_or(|accept| accept(names))
-            && crate::layout::work_budget::candidate_fits(
-                layout,
-                crate::layout::FacilityKind::ControlCenter,
-                None,
-                &names
-                    .iter()
-                    .filter_map(|name| {
-                        filtered_pool.entry(name).map(|entry| {
-                            (
-                                entry.name.clone(),
-                                entry.elite,
-                                entry.buff_ids.clone(),
-                                entry.tags.clone(),
-                            )
-                        })
-                    })
-                    .collect::<Vec<_>>(),
-            )
-    };
+    let mode_eligibility = |names: &[String]| eligibility.is_none_or(|accept| accept(names));
     let combos = search_control_combos_with_eligibility(
         &filtered_pool,
         table,
@@ -413,42 +378,7 @@ fn filter_control_pool_for_fill(
     })
 }
 
-/// Apply the fixed, per-operator control admission before combo search. The
-/// control-wide reduction is the only shared context here; combo-specific
-/// recovery remains owned by the final assignment check.
-fn filter_control_pool_for_mood(
-    pool: &ControlPool,
-    work_hours: Option<f64>,
-    initial_mood: f64,
-    protected: &HashSet<String>,
-) -> Result<ControlPool> {
-    let Some(work_hours) = work_hours else {
-        return Ok(pool.clone());
-    };
-    let model = default_mood_model()?;
-    let entries = pool
-        .entries
-        .iter()
-        .filter(|entry| {
-            if protected.contains(&entry.name) {
-                return true;
-            }
-            crate::mood::control_roster_fits(
-                &model,
-                &entry.name,
-                entry.progress.elite,
-                initial_mood,
-                work_hours,
-            )
-        })
-        .cloned()
-        .collect();
-    Ok(ControlPool {
-        entries,
-        skipped: pool.skipped.clone(),
-    })
-}
-
+/// Pick a hit that keeps every existing pin and uses no occupied optional member.
 fn pick_control_extending_pins<T: Clone>(
     hits: impl IntoIterator<Item = T>,
     pinned: &HashSet<String>,
@@ -483,23 +413,4 @@ fn commit_control_combo(
         .collect::<Result<Vec<_>>>()?;
     assignment.set_room(room_id.clone(), ops);
     Ok(())
-}
-
-fn operators_for_presence(
-    pool: &ControlPool,
-    names: &[String],
-) -> Vec<(String, u8, Vec<String>, Vec<String>)> {
-    names
-        .iter()
-        .filter_map(|name| {
-            pool.entry(name).map(|entry| {
-                (
-                    entry.name.clone(),
-                    entry.elite,
-                    entry.buff_ids.clone(),
-                    entry.tags.clone(),
-                )
-            })
-        })
-        .collect()
 }

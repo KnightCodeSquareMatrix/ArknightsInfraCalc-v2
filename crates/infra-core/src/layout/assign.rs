@@ -52,8 +52,8 @@ pub struct AssignBaseOptions {
     pub top_k: usize,
     pub mood: f64,
     pub shift_hours: f64,
-    /// Optional control-combination work budget for an explicit timed profile.
-    /// None preserves standalone and existing rotation selection policies.
+    /// Initial single-operator control roster ETA window for an explicit profile.
+    /// No later search, fill or final-assignment mood admission is performed.
     pub control_work_hours: Option<f64>,
     /// Variant C: peak-step registry selection rejects a system whose own control pins
     /// cannot sustain this many continuous hours. None disables the check.
@@ -311,7 +311,6 @@ pub(crate) fn complete_standalone_assignment(
             .iter()
             .flat_map(|reserve| reserve.operators.iter().cloned()),
     );
-    let model = crate::mood::default_mood_model()?;
     let layout = crate::layout::resolve_base(
         blueprint,
         &result.assignment,
@@ -334,22 +333,7 @@ pub(crate) fn complete_standalone_assignment(
         blueprint,
         &office_candidates,
         |_, trial, room, candidate| {
-            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
             crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
-                && (!options.auto_rotation
-                    || super::work_budget::room_work_duration_fits(
-                        blueprint, trial, &room.id, instances,
-                    ))
-                && eta
-                    .operator_in_room(&candidate.name, &room.id.0)
-                    .is_some_and(|entry| {
-                        crate::mood::fits_work_budget(
-                            &model,
-                            options.mood,
-                            entry.drain_per_hour,
-                            options.shift_hours,
-                        )
-                    })
         },
     );
     let roster = operbox.roster_excluding(&excluded);
@@ -362,8 +346,6 @@ pub(crate) fn complete_standalone_assignment(
         })
         .collect();
     candidates.sort_by(|left, right| left.name.cmp(&right.name));
-    let before_eta =
-        crate::mood::shift_eta_with_instances(&model, blueprint, &result.assignment, instances);
     crate::layout::fill_workplace_vacancies(
         blueprint,
         &mut result.assignment,
@@ -371,73 +353,7 @@ pub(crate) fn complete_standalone_assignment(
         instances,
         table,
         |trial, room, candidate| {
-            if !crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
-            {
-                return false;
-            }
-            if options.auto_rotation
-                && !super::work_budget::room_work_duration_fits(
-                    blueprint, trial, &room.id, instances,
-                )
-            {
-                return false;
-            }
-            let eta = crate::mood::shift_eta_with_instances(&model, blueprint, trial, instances);
-            if room.kind == FacilityKind::Factory {
-                let operators = trial
-                    .operators_in(&room.id)
-                    .iter()
-                    .map(|operator| {
-                        let buff_ids =
-                            instances.resolve_manufacture_buff_ids(&operator.name, operator.tier());
-                        crate::manufacture::ManuOperator {
-                            name: operator.name.clone(),
-                            elite: operator.elite,
-                            compiled_atoms: Some(table.compile_manufacture_atoms(&buff_ids)),
-                            buff_ids,
-                            tags: instances.tags_for(&operator.name, operator.tier()),
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                if !crate::search::manufacture_combo_allowed_for_shift(
-                    &operators,
-                    table,
-                    (!options.auto_rotation).then_some(options.shift_hours),
-                ) {
-                    return false;
-                }
-            }
-            eta.operator_in_room(&candidate.name, &room.id.0)
-                .is_some_and(|entry| {
-                    crate::mood::fits_work_budget(
-                        &model,
-                        options.mood,
-                        entry.drain_per_hour,
-                        options.shift_hours,
-                    )
-                })
-                && before_eta
-                    .per_op
-                    .iter()
-                    .filter(|entry| {
-                        crate::mood::fits_work_budget(
-                            &model,
-                            options.mood,
-                            entry.drain_per_hour,
-                            options.shift_hours,
-                        )
-                    })
-                    .all(|before| {
-                        eta.operator_in_room(&before.name, &before.room_id)
-                            .is_some_and(|entry| {
-                                crate::mood::fits_work_budget(
-                                    &model,
-                                    options.mood,
-                                    entry.drain_per_hour,
-                                    options.shift_hours,
-                                )
-                            })
-                    })
+            crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
         },
     )?;
     refresh_standalone_efficiency(

@@ -1247,7 +1247,7 @@ pub fn search_control_combos(
 }
 
 /// Apply a caller-owned feasibility constraint before ranking/top-K. The public
-/// search keeps its existing policy when no timed work budget is supplied.
+/// search keeps its existing policy when no structural constraint is supplied.
 pub(crate) fn search_control_combos_with_eligibility(
     pool: &ControlPool,
     table: &SkillTable,

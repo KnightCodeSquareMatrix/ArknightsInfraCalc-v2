@@ -199,8 +199,6 @@ pub struct BaseAssignment {
     #[serde(skip)]
     pub(crate) work_hours: Option<f64>,
     #[serde(skip)]
-    pub(crate) auto_main_work_budget: Option<std::sync::Arc<super::work_budget::WorkState>>,
-    #[serde(skip)]
     pub(crate) auto_dorm_support_rooms: std::collections::BTreeMap<String, RoomId>,
     #[serde(default)]
     rooms: Vec<RoomAssignment>,

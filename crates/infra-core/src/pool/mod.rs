@@ -5,6 +5,8 @@ mod power;
 mod standalone;
 mod trade;
 
+pub(crate) use control::admit_control_roster;
+
 pub use base::{filter_pool, HasName, HasProgress, PoolCore, TierTagged};
 pub use control::{
     build_control_pool, build_control_pool_with_fillers, filter_control_pool, ControlPool,

@@ -8,7 +8,6 @@ pub(crate) mod control_rotation;
 mod cycle_mood;
 mod dorm_finalizer;
 mod fiammetta_events;
-mod room_admission;
 mod rotation_scoring;
 mod rotation_types;
 mod shift_bind;
