@@ -91,7 +91,9 @@
         "质量early-return",
         "终态检查",
         "终检",
-        "structural_violations"
+        "structural_violations",
+        "peak替补错误",
+        "中枢错误拒绝输出"
       ],
       "owners": [
         "docs/定时换班.md",
@@ -237,6 +239,8 @@
       "heading": "缺 buff 与空 atom",
       "aliases": [
         "缺SkillTable buff",
+        "buff_id不在skill_table",
+        "buff不在skill_table",
         "空atom",
         "技能缺失",
         "validate_operator_refs",
@@ -282,6 +286,11 @@
         "两页不同规则",
         "按日期决定",
         "历史计划当前",
+        "proposal日期更新",
+        "dirty文档裁决权",
+        "未提交文档裁决权",
+        "技能触发与Plan准入边界",
+        "Plan准入不是游戏机制",
         "旧规则",
         "真源冲突"
       ],
