@@ -274,7 +274,7 @@ pub fn assign_shift_with_plan(
     seed: &BaseAssignment,
 ) -> Result<AssignShiftResult> {
     let _memo_scope = crate::search::ensure_search_memo_scope();
-    let mut result = assign_shift_with_plan_skip(
+    let enabled = assign_shift_with_preclaimed_plan(
         blueprint,
         operbox,
         instances,
@@ -282,10 +282,42 @@ pub fn assign_shift_with_plan(
         options,
         mode,
         seed,
+        seed,
         &HashSet::new(),
+        |_| Ok(()),
     )?;
-    complete_standalone_assignment(blueprint, operbox, instances, table, options, &mut result)?;
-    Ok(result)
+    if !four_gold_selected(&enabled.plan) {
+        let mut enabled = enabled;
+        complete_standalone_assignment(
+            blueprint,
+            operbox,
+            instances,
+            table,
+            options,
+            &mut enabled,
+        )?;
+        return Ok(enabled);
+    }
+
+    let mut disabled_skip = HashSet::new();
+    disabled_skip.insert("pozyomka_durin".to_string());
+    let disabled = assign_shift_with_preclaimed_plan(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        mode,
+        seed,
+        seed,
+        &disabled_skip,
+        |_| Ok(()),
+    )?;
+    let mut enabled = enabled;
+    let mut disabled = disabled;
+    complete_standalone_assignment(blueprint, operbox, instances, table, options, &mut enabled)?;
+    complete_standalone_assignment(blueprint, operbox, instances, table, options, &mut disabled)?;
+    Ok(select_four_gold_trade_winner(enabled, disabled))
 }
 
 pub(crate) fn complete_standalone_assignment(
@@ -426,6 +458,97 @@ pub(crate) fn refresh_standalone_efficiency(
     Ok(())
 }
 
+fn four_gold_selected(plan: &AssignmentPlan) -> bool {
+    plan.selected_rules
+        .iter()
+        .any(|rule| rule.rule_id == "pozyomka_durin")
+}
+
+fn trade_assignment_score(assignment: &BaseAssignment) -> crate::Efficiency {
+    assignment
+        .iter_rooms()
+        .filter_map(|room| room.efficiency.as_ref())
+        .map(|snapshot| {
+            snapshot.trade_total_efficiency
+                * if snapshot.trade_unit_output_multiplier.is_zero() {
+                    crate::Efficiency::ONE
+                } else {
+                    snapshot.trade_unit_output_multiplier
+                }
+        })
+        .sum()
+}
+
+fn select_four_gold_trade_winner(
+    enabled: AssignShiftResult,
+    disabled: AssignShiftResult,
+) -> AssignShiftResult {
+    let enabled_score = trade_assignment_score(&enabled.assignment);
+    let disabled_score = trade_assignment_score(&disabled.assignment);
+    if enabled_score > disabled_score {
+        eprintln!(
+            "[four-gold-candidate] winner=enabled enabled_trade={} disabled_trade={}",
+            enabled_score, disabled_score
+        );
+        enabled
+    } else {
+        eprintln!(
+            "[four-gold-candidate] winner=disabled enabled_trade={} disabled_trade={}",
+            enabled_score, disabled_score
+        );
+        disabled
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn assign_shift_with_preclaimed_four_gold_comparison<F>(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    mode: AssignShiftMode,
+    planning_seed: &BaseAssignment,
+    execution_seed: &BaseAssignment,
+    skip_system_ids: &HashSet<String>,
+    augment_plan: F,
+) -> Result<AssignShiftResult>
+where
+    F: Fn(&mut AssignmentPlan) -> Result<()>,
+{
+    let enabled = assign_shift_with_preclaimed_plan(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        mode,
+        planning_seed,
+        execution_seed,
+        skip_system_ids,
+        &augment_plan,
+    )?;
+    if skip_system_ids.contains("pozyomka_durin") || !four_gold_selected(&enabled.plan) {
+        return Ok(enabled);
+    }
+
+    let mut ordinary_skip = skip_system_ids.clone();
+    ordinary_skip.insert("pozyomka_durin".to_string());
+    let disabled = assign_shift_with_preclaimed_plan(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        mode,
+        planning_seed,
+        execution_seed,
+        &ordinary_skip,
+        &augment_plan,
+    )?;
+    Ok(select_four_gold_trade_winner(enabled, disabled))
+}
+
 /// 同 [`assign_shift_with_plan`]，额外允许跳过指定体系。
 pub fn assign_shift_with_plan_skip(
     blueprint: &BaseBlueprint,
@@ -437,7 +560,7 @@ pub fn assign_shift_with_plan_skip(
     seed: &BaseAssignment,
     skip_system_ids: &HashSet<String>,
 ) -> Result<AssignShiftResult> {
-    assign_shift_with_preclaimed_plan(
+    assign_shift_with_preclaimed_four_gold_comparison(
         blueprint,
         operbox,
         instances,

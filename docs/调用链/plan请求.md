@@ -53,7 +53,7 @@ run_user_rotation_probe_with_request_and_preferences(
 
 核心三人形成自己的同步轮休绑定，不让建议队友合并改变核心轮休队形。ABC 三班按两上休一核对；其他 profile 按各自团队拓扑核对同上同下，不把三班 2/1 次数套到主备两班。门禁按最终非宿舍工作岗位计数：核心 team 的休班上三人必须全不在工作岗位，落在宿舍属于休息；实际工作班分别满足相应双站/三站几何，并至少有一个完整工作班证明核心实际生效。普通入口保留排班和可定位质量 warning，显式 `--assert-invariants` 才对最终真实拆组、班数或几何错误失败。
 
-**尚未实现的择优**：用户 10-20 已明确比较字段为 `TradeEfficiency::final_efficiency`：技能效率计入纸面总效率，再乘特殊订单单位产出倍率；`mechanic_equivalent_efficiency` 仅解释机制，不重复计入。单房 `search_trade_triples`、`role_pick` 和贸易补入比较已在 `ddf5218` 改为读取 `final_efficiency`；`Stations` 仍是独立的站数加权复合。当前 Plan 阶段仍按优先级与 exclusive group 提交首个可行候选，没有跨完整候选评分器；单个候选内的排序不能证明两套完整 Plan 已比较。排班报告的逐房/按周期加权汇总已使用 `final_efficiency`；但 `pipeline` 中动态 producer 的跨域 Trade/制造加权比较仍累计纸面 `trade_total_efficiency`。这是不同的消费者，不能把后者说成排班周期汇总。完整四赤金对普通 Trade Core Plan 的同场比较尚未实现；评分窗、多贸易站聚合与平手处理见 [ADR 0013](../ADR/0013-four-gold-trade-core-candidate.md)，不得据当前单房排序推导整体或全局最优。
+**四赤金完整择优**：单班 owner 首次完整求解选中 `pozyomka_durin` 后，以相同 seed、选项和模式重跑禁用该体系的普通分支。两份最终 assignment 分别汇总所有贸易站的 `trade_total_efficiency × trade_unit_output_multiplier`；只比较贸易域，启用分支严格更高才采用，平手采用普通分支。比较器不改变两个分支内部的候选、枚举或安全缩减，也不新增启发式剪枝；它证明的是两份已完成结果之间的确定择优，不把现有分支搜索保证扩大成全局最优。未选四赤金或调用方已显式跳过该体系时不触发第二次求解。
 
 Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不入选，技能本身仍按实际数值结算。`--prefer rosemary_perception=recruit_refresh_witch` 已是未知 alternative，不能再解除任何贸易禁配；黑键—巫恋同站限制由贸易搜索执行，不依赖该规则是否激活。
 

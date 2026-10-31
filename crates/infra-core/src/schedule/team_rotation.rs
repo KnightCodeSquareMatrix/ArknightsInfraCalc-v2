@@ -8694,7 +8694,7 @@ fn assign_originium_pair_peak(
                 room_id.0
             )));
         }
-        let result = assign_shift_with_preclaimed_plan(
+        let result = crate::layout::assign::assign_shift_with_preclaimed_four_gold_comparison(
         blueprint,
         operbox,
         instances,
