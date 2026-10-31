@@ -71,12 +71,9 @@ requires manual semantic review.
 
 1. Read `AGENTS.md` and the relevant canonical mechanism document. Record the
    operator, layout, operbox, expected stage, and current output.
-2. Run the script unit tests:
-
-   ```bash
-   env PYTHONPATH=scripts python3 -m unittest \
-     scripts.tests.test_audit_building_skill_unlocks
-   ```
+2. Do not add, retain, or run source tests (user decision, 2026-10-31).
+   Use the existing audit command, focused real CLI inputs, and final-state
+   invariant checks to establish the unlock boundary.
 
 3. Run the full upstream audit and retain the JSON report:
 
@@ -100,7 +97,7 @@ requires manual semantic review.
    existing `stepwise` semantics: it merges same-stem skills within the
    effective runtime state; it must not cause a phase 2 skill to survive when
    the upstream phase 2 skill replaces phase 0.
-6. Add a focused regression for every repaired operator. At minimum assert
+6. Retain focused real CLI evidence for every repaired operator. At minimum check
    `tier_0` and `tier_up` resolved buff IDs, facility membership, and the
    relevant rarity/progression mapping.
 7. Re-run the focused real entry. For cross-facility changes, use the actual
@@ -128,7 +125,7 @@ Stop after:
 - all confirmed phase mismatches for the requested scope are zero;
 - accepted aliases are recorded with provenance;
 - unresolved custom IDs and completeness findings are listed separately;
-- focused runtime and regression tests pass;
+- focused real CLI checks and the applicable final-state invariant gate pass;
 - no unreviewed bulk rewrite remains.
 
 The normal residual state may be:

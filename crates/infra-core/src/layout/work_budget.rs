@@ -172,6 +172,14 @@ pub(crate) fn candidate_fits(
     let (Some(hours), Some(budget)) = (layout.work_hours, layout.auto_work_budget.as_ref()) else {
         return false;
     };
+    // 每站可独立轮换，主力选人时不能透支当前主中枢的较强光环。
+    // 同房技能仍按真实组合试算；缺员可能让另一中枢不满五人，因此固定减免也不预借。
+    if kind != FacilityKind::ControlCenter
+        && !crate::mood::room_workable_hours_without_control(kind, recipe, members)
+            .is_ok_and(|workable| hours <= workable + 1e-9)
+    {
+        return false;
+    }
     if !fits(
         kind,
         recipe,
@@ -246,12 +254,12 @@ pub(crate) fn fixed_main_fits(assignment: &BaseAssignment) -> bool {
 }
 
 /// 每房两名单 × 两中枢。当前唯一额外心情维度（外站深海人数）按各房可选最大值取最坏输入。
-pub(crate) fn assignments_fit(
+pub(crate) fn assignment_budget_failure(
     blueprint: &BaseBlueprint,
     main: &BaseAssignment,
     backup: &BaseAssignment,
     instances: &OperatorInstances,
-) -> bool {
+) -> Option<String> {
     let outside = blueprint
         .rooms
         .iter()
@@ -270,18 +278,37 @@ pub(crate) fn assignments_fit(
         work_state(blueprint, main, instances),
         work_state(blueprint, backup, instances),
     ];
-    states.iter().all(|state| {
-        state.rooms.iter().all(|room| {
-            states.iter().all(|control| {
-                fits(
+    for state in &states {
+        for room in &state.rooms {
+            for control in &states {
+                if !fits(
                     room.kind,
                     room.recipe,
                     &room.members,
                     room.hours,
                     &control.control,
                     outside,
-                )
-            })
-        })
-    })
+                ) {
+                    return Some(format!(
+                        "{} needs {}h; members {:?}; control {:?}; workable {:?}h",
+                        room.room.0,
+                        room.hours,
+                        room.members
+                            .iter()
+                            .map(|member| &member.0)
+                            .collect::<Vec<_>>(),
+                        control.control,
+                        crate::mood::room_workable_hours_with_control(
+                            &control.control,
+                            outside,
+                            room.kind,
+                            room.recipe,
+                            &room.members,
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+    None
 }

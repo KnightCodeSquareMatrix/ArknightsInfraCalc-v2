@@ -188,7 +188,9 @@ fn run_shift_pipeline_with_producer_pruning(
 
     match mode {
         AssignShiftMode::Peak => {
+            let optional_precision;
             if options.auto_rotation {
+                optional_precision = false;
                 // Plan controls are already in the assignment; only fill missing slots before
                 // entering the single production fill shared with the ordinary prefix path.
                 if run.assignment.control_operators().len() < 5 {
@@ -296,6 +298,7 @@ fn run_shift_pipeline_with_producer_pruning(
                         gold_lines,
                         &forbid_same_room,
                         stable_order,
+                        prepared.optional_precision,
                     )?
                     else {
                         continue;
@@ -308,8 +311,26 @@ fn run_shift_pipeline_with_producer_pruning(
                         best = Some(candidate);
                     }
                 }
-                let best =
-                    best.ok_or_else(|| Error::msg("all peak prefix candidates are infeasible"))?;
+                let best = match best {
+                    Some(best) => best,
+                    None => {
+                        run.assignment.construction_warnings.push("control: no peak prefix satisfied the admitted Plan; ordinary vacancies retained".into());
+                        finish_peak_prefix_candidate(
+                            run,
+                            plan,
+                            &trade_pool,
+                            &manu_pool,
+                            &power_pool,
+                            gold_lines,
+                            &forbid_same_room,
+                            0,
+                            false,
+                        )?
+                        .ok_or_else(|| {
+                            Error::msg("ordinary prefix unexpectedly requires optional precision")
+                        })?
+                    }
+                };
                 observe!(
                     "peak_prefix_winner mask={} policy_sort_key={:?} control={:?}",
                     best.stable_order,
@@ -321,6 +342,7 @@ fn run_shift_pipeline_with_producer_pruning(
                         .map(|op| op.name.as_str())
                         .collect::<Vec<_>>()
                 );
+                optional_precision = best.optional_precision;
                 run = best.run;
             }
             // 只对最终 winner 做一次夜烟 trade/manufacture 归属比较；候选循环内不再
@@ -343,8 +365,17 @@ fn run_shift_pipeline_with_producer_pruning(
                 gold_lines,
                 &forbid_same_room,
             )? {
-                run.assignment = assignment;
-                run.used = used;
+                if !optional_precision
+                    || !crate::response_dependency::karlan_precision_consumer_rooms(
+                        blueprint,
+                        &assignment,
+                        instances,
+                    )
+                    .is_empty()
+                {
+                    run.assignment = assignment;
+                    run.used = used;
+                }
             }
             timer.mark("peak_prefixes");
         }
@@ -479,13 +510,11 @@ fn apply_shadow_trade_manufacture_pair(
                 manu
             }
         }
-        (Ok(trade), Err(_)) => trade,
-        (Err(_), Ok(manu)) => manu,
-        (Err(trade_error), Err(manu_error)) => {
-            return Err(Error::msg(format!(
-                "shadow pair has no feasible disjoint branch: trade-first={trade_error}; manufacture-first={manu_error}"
-            )))
-        }
+        (Ok(trade), Err(Error::NoCandidate(_))) => trade,
+        (Err(Error::NoCandidate(_)), Ok(manu)) => manu,
+        (Ok(_), Err(error)) | (Err(error), Ok(_)) => return Err(error),
+        (Err(Error::NoCandidate(_)), Err(Error::NoCandidate(_))) => return Ok(None),
+        (Err(error), Err(_)) => return Err(error),
     };
     Ok(Some((winner.assignment, winner.used)))
 }
@@ -551,14 +580,18 @@ fn probe_shadow_pair(
     if !trade_takes_night_smoke {
         return Ok(None);
     }
-    let manu_hit = pick_shadow_manufacture(
+    let manu_hit = match pick_shadow_manufacture(
         run,
         manu_pool,
         &layout,
         room_recipe(manu_room)?,
         manu_room.level,
         used,
-    )?;
+    ) {
+        Ok(hit) => hit,
+        Err(Error::NoCandidate(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
     let manu_takes_night_smoke = manu_hit_names(&manu_hit)
         .iter()
         .any(|name| name == SHADOW_TRADE_MANUFACTURE_OPERATOR);
@@ -1131,12 +1164,14 @@ struct PeakPrefixCandidate<'a> {
     run: AssignmentRun<'a>,
     policy_sort_key: f64,
     stable_order: usize,
+    optional_precision: bool,
 }
 
 struct PreparedPeakControlCandidate<'a> {
     run: AssignmentRun<'a>,
     policy_upper_bound: f64,
     stable_order: usize,
+    optional_precision: bool,
 }
 
 fn should_prune_peak_candidate(
@@ -1253,6 +1288,12 @@ fn prepare_peak_control_candidate<'a>(
     dynamic_set: Option<(&HashSet<String>, &HashSet<String>)>,
     stable_order: usize,
 ) -> Result<Option<PreparedPeakControlCandidate<'a>>> {
+    let initial_control_names: HashSet<_> = run
+        .assignment
+        .control_operators()
+        .iter()
+        .map(|op| op.name.clone())
+        .collect();
     let saileach_best_office_pct = best_available_office_pct(&run, producer_layout)?;
     if !fill_peak_control(
         &mut run,
@@ -1267,6 +1308,16 @@ fn prepare_peak_control_candidate<'a>(
         return Ok(None);
     }
 
+    let optional_precision = run.assignment.control_operators().iter().any(|op| {
+        !initial_control_names.contains(&op.name)
+            && crate::response_dependency::control_buffs_have_karlan_precision(
+                run.table,
+                run.instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .map(String::as_str),
+            )
+    });
     let control_layout = control_layout_for_upper_bound(&run, producer_layout);
     Ok(Some(PreparedPeakControlCandidate {
         policy_upper_bound: control_inject_policy_sort_key_upper_bound(
@@ -1275,6 +1326,7 @@ fn prepare_peak_control_candidate<'a>(
             run.table,
         ),
         stable_order,
+        optional_precision,
         run,
     }))
 }
@@ -1303,6 +1355,28 @@ fn fill_peak_control(
                 );
             }
         };
+    }
+    if let (Some(hours), Some((required, _))) = (
+        run.options
+            .control_work_hours
+            .or(run.options.registry_sustain_hours),
+        dynamic_set,
+    ) {
+        let model = crate::mood::default_mood_model()?;
+        if required.iter().any(|name| {
+            control_pool.entry(name).is_none_or(|entry| {
+                !crate::mood::control_roster_fits(
+                    &model,
+                    name,
+                    entry.progress.elite,
+                    run.options.mood,
+                    hours,
+                )
+            })
+        }) {
+            observe!("prepare_return_none mask={stable_order} reason=dynamic_control_work_budget");
+            return Ok(false);
+        }
     }
     let control_names: HashSet<String> = run
         .assignment
@@ -1391,6 +1465,7 @@ fn finish_peak_prefix_candidate<'a>(
     gold_lines: u32,
     forbid_same_room: &[(String, String)],
     stable_order: usize,
+    optional_precision: bool,
 ) -> Result<Option<PeakPrefixCandidate<'a>>> {
     let mut run = finish_peak_prefix(
         run,
@@ -1401,15 +1476,33 @@ fn finish_peak_prefix_candidate<'a>(
         gold_lines,
         forbid_same_room,
     )?;
+    if optional_precision
+        && crate::response_dependency::karlan_precision_consumer_rooms(
+            run.blueprint,
+            &run.assignment,
+            run.instances,
+        )
+        .is_empty()
+    {
+        if std::env::var_os("ARKNIGHTS_INFRA_OBSERVE_CONTROL").is_some_and(|value| value == "1") {
+            eprintln!("[INFRA-CONTROL-OBSERVE] peak_prefix mask={stable_order} result=discarded_precision_teammates_lost");
+        }
+        return Ok(None);
+    }
     let policy_sort_key = match run.options.dynamic_producer_policy {
         ScoringPolicyId::ControlInjectRawSumV0 => {
             let final_layout = run.resolve_snapshot(true)?;
+            let precision_gain = if final_layout.global_inject.karlan_precision().is_some() {
+                karlan_precision_trade_gain_pct(&run)?
+            } else {
+                0.0
+            };
             control_inject_policy_sort_key_for_assignment(
                 &final_layout,
                 run.blueprint,
                 &run.assignment,
                 run.instances,
-            )
+            ) + precision_gain
         }
         ScoringPolicyId::TradeManufactureWeightedEfficiencyV1 => {
             refresh_manufacture_efficiency_snapshots(
@@ -1441,6 +1534,7 @@ fn finish_peak_prefix_candidate<'a>(
     Ok(Some(PeakPrefixCandidate {
         policy_sort_key,
         stable_order,
+        optional_precision,
         run,
     }))
 }
@@ -1459,6 +1553,7 @@ fn finish_peak_prefix<'a>(
         run.blueprint,
         run.operbox,
         &plan.producers,
+        run.options,
         &mut run.assignment,
         &mut run.used,
     )?;
@@ -1522,6 +1617,50 @@ fn finish_peak_prefix<'a>(
     Ok(run)
 }
 
+/// ControlInjectRawSumV0 extension for precision: settle the same actual
+/// workforce with and without its coefficients, and add the final trade gain
+/// in percentage points. No teammate search or opportunity-cost claim here.
+fn karlan_precision_trade_gain_pct(run: &AssignmentRun<'_>) -> Result<f64> {
+    let resolved = crate::layout::resolve_base(
+        run.blueprint,
+        &run.assignment,
+        Some(run.instances),
+        Some(run.table),
+        run.options.mood,
+        Some(run.durin_plan),
+    )?;
+    if resolved.layout.global_inject.karlan_precision().is_none() {
+        return Ok(0.0);
+    }
+    let gold_lines = resolved.gold_manu_line_count();
+    let mut gain = crate::Efficiency::ZERO;
+    for room in resolved.trade_rooms {
+        if room.operators.is_empty() {
+            continue;
+        }
+        let mut input = crate::trade::TradeRoomInput {
+            level: room.level,
+            operators: room.operators,
+            order_count: None,
+            mood: run.options.mood,
+            gold_production_lines: Some(gold_lines),
+            durin_virtual_lines: None,
+            human_fireworks: None,
+            layout: std::sync::Arc::new(room.layout),
+            active_order_kind: room.order,
+        };
+        let actual =
+            crate::trade::solve_trade_with_shift(&input, run.table, run.options.shift_hours)?;
+        std::sync::Arc::make_mut(&mut input.layout)
+            .global_inject
+            .clear_karlan_precision();
+        let without =
+            crate::trade::solve_trade_with_shift(&input, run.table, run.options.shift_hours)?;
+        gain += actual.efficiency.final_efficiency - without.efficiency.final_efficiency;
+    }
+    Ok(gain.as_f64() * 100.0)
+}
+
 fn operator_is_in_normal_base(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
@@ -1575,10 +1714,15 @@ fn dynamic_producer_candidates(
         .collect();
     let mut producers = Vec::new();
     for entry in &control_pool.entries {
+        let precision = crate::response_dependency::control_buffs_have_karlan_precision(
+            table,
+            entry.buff_ids.iter().map(String::as_str),
+        );
         if crate::response_dependency::control_buff_is_automatically_excluded(
             table,
             entry.buff_ids.iter().map(String::as_str),
-        )? {
+        )? && !precision
+        {
             continue;
         }
         let trade_match = control_entry_deferred_trade_tags(entry, table)?

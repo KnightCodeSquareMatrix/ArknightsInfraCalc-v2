@@ -9,8 +9,8 @@ mod drain;
 mod eta;
 mod recovery;
 
-pub(crate) use drain::room_workable_hours_with_control;
 pub use drain::{operator_net_drain, workable_hours, DrainInputs};
+pub(crate) use drain::{room_workable_hours_with_control, room_workable_hours_without_control};
 pub use eta::{
     fits_shift_budget, fits_work_budget, shift_eta, shift_eta_in_context, shift_eta_with_instances,
     OperatorEta, ShiftEta,
@@ -548,4 +548,33 @@ pub fn default_mood_model() -> Result<&'static MoodModel> {
         Ok(model) => Ok(model),
         Err(error) => Err(Error::msg(error.clone())),
     }
+}
+
+/// Fixed roster admission: full control occupancy and the operator's own
+/// modeled skills only. Actual combinations remain a final-cycle check.
+pub(crate) fn control_roster_fits(
+    model: &MoodModel,
+    name: &str,
+    elite: u8,
+    initial_mood: f64,
+    hours: f64,
+) -> bool {
+    let room_ops = vec![(name.to_string(), elite)];
+    fits_work_budget(
+        model,
+        initial_mood.min(model.mood_cap),
+        operator_net_drain(
+            model,
+            &DrainInputs {
+                name,
+                elite,
+                facility: FacilityKind::ControlCenter,
+                room_ops: &room_ops,
+                full_control: true,
+                control_ops: &[],
+                recipe: None,
+            },
+        ),
+        hours,
+    )
 }

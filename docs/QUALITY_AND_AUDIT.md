@@ -80,7 +80,7 @@
 | `UNRESOLVED_EVIDENCE_DISPUTE` | 独立 reviewer 的实质分歧无法由 canonical、最终状态 assertion、真实入口或 batch 结果裁决。 |
 | `EXTERNAL_OR_IRREVERSIBLE_EFFECT` | 修复将部署、迁移 / 删除数据、覆盖用户工作区改动、改变公共接口，或产生其他不可逆外部副作用。 |
 
-自动循环的任务包必须声明：目标、用户已授权范围、canonical 路径、允许 changed paths、保证等级、required proof obligations、最大轮数和外部动作策略。默认上限是同一 finding 两次自动修复、整个任务四个修复单元；达到任一上限时以 `UNRESOLVED_EVIDENCE_DISPUTE` 暂停并保留 checkpoint，不得无界重试。每轮 final status 只能是：
+自动循环的任务包必须声明：目标及可观察的完成条件、用户已授权范围、canonical 路径、允许 changed paths、保证等级、required proof obligations、最大轮数和外部动作策略。完成条件先于实施方案，局部修复可由已确认的复现及其验收表达；任务完成后不自动开启旁支。默认上限是同一 finding 两次自动修复、整个任务四个修复单元；达到任一上限时以 `UNRESOLVED_EVIDENCE_DISPUTE` 暂停并保留 checkpoint，不得无界重试。每轮 final status 只能是：
 
 ```text
 AUTO_STATUS: CONTINUE | PAUSED_FOR_USER | COMPLETED
@@ -160,21 +160,17 @@ NEXT_IMPLEMENTATION_UNIT:
 
 证据至少保留到任务交付完成。交付后可按任务目录归档或清理；具有长期审计价值的结论应保存稳定摘要或 artifact，不能假设 `target/` 永远不会被 `cargo clean` 删除。本次工作流不要求迁移或批量删除旧日志。
 
-## 5. Full suite 与失败基线
+## 5. 生产检查与失败证据
 
-本仓库当前不能被笼统描述为“全套测试全绿”。历史和当前证据中存在既有失败；具体集合以本轮开始前保存的完整 baseline 日志为准，不在本文硬编码一个容易过时的数量。
+用户 2026-10-31 裁决不新增、保留或运行源码单元/集成测试；历史源码测试和专用失败集合比较工具删除。Rust 生产终态断言、持久 Box、真实 CLI 回归、数据审计及文档检查继续作为验收入口，不恢复源码测试。
 
-Full suite 验收必须：
+现有 `check_repository_facts.py` 拒绝 Rust 的 `#[test]`、`#[bench]`、`#[cfg(test)]` 和源码测试目录；CI 调用该检查，阻止这些已知形式重新进入仓库。它不声称识别所有条件编译表达式或自定义测试框架。检查当前仓库的 `crates/` 和 `scripts/`，不读取其他工作树。
 
-1. 保存完整失败列表。
-2. 从原始 baseline 和当前日志提取测试全名集合。
-3. 分别报告 additions、removals 和 unchanged；不能只比较失败数量。
-4. 新增失败为 0 才能宣称“没有新增 full-suite 回归”。
-5. 修复或删除一个旧失败必须说明其业务依据；旧测试可能本身保护错误语义。
-
-使用 `scripts/codex/compare_test_failures.py` 从完整日志生成 JSON 与 Markdown；新增失败返回非零，日志截断或格式不识别必须硬失败，不能解析成空集合成功。
-
-Baseline 是检测回归的工具，不是允许既有错误永久存在的豁免，也不能用于宣称全套测试通过。
+1. 用 release CLI 运行受影响的真实入口，保存输入、退出码、诊断和完整产物。
+2. 涉及 solver、Plan、Team/Shift、rotation、export、跨设施或大规模运行时数据时，运行最终 assignment 的 `--assert-invariants`，并对代表性与 high-owned Box 批量调用；按风险覆盖激活、拒绝和边界反例。
+3. 批量结果分开报告不变量失败、求解失败、输入错误和超时；每项失败附具体 Box、profile、命令与诊断。通过只证明这些输入满足已注册不变量，不能证明所有机制、输入或全局最优。
+4. 比较前后结果时使用同一输入集合和保证范围，复用 `scripts/assert_rotation_invariants.py --compare-to`；明确变化项与未变化项。失败数量相同不能证明没有新增错误。
+5. 既有检查失败仍须核对领域依据与实际行为；删除源码测试不等于修复了它曾报告的差异。历史测试日志保留为调查材料，不再作为当前执行要求或业务真源。
 
 ## 6. Bake 安全门禁
 
@@ -193,6 +189,10 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
 
 当前实现 owner 见 [PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md)，冻结证据和详细范围见 [性能优化调查与Bake重设计](TODO/性能优化调查与Bake重设计.md) §8.1。第一轮旧表29,783,417行/3,292查询零差异、2,148跳过以及原选人/MAA/失败差异均保留；后续旧语义消融同样完整表29,783,417行/3,435查询零差异、2,005跳过，152盒及full-e2两入口中实际产出/成员/rotation/MAA零差异，296叶仅同文件输入绝对路径标签，原same5/changed147和逐字相同既有断言失败保留。覆盖内纯性能归因可关闭，不能宣称raw字节相同或推广全部输入/Required+peer-reset。首轮592270b历史证据保留；最终7695096fd新冻结重复原55×3解析及225输入，并新增129输入，总1122full（1050成功、72预期非有限错误）、1050search（798获准精确一致、252既有>=12h负心情扣减政策排除），数学千分与公开f64合同零差异，指定P1/P2静态闭合；不能将252排除写成light/full一致或认证所有实数微段/全技能/全局排班。P1铅踝扣减后槐琥漏读、P2合法极短浮点段拒绝已局部修复并完成新release编译：槐琥分桶在全部EffVar直接贡献后读取（order10→30，五ramp order9保持），极短段保留权重和可表示求值。普通段分段积分，微段保留权重但非线性代表点求值仍受f64舍入约束；新数值和反例已完成，最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 旧完整表不能替代新语义验收。None20h使用新连续暖机，Some(h)真实时长不round/clamp，发电不改。五例24/24预算确实超限，保持正确gate与canonical既定正常warning fallback，不新增排班policy。
 
+制造 Plan 试排另使用有界的运行时完整条件响应表，支持真实混合练度和动态上下文；它不放宽
+上述磁盘 catalog 的兼容门禁。键覆盖、纯单房结果复用和 miss 重算边界见
+[PERFORMANCE_ENGINEERING.md](PERFORMANCE_ENGINEERING.md#制造体系试排的条件响应缓存2026-10-30)。
+
 ### 6.2 真实限制与后续边界
 
 - combo table 已有 bytes/hash 和逐 signature 行数校验；加载期 rank 索引由完整合法集合重建，index checksum 尚未独立持久化，不能写成已完成。
@@ -208,7 +208,7 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
 
 | 不变量 | 代码保证 | 删除的冲突 | 回归 | 端到端结果 | 日志 | 产物 |
 |--------|----------|------------|------|------------|------|------|
-| 逐项填写 | 唯一类型 / 字段 / 函数 | 被删除的旧路径 | 测试名与断言 | 实际房间 / 队伍 / 字段 | 可点击绝对路径 | 可点击绝对路径 |
+| 逐项填写 | 唯一类型 / 字段 / 函数 | 被删除的旧路径 | 真实反例 / 终态诊断名 | 实际房间 / 队伍 / 字段 | 可点击绝对路径 | 可点击绝对路径 |
 
 最终回复还必须单列：
 
@@ -216,5 +216,5 @@ Bake 是加速载体，不是业务真源。预计算结果只有在候选结构
 - 新的单一事实源。
 - 本轮通过项、既有失败、新增失败和未验证风险。
 - 实际运行过的用户入口。
-- Build、定向测试、full suite、真实 CLI、性能和 JSON 的验证证据。
+- release Build、终态断言与批量 Box、真实 CLI、性能和 JSON 的验证证据。
 - commit hash；未提交时明确写“未提交”。

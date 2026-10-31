@@ -477,7 +477,7 @@ catalog row/response 精确命中
 
 状态（2026-07-19）：已完成 `producer_rules.json`、稳定 source buff capability、四条当前动态
 workforce rule 的覆盖校验，以及 Haru 全贸易、Daifeen 当前房、Silver 达标房、Jessica 全制造
-workforce 的 live 结算和单元测试。
+workforce 的 live 结算和真实入口反例验证。
 
 预计涉及：
 
@@ -486,7 +486,7 @@ workforce 的 live 结算和单元测试。
 - `layout/workforce.rs` / `layout/resolve.rs`
 - `data/skill_table.json` / `operator_instances.json`
 
-交付：通用 deferred rule；Haru 跨站总数、Daifeen room-local、Silver 每站阈值的独立单元测试。
+交付：通用 deferred rule；Haru 跨站总数、Daifeen room-local、Silver 每站阈值的真实 CLI 反例与终态断言证据。
 
 ### Phase 2：先写 live reference indexed join
 
@@ -694,7 +694,7 @@ control inject 自动返回无限上界、禁用剪枝。full-E2 定向证据中
 - 根因层和旧模型为什么允许非法状态；
 - 新的单一事实源；
 - 删除的 data/code/test 路径；
-- build、定向测试、full suite、真实 `plan`、Bake hit/miss 与性能日志；
+- release build、终态断言与批量 Box、真实 `plan`、Bake hit/miss 与性能日志；
 - 本轮新增失败、既有失败和未验证风险；
 - profile / MAA JSON 的可点击路径与 commit hash。
 

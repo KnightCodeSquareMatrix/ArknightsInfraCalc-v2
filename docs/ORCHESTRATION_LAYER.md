@@ -22,6 +22,10 @@ build_plan 解析 PickOne、OptionalFixed、required count、scope 和 alternati
 
 当前策略是跨站体系先于同站候选、producer/consumer 以实际 presence 形成 dependency、制造逐房重算 resolve_base、fallback 只限声明式 role/alternative。旧路线图、删除 helper 和历史审计仅在 ARCHIVE 追溯。
 
+制造体系试排仍按每个临时 assignment 逐房 `resolve_base`；完整制造搜索由域内条件响应缓存
+复用相同上下文的全部单房结果，再按当前候选池与必选成员查询。缓存不持有 Plan 或已占用状态，
+不复用不同上下文的静态 top-K；见 [搜索性能与 Bake 边界](PERFORMANCE_ENGINEERING.md)。
+
 ## 变更时的调用链定位
 
 - 组合未进入岗位：先查 build_plan 是否有 required admission/alternative，再查 execute_plan 是否提交 anchor；不要先调 facility solver。

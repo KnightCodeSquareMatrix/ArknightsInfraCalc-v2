@@ -12,7 +12,7 @@
 
 ## 编制硬约束
 
-中枢容量由 blueprint 决定，当前标准布局为 5 人。可用角色足够时先满足 Plan 的 required anchor，再补齐合法席位；无中枢技能的 filler 仍可能提供 occupancy/mood 或满足跨设施条件。后续 filler 不能替换已认领的 required anchor。定时轮换内部班次可在候选构造阶段暂时少于容量，required anchor、`min_count`、身份唯一性、活跃队伍准入与练度仍需满足；完整周期后的普通 fallback 再从当前合法剩余候选补位。候选耗尽时最终 Assignment 保留缺额并由缺员 warning 报告，不把单纯容量不足升级为产品拒绝；超容量、重复 operator、同房禁配和无法满足仍不可降级的 required group 继续错误/无解。最终显式 invariant 核验中枢不超容量，并重放同一普通补位策略：仍有合法候选可加入才失败，候选耗尽后的短员保留 warning，不以满员作为通过前提。其余门禁按各自已实现范围独立执行，不据此声称所有 profile 的 required 或通用绑定均已独立重放。
+中枢容量由 blueprint 决定，标准布局为 5 人。required anchor 先落位，后续 filler 不替换它。普通候选、Rule 分组候选、registry 固定/Search claim 和动态 producer 在成为承诺前，按当前 owner 工作窗口检查既有单人保守预算；满 pin 快捷路径只消费已准入承诺。后续 protected 仅保护 pin，不让全部 requirement 或动态 required 绕过资格。普通补位保留实际 ETA owner；深海专用恢复仍按其上下文判断。构造候选不足或承诺矛盾保留诊断和此前岗位，继续其他设施与普通补位；终检不修 admission。显式 gate 保留容量、唯一性、required/min_count、绑定和真实周期预算，候选耗尽后的短员不升级为硬失败。
 
 `search/control.rs` 的 `ControlFillPolicy` 是顺序 policy，不是全基建匿名总分。排序依次消费 Plan anchor、贸易/制造全局区域、训练/办公室/会客室、心情去重和普通补位；不回溯替换前序结果。
 
@@ -34,7 +34,17 @@
 
 ## 动态 producer
 
-中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；source 只有实际 assignment 在场时才进入 manifest。producer 变化应触发 resolve 和下一阶段搜索，不能靠标签存在或 export 补偿。
+中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；动态 mask 的 required 先按 `control_work_hours` 或既有 `registry_sustain_hours` 工作窗通过资格。source 只有实际 assignment 在场时才进入 manifest，producer 变化触发 resolve 和下阶段搜索。当前 selector 不生成旧 ProducerSlot；该接口若被使用仍在落位前检查工作窗与占用，不构成免准入入口。
+
+## 灵知可选协同（2026-10-30）
+
+用户裁决采用部分搜索：“它的队友落选就丢弃掉”。灵知不再由 `ling_jie_karlan` registry 提前认领中枢、孑和喀兰成员，旧 registry 及其生成脚本模板已删除。`trade_karlan_precision` 在 producer 目录声明为 deferred optional；普通中枢补位仍排除该技能，仅显式试算分支或既有硬 pin 可以进入。
+
+Peak 复用动态中枢 presence 枚举，每个分支按当前贸易 role/房间顺序选人，不固定孑、银灰或第三人。移除喀兰 role 可用就优先返回的补位路径；贸易填完后，实际同房没有市井孑与喀兰成员的可选灵知分支直接淘汰，不重排其他房间、不回头抢队友。实际 Box 练度固定。第三人不要求喀兰；缺银灰的低档合法协同也不按技能非法排除。
+
+`ControlInjectRawSumV0` 保留原注入比较项，并加入灵知在完整实际贸易名单上的边际 final 效率百分点：同一名单分别由贸易 solver 按有/无精密计算结算，差值求和。该差值不是队友重新优化收益，也不代表全基建机会成本；`TradeManufactureWeightedEfficiencyV1` 保留原比较口径。旧正注入上界不覆盖此交互，有精密计算的分支不走该上界剪枝。整体仍是 **heuristic / 部分搜索**，不声称全局最优。
+
+胜出名单由 `resolve_actual_producer_dependencies` 派生 `trade_karlan_precision` 实际依赖，精密计算来源与实际市井孑、喀兰受益成员沿既有 exact-presence 同班；同站关系随既有生产组件轮换。独立第三人（如但书、可露希尔）不额外绑同休，可按其原有连续工作或菲亚规则继续在岗。夜烟归属重算若破坏该已选协同，其替代结果不提交。终态 gate 的 `karlan_precision_selected_team` 在最终 assignment 检查在岗来源对应的实际贸易成员同房，既有 `karlan_trade_requires_control_source` 和 bind cycle 检查反向来源与同班。旧 `scripts/check_karlan_rotation.py` 入口转调统一批量 runner，始终运行 Rust 终态 gate，不再用 Python 重写 registry 认领或上下班判断。
 
 ## 核验
 

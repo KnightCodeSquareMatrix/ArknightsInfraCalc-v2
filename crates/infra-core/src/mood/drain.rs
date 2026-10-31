@@ -123,6 +123,33 @@ pub(crate) fn room_workable_hours_with_control(
     recipe: Option<crate::types::RecipeKind>,
     members: &[(String, u8, Vec<String>, Vec<String>)],
 ) -> crate::error::Result<f64> {
+    room_workable_hours_in_context(
+        control_operators,
+        abyssal_outside_dorm,
+        facility,
+        recipe,
+        members,
+        control_operators.len() >= 5,
+    )
+}
+
+/// 自动建议的前置预算不借用尚未保证常驻的中枢人数减免或光环。
+pub(crate) fn room_workable_hours_without_control(
+    facility: FacilityKind,
+    recipe: Option<crate::types::RecipeKind>,
+    members: &[(String, u8, Vec<String>, Vec<String>)],
+) -> crate::error::Result<f64> {
+    room_workable_hours_in_context(&[], 0, facility, recipe, members, false)
+}
+
+fn room_workable_hours_in_context(
+    control_operators: &[(String, u8)],
+    abyssal_outside_dorm: usize,
+    facility: FacilityKind,
+    recipe: Option<crate::types::RecipeKind>,
+    members: &[(String, u8, Vec<String>, Vec<String>)],
+    full_control: bool,
+) -> crate::error::Result<f64> {
     let model = super::default_mood_model()?;
     let room_ops: Vec<_> = members
         .iter()
@@ -148,7 +175,11 @@ pub(crate) fn room_workable_hours_with_control(
                 elite: *elite,
                 facility,
                 room_ops: &room_ops,
-                full_control: control_ops.len() >= 5,
+                full_control: if facility == FacilityKind::ControlCenter {
+                    control_ops.len() >= 5
+                } else {
+                    full_control
+                },
                 control_ops,
                 recipe,
             },

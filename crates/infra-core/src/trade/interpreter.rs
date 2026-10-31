@@ -401,7 +401,15 @@ fn apply_atom(ctx: &mut TradeContext<'_>, atom: &EffectAtom, owner: &str) {
         Phase::Constant | Phase::PeerShare | Phase::EffVar | Phase::OrderVar | Phase::LimitVar => {
             apply_eff_action(ctx, atom, owner);
         }
-        Phase::Limit => apply_limit_action(ctx, atom, owner),
+        Phase::Limit => {
+            // Contributed-limit efficiency settles after limit modifiers and
+            // before efficiency-based compression, ordered by the runtime atoms.
+            if matches!(atom.action, Action::AddBucketEffFromSelector { .. }) {
+                apply_eff_action(ctx, atom, owner);
+            } else {
+                apply_limit_action(ctx, atom, owner);
+            }
+        }
         Phase::OrderMechanic => {
             apply_order_mechanic(ctx, atom);
             if matches!(atom.action, Action::AddFlatEff { .. }) {
@@ -588,9 +596,12 @@ fn resolve_selector_value(ctx: &TradeContext<'_>, selector: Option<&Selector>, o
             .iter()
             .filter(|o| o.tags.iter().any(|t| t == tag))
             .count() as f64,
-        Some(Selector::LimitContribSum) => {
-            ctx.operators.iter().map(|o| o.limit_contrib).sum::<i32>() as f64
-        }
+        Some(Selector::LimitContribSum) => ctx
+            .operators
+            .iter()
+            .map(|o| o.limit_contrib)
+            .sum::<i32>()
+            .max(0) as f64,
         Some(Selector::MeetingMaxLevel) => f64::from(ctx.layout.meeting_max_level),
         Some(Selector::DormLevelSum) => f64::from(ctx.layout.dorm_level_sum),
         Some(Selector::ManuRecipeKinds) => f64::from(ctx.layout.manu_recipe_kinds),

@@ -12,7 +12,7 @@ description: 改 solver/search、Plan admission、Team/Shift、rotation、MAA/ex
 3. 用结算时同一套运行时输入重建检查：真实 operbox 练度、instances、skill table、解析后的 layout。失败返回 `Result` 错误。
 4. Python 只负责批量调用 Rust gate 和分类结果，不解析文本 / MAA，不重写机制语义。现有批量入口是 `scripts/assert_rotation_invariants.py`。
 
-这类大改动的验证靠终态断言加批量 box，不靠新增源码测试。单房间计算这类局部修复可以补最小复现测试。
+用户 2026-10-31 裁决不新增、保留或运行源码测试。大改动靠终态断言加批量 box；局部修复用最小反例、相邻反例和真实 CLI 入口检查。
 
 ## 批量输入
 

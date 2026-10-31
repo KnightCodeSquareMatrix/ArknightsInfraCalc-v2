@@ -65,9 +65,6 @@ pub struct SystemAnchor {
     /// Recommendation provenance used only for bounded Plan retry when its required trade fill fails.
     #[serde(skip)]
     pub(crate) optional_trade_role: Option<String>,
-    /// Present only for a rule role with min_count=0 in the control center.
-    #[serde(skip)]
-    pub optional_control_role: Option<String>,
     pub elite: u8,
     pub facility: FacilityKind,
     /// `None` = 该设施类型首个空房，不绑定具体 `room_id`。

@@ -6635,7 +6635,9 @@
     "锏@tier_0": {
       "name": "锏",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.karlan"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -6648,7 +6650,9 @@
     "锏@tier_up": {
       "name": "锏",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.karlan"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [

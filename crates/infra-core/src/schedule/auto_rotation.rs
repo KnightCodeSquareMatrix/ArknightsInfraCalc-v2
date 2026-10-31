@@ -132,7 +132,7 @@ pub fn schedule_auto_rotation(
     let mut options = options.clone();
     options.auto_rotation = true;
     options.fiammetta_enable = false;
-    options.control_work_hours = None;
+    options.control_work_hours = Some(timing.shift_hours[0]);
     options.registry_sustain_hours = None;
     options.skip_standalone_control = true;
     options.shift_hours = timing.shift_hours[0];
@@ -161,6 +161,7 @@ pub fn schedule_auto_rotation(
     // 第一次完整主力的工作名单在此冻结；替补不得预占成员或触发主力回选。
     let mut backup_options = options.clone();
     backup_options.shift_hours = timing.shift_hours[1];
+    backup_options.control_work_hours = Some(timing.shift_hours[1]);
     let backup = super::team_rotation::solve_policy_disjoint_backup(
         blueprint,
         &operbox,
@@ -216,16 +217,13 @@ pub fn schedule_auto_rotation(
         instances,
         table,
     )?;
-    if !crate::layout::work_budget::assignments_fit(
+    if let Some(reason) = crate::layout::work_budget::assignment_budget_failure(
         blueprint,
         &main.assignment,
         &backup.assignment,
         instances,
     ) {
-        return Err(fixed_main_backup_error(
-            "最终工时检查",
-            "主备配置不能在两中枢下撑满输入时长",
-        ));
+        return Err(fixed_main_backup_error("最终工时检查", reason));
     }
     validate_explicit_supports(
         blueprint,

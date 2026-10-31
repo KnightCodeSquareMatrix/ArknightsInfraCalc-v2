@@ -352,7 +352,8 @@ fn validate_producer_rule_catalog(
             .atoms
             .iter()
             .filter(|atom| {
-                dynamic_workforce_selector(atom.selector.as_ref()).is_some()
+                (dynamic_workforce_selector(atom.selector.as_ref()).is_some()
+                    || matches!(atom.action, Action::GlobalInjectKarlanPrecision { .. }))
                     && target_facility(&skill.facility, &atom.action, atom.scope)
                         == rule.target_facility
             })
@@ -387,6 +388,7 @@ fn validate_producer_rule_catalog(
                     atom.action,
                     Action::GlobalInjectTradeEff { .. } | Action::GlobalInjectManuEff { .. }
                 ) && dynamic_workforce_selector(atom.selector.as_ref()).is_some()
+                    || matches!(atom.action, Action::GlobalInjectKarlanPrecision { .. })
             })
         })
         .map(|skill| skill.id.as_str())
@@ -442,14 +444,56 @@ pub fn control_buff_is_automatically_excluded<'a>(
     }) {
         return Ok(true);
     }
-    Ok(requested.iter().any(|buff_id| {
+    // Precision is considered only by an explicit optional prefix, never by
+    // ordinary control fill. The prefix does not reserve trade teammates.
+    Ok(control_buffs_have_karlan_precision(
+        table,
+        requested.iter().copied(),
+    ))
+}
+
+pub(crate) fn control_buffs_have_karlan_precision<'a>(
+    table: &SkillTable,
+    buff_ids: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    buff_ids.into_iter().any(|buff_id| {
         table.get(buff_id).is_some_and(|skill| {
             skill
                 .atoms
                 .iter()
                 .any(|atom| matches!(atom.action, Action::GlobalInjectKarlanPrecision { .. }))
         })
-    }))
+    })
+}
+
+/// Selection policy witness: the real market variant and a Karlan peer
+/// survived trade selection in the same room. This does not place either one.
+pub(crate) fn karlan_precision_consumer_rooms(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: &OperatorInstances,
+) -> Vec<RoomId> {
+    blueprint
+        .rooms
+        .iter()
+        .filter(|room| {
+            room.kind == FacilityKind::TradePost && {
+                let operators = assignment.operators_in(&room.id);
+                operators.iter().any(|op| {
+                    instances
+                        .resolve_trade_buff_ids(&op.name, op.tier())
+                        .iter()
+                        .any(|buff| buff == "trade_ord_limit_count[000]")
+                }) && operators.iter().any(|op| {
+                    instances
+                        .tags_for(&op.name, op.tier())
+                        .iter()
+                        .any(|tag| tag == "cc.g.karlan")
+                })
+            }
+        })
+        .map(|room| room.id.clone())
+        .collect()
 }
 
 pub fn resolve_assignment_producer_dependencies(
@@ -488,6 +532,49 @@ pub fn resolve_assignment_producer_dependencies(
                 rule.id, rule.source_buff_id
             ))
         })?;
+        if control_buffs_have_karlan_precision(table, [rule.source_buff_id.as_str()]) {
+            let target_rooms = karlan_precision_consumer_rooms(blueprint, assignment, instances);
+            if target_rooms.is_empty() {
+                continue;
+            }
+            // Bind the market converter and actual Karlan recipients. An
+            // independent third operator (e.g. Docus with Fiammetta coverage)
+            // may keep working while this synergy rests.
+            let mut consumers: Vec<_> = target_rooms
+                .iter()
+                .flat_map(|room| {
+                    assignment
+                        .operators_in(room)
+                        .iter()
+                        .filter(|op| {
+                            instances
+                                .tags_for(&op.name, op.tier())
+                                .iter()
+                                .any(|tag| tag == "cc.g.karlan")
+                                || instances
+                                    .resolve_trade_buff_ids(&op.name, op.tier())
+                                    .iter()
+                                    .any(|buff| buff == "trade_ord_limit_count[000]")
+                        })
+                        .map(|op| op.name.clone())
+                })
+                .collect();
+            consumers.sort();
+            consumers.dedup();
+            resolved.push(ResolvedProducerDependency {
+                rule_id: rule.id.clone(),
+                source_buff_id: rule.source_buff_id.clone(),
+                producers,
+                consumers,
+                target_facility: rule.target_facility.clone(),
+                target_rooms,
+                relation: rule.schedule_relation,
+                on_shifts: rule.on_shifts,
+                off_shifts: rule.off_shifts,
+                effective_contribution: None,
+            });
+            continue;
+        }
         let mut consumers = BTreeSet::new();
         let mut target_rooms = Vec::new();
         let mut contribution = 0.0;

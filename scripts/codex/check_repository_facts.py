@@ -586,6 +586,28 @@ def check_agent_index(repo: Path) -> list[str]:
     return errors
 
 
+def check_rust_source_tests(source: str, label: str) -> list[str]:
+    masked, error = _mask_rust_noncode(source)
+    if error:
+        return [f"cannot inspect source tests in {label}: {error}"]
+    attribute = re.search(
+        r"#\s*\[\s*(?:(?:test|bench)\s*\]|cfg\s*\(\s*test\s*\)\s*\])",
+        masked,
+    )
+    return [f"source tests are not allowed: {label}"] if attribute else []
+
+
+def check_no_source_tests(repo: Path) -> list[str]:
+    errors: list[str] = []
+    for path in sorted(repo.glob("crates/*/src/**/*.rs")):
+        errors.extend(check_rust_source_tests(path.read_text(encoding="utf-8"), str(path.relative_to(repo))))
+    for pattern in ("crates/*/tests/**/*", "scripts/tests/**/*", "scripts/codex/tests/**/*", "scripts/**/test_*.py"):
+        for path in sorted(repo.glob(pattern)):
+            if path.is_file() and "__pycache__" not in path.parts:
+                errors.append(f"source test files are not allowed: {path.relative_to(repo)}")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
@@ -601,6 +623,7 @@ def main() -> int:
     errors.extend(check_project_map_owner_contract(repo))
     errors.extend(check_navigation_contract(repo))
     errors.extend(check_agent_index(repo))
+    errors.extend(check_no_source_tests(repo))
     if errors:
         for error in sorted(set(errors)):
             print(f"error: {error}", file=sys.stderr)
@@ -609,7 +632,7 @@ def main() -> int:
         "PASS repository_facts "
         f"documents={len(documents)} domains={sum(len(document.domains) for document in documents)} "
         "lifecycle=ok links=ok feedback=ok cli_help_map=ok "
-        "project_map_owner=ok navigation=ok"
+        "project_map_owner=ok navigation=ok source_tests=absent"
     )
     return 0
 

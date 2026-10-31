@@ -62,8 +62,6 @@ pub struct AssignBaseOptions {
     pub skip_standalone_control: bool,
     /// `system_id=alternative_id` 解析后的通用体系路径偏好。
     pub system_preferences: std::collections::HashMap<String, String>,
-    /// ABC-only Plan retry: optional control candidates proven unable to cover their bound shifts.
-    pub skipped_optional_control_roles: HashSet<(String, String, String)>,
     /// 金单贸易站自然搜索的 role 首选顺序偏好（B 分支：巫恋组优先）。
     pub trade_role_preference: Option<TradeRolePreference>,
     /// 启用菲亚候选分支时，把 N/A/B 三份最终排班报告写入该目录（调试/对比用）。
@@ -91,7 +89,6 @@ impl Default for AssignBaseOptions {
             registry_sustain_hours: None,
             skip_standalone_control: false,
             system_preferences: std::collections::HashMap::new(),
-            skipped_optional_control_roles: HashSet::new(),
             trade_role_preference: None,
             fiammetta_candidates_out: None,
             fiammetta_enable: true,
@@ -583,7 +580,6 @@ where
             table,
             options.mood,
             &options.system_preferences,
-            &options.skipped_optional_control_roles,
             &skipped_optional_trade_roles,
             options.support_combinations_enable,
             options.registry_sustain_hours,

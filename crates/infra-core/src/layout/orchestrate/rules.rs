@@ -1092,7 +1092,6 @@ fn place_role_recursive(
                 operator: operator.name.clone(),
                 proactive_support: true,
                 optional_trade_role: None,
-                optional_control_role: None,
                 elite: operator.elite,
                 facility: FacilityKind::Dormitory,
                 room_id: Some(room_id),
@@ -1143,9 +1142,6 @@ fn place_role_recursive(
                 operator: candidate.name.clone(),
                 proactive_support: role.proactive_support,
                 optional_trade_role: role.optional_trade_recommendation.then(|| role.id.clone()),
-                optional_control_role: (role.min_count == 0
-                    && role.facility == FacilityKind::ControlCenter)
-                    .then(|| role.id.clone()),
                 elite: progress.elite,
                 facility: ctx
                     .blueprint
@@ -1578,6 +1574,28 @@ fn complete_domain_roles(
             return None;
         }
     }
+    // 所有声明角色和domain补齐完成后再承诺Plan；固定贸易锚点等也必须经过预算。
+    // 未补齐的角色前缀不作为最终名单试算，避免提前排除可由同房技能补齐的组合。
+    if state.assignment.auto_rotation
+        && state
+            .anchors
+            .iter()
+            .filter(|anchor| anchor.system_id == rule_id)
+            .filter_map(|anchor| anchor.room_id.as_ref())
+            .filter_map(|room| ctx.blueprint.room(room))
+            .any(|room| {
+                crate::layout::ordinary_workplace(room.kind)
+                    && room.kind != FacilityKind::ControlCenter
+                    && !crate::layout::work_budget::room_work_duration_fits(
+                        ctx.blueprint,
+                        &state.assignment,
+                        &room.id,
+                        ctx.instances,
+                    )
+            })
+    {
+        return None;
+    }
     Some(state)
 }
 
@@ -1597,17 +1615,19 @@ fn complete_and_compare_domain_role(
         return false;
     };
     match room.kind {
-        FacilityKind::TradePost if role.fill_to_capacity => complete_trade_role(
-            rule_id,
-            role,
-            room,
-            ctx,
-            assignment,
-            used,
-            anchors,
-            alternative_baseline,
-            optional_dorm_support,
-        ),
+        FacilityKind::TradePost if role.fill_to_capacity || assignment.auto_rotation => {
+            complete_trade_role(
+                rule_id,
+                role,
+                room,
+                ctx,
+                assignment,
+                used,
+                anchors,
+                alternative_baseline,
+                optional_dorm_support,
+            )
+        }
         FacilityKind::Factory => complete_manufacture_role(
             rule_id,
             role,
@@ -1754,7 +1774,6 @@ fn complete_manufacture_role(
                 operator: name.clone(),
                 proactive_support: role.proactive_support,
                 optional_trade_role: None,
-                optional_control_role: None,
                 elite: operator.elite,
                 facility: FacilityKind::Factory,
                 room_id: Some(room.id.clone()),
@@ -2272,7 +2291,6 @@ fn complete_trade_role(
             elite: progress.elite,
             proactive_support: false,
             optional_trade_role: None,
-            optional_control_role: None,
             facility: FacilityKind::TradePost,
             room_id: Some(room.id.clone()),
             recipe: None,

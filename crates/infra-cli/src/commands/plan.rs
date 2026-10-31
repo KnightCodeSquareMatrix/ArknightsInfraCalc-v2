@@ -345,6 +345,9 @@ fn auto_rotation_cmd(
     }
     let operbox_path = operbox_path_from_args(args)?;
     let layout_path = layout_path_from_args(args).unwrap_or(default_layout_243_path()?);
+    let layout_label = layout_path.display().to_string();
+    let operbox_label = operbox_path.display().to_string();
+    let _trace = infra_core::profile::start_solver_perf_trace(&layout_label, &operbox_label);
     let blueprint = BaseBlueprint::load(&layout_path)?;
     let operbox = OperBox::load(&operbox_path)?;
     let instances = OperatorInstances::load(&default_instances_path()?)?;

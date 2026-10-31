@@ -14,7 +14,7 @@
 |---|---|---|
 | StateWrite | `apply_state_write` | `state_pool` |
 | Constant/PeerShare/EffVar/OrderVar/LimitVar | `apply_eff_action` | `settled_eff`, `variable_eff`, `direct_eff` |
-| Limit | `apply_limit_action` | `limit_contrib`, compression |
+| Limit | `apply_limit_action` / `apply_eff_action` | 上限增减 → 上限派生 settled 效率 → compression |
 | OrderMechanic | `apply_order_mechanic` | order tags、law、LMD bonus |
 | PeerAbsorb | `apply_peer_absorb` | peer 清零、owner settled eff |
 | Mood | `apply_mood_action` | mood drain delta |
@@ -22,3 +22,5 @@
 L1 不解析 L2 订单分布或 L3 shortcut；solver 在 `order_eff_pre` 之后调用对应模块。`GlobalInject` 在贸易 L1 不执行，control/global resolve 先把 manifest 注入 LayoutContext。
 
 诊断顺序：buff ids/atoms → phase trace → limit/order tags → order mechanic → shortcut/unit output。新增 selector 要同时检查 `resolve_selector_value` 和 condition；不要在 CLI 补公式。
+
+贸易 `Limit` 阶段内由 atom 的 `phase_order` 保证：上限增减≤40，冠军风采50，市井之道压缩60。冠军风采以非负 `limit_contrib` 合计换效率并写入 settled，孑能读取；招商引资继续在后续 `LimitVar` 读取压缩后的上限净增量。不得把两类上限派生效率混为一个后置阶段。

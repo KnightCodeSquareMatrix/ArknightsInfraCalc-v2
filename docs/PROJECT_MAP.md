@@ -202,7 +202,8 @@ layout / operbox / runtime data
 
 | 层级 | 主要入口 |
 |---|---|
-| 终态断言与批量 box | `--assert-invariants` + `data/fixtures/box-bundles/` 批量脚本（仓库不保留源码测试） |
+| 生产构建 | `cargo build --release -p infra-cli`；不新增、保留或运行源码测试 |
+| 终态不变量 / 批量 Box | `plan --assert-invariants`；`scripts/assert_rotation_invariants.py --binary target/release/infra-cli --group all` |
 | CLI 回归 | `infra-cli verify` + `data/REGRESSION_CASES.csv` + `data/UNIT_OUTPUT_ANCHORS.csv` |
 | 真实 layout/plan | `data/fixtures/243/` + `plan` / `layout test` / `layout team-rotation` |
 | 文档 lifecycle/link/命令地图 | `docs_inventory.py --check`、`check_repository_facts.py` |

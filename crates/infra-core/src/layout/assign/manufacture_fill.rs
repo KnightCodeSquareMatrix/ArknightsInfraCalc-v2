@@ -79,15 +79,15 @@ pub(super) fn assign_manufacture_lines(
         if existing.len() > 1 {
             let anchors: Vec<_> = existing
                 .iter()
-                .map(|operator| {
-                    pool.entry(&operator.name).cloned().ok_or_else(|| {
-                        Error::msg(format!(
-                            "manufacture {} anchor {} missing from pool",
-                            room.id.0, operator.name
-                        ))
-                    })
-                })
-                .collect::<Result<_>>()?;
+                .filter_map(|operator| pool.entry(&operator.name).cloned())
+                .collect();
+            if anchors.len() != existing.len() {
+                assignment.construction_warnings.push(format!(
+                    "manufacture {}: committed anchor missing from candidate pool",
+                    room.id.0
+                ));
+                continue;
+            }
             for anchor in &anchors {
                 used.remove(&anchor.name);
             }
@@ -125,11 +125,15 @@ pub(super) fn assign_manufacture_lines(
             // forbid-same-room：anchor 房禁止纳入指定干员（迷迭香 ≠ 清流/温蒂同房）。
             let forbidden = forbidden_teammates(&anchor, forbid_same_room);
             pick_manu_hit_with_anchor(pool, table, opts, used, options.top_k, &anchor, &forbidden)
-        }
-        .map_err(|e| Error::msg(format!("manufacture {}: {e}", room.id.0)));
+        };
         let hit = match hit {
             Ok(hit) => hit,
-            Err(_) if options.auto_rotation && existing.is_empty() => continue,
+            Err(Error::NoCandidate(message)) => {
+                assignment
+                    .construction_warnings
+                    .push(format!("manufacture {}: {message}", room.id.0));
+                continue;
+            }
             Err(error) => return Err(error),
         };
         commit_manu_room(assignment, &room.id, &hit, pool, used)?;
@@ -354,25 +358,28 @@ pub(crate) fn assign_manu_room_with_anchors(
 ) -> Result<()> {
     let capacity = station_operator_capacity(room_level);
     if anchors.is_empty() || anchors.len() > capacity {
-        return Err(Error::msg(format!(
+        assignment.construction_warnings.push(format!(
             "manufacture {} invalid anchor count {}",
             room_id.0,
             anchors.len()
-        )));
+        ));
+        return Ok(());
     }
     let mut seen = HashSet::new();
     for anchor in &anchors {
         if !seen.insert(anchor.name.clone()) {
-            return Err(Error::msg(format!(
+            assignment.construction_warnings.push(format!(
                 "manufacture {} duplicate anchor {}",
                 room_id.0, anchor.name
-            )));
+            ));
+            return Ok(());
         }
         if used.contains(&anchor.name) {
-            return Err(Error::msg(format!(
+            assignment.construction_warnings.push(format!(
                 "manufacture {} anchor {} already used",
                 room_id.0, anchor.name
-            )));
+            ));
+            return Ok(());
         }
     }
 
@@ -430,10 +437,17 @@ pub(crate) fn assign_manu_room_with_anchors(
                 anchor_count: anchors.len(),
             }
         } else {
-            Error::msg(format!(
+            assignment.construction_warnings.push(format!(
                 "manufacture {} produced no anchored hit",
                 room_id.0
-            ))
+            ));
+            used.extend(
+                assignment
+                    .operators_in(room_id)
+                    .iter()
+                    .map(|op| op.name.clone()),
+            );
+            return Ok(());
         });
     };
     let mut commit_pool = pool.clone();
@@ -590,7 +604,9 @@ pub(super) fn pick_capacity_manu_hit(
                 return Ok(hit);
             }
         }
-        return Err(Error::msg("no admitted partial manufacture candidate"));
+        return Err(Error::no_candidate(
+            "no admitted partial manufacture candidate",
+        ));
     }
     let entries: Vec<_> = general_pool
         .entries
@@ -672,7 +688,7 @@ fn search_manu_hit_in_pool(
 ) -> Result<ManuSearchHit> {
     let capacity = search_opts.operator_capacity.clamp(1, 3);
     if pool.entries.len() < capacity {
-        return Err(Error::msg(format!(
+        return Err(Error::no_candidate(format!(
             "{label} has {} ready operators (need {capacity})",
             pool.entries.len(),
         )));
@@ -683,7 +699,7 @@ fn search_manu_hit_in_pool(
     if manu_hit_names(&report.best).is_empty()
         && report.top.iter().all(|hit| manu_hit_names(hit).is_empty())
     {
-        return Err(Error::msg(format!(
+        return Err(Error::no_candidate(format!(
             "{label} produced no manufacture triple"
         )));
     }

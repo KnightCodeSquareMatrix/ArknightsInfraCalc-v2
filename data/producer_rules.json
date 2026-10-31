@@ -2,6 +2,13 @@
   "version": 1,
   "rules": [
     {
+      "id": "trade_karlan_precision",
+      "source_buff_id": "control_tra_limit&spd[000]",
+      "admission": "deferred_optional",
+      "target_facility": "trade",
+      "schedule_relation": "exact_presence"
+    },
+    {
       "id": "trade_siracusa_scaling",
       "source_buff_id": "control_tra_limit&spd2[000]",
       "admission": "deferred_optional",

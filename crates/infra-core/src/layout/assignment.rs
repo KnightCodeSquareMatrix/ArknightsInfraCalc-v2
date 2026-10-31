@@ -211,6 +211,15 @@ pub struct BaseAssignment {
     pub base_workforce: Vec<String>,
     #[serde(skip)]
     pub(crate) note_facts: crate::notes::NoteFacts,
+    /// Construction diagnostics retained until the complete cycle is settled.
+    #[serde(skip)]
+    pub(crate) construction_warnings: Vec<String>,
+    /// Execution fact submitted by dorm completion; wording never controls MAA.
+    #[serde(skip)]
+    pub(crate) dorm_autofill: bool,
+    /// Room permutations committed by warmup continuity during construction.
+    #[serde(skip)]
+    pub(crate) rotation_room_moves: std::collections::HashMap<RoomId, RoomId>,
     /// Frozen scheduling inputs for the final-state control gate; not a second
     /// selected-members list and never part of the public assignment protocol.
     #[serde(skip)]
@@ -394,6 +403,23 @@ impl BaseAssignment {
             ) {
                 room.operators
                     .sort_by_key(|op| crate::trade::gold_flow::ordered_trio_priority(&op.name));
+            }
+        }
+    }
+
+    /// Normalize gold-flow entry order only in trade rooms, preserving other facilities' order.
+    pub fn sort_trade_gold_flow_operators(&mut self, blueprint: &BaseBlueprint) {
+        for room in &mut self.rooms {
+            if blueprint
+                .room(&room.room_id)
+                .is_some_and(|blueprint_room| blueprint_room.kind == FacilityKind::TradePost)
+                && crate::trade::gold_flow::has_ordered_gold_flow(
+                    room.operators.iter().map(|operator| operator.name.as_str()),
+                )
+            {
+                room.operators.sort_by_key(|operator| {
+                    crate::trade::gold_flow::ordered_trio_priority(&operator.name)
+                });
             }
         }
     }

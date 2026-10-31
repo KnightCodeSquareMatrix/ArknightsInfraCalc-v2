@@ -33,34 +33,6 @@
   ],
   "systems": [
     {
-      "id": "ling_jie_karlan",
-      "label": "喀兰跨站：灵知 E2 + 孑 + E2 喀兰贸易成员",
-      "tier": "cross_station",
-      "priority": 18,
-      "bind_all": true,
-      "exclusive_group": "meta_chain",
-      "shift_modes": ["peak"],
-      "slots": [
-        {
-          "facility": "control",
-          "operators": [
-            { "name": "灵知", "elite": 2 }
-          ]
-        },
-        {
-          "facility": "trade_post",
-          "trade_role": "karlan",
-          "operators": [
-            { "name": "孑", "elite": 1 },
-            {
-              "pick_one": ["银灰", "崖心", "讯使", "角峰"],
-              "elite": 2
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "witch_long_beta",
       "label": "巫恋组（定稿）：巫恋Ⅱ+龙舌兰Ⅱ+裁缝β第三人；不进 meta_chain，与但书链双贸共存",
       "tier": "same_station",

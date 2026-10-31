@@ -66,7 +66,6 @@ pub fn build_plan_with_runtime(
         mood,
         preferences,
         &std::collections::HashSet::new(),
-        &std::collections::HashSet::new(),
         false,
         None,
         None,
@@ -87,7 +86,6 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     table: &SkillTable,
     mood: f64,
     preferences: &std::collections::HashMap<String, String>,
-    skipped_optional_control_roles: &std::collections::HashSet<(String, String, String)>,
     skipped_optional_trade_roles: &std::collections::HashSet<(String, String, String)>,
     support_combinations_enable: bool,
     registry_sustain_hours: Option<f64>,
@@ -116,23 +114,33 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
             }
         }
     }
-    for rule in &mut catalog.rules {
-        for alternative in &mut rule.alternatives {
-            for role in alternative.roles.iter_mut().chain(
-                alternative
-                    .conditional_packs
-                    .iter_mut()
-                    .flat_map(|pack| &mut pack.roles),
-            ) {
-                if role.min_count == 0
-                    && role.facility == crate::layout::FacilityKind::ControlCenter
-                {
+    // Admit each possible fixed Rule member before a concrete alternative is
+    // claimed. Removing an unqualified choice does not dismantle a live bind.
+    if let Some(hours) = control_work_hours.or(registry_sustain_hours) {
+        let model = crate::mood::default_mood_model()?;
+        for rule in &mut catalog.rules {
+            for alternative in &mut rule.alternatives {
+                for role in alternative.roles.iter_mut().chain(
+                    alternative
+                        .conditional_packs
+                        .iter_mut()
+                        .flat_map(|pack| &mut pack.roles),
+                ) {
+                    if role.facility != crate::layout::FacilityKind::ControlCenter {
+                        continue;
+                    }
                     role.candidates.retain(|candidate| {
-                        !skipped_optional_control_roles.contains(&(
-                            rule.id.clone(),
-                            role.id.clone(),
-                            candidate.name.clone(),
-                        ))
+                        operbox
+                            .progress_of(&candidate.name)
+                            .is_some_and(|progress| {
+                                crate::mood::control_roster_fits(
+                                    &model,
+                                    &candidate.name,
+                                    progress.elite,
+                                    mood,
+                                    hours,
+                                )
+                            })
                     });
                 }
             }
@@ -240,8 +248,12 @@ fn compile_plan_once(
         // legacy registry can only prepare and reject the remaining cross/same-station entries.
         Vec::new()
     } else {
-        let mut mood_admission = registry_mood_admission(control_work_hours, instances, mood)?;
-        let mut admission = |claim: &crate::layout::system::RegistrySystemClaim,
+        let mut mood_admission = registry_mood_admission(
+            control_work_hours.or(registry_sustain_hours),
+            instances,
+            mood,
+        )?;
+        let mut admission = |claim: &mut crate::layout::system::RegistrySystemClaim,
                              trial: &BaseAssignment| {
             mood_admission
                 .as_deref_mut()
@@ -489,7 +501,10 @@ fn registry_mood_admission<'a>(
     initial_mood: f64,
 ) -> Result<
     Option<
-        Box<dyn FnMut(&crate::layout::system::RegistrySystemClaim, &BaseAssignment) -> bool + 'a>,
+        Box<
+            dyn FnMut(&mut crate::layout::system::RegistrySystemClaim, &BaseAssignment) -> bool
+                + 'a,
+        >,
     >,
 > {
     let Some(hours) = hours else {
@@ -498,6 +513,30 @@ fn registry_mood_admission<'a>(
     let model = crate::mood::default_mood_model()?;
     const ABYSSAL_CONTROL_DRAIN_BUFF: &str = "control_mp_aegir2[010]";
     Ok(Some(Box::new(move |claim, _trial| {
+        // Search groups promise a count, not every name. Filter choices before
+        // committing the claim; later control fill consumes this qualified set.
+        for slot in claim.slots.iter_mut().filter(|slot| {
+            slot.facility == crate::layout::FacilityKind::ControlCenter
+                && slot.fill == SlotFillMode::Search
+        }) {
+            slot.operators.retain(|op| {
+                let contextual = instances
+                    .resolve_control_buff_ids(&op.name, op.tier())
+                    .iter()
+                    .any(|id| id == ABYSSAL_CONTROL_DRAIN_BUFF);
+                contextual
+                    || crate::mood::control_roster_fits(
+                        &model,
+                        &op.name,
+                        op.elite,
+                        initial_mood,
+                        hours,
+                    )
+            });
+            if slot.operators.len() < usize::from(slot.required_count) {
+                return false;
+            }
+        }
         let control_claims: Vec<_> = claim
             .slots
             .iter()
@@ -509,15 +548,10 @@ fn registry_mood_admission<'a>(
         {
             return true;
         }
-        if control_claims
-            .iter()
-            .any(|slot| slot.fill == SlotFillMode::Search)
-        {
-            return true;
-        }
         let available = initial_mood.min(model.mood_cap);
         control_claims
             .iter()
+            .filter(|slot| slot.fill != SlotFillMode::Search)
             .flat_map(|slot| &slot.operators)
             .all(|op| {
                 // Abyssal drain depends on outside-dorm presence, which is not
@@ -529,22 +563,7 @@ fn registry_mood_admission<'a>(
                 {
                     return true;
                 }
-                let room_ops = vec![(op.name.clone(), op.elite)];
-                let inputs = crate::mood::DrainInputs {
-                    name: &op.name,
-                    elite: op.elite,
-                    facility: crate::layout::FacilityKind::ControlCenter,
-                    room_ops: &room_ops,
-                    full_control: true,
-                    control_ops: &[],
-                    recipe: None,
-                };
-                crate::mood::fits_work_budget(
-                    &model,
-                    available,
-                    crate::mood::operator_net_drain(&model, &inputs),
-                    hours,
-                )
+                crate::mood::control_roster_fits(&model, &op.name, op.elite, available, hours)
             })
     })))
 }

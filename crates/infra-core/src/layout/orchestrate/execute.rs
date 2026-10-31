@@ -45,10 +45,11 @@ pub fn execute_plan(
                 {
                     continue;
                 }
-                return Err(crate::error::Error::msg(format!(
+                assignment.construction_warnings.push(format!(
                     "planned operator {} for {} was occupied before execute",
                     anchor.operator, anchor.system_id
-                )));
+                ));
+                continue;
             }
             let room_id = anchor.room_id.as_ref().ok_or_else(|| {
                 crate::error::Error::msg(format!(
@@ -68,10 +69,11 @@ pub fn execute_plan(
                 || !product_matches
                 || assignment.operators_in(room_id).len() >= room.operator_capacity()
             {
-                return Err(crate::error::Error::msg(format!(
+                assignment.construction_warnings.push(format!(
                     "planned placement {} -> {} is no longer feasible",
                     anchor.operator, room_id.0
-                )));
+                ));
+                continue;
             }
             let progress = operbox.progress_of(&anchor.operator).ok_or_else(|| {
                 crate::error::Error::msg(format!(
@@ -88,7 +90,18 @@ pub fn execute_plan(
             used.insert(anchor.operator.clone());
         }
         for claim in &plan.registry_claims {
-            apply_registry_system_claim(blueprint, claim, &mut assignment, &mut used)?;
+            let mut trial = assignment.clone();
+            let mut trial_used = used.clone();
+            match apply_registry_system_claim(blueprint, claim, &mut trial, &mut trial_used) {
+                Ok(()) => {
+                    assignment = trial;
+                    used = trial_used;
+                }
+                Err(crate::error::Error::ScheduleQuality(message)) => {
+                    assignment.construction_warnings.push(message)
+                }
+                Err(error) => return Err(error),
+            }
         }
     }
     used.extend(plan.excluded_operators.iter().cloned());

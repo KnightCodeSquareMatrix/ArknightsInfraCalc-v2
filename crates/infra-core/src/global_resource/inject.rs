@@ -566,6 +566,11 @@ impl GlobalInjectManifest {
         self.karlan_precision
     }
 
+    /// Counterfactual settlement of the same workforce without precision.
+    pub(crate) fn clear_karlan_precision(&mut self) {
+        self.karlan_precision = None;
+    }
+
     pub fn record_active_source_buff(&mut self, buff_id: &str) {
         self.active_source_buffs.insert(buff_id.to_string());
     }

@@ -164,7 +164,7 @@ pub(super) fn pick_disjoint_from_report<T: Clone>(
         &names_of,
         used,
     )
-    .ok_or_else(|| Error::msg(err))
+    .ok_or_else(|| Error::no_candidate(err))
 }
 
 fn commit_operators_to_room(
@@ -177,15 +177,19 @@ fn commit_operators_to_room(
     facility: &str,
     efficiency: Option<RoomEfficiencySnapshot>,
 ) -> Result<()> {
-    let ops = names
-        .iter()
-        .map(|name| {
-            if !anchors.contains(name) && !used.insert(name.clone()) {
-                return Err(Error::msg(format!("{facility} duplicate {name}")));
-            }
-            Ok(operator_of(name))
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let mut trial_used = used.clone();
+    trial_used.extend(anchors.iter().cloned());
+    let mut unique = HashSet::new();
+    for name in names {
+        if !unique.insert(name) || (!anchors.contains(name) && !trial_used.insert(name.clone())) {
+            assignment
+                .construction_warnings
+                .push(format!("{facility} duplicate {name}"));
+            return Ok(());
+        }
+    }
+    let ops = names.iter().map(|name| operator_of(name)).collect();
     assignment.set_room_with_efficiency(room_id.clone(), ops, efficiency);
+    *used = trial_used;
     Ok(())
 }

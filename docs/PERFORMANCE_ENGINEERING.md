@@ -41,7 +41,7 @@
 
 ## 常驻性能汇总
 
-启用 trace 的求解在 stderr 输出一条 `[perf]` JSON，诊断 schema 为 2、`event` 为 `solver_summary`；求解结果 JSON 不增加字段。trace guard 结束时集中格式化和写出，错误和提前返回也会释放；嵌套 trace 结束后恢复外层 trace，`serve` 每次请求单独汇总。`profile layout-full` 每次 run 建立自己的 trace，标签使用实际 layout 和 OperBox 路径。
+启用 trace 的求解在 stderr 输出一条 `[perf]` JSON，诊断 schema 为 2、`event` 为 `solver_summary`；求解结果 JSON 不增加字段。trace guard 结束时集中格式化和写出，错误和提前返回也会释放；嵌套 trace 结束后恢复外层 trace，`serve` 每次请求单独汇总。`profile layout-full` 每次 run 建立自己的 trace，标签使用实际 layout 和 OperBox 路径。独立自动轮换 plan 也在加载前建立同一 trace，消除提前分派缺失性能汇总的问题。
 
 默认只在固定的 61 个 scope/stage 槽里累计 `calls`、`errors`、`elapsed_ms` 和各 operation 的计数与耗时差量；热阶段不构造 JSON、不格式化、不写 stderr。输出仅列出至少一个非零字段的 operation，省略全零 operation。新增的未知标签安全累计到 `stage_id=61` 的 overflow 槽，保留调用、错误、耗时与 metrics，不影响求解。`errors` 统计调用方原有 `status="error"`，其中可能包含无候选命中，不能等同于请求失败。
 
@@ -56,7 +56,7 @@
 
 `actual_trade_solves`、`actual_exclusive_checks`、`actual_shortcut_json_loads` 是每次搜索真实入口次数，在全部任务 batch 和串行 batch 释放后加入对应 operation。solver 早退、检查失败，以及算完后被 hit filter 排除的组合都保留已发生的次数；组合数、尝试数与最终命中数不能代替这些计数。制造轻量枚举和完整物化只统计已存在的这三类入口，本版本没有制造 solve 次数指标。顶层 operation 仅覆盖搜索归属的实际次数；全局 hot-path snapshot 还包含其他直接求解入口。
 
-排班新增固定阶段覆盖 N/A/B 候选、全中枢重建的 `attempt_0` 至 `attempt_3`、γ 两半、深海候选构造及评分、菲亚单核和巫恋替补、源石对 peak 与普通 disjoint backup。候选和重建阶段包含最终化；一次候选中的其他内部重试包含在同一重建阶段。`calls` 是实际进入该阶段的次数，替补函数合法返回未应用也算成功调用。peak 和 ABC total 改为 RAII 计时，进入后错误提前返回也保留差量；其余新阶段同样以 RAII 保留错误退出。阶段是 inclusive，同一操作会出现在候选、重建和内部阶段中，禁止加总父子计数。
+排班固定阶段覆盖 N/A/B 候选、γ 两半、深海候选构造及评分、菲亚单核和巫恋替补、源石对 peak 与普通 disjoint backup。候选阶段包含构造及终态结算；已删除的中枢重建与主备撤预算重试不再执行。`calls` 是实际进入该阶段的次数，替补函数合法返回未应用也算成功调用。peak 和 ABC total 改为 RAII 计时，进入后错误提前返回也保留差量；其余新阶段同样以 RAII 保留错误退出。阶段是 inclusive，同一操作会出现在候选和内部阶段中，禁止加总父子计数。
 
 ## 贸易房间解释器的借用边界
 
@@ -128,3 +128,30 @@
 冷指标与查询分类加入 snapshot 的累计/差分，trace 结束才映射标签和生成 JSON；没有 trace 不计数。operation 与 Bake 指标省略数值零项，schema 2 消费者须将缺字段解释为零。阶段框架字段保持；固定数值收集不向组合热循环引入 format/JSON/I/O。父子冷耗时 inclusive，禁止加总；真实重复验证照次累计。
 
 本单元仅格式化、workspace 离线编译及文档/源差异检查；未运行求解、Bake、测量或测试，不能据此声称性能幅度或最终行为等价。
+性能报告至少记录 commit、输入 OperBox、pool size、组合数、evaluated、命中模式和 stage timing。正确性用 `bake validate`、`bake verify`、`infra-cli verify` 和最终 assignment gate；性能数据不能证明机制覆盖，Bake 校验也不能证明未抽样行的全局等价。
+
+## 制造体系试排的缓存取舍（2026-10-31）
+
+`complete_manufacture_role` 与 `score_completed_manufacture` 直接调用原实时制造搜索，保留请求memo、实际预算与排序。已删除额外条件响应表及其计时阶段：完整动态上下文和保守预算使跨试排复用有限，首次全量生成和排序的成本超过收益。
+
+最终候选缓存版本与实时搜索消融的12对CLI结果共28对rotation/profile/MAA产物一致；定向response除elapsed的完整best/top/combinations/evaluated也一致。串行release、Rayon2、慢盒各3次，三班b-102-421中位数9.69s→4.41s，b-231-425约9.53s→5.09s；自动b-101-424约18.18s→实时约12s。最终发布版本速度以本轮整合归档的全样本测量为准；旧静态缓存结果不能代表真实定时预算下的收益。
+
+本次属于执行成本优化，候选、排序、top-K及保证等级不变。不恢复静态裁剪来绕过真实心情准入，也不提高全局最优保证。证据保留于`target/codex-runs/main-integration-20261031/`。
+
+## 主分支整合的最终测速（2026-10-31）
+
+同一最终release二进制、Rayon2/OMP1，独立CLI串行运行，包含数据加载、求解、显式终态断言及产物写入；生成Bake的进程暂停，文件系统已暖。28代表性盒和10高持有量盒各测三班、12/12/12、auto24/12，共114次；普通三班及自动模式各取最慢两盒重复三次，共12次。126次全部成功。
+
+| 模式 | 代表性28盒：中位/最大 | 高持有量10盒：中位/最大 |
+|---|---|---|
+| 三班 `3` | 0.424s / 2.824s | 3.078s / 4.618s |
+| 三班 `12/12/12` | 0.375s / 2.457s | 2.315s / 4.001s |
+| 自动 `auto@24/12` | 0.768s / 2.037s | 2.163s / 11.991s |
+
+三班b-102-421重复4.418–4.510s，b-231-425为4.836–5.154s；自动b-101-424为11.866–14.435s，b-112-404为6.744–7.547s。自动最慢盒制造搜索约10.8s、226万候选；三班最慢盒制造搜索约3.4s、318万候选。计时是包含子调用的口径，不能累加阶段。仍有自动模式慢盒；这些结果只代表当前机器、线程与输入集合，不证明任意Box时延或线上吞吐。
+
+最终二进制SHA-256为`f4f672ba8f478a9b93296e28257ee80caf89ca46f87631eef417e2685a39c7a8`；完整命令、逐盒指标和重复测量见`target/codex-runs/main-integration-20261031/final-speed-summary.json`及`speed/final-live-*`。
+
+## 最终整合Bake（2026-10-31）
+
+同一最终release二进制在隔离目录执行`bake all`，生成schema17共29,783,417行；发布前及原子发布后均完成完整结构/逐行/live查询校验。命令exit0，最终报告29,783,417行零差异、3,292查询零差异、2,148按既有合同跳过、28项机制回归通过。完整冷流程约1112秒；generate/validate/verify/publish是inclusive观测，不可相加，运行中曾为独占速度测量暂停。二进制和表指纹一致；未部署。

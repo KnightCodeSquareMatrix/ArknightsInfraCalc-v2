@@ -147,7 +147,7 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 4. 用 `HashMap<RoomId, Vec<AssignedOperator>>` 保存连续段中的普通办公室成员；绑定成员继续走 resolved dependency、消费方 presence 和原有 bind 路径。
 5. 在所有 profile 的最终 report 上运行闭环终验；不缩小现有 `validate_profile_rotation` 的检查范围，并显式处理“整轮无休息边界”：累计净消耗大于零时拒绝，累计为零时允许。
 6. 同步更新 `docs/定时换班.md`、`docs/SCHEDULE_ROTATION.md` 所引用的旧办公室范围。ADR 0008 accepted 后，旧裁决必须在正文中明确被本 ADR 替代，不能让 current canonical 保留冲突表述。
-7. 补充纯函数边界测试、`12/6/6` 集成测试、自定义 `8/8/8` 与 `5/7/10` 测试、跨周期首尾测试、整轮正净消耗拒绝与零净消耗允许测试、多办公室房间稳定测试、绑定成员缺席测试、斥罪数据驱动测试和真实 CLI 回归。
+7. 通过终态断言与真实 CLI 检查连续预算边界、`12/6/6`、自定义 `8/8/8` 与 `5/7/10`、跨周期首尾、整轮正净消耗拒绝与零净消耗允许、多办公室房间稳定、绑定成员缺席及斥罪数据驱动行为；不新增源码测试。
 
 ## 后果
 

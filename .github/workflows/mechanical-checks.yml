@@ -24,8 +24,13 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-      - name: Check workspace compiles
-        run: cargo check --workspace
+      - name: Build release CLI
+        run: cargo build --release -p infra-cli
+
+      - name: Check final assignments on persistent Boxes
+        env:
+          RAYON_NUM_THREADS: 2
+        run: python3 scripts/assert_rotation_invariants.py --binary target/release/infra-cli --skip-build --group all --jobs 2 --output-dir target/codex-runs/ci-invariants
 
       - name: Check stable Markdown and CLI facts
         run: python3 scripts/codex/check_repository_facts.py

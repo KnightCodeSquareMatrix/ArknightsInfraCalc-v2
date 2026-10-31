@@ -214,8 +214,17 @@ fn assign_team_trade_meta_rooms(
             used,
             &[],
             false,
-        )
-        .map_err(|e| Error::msg(format!("team trade {}: {e}", room.id.0)))?;
+        );
+        let hit = match hit {
+            Ok(hit) => hit,
+            Err(Error::NoCandidate(message)) => {
+                assignment
+                    .construction_warnings
+                    .push(format!("team trade {}: {message}", room.id.0));
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
         eprintln!(
             "[rotation-debug] gamma trade hit room={} names={:?} rule={:?} efficiency={} used_after_search={:?}",
             room.id.0,
@@ -296,17 +305,17 @@ fn assign_team_manu_rooms(
         .layout;
         let opts = manu_options(&current_layout, options, recipe, room.level);
         if let Some(required) = required_manu_by_room.get(room_id) {
-            let anchors = required
+            let anchors: Vec<_> = required
                 .iter()
-                .map(|name| {
-                    manu_pool.entry(name).cloned().ok_or_else(|| {
-                        Error::msg(format!(
-                            "team manu {} required operator {} missing from pool",
-                            room_id.0, name
-                        ))
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?;
+                .filter_map(|name| manu_pool.entry(name).cloned())
+                .collect();
+            if anchors.len() != required.len() {
+                assignment.construction_warnings.push(format!(
+                    "team manu {} required member missing from candidate pool",
+                    room_id.0
+                ));
+                continue;
+            }
             let mut room_used = used.clone();
             for name in required {
                 room_used.remove(name);
@@ -350,8 +359,17 @@ fn assign_team_manu_rooms(
                         used,
                         room.level,
                     )
-                })
-                .map_err(|e| Error::msg(format!("team manu {}: {e}", room_id.0)))?;
+                });
+            let hit = match hit {
+                Ok(hit) => hit,
+                Err(Error::NoCandidate(message)) => {
+                    assignment
+                        .construction_warnings
+                        .push(format!("team manu {}: {message}", room_id.0));
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             commit_manu_room(assignment, room_id, &hit, manu_pool, used)?;
         }
     }

@@ -74,7 +74,7 @@ runtime、CLI 默认输出和 debug 的 manifest 发现共用 `default_baked_out
 
 核验：`bake validate`、`bake verify`、`infra-cli verify`，并记录输入、组合数、evaluated 和命中模式。候选/剪枝/Bake 改动还要运行最终 assignment invariant gate。
 
-请求scope覆盖整个 `schedule_timed_rotation_request`、ABC候选共同入口、独立assignment入口以及CLI单次plan/profile run；嵌套搜索只复用外层scope。因此N/A/B候选、控制中枢重建和各房间搜索可复用完整输入一致的叶报告，请求结束即释放；不传播到Rayon组合评估线程，不跨请求缓存。此阶段仅编译，真实命中率及性能留最终统一包。
+请求scope覆盖整个 `schedule_timed_rotation_request`、ABC候选共同入口、独立assignment入口以及CLI单次plan/profile run；嵌套搜索只复用外层scope。因此N/A/B候选和各房间搜索可复用完整输入一致的叶报告，请求结束即释放；不传播到Rayon组合评估线程，不跨请求缓存。此阶段仅编译，真实命中率及性能留最终统一包。
 
 ## Bake 诊断计数
 
@@ -95,3 +95,4 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 本房候选用实际配方、成员、H与两中枢检查时长，备中枢额外检查冻结主力；由`layout/work_budget.rs`调用原mood公式。H与实际预算上下文随收益layout进入memo身份；不以搜索已通过标记替代终态检查。自动制造取消≥12小时负心情差身份排除，保留实际积分与暖机。自动仍用live，普通Bake与兼容规则不变。
 
 终态只核对实际结构、Plan、显式挂件归属、工时和快照；每房两名单×两中枢及当前外站深海人数最大值覆盖工时，不再枚举全站协同。详见[自动轮换](../自动轮换.md)。
+制造体系试排直接调用原实时制造搜索，保留请求memo与完整实际预算。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。

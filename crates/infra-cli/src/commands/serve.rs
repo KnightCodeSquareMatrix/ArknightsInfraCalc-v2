@@ -789,12 +789,12 @@ fn handle_plan_compute(
                 .map(|current| &current.rotation)
                 .or(failure.rotation.as_ref());
             let rotation = rotation_report.map(RotationSummary::from);
-            let training_advice = rotation_report.map(|report| {
+            let training_advice = failure.current.as_ref().map(|current| {
                 build_plan_compute_training_advice(
                     &operbox,
                     &params.layout,
                     &state.training_advice_knowledge,
-                    Some(report),
+                    Some(&current.rotation),
                 )
             });
             let message = failure.error.to_string();
