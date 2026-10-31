@@ -296,6 +296,10 @@ pub(crate) fn pepe_station_trade_eff_violation_refs(
     if !room_has_pepe_exclusive(ops, table) {
         return false;
     }
+    room_has_pepe_forbidden_flat_eff(ops, table)
+}
+
+fn room_has_pepe_forbidden_flat_eff(ops: &[TradeOperatorRef<'_>], table: &SkillTable) -> bool {
     ops.iter()
         .any(|o| o.name != "佩佩" && operator_constant_trade_flat_eff(o, table) > 0.0)
 }
@@ -315,14 +319,15 @@ pub(crate) fn trade_station_exclusive_violation_refs(
     let closure = has_closure(ops, table);
     let witch = has_witch_e2(ops, table);
     let pepe = room_has_pepe_exclusive(ops, table);
+    let witch_side = (docus || pepe) && room_has_witch_side_group_refs(ops, table);
 
-    if docus_tailor_exclusive_violation_refs(ops, table) {
+    if docus && witch_side {
         return true;
     }
-    if pepe_station_trade_eff_violation_refs(ops, table) {
+    if pepe && room_has_pepe_forbidden_flat_eff(ops, table) {
         return true;
     }
-    if pepe && (docus || closure || room_has_witch_side_group_refs(ops, table)) {
+    if pepe && (docus || closure || witch_side) {
         return true;
     }
     if docus && closure {

@@ -396,12 +396,20 @@ fn search_manufacture_single_recipe(
         eff: Efficiency,
         storage: i32,
     }
+    let peer_traits: Vec<_> = sub
+        .entries
+        .iter()
+        .map(|entry| ManufacturePeerTraits::from_operator(&entry.as_manu_operator_ref(), table))
+        .collect();
     let k = operator_capacity;
     let mut hits: Vec<Light> = evaluate_flat_combinations(
         &flat,
         k,
         &batch_counters,
         |ci, combo| {
+            if !manufacture_peer_traits_compatible(combo.iter().map(|index| peer_traits[*index])) {
+                return None;
+            }
             let ops: SmallVec<[_; 5]> = combo
                 .iter()
                 .map(|i| sub.entries[*i].as_manu_operator_ref())
@@ -425,7 +433,7 @@ fn search_manufacture_single_recipe(
                 layout: &layout,
             };
             let (eff, storage) =
-                evaluate_manufacture_room_light(&base, table, recipe, shift_hours)?;
+                evaluate_manufacture_room_light_prevalidated(&base, table, recipe, shift_hours)?;
             Some(Light {
                 idx: ci,
                 eff,
@@ -449,7 +457,10 @@ fn search_manufacture_single_recipe(
         },
     );
     let sort_started = Instant::now();
-    hits.sort_by(|a, b| {
+    let evaluated = hits.len() as u64;
+    let top_k = options.top_k.min(hits.len());
+    let materialize = if hits.is_empty() { 0 } else { top_k.max(1) };
+    let compare = |a: &Light, b: &Light| {
         b.eff
             .cmp(&a.eff)
             .then_with(|| b.storage.cmp(&a.storage))
@@ -460,11 +471,14 @@ fn search_manufacture_single_recipe(
                     .map(|i| sub.entries[*i].name.as_str())
                     .cmp(cb.iter().map(|i| sub.entries[*i].name.as_str()))
             })
-    });
-
-    let evaluated = hits.len() as u64;
-    let top_k = options.top_k.min(hits.len());
-    let materialize = if hits.is_empty() { 0 } else { top_k.max(1) };
+            // 原稳定排序在完整键相同时保留 indexed 枚举顺序。
+            .then_with(|| a.idx.cmp(&b.idx))
+    };
+    if materialize < hits.len() {
+        hits.select_nth_unstable_by(materialize, &compare);
+        hits.truncate(materialize);
+    }
+    hits.sort_unstable_by(compare);
     let mut full: Vec<ManuSearchHit> = Vec::with_capacity(materialize);
     for light in hits.iter().take(materialize) {
         let combo = &flat[light.idx * k..light.idx * k + k];
@@ -537,12 +551,39 @@ pub(crate) fn manufacture_peers_compatible(operators: &[ManuOperator], table: &S
 }
 
 fn manufacture_peer_refs_compatible(operators: &[ManuOperatorRef<'_>], table: &SkillTable) -> bool {
-    !operators
-        .iter()
-        .any(|operator| manufacture_operator_resets_peers(operator, table))
-        || operators.iter().all(|operator| {
-            operator.name == "清流" || manufacture_operator_resets_peers(operator, table)
-        })
+    manufacture_peer_traits_compatible(
+        operators
+            .iter()
+            .map(|operator| ManufacturePeerTraits::from_operator(operator, table)),
+    )
+}
+
+#[derive(Clone, Copy)]
+struct ManufacturePeerTraits {
+    resets_peers: bool,
+    accepts_reset: bool,
+}
+
+impl ManufacturePeerTraits {
+    fn from_operator(operator: &ManuOperatorRef<'_>, table: &SkillTable) -> Self {
+        let resets_peers = manufacture_operator_resets_peers(operator, table);
+        Self {
+            resets_peers,
+            accepts_reset: resets_peers || operator.name == "清流",
+        }
+    }
+}
+
+fn manufacture_peer_traits_compatible(
+    operators: impl Iterator<Item = ManufacturePeerTraits>,
+) -> bool {
+    let mut has_reset = false;
+    let mut all_accept_reset = true;
+    for operator in operators {
+        has_reset |= operator.resets_peers;
+        all_accept_reset &= operator.accepts_reset;
+    }
+    !has_reset || all_accept_reset
 }
 
 fn manufacture_operator_resets_peers(operator: &ManuOperatorRef<'_>, table: &SkillTable) -> bool {
@@ -770,16 +811,13 @@ fn evaluate_manufacture_room_view_with_shift(
     })
 }
 
-/// 只产出排序所需的 (final_efficiency, storage key)，不构造 names / breakdown。
-fn evaluate_manufacture_room_light(
+/// 调用方已按固定候选特征检查同伴兼容；这里只产出排序需要的数值。
+fn evaluate_manufacture_room_light_prevalidated(
     base: &ManuRoomView<'_>,
     table: &SkillTable,
     recipe: RecipeKind,
     shift_hours: Option<f64>,
 ) -> Option<(Efficiency, i32)> {
-    if !manufacture_peer_refs_compatible(&base.operators, table) {
-        return None;
-    }
     let (final_efficiency, storage_limit) =
         solve_manufacture_light_view(base, table, shift_hours).ok()?;
     let storage = match recipe {

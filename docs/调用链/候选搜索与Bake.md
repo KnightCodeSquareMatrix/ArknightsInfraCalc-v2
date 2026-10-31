@@ -36,6 +36,8 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 
 ## 搜索与提交
 
+制造 live 在不可变子池上预备同伴兼容特征，仍评价全部合法组合；选择前 K 后按原完整比较键排序，以枚举下标保留同键稳定顺序，再完整物化 best/top。中枢顺序候选的合法性检查返回已计算的真实结算结果，候选组和效果区直接用于排名；两处不再对同一个 trial 重算。这只是 `safe_reduction`，不改变候选资格或搜索 policy。
+
 `search_trade_triples`、`search_manufacture_triples`、`search_power_assignment` 和 `search_control_combos` 只比较已经通过 admission 的组合。域 solver 结算实际组合并返回 breakdown；`layout/assign` 将命中提交到 assignment 后才允许下一阶段重新 resolve。候选搜索不负责 export 或 MAA 文本。
 
 跨设施 producer 候选必须在当前 assignment 中同时满足 source、admission、target 和 relation；只存在 tag、能力或拥有名单不能提交 dependency。中枢 policy 读取冻结 ledger，不以跨域匿名总分替代 hard anchor。

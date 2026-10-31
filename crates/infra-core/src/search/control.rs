@@ -839,19 +839,26 @@ fn search_control_in_order(
             table,
         )
     };
-    let legal = |ops: &[ControlOperator]| {
+    let evaluate_legal = |ops: &[ControlOperator]| {
         let control: Vec<_> = ops.iter().map(|op| (op.name.clone(), op.elite)).collect();
-        !model.control_global_recovery_has_conflict(&control)
-            && !evaluate(ops).effect_ledger.has_conflicting_effect_sources()
-            && (!ops.iter().any(|op| op.name == "琴柳")
+        if model.control_global_recovery_has_conflict(&control) {
+            return None;
+        }
+        let result = evaluate(ops);
+        if result.effect_ledger.has_conflicting_effect_sources()
+            || !(!ops.iter().any(|op| op.name == "琴柳")
                 || options.saileach_required
                 || options.saileach_best_office_pct.is_none_or(|best| {
                     let other: Vec<_> =
                         ops.iter().filter(|op| op.name != "琴柳").cloned().collect();
                     5.0 + best + evaluate(&other).office_hire_spd_pct < 30.0
                 }))
+        {
+            return None;
+        }
+        Some(result)
     };
-    if !legal(&selected) {
+    if evaluate_legal(&selected).is_none() {
         observe!(
             "search_control initial_prefix={:?} rejected=illegal_required_prefix",
             selected.iter().map(|op| &op.name).collect::<Vec<_>>()
@@ -933,10 +940,10 @@ fn search_control_in_order(
                     observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_capacity trial={trial_names:?}", entry.name);
                     continue;
                 }
-                if !legal(&trial) {
+                let Some(result) = evaluate_legal(&trial) else {
                     observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
                     continue;
-                }
+                };
                 if !groups_can_fit(&trial) {
                     observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
                     continue;
@@ -945,7 +952,6 @@ fn search_control_in_order(
                     observe!("control_try stage=required_group prefix={prefix:?} candidate={} result=rejected_complete_eligibility trial={trial_names:?}", entry.name);
                     continue;
                 }
-                let result = evaluate(&trial);
                 ranked.push((
                     *entry,
                     [
@@ -1002,15 +1008,14 @@ fn search_control_in_order(
             trial.push(entry.to_control_operator());
             let trial_names = observe_control
                 .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
-            if !legal(&trial) {
+            let Some(result) = evaluate_legal(&trial) else {
                 observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
                 continue;
-            }
+            };
             if !groups_can_fit(&trial) {
                 observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=rejected_min_count_residual trial={trial_names:?}", entry.name);
                 continue;
             }
-            let result = evaluate(&trial);
             let score = value(&result, region);
             if score <= before_score {
                 observe!("control_try stage=regional region={region} prefix={prefix:?} candidate={} result=no_improvement score={score} current={before_score} trial={trial_names:?}", entry.name);
@@ -1062,7 +1067,7 @@ fn search_control_in_order(
             trial.push(entry.to_control_operator());
             let trial_names = observe_control
                 .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
-            if !legal(&trial) {
+            if evaluate_legal(&trial).is_none() {
                 observe!("control_try stage=global_recovery prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
                 continue;
             }
@@ -1139,7 +1144,7 @@ fn search_control_in_order(
             trial.push(entry.to_control_operator());
             let trial_names = observe_control
                 .then(|| trial.iter().map(|op| op.name.as_str()).collect::<Vec<_>>());
-            if !legal(&trial) {
+            if evaluate_legal(&trial).is_none() {
                 observe!("control_try stage=mood_and_ordinary_fill prefix={prefix:?} candidate={} result=rejected_legal_constraint trial={trial_names:?}", entry.name);
                 continue;
             }

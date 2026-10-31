@@ -34,6 +34,8 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## 请求内搜索 memo
 
+live 执行成本优化保留原候选与报告：制造同伴兼容特征按当前子池预备，组合检查与完整物化共用同一规则；所有组合评价后按效率、仓库、姓名和原枚举下标选出前 K，只排序/物化该前缀，零 K 保留 best。中枢顺序入口对同一 trial 只结算一次，结果同时用于合法性和候选组/效果区排名。贸易整体互斥复用已识别的房间特征，独立互斥 API 仍保留。这些属于 `safe_reduction`，不改变具名 policy、计数、决胜或 Bake 支持域。
+
 贸易单订单和制造单配方叶入口在各自过滤、组合准备之前查询请求内 memo。这属于完整输入精确相等的 `safe reduction`：复用成功 report，不更改候选、必选、禁配、排序、top-K 或组合计数；`Stations` / `Lines` 包装器仍分别调用叶搜索并自行组合报告。叶入口的错误不缓存，`BakeMode::Required` 和带贸易 hit predicate 的查询不缓存；键编码失败保守执行原搜索。
 
 键覆盖不可变 SkillTable identity、有序完整 pool entry（含练度、buff、标签、预编译 atom、hint、mechanic/delegate、tier）、完整 LayoutContext 及其私有 global 数据、全部 options 和叶订单/配方、贸易 must/完整 override/禁配。`pool.skipped` 只用于建池诊断，不参与叶结果。编码保留浮点 bit、序列顺序和 map 实际遍历顺序；layout 与 atom 首次精确编码后 intern，以完整 bytes 相等判定，并保活 Arc 防止地址复用或 `Arc::make_mut` 原地修改。含动态贸易 tagged 或制造 count-scaled 注入的 layout 额外按 Arc 实例分离，避免未经证明的 map clone/insert 求和顺序等价合并。
