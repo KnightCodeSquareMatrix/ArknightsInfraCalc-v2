@@ -97,7 +97,7 @@
 | 热点 | 建议的唯一 owner |
 |---|---|
 | `shift_bind` 与 required admission 的边界 | `docs/SCHEDULE_ROTATION.md` §5；其他页只留一行定义加链接 |
-| 排班 profile 闭集、时长、裸 `4` 限制 | `docs/排班模式.md`（沿用 `docs/TODO/排班统一内核RAG文档计划.md`） |
+| 排班 profile 闭集、时长、裸 `4` 限制 | `docs/排班模式.md`（沿用 `docs/ARCHIVE/done/排班统一内核RAG文档计划-20261018.md`） |
 | 周期心情预算 | `docs/定时换班.md`（同上） |
 | `docs/模块/排班与轮换.md` 与 `docs/SCHEDULE_ROTATION.md` 互为真源 | 二选一（同上） |
 | 文档状态与关闭 / 完成证明 | 状态与关闭归 `docs/文档生命周期.md`；完成证明归 `docs/QUALITY_AND_AUDIT.md` |

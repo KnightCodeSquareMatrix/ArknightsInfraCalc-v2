@@ -12,7 +12,7 @@
 
 ## 编制硬约束
 
-中枢容量由 blueprint 决定，标准布局为 5 人。required anchor 先落位，后续 filler 不替换它。普通候选、Rule 分组候选、registry 固定/Search claim 和动态 producer 在成为承诺前，按当前 owner 工作窗口检查既有单人保守预算；满 pin 快捷路径只消费已准入承诺。后续 protected 仅保护 pin，不让全部 requirement 或动态 required 绕过资格。普通补位保留实际 ETA owner；深海专用恢复仍按其上下文判断。构造候选不足或承诺矛盾保留诊断和此前岗位，继续其他设施与普通补位；终检不修 admission。显式 gate 保留容量、唯一性、required/min_count、绑定和真实周期预算，候选耗尽后的短员不升级为硬失败。
+中枢容量由 blueprint 决定，标准布局为5人。required anchor先落位，后续filler不替换。普通候选与初始Plan Rule/registry认领在最初中枢建池/承诺入口使用既有单人保守ETA；ABC按队伍归属窗口首次冻结。动态producer、满pin、普通补位等后续阶段不再复筛工作预算；技能、占用、Team/Shift、容量与Plan来源仍独立生效。深海宿管按真实恢复量排序，不以恢复量能否覆盖工作量淘汰。构造候选不足或承诺矛盾保留诊断和此前岗位，继续普通完成；终检不修admission。显式gate检查容量、唯一性、required/min_count和绑定，并核对真实周期心情提示准确性；心情不足本身及候选耗尽后的短员不升级为硬失败。当前裁决见[定时换班](定时换班.md)及[删除交付](ARCHIVE/done/后续心情筛选删除与排班耗时-20261031.md)。
 
 `search/control.rs` 的 `ControlFillPolicy` 是顺序 policy，不是全基建匿名总分。排序依次消费 Plan anchor、贸易/制造全局区域、训练/办公室/会客室、心情去重和普通补位；不回溯替换前序结果。
 
@@ -20,7 +20,7 @@
 
 心情补位消费 `solve_control` 的当前前缀结算和既有 MoodModel 作用范围；不同设施的统一减免不转换成个人耗损分数。最终心情/办公室条件使用中枢结算前快照，办公室后置求值不能覆盖中枢条件输入。未建模技能保留为 pool skip，不擦除 buff 后作为 filler。
 
-魔王两档同房配对恢复明确委托给 `MoodModel` 的 `control_pair_recovery` 数据与净消耗 owner，不由 control atom 再结算一次。显式承认配对技能来源后，E0 魔王可进入正常中枢候选池；精二档还包含既有 `期冀之汇` 来源，因此不再因配对 buff 缺映射而整人 skip，该 +15% 会客室线索效果仍沿既有中枢账本结算，不是配对恢复的第二份结算。未知技能的 pool skip 规则不变。配对读取当前实际中枢房间成员和来源练度，只影响指定两人，不属于统一全中枢恢复或可扩散的笑脸。条件、档位和数值引用固定知识库[控制中枢技能](知识库引用.md)中的魔王章节；候选预算、周期检查与最终 gate 共用实际心情 owner。接入不新增强制配队、跨班 bind 或选位政策，合法入池不等于必然入选。
+魔王两档同房配对恢复明确委托给 `MoodModel` 的 `control_pair_recovery` 数据与净消耗 owner，不由 control atom 再结算一次。显式承认配对技能来源后，E0 魔王可进入正常中枢候选池；精二档还包含既有 `期冀之汇` 来源，因此不再因配对 buff 缺映射而整人 skip，该 +15% 会客室线索效果仍沿既有中枢账本结算，不是配对恢复的第二份结算。未知技能的 pool skip 规则不变。配对读取当前实际中枢房间成员和来源练度，只影响指定两人，不属于统一全中枢恢复或可扩散的笑脸。条件、档位和数值引用固定知识库[控制中枢技能](知识库引用.md)中的魔王章节；初次中枢ETA、最终周期诊断和gate提示核对共用实际心情owner；后续候选不按工作预算复筛。接入不新增强制配队、跨班 bind 或选位政策，合法入池不等于必然入选。
 
 ## 体系准入档位
 
@@ -34,7 +34,7 @@
 
 ## 动态 producer
 
-中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；动态 mask 的 required 先按 `control_work_hours` 或既有 `registry_sustain_hours` 工作窗通过资格。source 只有实际 assignment 在场时才进入 manifest，producer 变化触发 resolve 和下阶段搜索。当前 selector 不生成旧 ProducerSlot；该接口若被使用仍在落位前检查工作窗与占用，不构成免准入入口。
+中枢 producer 的 admission、target、relation 由 `data/producer_rules.json`/Plan 解析；动态mask从已完成初次ETA筛选的control pool枚举required，不在mask或落位阶段重算工作预算。source 只有实际 assignment 在场时才进入 manifest，producer 变化触发 resolve 和下阶段搜索。当前 selector 不生成旧 ProducerSlot；该接口若被使用仍检查恢复owner冲突与占用，不复筛工作预算，不构成免准入入口。
 
 ## 灵知可选协同（2026-10-30）
 

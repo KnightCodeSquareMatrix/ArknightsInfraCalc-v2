@@ -88,6 +88,8 @@
 
 ## 4. 从哪里读
 
+- 本地知识检索与检查删减定位：[`Agent知识库`](docs/Agent知识库.md)；查询入口 `python3 scripts/codex/query_project_knowledge.py --query <问题>`。排名只作导航，先回 current owner 和原文核对。
+- 本项目 Agent 知识库建设任务：压缩、交接或接续后，先完整读 [`项目Agent知识库建设计划`](docs/ARCHIVE/done/项目Agent知识库建设计划-20261101.md)，按其中进度和恢复顺序继续；阶段完成、重要裁决和交接前及时更新。来源：用户 2026-11-01 明确要求完整计划、及时更新及压缩后优先回看。
 - 按症状找文档：[`docs/INDEX.md`](docs/INDEX.md)。代码 owner 和命令：[`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) 的相关段，不需要通读。
 - 文档角色、生命周期与归档：[`docs/文档生命周期.md`](docs/文档生命周期.md)。
 - 保证等级、风险分层验证、无人值守：[`docs/QUALITY_AND_AUDIT.md`](docs/QUALITY_AND_AUDIT.md)。

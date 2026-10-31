@@ -33,7 +33,17 @@
 
 ## Bake 生命周期
 
-全表生成与冷校验已使用完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥；热查询使用 checked colex rank 和有界 top-K 堆，并核对 canonical 相对顺序、完整布局、技能原文及编译 atom，生产候选政策保持现状。旧语义消融已完整执行152盒及full-e2两入口：成员、产出、rotation和MAA零差异，296叶仅同文件输入路径标签，原same5/changed147保留；覆盖内纯性能归因可关闭。新冻结连续暖机局部数值验收及指定P1/P2静态闭合已完成：1122full含72预期非有限错误，1050search中798获准精确一致、252由既有>=12h负心情扣减政策排除；数学千分及公开f64合同零差异，不能称所有搜索获准。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 普通段分段积分与f64微段求值边界保留，不能泛称所有实数精确。旧表全量对账不替代新语义验收，不推广任意查询或独立Required+peer-reset；证据与门禁见活动文档§8.1及当前真源。
+全表生成与冷校验已使用完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥；热查询使用 checked colex rank 和有界 top-K 堆，并核对 canonical 相对顺序、完整布局、技能原文及编译 atom，生产候选政策保持现状。
+
+<!-- knowledge:historical -->
+### 旧暖机与预算政策的当轮验收
+
+以下旧预算失败与≥12h排除仅属于冻结历史binary/input；2026-10-31已删除后续筛选和预算拒绝，当前规则见[定时换班](定时换班.md)。
+
+旧语义消融已完整执行152盒及full-e2两入口：成员、产出、rotation和MAA零差异，296叶仅同文件输入路径标签，原same5/changed147保留；覆盖内纯性能归因可关闭。新冻结连续暖机局部数值验收及指定P1/P2静态闭合已完成：1122full含72预期非有限错误，1050search中798获准精确一致、252由既有>=12h负心情扣减政策排除；数学千分及公开f64合同零差异，不能称所有搜索获准。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 普通段分段积分与f64微段求值边界保留，不能泛称所有实数精确。旧表全量对账不替代新语义验收，不推广任意查询或独立Required+peer-reset；证据与门禁见活动文档§8.1及当前真源。
+
+### 当前表身份与运行时行为
+
 
 `BAKE_SCHEMA_VERSION` 当前为 17。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
 
@@ -122,6 +132,11 @@
 运行时每个 signature 保存 typed compact 行：贸易静态行大小预计 96B、制造 48B，这是类型布局估计，不是 RSS 测量。行保留有序 `u16` 状态下标、全部原始 `i32`/`f64`，rule 字符串以 checked `u32` 字典编号复用，colex rank 数组也使用 checked `u32` 与 sentinel。姓名、mask、facility 和机制元数据不再逐行常驻；选中行按 header 身份物化原 owned 命中，热查询没有 I/O，枚举、合法过滤、比较和输出合同保持。
 
 冷加载对同一已打开 File 分块 hash 后 rewind，流式读取 metadata 与单行，核对全部结构、排序、身份与实际合法组合。完整合法 universe 用 rank bitset 枚举清位，拒绝缺行、残行及数量不符；canonical 有序 IDs 仍重建并核对贸易链重排，不把状态集合当作可交换输入。全量 verify 按 signature offset 重读同一 File，每批 4096 行核对全部磁盘字段与 live，并额外比较实际 compact 物化命中；确定性 320 查询及 skip 口径保持。完整贸易 API 保留 signature+offset 标识与原签名，按需输出 owned 行；显式索取全 signature 的 owned Vec 仍可能有较大分配。
+
+<!-- knowledge:historical -->
+### 内存改动与连续暖机的历史证据
+
+本段含已撤销12h筛选和心情预算失败，保留当轮事实，不作为当前执行要求。
 
 此轮改动属于保持完整表和精度的内部成本优化，声明为 `safe reduction`。格式化、release 编译及静态契约/意图审查已完成；第一轮历史完整Bake的29,783,417行/3,292查询零差异、2,148跳过，CLI exit1仅但书旧期望；当轮内存观测9.2G/swap0B保留为历史。最终新语义完整Bake exit0/但书PASS；最终运行的cgroup采样与systemd终止摘要是不同观测口径，不拼接为单一RSS结论。第一轮四轮换/全精二对拍的选人、MAA及失败集合差异保留，五例24/24终态超预算断言已证实无误报，正常warning fallback与显式gate各按既定职责执行。用户最新裁决采用连续线性暖机：阿罗玛首小时整个0以后+2%/h至20%，其余四技能首小时20/15%以后+1/2%/h至25%；连续积分首轮独立数值验证已通过；P1铅踝扣减后槐琥漏读与P2合法极短浮点段拒绝已修复并完成新release编译，槐琥读取在全部EffVar直接贡献之后（order30、五ramp9保持），新冻结局部数值验收与指定P1/P2静态闭合已完成，1122full含72预期非有限错误、798获准search精确一致、252既有>=12h政策排除；最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 保留无暖机热路径。旧语义完整消融的152盒及full-e2两入口中生产字段零差异，296叶仅同文件路径标签，原same5/changed147保留；覆盖内纯性能归因已关闭，不推广任意输入或Required+peer-reset。先平均再槐琥floor/cap不交换已确定，不能将旧整小时平均视为精确积分。暖机源码修改会改变`None`的20h表数值和exe指纹；原binary与旧表/对账证据保留，仅证明内存实现按旧暖机语义等价。最终连续暖机binary隔离完整表verify及CLI回归已完成，CLI exit0；不手改指纹，也不能用旧完整表验收替代新语义验收。本轮生命周期算法未改，冷路径覆盖来自完整Bake全量verify/Required查询与后续Auto加载，其他fresh/cache/fallback边界按实际覆盖报告，不追加重生成或性能测量。性能实现与最终实测已交付收口，五既有预算失败保持；没有额外热性能收益测量结论。执行状态与唯一冻结基线见 [性能优化调查与 Bake 重设计](TODO/性能优化调查与Bake重设计.md) §0.1。
 

@@ -2,7 +2,7 @@
 
 > 文档角色：module-reference
 > 生命周期状态：current
-> 当前真源：docs/ORCHESTRATION_LAYER.md
+> 当前真源：docs/SYSTEM_CHAINS.md；docs/定时换班.md
 > 摘要：说明单班 BaseAssignment 的 Plan、落位、互斥和 resolve 责任
 > 代码范围：crates/infra-core/src/layout/、crates/infra-core/src/layout/resolve.rs
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
@@ -22,6 +22,6 @@
 
 每房提交后立即把成员写入 used，下一房基于合并后的 assignment 重算 resolve_base；这使“上一房抢走了当前房候选”成为可复现的顺序事实，而不是缓存随机性。Plan 相关岗位应检查 AssignmentPlan 的 anchors、claims、resolved_producer_dependencies；纯房间效率应检查 RoomEfficiencyLine 和 notes。
 
-当前 `BaseAssignment::operator_names()` 只从 `rooms` 收集成员；`training_assist` 是单独字段。现有房间 `used` 过滤和轮换的房间成员唯一性检查不等于已经统一校验训练协助位与房间成员的互斥；该字段的跨位置唯一占用仍需补齐，不能将上述业务约束写成已证明的运行时保证。
+当前 `BaseAssignment::operator_names()` 只从 `rooms` 收集成员；`training_assist` 是单独字段。`occupied_operator_names()` 另包含训练副手；`structural_violations()` 在最终状态检查房间与训练副手重复占用。该函数当前不是所有写入入口的统一守卫，不能将终态覆盖写成构造阶段已统一保证；生产占用和工作口径分别消费对应方法。
 
 单班 assignment 通过 layout test 产生时，不自动拥有跨班 bind 或 dorm policy。将它交给 schedule 前，schedule 会重新建立 profile owner、teams 和 runtime bind；不要把单班 JSON 直接当作轮换报告。

@@ -8,6 +8,17 @@
 
 三个入口均输出 JSON：成功返回 0，无匹配或缺少显式预期文件返回 1，输入格式/读取错误返回 2。默认终端最多 6000 字符，`--max-chars N` 可调整（至少 1500）；超出时输出仍为合法 JSON，并标明省略位置、总量和展开方法。`--full` 展开完整查询结果，`--output <path>` 保存完整查询结果，终端仍受预算限制。禁止用 `--output` 覆盖输入或来源文件；完整结果留在 `target/codex-runs/` 或 `out/`，不提交。
 
+### 项目知识与检查删减
+
+```bash
+python3 scripts/codex/query_project_knowledge.py --query '自动轮换中枢灵知' --mode auto
+python3 scripts/codex/query_project_knowledge.py --query 'flat_combinations' --kind code
+python3 scripts/codex/query_project_knowledge.py --id <返回ID> --parent --full
+python3 scripts/codex/query_project_knowledge.py --check
+```
+
+本地关键词、Markdown父段与Rust声明导航，默认排除历史/提案，`--history`显式纳入；不是embedding语义检索。返回原文、owner、hash、HEAD、dirty、历史身份与完整回取，不裁决业务。详见[Agent知识库](../../docs/Agent知识库.md)、[检查与删减导航](../../docs/检查与删减导航.md)。源码声明是正则导航，不能证明AST或真实调用。缓存放target，hash改变按文件更新；文档/源码同时变化时查询会要求重读。
+
 ### 排班报告
 
 ```bash
@@ -16,7 +27,7 @@ python3 scripts/codex/query_rotation_report.py --report out/rotation.json --shif
 python3 scripts/codex/query_rotation_report.py --report out/new-rotation.json --compare out/old-rotation.json
 ```
 
-输入为 `plan --rotation-out` 或 `layout team-rotation --rotation-out` 保存的完整 rotation JSON。profile 的 `rotation` 只有效率摘要，MAA 也采用不同结构，均会明确拒绝。房间和姓名精确匹配；`--shift N` 是一基班次编号，匹配保存的 `index == N-1`，不按数组位置取值，也不把 `plan_index` 当班次。
+输入为定时模式 `plan --rotation-out` 或 `layout team-rotation --rotation-out` 保存的完整 Timed rotation JSON；当前不支持 AutoReport。profile 的 `rotation` 只有效率摘要，MAA 也采用不同结构，均会明确拒绝。房间和姓名精确匹配；`--shift N` 是一基班次编号，匹配保存的 `index == N-1`，不按数组位置取值，也不把 `plan_index` 当班次。
 
 默认返回已有日产出、告警、班次时长、Plan 引用和设施效率；指定房间/干员后附命中房间的人员原字段和对应房间效率。来源包含路径、SHA-256，结果位置使用 JSON Pointer。合法省略的告警视为零；必需结构不符、重复索引/房间 ID、Plan 引用越界会报错，不能把缺数据解释为空结果。
 

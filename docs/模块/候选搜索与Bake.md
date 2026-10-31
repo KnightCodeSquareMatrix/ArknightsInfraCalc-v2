@@ -56,7 +56,17 @@ v17 的 `operator_states` 保存姓名、entry 的精英阶段、有序 buff ID 
 
 冷加载以完整身份建立 state→entry 索引，核对 canonical 状态集合；对同一打开 File 分块 hash、rewind 后流式读取 metadata 和单行。两域每个 signature 的存储行集合必须与同名互异且满足实际 legality 的完整合法 universe 相同，用 checked colex rank bitset 枚举清位核对缺行、多行及数量，避免同时保留 expected/actual 两套 BTreeSet。仍按 canonical 顺序重建有序 IDs 并核对实际贸易链重排；signature 的 OR 位图只做 verify 样本域快筛，不证明完整组合覆盖。
 
-常驻表按 signature 保存 typed compact 行、有序 `u16` 状态 IDs、checked `u32` rank/规则字典，全部原始 `i32`/`f64` 保留；不逐行常驻姓名、mask、facility。贸易 96B/制造 48B 仅静态类型大小估计，不能代表 RSS。热查询只物化选中行的完整 owned 命中，不做 I/O；完整贸易 API 保留 signature+offset 标识与原签名，按需还原 owned 行及执行顺序，显式请求全行 Vec 仍有分配成本。全量 verify 按 offset 从同一 File 每批读取 4096 行，保留全部 Disk 字段/live 对账，并比较实际 compact 物化命中；320 查询差分覆盖不减少。内存改动已 release 编译、静态审查及完整 29,783,417 行/3,292 兼容查询零差异对账，2,148 查询按原门禁跳过；最终实现与实测已完成。第一轮轮换包包含选人/MAA/失败集合变化，历史差异保留；后续固定旧语义消融的152盒及full-e2两入口已确认成员/产出/rotation/MAA零差异，仅296叶为输入绝对路径标签，原same5/changed147保留，覆盖内纯性能归因可关闭。消融完整表3,435兼容查询零差异、2,005跳过；不推广任意上下文或独立Required+peer-reset，也不证明热性能收益。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 冷路径生命周期算法本轮未改，覆盖限制随最终包报告，不另开重生成或性能测量任务。
+常驻表按 signature 保存 typed compact 行、有序 `u16` 状态 IDs、checked `u32` rank/规则字典，全部原始 `i32`/`f64` 保留；不逐行常驻姓名、mask、facility。贸易 96B/制造 48B 仅静态类型大小估计，不能代表 RSS。热查询只物化选中行的完整 owned 命中，不做 I/O；完整贸易 API 保留 signature+offset 标识与原签名，按需还原 owned 行及执行顺序，显式请求全行 Vec 仍有分配成本。全量 verify 按 offset 从同一 File 每批读取 4096 行，保留全部 Disk 字段/live 对账，并比较实际 compact 物化命中；320 查询差分覆盖不减少。
+
+<!-- knowledge:historical -->
+### 内存与旧暖机预算的历史验收
+
+下述旧预算失败为当轮快照；当前制造≥12h排除和后续预算拒绝已删除，不能据此恢复。
+
+内存改动已 release 编译、静态审查及完整 29,783,417 行/3,292 兼容查询零差异对账，2,148 查询按原门禁跳过；最终实现与实测已完成。第一轮轮换包包含选人/MAA/失败集合变化，历史差异保留；后续固定旧语义消融的152盒及full-e2两入口已确认成员/产出/rotation/MAA零差异，仅296叶为输入绝对路径标签，原same5/changed147保留，覆盖内纯性能归因可关闭。消融完整表3,435兼容查询零差异、2,005跳过；不推广任意上下文或独立Required+peer-reset，也不证明热性能收益。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 冷路径生命周期算法本轮未改，覆盖限制随最终包报告，不另开重生成或性能测量任务。
+
+### 当前热查询与兼容门禁
+
 
 热查询要求每个真人只出现一次，完整状态在相应设施 canonical 池中，且输入保留该池相对顺序。生产 signature 查找使用固定 13 个可空槽：贸易 level1/2/3 赤金及 level3 源石占四槽，制造三级 × 三配方占九槽；先严格核对 level 1–3 与 capacity 等于等级，赤金另核对实际金线数等于冷加载基准，源石沿原 key 不限制金线数。冷加载按每个 index 首行恢复原字符串 key 并完整核对、拒绝重复槽；磁盘 v17、manifest 与逐行验证仍保留原字符串协议，热查询不再格式化 signature 或查字符串 HashMap。每个 signature 建立长度 `C(状态数, 容量)` 的 dense colex rank 数组，未存储组合用 sentinel 表示；容量只支持 1–3，组合数、rank 与数组分配均 checked，溢出或分配失败给出可读原因。查询沿 live 的原组合字典序枚举，固定三槽仅复制状态 ID 后排序计算 rank，不改变解算或输出顺序；直接 lookup 取代扫描和排序整张表。最大堆只保留 `top_k.max(1)` 个轻量候选，按贸易效率与原枚举次序、制造效率/仓库/组合姓名次序比较，最后物化 best/top。`evaluated` 仍统计全部通过合法性和必选过滤的组合，`combinations` 保留调用方枚举口径；贸易零命中 miss 回 live，制造保留成功空报告。
 
@@ -84,7 +94,16 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 `metrics.bake.trade` / `manufacture` 输出非零类别：`forbidden_pairs`、`override`、`predicate`、`invalid_mood`、`invalid_shift`、`layout`、`mood_sensitive`、`ramp`、`peer_reset`、`generating`、`unavailable`、`skill_table`、`duplicate_names`、`state_absent`、`facility_state_absent`、`noncanonical_order`、`trade_atoms`、`manufacture_atoms`、`signature_absent`、`capacity`、`heap_unavailable`、`trade_incomplete`、`manufacture_incomplete`、`no_eligible_trade`。
 
-制造有班长且池内技能包含 `AddEffRamp` 时，以 `ramp` 原因整体回 live；Required 严格报 miss。live连续积分实现用解析平均与阈值分段加权，心情区间不重启暖机；Some(h)使用真实时长，不round/clamp。首轮冻结记录保留，新冻结局部数值验收及指定P1/P2静态闭合完成；1122full含72预期非有限错误、1050search中798获准精确一致、252既有>=12h负心情扣减政策排除，不能认证所有搜索组合；最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 槐琥分桶修正为全部EffVar直接贡献后读取（order10→30，五ramp order9保持），普通段按阈值分段积分；极短段保留真实权重，暖机解析平均、非线性按原解释器可表示点求值，保留f64分辨率和舍入边界。无班长默认 20 小时，固定 Bake 行须按新连续积分口径重新生成与全量校验；带班长且含暖机的查询差分明确计 skipped，不计 checked。此门禁不删候选，也不把 20 小时表当作新班长结果。
+制造有班长且池内技能包含 `AddEffRamp` 时，以 `ramp` 原因整体回 live；Required 严格报 miss。live连续积分实现用解析平均与阈值分段加权，心情区间不重启暖机；Some(h)使用真实时长，不round/clamp。
+
+<!-- knowledge:historical -->
+### 暖机局部验证的旧政策快照
+
+下述数量与旧预算失败属于连续暖机实施时的历史证据，制造≥12h排除与心情预算拒绝已由2026-10-31裁决删除，不能解释当前行为。首轮冻结记录保留，新冻结局部数值验收及指定P1/P2静态闭合完成；1122full含72预期非有限错误、1050search中798获准精确一致、252既有>=12h负心情扣减政策排除，不能认证所有搜索组合；最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。
+
+### 当前暖机与诊断计时
+
+ 槐琥分桶修正为全部EffVar直接贡献后读取（order10→30，五ramp order9保持），普通段按阈值分段积分；极短段保留真实权重，暖机解析平均、非线性按原解释器可表示点求值，保留f64分辨率和舍入边界。无班长默认 20 小时，固定 Bake 行须按新连续积分口径重新生成与全量校验；带班长且含暖机的查询差分明确计 skipped，不计 checked。此门禁不删候选，也不把 20 小时表当作新班长结果。
 
 冷阶段 `metrics.bake.cold` 按 `init`、`generate`、`validate`、`verify`、`index`、`publish` 保存 calls/errors/elapsed_ms；init 只覆盖真正 OnceLock 初始化，缓存访问不冒充冷加载。实际重复验证照次数记；父子阶段 inclusive，不能相加作总耗时。CLI bake 在动作体包 trace，保留核心全量校验与既有 CLI 回归失败；serve 的启动 warm 单独输出 trace。
 
@@ -96,5 +115,5 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 所有排班模式仅保留最初中枢名单ETA试算；搜索不再做本房、双中枢或固定主力预算准入，memo移除这些状态，仅保留数值收益layout、模式与H。制造≥12小时负心情差身份排除已删除，真实积分与暖机保留。自动仍用live，普通Bake兼容门禁不变。
 
-终态只核对实际结构、Plan、显式挂件归属、工时和快照；每房两名单×两中枢及当前外站深海人数最大值覆盖工时，不再枚举全站协同。详见[自动轮换](../自动轮换.md)。
+终态核对实际结构、Plan、显式挂件归属与快照；工时不足仅诊断，显式 gate 核对提示准确性，不恢复每房两名单×两中枢工作预算拒绝或全站协同枚举。详见[自动轮换](../自动轮换.md)。
 制造体系试排直接调用原实时制造搜索，保留请求memo与实际收益上下文。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。

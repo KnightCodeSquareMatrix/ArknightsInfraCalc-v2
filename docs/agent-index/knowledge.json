@@ -1,0 +1,317 @@
+{
+  "schema": 1,
+  "description": "仅导航与已证来源关系，不裁决领域语义；别名是检索提示。",
+  "cards": [
+    {
+      "id": "MOOD.POST",
+      "path": "docs/检查与删减导航.md",
+      "heading": "后续工作心情筛选与重试",
+      "aliases": [
+        "三班心情复筛和重试",
+        "心情筛选",
+        "ETA后续",
+        "24/24换班制心情",
+        "ABC重试"
+      ],
+      "owners": [
+        "docs/定时换班.md",
+        "docs/自动轮换.md"
+      ],
+      "code": [
+        "crates/infra-core/src/pool/control.rs",
+        "crates/infra-core/src/schedule/cycle_mood.rs"
+      ],
+      "modes": []
+    },
+    {
+      "id": "ACTION.READY",
+      "path": "docs/检查与删减导航.md",
+      "heading": "菲亚本人 ready 与目标预算",
+      "aliases": [
+        "菲亚ready",
+        "菲亚心情检查",
+        "动作目标预算"
+      ],
+      "owners": [
+        "docs/菲亚梅塔使用规则.md"
+      ],
+      "code": [
+        "crates/infra-core/src/schedule/fiammetta_events.rs"
+      ],
+      "modes": []
+    },
+    {
+      "id": "AUTO.ROSTER",
+      "path": "docs/检查与删减导航.md",
+      "heading": "自动中枢 deferred producer 名单",
+      "aliases": [
+        "灵知",
+        "灵芝",
+        "戴菲恩",
+        "黛菲恩",
+        "八幡海铃",
+        "自动中枢禁止角色"
+      ],
+      "owners": [
+        "docs/自动轮换.md"
+      ],
+      "code": [
+        "crates/infra-core/src/pool/control.rs::auto_rotation_control_roster"
+      ],
+      "modes": [
+        "auto"
+      ]
+    },
+    {
+      "id": "AUTO.PROOF",
+      "path": "docs/检查与删减导航.md",
+      "heading": "自动全站证明与任意混搭",
+      "aliases": [
+        "自动跨站组合",
+        "任意混搭",
+        "4096",
+        "自动轮换正确性"
+      ],
+      "owners": [
+        "docs/自动轮换.md"
+      ],
+      "code": [
+        "crates/infra-core/src/layout/orchestrate/rules.rs"
+      ],
+      "modes": [
+        "auto"
+      ]
+    },
+    {
+      "id": "OUTPUT.QUALITY",
+      "path": "docs/检查与删减导航.md",
+      "heading": "正常质量输出与显式终态验收",
+      "aliases": [
+        "报错拒绝输出",
+        "质量early-return",
+        "终态检查",
+        "终检",
+        "structural_violations"
+      ],
+      "owners": [
+        "docs/定时换班.md",
+        "docs/QUALITY_AND_AUDIT.md"
+      ],
+      "code": [
+        "crates/infra-core/src/schedule/auto_rotation.rs::fixed_main_backup_error",
+        "crates/infra-core/src/layout/assignment.rs::structural_violations"
+      ],
+      "modes": []
+    },
+    {
+      "id": "GLOBAL.CONDITION",
+      "path": "docs/检查与删减导航.md",
+      "heading": "Global 条件与逐房扣回的范围",
+      "aliases": [
+        "带条件Global atom",
+        "Global条件简化",
+        "condition_met",
+        "逐房扣回",
+        "跨设施原子",
+        "触发条件"
+      ],
+      "owners": [
+        "docs/模块/中枢与跨设施状态.md"
+      ],
+      "code": [
+        "crates/infra-core/src/cross_facility/interpreter.rs::condition_met",
+        "crates/infra-core/src/layout/resolve.rs"
+      ],
+      "modes": []
+    },
+    {
+      "id": "RECYCLE.STATIC",
+      "path": "docs/检查与删减导航.md",
+      "heading": "回收站静态技能支持",
+      "aliases": [
+        "回收站动态技能",
+        "回收站条件",
+        "recycle_skill_efficiency"
+      ],
+      "owners": [
+        "docs/模块/心情与辅助设施.md"
+      ],
+      "code": [
+        "crates/infra-core/src/recycle.rs::recycle_skill_efficiency"
+      ],
+      "modes": []
+    },
+    {
+      "id": "CACHE.BAKE",
+      "path": "docs/检查与删减导航.md",
+      "heading": "Bake、精确 memo 与旧响应缓存",
+      "aliases": [
+        "baking",
+        "Bake为什么仍慢",
+        "有Bake为何仍慢",
+        "缓存",
+        "耗时",
+        "自动轮换速度",
+        "烘焙",
+        "烘焙表",
+        "实时计算"
+      ],
+      "owners": [
+        "docs/PERFORMANCE_ENGINEERING.md",
+        "docs/模块/候选搜索与Bake.md"
+      ],
+      "code": [
+        "crates/infra-core/src/search/manufacture.rs",
+        "crates/infra-core/src/search/trade.rs",
+        "crates/infra-core/src/search/memo.rs"
+      ],
+      "modes": []
+    },
+    {
+      "id": "SEARCH.FLAT",
+      "path": "docs/检查与删减导航.md",
+      "heading": "flat 效率与枚举保证",
+      "aliases": [
+        "flat_combinations",
+        "flat效率后置",
+        "静态效率",
+        "全局最优",
+        "top-K",
+        "静态散件",
+        "放最后",
+        "后置"
+      ],
+      "owners": [
+        "docs/PERFORMANCE_ENGINEERING.md",
+        "docs/模块/候选搜索与Bake.md"
+      ],
+      "code": [
+        "crates/infra-core/src/search/enumerate.rs::flat_combinations"
+      ],
+      "modes": []
+    },
+    {
+      "id": "MANU.ROBOT",
+      "path": "docs/检查与删减导航.md",
+      "heading": "工程机器人与槐琥技能面",
+      "aliases": [
+        "槐琥",
+        "至简",
+        "工程机器人",
+        "技能面"
+      ],
+      "owners": [
+        "docs/MANUFACTURE_STATUS.md"
+      ],
+      "code": [
+        "crates/infra-core/src/manufacture/interpreter.rs"
+      ],
+      "modes": []
+    },
+    {
+      "id": "MODE.REPORT",
+      "path": "docs/检查与删减导航.md",
+      "heading": "泛型二三班与报告工具",
+      "aliases": [
+        "generic二三班是否实现",
+        "泛型排班",
+        "自动报告工具",
+        "AutoReport",
+        "main分支排班",
+        "自定义时间",
+        "三队轮流"
+      ],
+      "owners": [
+        "docs/排班模式.md",
+        "docs/调用链/自动轮换建议.md"
+      ],
+      "code": [
+        "crates/infra-core/src/schedule/mod.rs",
+        "scripts/codex/query_rotation_report.py"
+      ],
+      "modes": []
+    },
+    {
+      "id": "DATA.DELEGATE",
+      "path": "docs/检查与删减导航.md",
+      "heading": "缺 buff 与空 atom",
+      "aliases": [
+        "缺SkillTable buff",
+        "空atom",
+        "技能缺失",
+        "validate_operator_refs",
+        "实例",
+        "漏算",
+        "表里没有",
+        "buff但表"
+      ],
+      "owners": [
+        "docs/模块/输入与技能映射.md",
+        "docs/模块/心情与辅助设施.md"
+      ],
+      "code": [
+        "crates/infra-core/src/skill_table.rs::validate_operator_refs",
+        "scripts/codex/query_runtime_data.py"
+      ],
+      "modes": []
+    },
+    {
+      "id": "VERIFY.POLICY",
+      "path": "docs/检查与删减导航.md",
+      "heading": "源码测试与验证替代",
+      "aliases": [
+        "不要测试",
+        "源码测试删除",
+        "如何验证",
+        "失败检查"
+      ],
+      "owners": [
+        "docs/QUALITY_AND_AUDIT.md"
+      ],
+      "code": [
+        "scripts/assert_rotation_invariants.py"
+      ],
+      "modes": []
+    },
+    {
+      "id": "KNOWLEDGE.AUTHORITY",
+      "path": "docs/Agent知识库.md",
+      "heading": "当前实现与保证",
+      "aliases": [
+        "canonical冲突",
+        "两页不同规则",
+        "按日期决定",
+        "历史计划当前",
+        "旧规则",
+        "真源冲突"
+      ],
+      "owners": [
+        "docs/文档生命周期.md",
+        "docs/知识库引用.md"
+      ],
+      "code": [
+        "scripts/codex/query_project_knowledge.py"
+      ],
+      "modes": []
+    },
+    {
+      "id": "KNOWLEDGE.CACHE",
+      "path": "docs/Agent知识库.md",
+      "heading": "更新与验证",
+      "aliases": [
+        "知识索引缓存",
+        "知识库缓存",
+        "索引失效",
+        "RAG缓存",
+        "索引更新"
+      ],
+      "owners": [
+        "docs/文档生命周期.md"
+      ],
+      "code": [
+        "scripts/codex/query_project_knowledge.py::source_index"
+      ],
+      "modes": []
+    }
+  ]
+}

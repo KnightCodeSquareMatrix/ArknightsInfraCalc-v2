@@ -35,7 +35,12 @@ ManuRoomInput
 
 暖机映射的五条 `AddEffRamp` 置于 EffVar/order9，技能面分桶置于 order30；先写齐直接技能面贡献（含暖机和铅踝的心情扣减），再读取他人技能面，修正同 order10 的后置暖机漏读及原 order20 心情扣减未被读取的问题。解释器仍按原阶段与 owner/atom 归并，未按干员名补偿。
 
-新冻结局部验收（CLI `7695096fd...`）：原55×3独立解析及225输入保留/重跑，新增129输入，总1122次full中1050成功、72预期非有限错误，数学千分值和公开f64合同零差异。1050次search中798获准并通过真实light→full效率断言及best/top完整字段精确比较；252次20/30h搜索因原有负心情扣减技能`>=12h`政策排除，不计为light/full验证通过。该门禁位于`search/manufacture.rs`，旧e40900f和当前常量均12.0；例如阿罗玛+槐琥+铅踝mood20/20h full为1.620，search evaluated=0。P1静态0h六序final1.530、P2芬+槐琥nextafter1三配方两序final1.420已验证，指定P1/P2静态复审闭合。证据`target/codex-runs/perf-final-20261028/correctness-warm/p1p2-final/{report.md,summary.json,search-policy-source.json}`。范围限点名真实技能、心情与时长，不证明私有light独立数值、全技能/全局注入、个体耗尽或排班；普通段积分与f64微段舍入边界见上文。
+<!-- knowledge:historical -->
+## 连续暖机实施时的历史验收
+
+以下数量、旧12h政策与预算失败属于当轮binary/input，不解释当前搜索。2026-10-31已删除后续工作预算和制造≥12h排除；当前责任见[定时换班](定时换班.md)及[删减导航](检查与删减导航.md)。
+
+新冻结局部验收（CLI `7695096fd...`）：原55×3独立解析及225输入保留/重跑，新增129输入，总1122次full中1050成功、72预期非有限错误，数学千分值和公开f64合同零差异。1050次search中798获准并通过真实light→full效率断言及best/top完整字段精确比较；252次20/30h搜索因原有负心情扣减技能`>=12h`政策排除，不计为light/full验证通过。该历史门禁当时位于`search/manufacture.rs`，阈值12.0，现已删除；例如阿罗玛+槐琥+铅踝mood20/20h full为1.620，search evaluated=0。P1静态0h六序final1.530、P2芬+槐琥nextafter1三配方两序final1.420已验证，指定P1/P2静态复审闭合。证据`target/codex-runs/perf-final-20261028/correctness-warm/p1p2-final/{report.md,summary.json,search-policy-source.json}`。范围限点名真实技能、心情与时长，不证明私有light独立数值、全技能/全局注入、个体耗尽或排班；普通段积分与f64微段舍入边界见上文。
 
 带班长且查询池含暖机 atom 时，Bake 整个查询回 live，并记 `ramp`；无班长的固定 20h 行按新积分口径重新生成与全量对账。该门禁不删除候选，只影响暖机查询。当前状态：新冻结连续暖机局部数值验收与指定P1/P2静态闭合完成；最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 不把局部结果认证为所有实数区间或全排班。
 
@@ -47,6 +52,6 @@ ManuRoomInput
 
 ## 失败与回退
 
-配方/等级/人数非法直接返回错误；单配方无解返回无 hit/错误，由上层决定是否换配方。心情不足返回带 gap 的结果，排班 policy 决定休息或换班；制造 solver 不修改宿舍。全局资源未刷新时检查 `resolve_base` 与 cross-facility 链，不在制造结果出口补百分比。Bake 不兼容时回退 live search。
+配方/等级/人数非法直接返回错误；单配方无解返回无 hit/错误，由上层决定是否换配方。心情不足返回带gap的真实结果，排班终态作质量提示，不恢复工作预算筛选或拒绝；制造 solver 不修改宿舍。全局资源未刷新时检查 `resolve_base` 与 cross-facility 链，不在制造结果出口补百分比。Bake 不兼容时回退 live search。
 
 核验入口：`layout eval --explain-json`、`infra-cli bench`、制造搜索报告和 `plan --assert-invariants`。机制数字来自知识库桥接；运行时 JSON 只作为输入载体。

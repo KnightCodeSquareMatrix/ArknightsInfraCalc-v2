@@ -2,7 +2,7 @@
 
 > 文档角色：module-reference
 > 生命周期状态：current
-> 当前真源：docs/BASE_ASSIGNMENT.md
+> 当前真源：docs/SYSTEM_CHAINS.md；docs/定时换班.md；docs/自动轮换.md
 > 摘要：说明声明式规则如何编译为 AssignmentPlan 并交给 executor
 > 代码范围：crates/infra-core/src/layout/orchestrate/、layout/assign/、data/orchestration_rules.json
 > 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
@@ -22,9 +22,7 @@ build_plan 解析 PickOne、OptionalFixed、required count、scope 和 alternati
 
 当前策略是跨站体系先于同站候选、producer/consumer 以实际 presence 形成 dependency、制造逐房重算 resolve_base、fallback 只限声明式 role/alternative。旧路线图、删除 helper 和历史审计仅在 ARCHIVE 追溯。
 
-制造体系试排仍按每个临时 assignment 逐房 `resolve_base`；完整制造搜索由域内条件响应缓存
-复用相同上下文的全部单房结果，再按当前候选池与必选成员查询。缓存不持有 Plan 或已占用状态，
-不复用不同上下文的静态 top-K；见 [搜索性能与 Bake 边界](PERFORMANCE_ENGINEERING.md)。
+制造体系试排按每个临时 assignment 逐房 `resolve_base`，直接调用实时制造搜索；请求级完整精确键 memo 保留。额外条件响应表已删除，不能恢复不同上下文共享的静态 top-K；取舍与范围见 [搜索性能与 Bake 边界](PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。
 
 ## 变更时的调用链定位
 
