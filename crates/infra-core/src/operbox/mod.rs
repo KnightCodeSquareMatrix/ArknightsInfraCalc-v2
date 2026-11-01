@@ -32,6 +32,8 @@ pub struct OperBoxEntry {
 pub struct OperBox {
     pub entries: Vec<OperBoxEntry>,
     pub owned: HashMap<String, OperatorProgress>,
+    /// 自动排班在搜索前冻结的按设施初始 ETA 资格；不删除其他岗位资格。
+    facility_eta_exclusions: HashMap<String, HashSet<String>>,
 }
 
 impl OperBox {
@@ -90,7 +92,11 @@ impl OperBox {
                 })
                 .or_insert(progress);
         }
-        Ok(Self { entries, owned })
+        Ok(Self {
+            entries,
+            owned,
+            facility_eta_exclusions: HashMap::new(),
+        })
     }
 
     pub fn owns(&self, name: &str) -> bool {
@@ -134,8 +140,20 @@ impl OperBox {
     }
 
     fn facility_roster(&self, instances: &OperatorInstances, facility: &str) -> Roster {
+        let eta_key = if facility == "manufacture" {
+            "factory"
+        } else {
+            facility
+        };
         let mut roster = Roster::default();
         for (name, progress) in &self.owned {
+            if self
+                .facility_eta_exclusions
+                .get(eta_key)
+                .is_some_and(|names| names.contains(name))
+            {
+                continue;
+            }
             let tier = PromotionTier::from_progress(*progress);
             if instances
                 .get(name, tier)
@@ -145,6 +163,60 @@ impl OperBox {
             }
         }
         roster
+    }
+
+    pub(crate) fn admits_facility(
+        &self,
+        name: &str,
+        facility: crate::layout::FacilityKind,
+    ) -> bool {
+        crate::mood::facility_key(facility).is_none_or(|key| {
+            self.facility_eta_exclusions
+                .get(key)
+                .is_none_or(|names| !names.contains(name))
+        })
+    }
+
+    pub(crate) fn roster_for_facility(&self, facility: crate::layout::FacilityKind) -> Roster {
+        Roster::from_progress_map(
+            self.owned
+                .iter()
+                .filter(|(name, _)| self.admits_facility(name, facility))
+                .map(|(name, progress)| (name.clone(), *progress))
+                .collect(),
+        )
+    }
+
+    /// 初始单人试算 policy：满中枢基础减耗、计划满房人数、自身技能；不借未来同房/中枢技能减免。
+    pub(crate) fn with_auto_roster_eta(
+        &self,
+        blueprint: &crate::layout::BaseBlueprint,
+        instances: &OperatorInstances,
+        hours: f64,
+    ) -> Result<Self> {
+        let model = crate::mood::default_mood_model()?;
+        let mut result = self.clone();
+        result.facility_eta_exclusions.clear();
+        for room in &blueprint.rooms {
+            let Some(key) = crate::mood::facility_key(room.kind) else {
+                continue;
+            };
+            if room.kind == crate::layout::FacilityKind::ControlCenter {
+                continue;
+            }
+            for (name, progress) in &self.owned {
+                if !crate::mood::auto_roster_room_fits(
+                    model, blueprint, room, instances, name, *progress, hours,
+                ) {
+                    result
+                        .facility_eta_exclusions
+                        .entry(key.to_string())
+                        .or_default()
+                        .insert(name.clone());
+                }
+            }
+        }
+        Ok(result)
     }
 
     pub fn roster_excluding(&self, excluded: &HashSet<String>) -> Roster {
@@ -167,6 +239,7 @@ impl OperBox {
                 .cloned()
                 .collect(),
             owned: self.owned_subset(excluded),
+            facility_eta_exclusions: self.facility_eta_exclusions.clone(),
         }
     }
 
@@ -185,6 +258,7 @@ impl OperBox {
                 .filter(|(k, _)| names.contains(*k))
                 .map(|(k, v)| (k.clone(), *v))
                 .collect(),
+            facility_eta_exclusions: self.facility_eta_exclusions.clone(),
         }
     }
 

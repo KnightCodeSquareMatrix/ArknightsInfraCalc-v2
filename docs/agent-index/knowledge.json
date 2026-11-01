@@ -225,7 +225,7 @@
       ],
       "owners": [
         "docs/排班模式.md",
-        "docs/调用链/自动轮换建议.md"
+        "docs/调用链/自动轮换.md"
       ],
       "code": [
         "crates/infra-core/src/schedule/mod.rs",

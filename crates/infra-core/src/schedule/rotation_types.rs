@@ -311,7 +311,7 @@ pub enum GenericRotationTiming {
     Abc { shift_hours: [f64; 3] },
 }
 
-/// 建议模式的主力、替补工作时长；不携带定时班次或恢复语义。
+/// 自动排班的主力、替补工作时长；不携带定时班次或恢复语义。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AutoRotationTiming {
     pub shift_hours: [f64; 2],

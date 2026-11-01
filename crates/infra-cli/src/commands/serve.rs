@@ -519,6 +519,10 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
                 "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6, 7],
+                "auto_rotation": {
+                    "entry": "plan --rotation auto@H1/H2",
+                    "fiammetta_policy": "static_priority",
+                },
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
                     "1": state.plan_contract_sha256_v1,

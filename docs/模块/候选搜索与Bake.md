@@ -109,7 +109,7 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 所有计数在当前 trace 的固定数值数组累积，没有 trace 时不统计。JSON 与标签只在 trace 结束生成；schema 2 的 operation 和 Bake 数值指标省略零值，缺字段按零解释，顶层 event/schema 与阶段结构保留。本阶段仅格式化、workspace 离线编译和文档/源差异检查，未运行 solver、Bake、性能或对拍。
 
-## 自动建议候选
+## 自动轮换候选
 
 自动模式在Plan入口删除禁用组合，整体跳过兼容registry与动态producer前缀竞争；允许域沿普通设施搜索、局部禁配、required和used。已删除CandidateAdmission、全站技能presence、资源来源复演及任意主备混搭穷举。按用户2026-10-30删减裁决，不再保证零散成员/任意混搭没有偶发禁用协同，此项属于approximation；没有新top-K或有限精查策略。
 

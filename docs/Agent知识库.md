@@ -36,7 +36,7 @@ python3 scripts/codex/query_project_knowledge.py --query '心情预算' --histor
 
 游戏技能原文去[固定知识库引用](知识库引用.md)，运行时映射去[输入与技能映射](模块/输入与技能映射.md)；产品支持去 canonical，当前实现去代码，某次结果去带 binary/input/commit 身份的证据。检索不会用 JSON、top hit 或助手总结替代裁决。
 
-运行时干员/buff/Rule/shortcut 使用 `query_runtime_data.py` 的精确原始记录和 JSON Pointer；调查原话使用 `index_research_reports.py`；定时排班产物使用 `query_rotation_report.py`。后者当前要求 TimedReport，不支持 AutoReport；自动建议读自身报告/调用链，不能仅凭 rotation 文件名推荐该脚本。
+运行时干员/buff/Rule/shortcut 使用 `query_runtime_data.py` 的精确原始记录和 JSON Pointer；调查原话使用 `index_research_reports.py`；定时排班产物使用 `query_rotation_report.py`。后者当前要求 TimedReport，不支持 AutoReport；自动轮换读自身报告/调用链，不能仅凭 rotation 文件名推荐该脚本。
 
 vault 按 routes 中固定 commit 读取，用 `--vault-root /home/knightcode/Projects/arknights-base-vault` 与 `--vault-path <routes中的路径>` 显式回取。不会跟随 vault 本地 HEAD，也不会扫描任意历史原话或外部账号数据；draft/未标状态保留原样，不升为 canonical。
 

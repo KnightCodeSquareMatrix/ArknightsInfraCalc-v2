@@ -256,7 +256,7 @@ pub(crate) fn fill_workplace_vacancies(
         let modeled = modeled_candidates(room.kind, &roster, instances, table, &registry)?;
         // 回收技能优先于普通补位；其他设施保留原“无技能先补空位”的 policy。
         let mut ranked = candidates.iter().collect::<Vec<_>>();
-        let skillless_order = if room.kind == FacilityKind::Recycle {
+        let skillless_order: &[bool] = if room.kind == FacilityKind::Recycle {
             let mut scored = ranked
                 .into_iter()
                 .map(|candidate| {
@@ -267,11 +267,17 @@ pub(crate) fn fill_workplace_vacancies(
             scored
                 .sort_by(|(left, a), (right, b)| b.cmp(a).then_with(|| left.name.cmp(&right.name)));
             ranked = scored.into_iter().map(|(candidate, _)| candidate).collect();
-            [false, true]
+            if assignment.auto_rotation {
+                &[false]
+            } else {
+                &[false, true]
+            }
+        } else if assignment.auto_rotation {
+            &[false]
         } else {
-            [true, false]
+            &[true, false]
         };
-        for skillless in skillless_order {
+        for &skillless in skillless_order {
             for candidate in &ranked {
                 if assignment.operators_in(&room.id).len() >= room.operator_capacity() {
                     break;
@@ -307,6 +313,34 @@ pub(crate) fn fill_workplace_vacancies(
                 *assignment = trial;
                 used.insert(candidate.name.clone());
                 placed.push((room.id.clone(), (*candidate).clone()));
+            }
+        }
+    }
+    if assignment.auto_rotation {
+        let random_order = std::collections::hash_map::RandomState::new();
+        let mut remaining: Vec<_> = candidates
+            .iter()
+            .filter(|operator| !used.contains(&operator.name))
+            .collect();
+        remaining.sort_by_key(|operator| {
+            std::hash::BuildHasher::hash_one(&random_order, &operator.name)
+        });
+        for room in &blueprint.rooms {
+            if !ordinary_workplace(room.kind) {
+                continue;
+            }
+            let mut operators = assignment.operators_in(&room.id).to_vec();
+            while operators.len() < room.operator_capacity() {
+                let Some(candidate) = remaining.pop() else {
+                    break;
+                };
+                used.insert(candidate.name.clone());
+                operators.push(candidate.clone());
+                assignment.fallback_operators.push(candidate.name.clone());
+                placed.push((room.id.clone(), candidate.clone()));
+            }
+            if operators.len() != assignment.operators_in(&room.id).len() {
+                assignment.set_room(room.id.clone(), operators);
             }
         }
     }

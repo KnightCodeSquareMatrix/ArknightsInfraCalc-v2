@@ -47,7 +47,7 @@ pub enum TradeRolePreference {
 
 #[derive(Debug, Clone)]
 pub struct AssignBaseOptions {
-    /// 建议模式能力边界，沿用同一 Plan / 搜索 / 完成步骤。
+    /// 自动排班能力边界，沿用同一 Plan / 搜索 / 完成步骤。
     pub auto_rotation: bool,
     pub top_k: usize,
     pub mood: f64,
@@ -365,8 +365,15 @@ pub(crate) fn complete_standalone_assignment(
     )?
     .layout;
     excluded.extend(result.assignment.occupied_operator_names());
+    let office_operbox = operbox.keeping_only(
+        &operbox
+            .roster_for_facility(FacilityKind::Office)
+            .names()
+            .cloned()
+            .collect(),
+    );
     let office_candidates = crate::office::rank_candidates(
-        operbox,
+        &office_operbox,
         &layout,
         options.mood,
         options.shift_hours,
@@ -397,6 +404,9 @@ pub(crate) fn complete_standalone_assignment(
         instances,
         table,
         |trial, room, candidate| {
+            if !operbox.admits_facility(&candidate.name, room.kind) {
+                return false;
+            }
             if room.kind == FacilityKind::ControlCenter
                 && forbidden_control_names.contains(&candidate.name)
             {

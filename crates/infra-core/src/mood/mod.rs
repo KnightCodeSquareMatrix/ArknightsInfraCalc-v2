@@ -591,3 +591,46 @@ pub(crate) fn control_roster_fits(
         hours,
     )
 }
+
+/// 自动排班的初始工作候选试算。空姓名只表达计划满房人数，不提供同房技能。
+pub(crate) fn auto_roster_room_fits(
+    model: &MoodModel,
+    blueprint: &crate::layout::BaseBlueprint,
+    room: &crate::layout::RoomBlueprint,
+    instances: &crate::instances::OperatorInstances,
+    name: &str,
+    progress: crate::roster::OperatorProgress,
+    hours: f64,
+) -> bool {
+    let mut room_ops = vec![(name.to_string(), progress.elite)];
+    room_ops.resize(room.operator_capacity(), (String::new(), 0));
+    let recipe = match &room.product {
+        Some(crate::layout::RoomProduct::Factory { recipe }) => Some(match recipe {
+            crate::types::RecipeKind::Gold => "gold",
+            crate::types::RecipeKind::BattleRecord => "battle_record",
+            crate::types::RecipeKind::Originium => "originium",
+            crate::types::RecipeKind::All => "all",
+        }),
+        _ => None,
+    };
+    let sui = instances
+        .tags_for(name, crate::tier::PromotionTier::from_progress(progress))
+        .iter()
+        .any(|tag| tag == "cc.g.sui");
+    let drain = drain::operator_net_drain_with_sui(
+        model,
+        &DrainInputs {
+            name,
+            elite: progress.elite,
+            facility: room.kind,
+            room_ops: &room_ops,
+            full_control: blueprint.rooms.iter().any(|room| {
+                room.kind == FacilityKind::ControlCenter && room.operator_capacity() >= 5
+            }),
+            control_ops: &[],
+            recipe,
+        },
+        sui,
+    );
+    fits_work_budget(model, model.mood_cap, drain, hours)
+}

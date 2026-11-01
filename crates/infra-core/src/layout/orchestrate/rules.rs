@@ -321,9 +321,11 @@ pub(super) fn default_rule_catalog_path() -> Result<std::path::PathBuf> {
 }
 
 /// 仅显式 gate 检查 Plan 的来源，不在生产候选中重新证明协同。
-pub(crate) fn assert_suggestion_plan_policy(plans: &[super::plan::AssignmentPlan]) -> Result<()> {
+pub(crate) fn assert_auto_rotation_plan_policy(
+    plans: &[super::plan::AssignmentPlan],
+) -> Result<()> {
     let mut catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
-    restrict_suggestion_catalog(&mut catalog);
+    restrict_auto_rotation_catalog(&mut catalog);
     for plan in plans {
         if !plan.auto_rotation || !plan.registry_claims.is_empty() {
             return Err(Error::msg(
@@ -1194,8 +1196,12 @@ fn enumerate_role_placements<'a>(
         .iter()
         .filter_map(|candidate| {
             let progress = ctx.operbox.progress_of(&candidate.name)?;
-            (!state.used.contains(&candidate.name) && progress.elite >= candidate.elite)
-                .then_some((candidate, progress))
+            (!state.used.contains(&candidate.name)
+                && progress.elite >= candidate.elite
+                && std::iter::once(role.facility)
+                    .chain(role.facilities.iter().copied())
+                    .any(|facility| ctx.operbox.admits_facility(&candidate.name, facility)))
+            .then_some((candidate, progress))
         })
         .collect();
     if matches!(role.selection, RoleSelection::ManufactureObjective) {
@@ -1297,17 +1303,18 @@ fn enumerate_role_placements<'a>(
     let mut trial = state.assignment.clone();
     for (candidate, progress) in available {
         let Some(room) = rooms.iter().copied().find(|room| {
-            trial.operators_in(&room.id).len()
-                < role_placement_capacity(
-                    role,
-                    room,
-                    ctx,
-                    &trial,
-                    &state.used,
-                    &candidate.name,
-                    existing_constraints,
-                    new_constraints,
-                )
+            ctx.operbox.admits_facility(&candidate.name, room.kind)
+                && trial.operators_in(&room.id).len()
+                    < role_placement_capacity(
+                        role,
+                        room,
+                        ctx,
+                        &trial,
+                        &state.used,
+                        &candidate.name,
+                        existing_constraints,
+                        new_constraints,
+                    )
                 && (!role.one_per_room
                     || if role.shared_room_facilities.contains(&room.kind) {
                         !placement.iter().any(|(id, _, _)| id == &room.id)
@@ -1559,17 +1566,18 @@ fn placement_is_valid(
         let Some(room) = ctx.blueprint.room(room_id) else {
             return false;
         };
-        if trial.operators_in(room_id).len()
-            >= role_placement_capacity(
-                role,
-                room,
-                ctx,
-                &trial,
-                used,
-                &candidate.name,
-                existing_constraints,
-                new_constraints,
-            )
+        if !ctx.operbox.admits_facility(&candidate.name, room.kind)
+            || trial.operators_in(room_id).len()
+                >= role_placement_capacity(
+                    role,
+                    room,
+                    ctx,
+                    &trial,
+                    used,
+                    &candidate.name,
+                    existing_constraints,
+                    new_constraints,
+                )
             || (role.one_per_room
                 && (!role_rooms.insert(room_id)
                     || (!role.shared_room_facilities.contains(&room.kind)
@@ -2210,7 +2218,7 @@ fn compile_relations(relations: &[RelationSpec]) -> Vec<SystemConstraint> {
 
 /// Product capability restriction happens before role placement. Tier alone is
 /// insufficient: it also labels legal single-station and building-count rules.
-pub(super) fn restrict_suggestion_catalog(catalog: &mut RuleCatalog) {
+pub(super) fn restrict_auto_rotation_catalog(catalog: &mut RuleCatalog) {
     for rule in &mut catalog.rules {
         rule.alternatives
             .retain(|alternative| match rule.id.as_str() {

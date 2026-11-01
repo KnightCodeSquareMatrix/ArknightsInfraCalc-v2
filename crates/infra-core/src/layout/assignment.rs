@@ -194,6 +194,9 @@ pub struct RoomAssignment {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BaseAssignment {
+    /// 普通 Fallback 实际补入的成员；不受自动初始技能候选 ETA 准入。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_operators: Vec<String>,
     #[serde(skip)]
     pub(crate) auto_rotation: bool,
     #[serde(skip)]

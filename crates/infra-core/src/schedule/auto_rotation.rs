@@ -1,4 +1,4 @@
-//! 每站主力/替补建议。选人、互斥和普通完成复用公共排班 owner。
+//! 每站主力/替补排班。选人、互斥和普通完成复用公共排班 owner。
 use serde::Serialize;
 
 use crate::error::{Error, Result};
@@ -10,8 +10,11 @@ use crate::layout::{
 use crate::operbox::OperBox;
 use crate::skill_table::SkillTable;
 
+const FALLBACK_WARNING: &str =
+    "可用干员太少，部分设施无法使用有技能的干员，已使用 Fallback 随机补位。";
+
 #[derive(Debug, Clone, Serialize)]
-pub struct AutoRoomRecommendation {
+pub struct AutoRoomRotation {
     pub room_id: RoomId,
     pub facility: FacilityKind,
     pub main: AutoRoomState,
@@ -24,6 +27,7 @@ pub struct AutoRoomState {
     pub efficiency: Option<crate::layout::RoomEfficiencySnapshot>,
     pub power_charge_efficiency: Option<crate::Efficiency>,
     pub support_speed_bonus_pct: Option<f64>,
+    pub recycle_efficiency: Option<crate::recycle::RecycleEfficiency>,
     pub control_effects: Option<AutoControlEffects>,
     pub evaluation_hours: f64,
     pub first_red_face: Option<String>,
@@ -31,7 +35,7 @@ pub struct AutoRoomState {
     pub complete: bool,
 }
 
-/// 中枢实际结算的静态加成；沿用效果账本，不在建议层重算机制。
+/// 中枢实际结算的静态加成；沿用效果账本，不在排班层重算机制。
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AutoControlEffects {
     pub trade_bonus_pct: f64,
@@ -65,12 +69,67 @@ pub struct AutoRotationReport {
     pub mode: &'static str,
     pub timing: super::AutoRotationTiming,
     pub complete: bool,
-    pub rooms: Vec<AutoRoomRecommendation>,
+    pub rooms: Vec<AutoRoomRotation>,
     pub constant_dorm_support: Vec<(RoomId, Vec<AssignedOperator>)>,
     pub main_assignment: BaseAssignment,
     pub backup_assignment: BaseAssignment,
     pub assignment_plans: Vec<AssignmentPlan>,
+    pub fiammetta: AutoFiammettaConfig,
     pub warnings: Vec<String>,
+}
+
+/// 静态目标队列，不承诺交换时刻、恢复预算或跨主备复用工作人员。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AutoFiammettaConfig {
+    pub enabled: bool,
+    pub available: bool,
+    pub priority: Vec<String>,
+    pub targets: Vec<AutoFiammettaTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AutoFiammettaTarget {
+    pub target: String,
+    pub room_id: RoomId,
+    pub state: &'static str,
+}
+
+fn configure_auto_fiammetta(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    enabled: bool,
+    assignments: [&BaseAssignment; 2],
+) -> AutoFiammettaConfig {
+    let priority = super::fiammetta_return_priority(blueprint);
+    let available = operbox.owns("菲亚梅塔");
+    let targets = if enabled && available {
+        priority
+            .iter()
+            .flat_map(|target| {
+                assignments
+                    .iter()
+                    .zip(["main", "backup"])
+                    .filter_map(move |(assignment, state)| {
+                        super::team_rotation::fiammetta_assignment_target_room(
+                            blueprint, assignment, target,
+                        )
+                        .map(|room_id| AutoFiammettaTarget {
+                            target: target.to_string(),
+                            room_id,
+                            state,
+                        })
+                    })
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    AutoFiammettaConfig {
+        enabled,
+        available,
+        priority: priority.into_iter().map(str::to_string).collect(),
+        targets,
+    }
 }
 
 pub(crate) fn select_control(
@@ -141,15 +200,19 @@ pub fn schedule_auto_rotation(
     timing: super::AutoRotationTiming,
 ) -> Result<AutoRotationReport> {
     timing.validate()?;
+    let fiammetta_enabled = options.fiammetta_enable;
+    let source_operbox = operbox;
     let mut options = options.clone();
     options.auto_rotation = true;
+    // 静态配置单独消费请求开关；公共选人仍不生成定时动作。
     options.fiammetta_enable = false;
     options.control_work_hours = Some(timing.shift_hours[0]);
     options.registry_sustain_hours = None;
     options.skip_standalone_control = true;
     options.shift_hours = timing.shift_hours[0];
     options.mood = crate::mood::default_mood_model()?.mood_cap;
-    let operbox = operbox.excluding(&["菲亚梅塔".to_string()].into_iter().collect());
+    let source = operbox.excluding(&["菲亚梅塔".to_string()].into_iter().collect());
+    let operbox = source.with_auto_roster_eta(blueprint, instances, timing.shift_hours[0])?;
     let mut seed = BaseAssignment::default();
     seed.auto_rotation = true;
     seed.work_hours = Some(options.shift_hours);
@@ -174,9 +237,11 @@ pub fn schedule_auto_rotation(
     let mut backup_options = options.clone();
     backup_options.shift_hours = timing.shift_hours[1];
     backup_options.control_work_hours = Some(timing.shift_hours[1]);
+    let backup_operbox =
+        source.with_auto_roster_eta(blueprint, instances, timing.shift_hours[1])?;
     let backup = super::team_rotation::solve_policy_disjoint_backup(
         blueprint,
-        &operbox,
+        &backup_operbox,
         instances,
         table,
         &backup_options,
@@ -184,7 +249,8 @@ pub fn schedule_auto_rotation(
         timing.shift_hours[1],
     )
     .map_err(|error| fixed_main_backup_error("替补选人", error))?;
-    let available = operbox.excluding(&main.assignment.work_position_operator_names(blueprint));
+    let available =
+        backup_operbox.excluding(&main.assignment.work_position_operator_names(blueprint));
     let mut backup = AssignShiftResult {
         assignment: backup.assignment,
         plan: backup.plan,
@@ -263,7 +329,8 @@ pub fn schedule_auto_rotation(
         .map(|room| {
             let state = |assignment: &BaseAssignment,
                          eta: &crate::mood::ShiftEta,
-                         resolved: &crate::layout::ResolvedBase| {
+                         resolved: &crate::layout::ResolvedBase|
+             -> Result<AutoRoomState> {
                 let members = assignment.operators_in(&room.id);
                 let bottleneck = eta
                     .per_op
@@ -275,7 +342,7 @@ pub fn schedule_auto_rotation(
                             .map(|hours| (entry.name.clone(), hours))
                     })
                     .min_by(|left, right| left.1.total_cmp(&right.1));
-                AutoRoomState {
+                Ok(AutoRoomState {
                     operators: members.to_vec(),
                     efficiency: assignment.efficiency_in(&room.id).cloned(),
                     power_charge_efficiency: (room.kind == FacilityKind::PowerPlant).then(|| {
@@ -292,31 +359,41 @@ pub fn schedule_auto_rotation(
                         .find(|support| support.id == room.id)
                         .and_then(|support| support.result.as_ref())
                         .map(|result| result.total_speed_bonus_pct),
+                    recycle_efficiency: (room.kind == FacilityKind::Recycle)
+                        .then(|| {
+                            crate::recycle::evaluate_recycle(room.level, members, instances, table)
+                        })
+                        .transpose()?,
                     control_effects: (room.kind == FacilityKind::ControlCenter)
                         .then(|| AutoControlEffects::from_layout(&resolved.layout)),
                     evaluation_hours: assignment.work_hours.expect("auto request work duration"),
                     first_red_face: bottleneck.map(|(name, _)| name),
                     missing_seats: room.operator_capacity().saturating_sub(members.len()),
                     complete: members.len() == room.operator_capacity(),
-                }
+                })
             };
-            AutoRoomRecommendation {
+            Ok(AutoRoomRotation {
                 room_id: room.id.clone(),
                 facility: room.kind,
-                main: state(&main.assignment, &main_eta, &main_resolved),
-                backup: state(&backup.assignment, &backup_eta, &backup_resolved),
-            }
+                main: state(&main.assignment, &main_eta, &main_resolved)?,
+                backup: state(&backup.assignment, &backup_eta, &backup_resolved)?,
+            })
         })
-        .collect();
+        .collect::<Result<_>>()?;
     for room in &rooms {
         for (label, state) in [("主力", &room.main), ("替补", &room.backup)] {
             if !state.complete {
                 warnings.push(format!(
-                    "{} {}缺{}人，建议不完整",
+                    "{} {}缺{}人，排班不完整",
                     room.room_id.0, label, state.missing_seats
                 ));
             }
         }
+    }
+    if !main.assignment.fallback_operators.is_empty()
+        || !backup.assignment.fallback_operators.is_empty()
+    {
+        warnings.push(FALLBACK_WARNING.to_string());
     }
     let constant_dorm_support = blueprint
         .rooms
@@ -335,6 +412,12 @@ pub fn schedule_auto_rotation(
             .all(|room| room.main.complete && room.backup.complete),
         rooms,
         constant_dorm_support,
+        fiammetta: configure_auto_fiammetta(
+            blueprint,
+            source_operbox,
+            fiammetta_enabled,
+            [&main.assignment, &backup.assignment],
+        ),
         main_assignment: main.assignment,
         backup_assignment: backup.assignment,
         assignment_plans: vec![main.plan, backup.plan],
@@ -352,12 +435,28 @@ pub fn assert_auto_rotation_invariants(
     instances: &OperatorInstances,
     table: &SkillTable,
     report: &AutoRotationReport,
+    fiammetta_enabled: bool,
 ) -> Result<()> {
     if report.mode != "auto_rotation" || report.assignment_plans.len() != 2 {
         return Err(Error::msg("assert-invariants auto_report_shape failed"));
     }
-    crate::layout::assert_suggestion_plan_policy(&report.assignment_plans)?;
+    crate::layout::assert_auto_rotation_plan_policy(&report.assignment_plans)?;
     report.timing.validate()?;
+    if report.fiammetta
+        != configure_auto_fiammetta(
+            blueprint,
+            operbox,
+            fiammetta_enabled,
+            [&report.main_assignment, &report.backup_assignment],
+        )
+        || [&report.main_assignment, &report.backup_assignment]
+            .iter()
+            .any(|assignment| assignment.operator_names().contains("菲亚梅塔"))
+    {
+        return Err(Error::msg(
+            "assert-invariants auto_fiammetta_static_priority failed",
+        ));
+    }
     validate_explicit_supports(
         blueprint,
         [&report.main_assignment, &report.backup_assignment],
@@ -416,6 +515,35 @@ pub fn assert_auto_rotation_invariants(
         .into_iter()
         .enumerate()
     {
+        let admitted =
+            operbox.with_auto_roster_eta(blueprint, instances, report.timing.shift_hours[index])?;
+        let mut fallback_seen = std::collections::HashSet::new();
+        for name in &assignment.fallback_operators {
+            if !fallback_seen.insert(name)
+                || !blueprint.rooms.iter().any(|room| {
+                    crate::layout::ordinary_workplace(room.kind)
+                        && assignment
+                            .operators_in(&room.id)
+                            .iter()
+                            .any(|op| &op.name == name)
+                })
+            {
+                return Err(Error::msg(
+                    "assert-invariants auto_fallback_identity failed",
+                ));
+            }
+        }
+        for room in &blueprint.rooms {
+            if assignment.operators_in(&room.id).iter().any(|operator| {
+                !assignment.fallback_operators.contains(&operator.name)
+                    && !admitted.admits_facility(&operator.name, room.kind)
+            }) {
+                return Err(Error::msg(format!(
+                    "assert-invariants auto_initial_eta_admission failed: {}",
+                    room.id.0
+                )));
+            }
+        }
         if !assignment.auto_rotation
             || assignment.work_hours != Some(report.timing.shift_hours[index])
         {
@@ -470,14 +598,14 @@ pub fn assert_auto_rotation_invariants(
             model.mood_cap,
             None,
         )?;
-        for recommendation in &report.rooms {
+        for room_rotation in &report.rooms {
             let state = if index == 0 {
-                &recommendation.main
+                &room_rotation.main
             } else {
-                &recommendation.backup
+                &room_rotation.backup
             };
             let room = blueprint
-                .room(&recommendation.room_id)
+                .room(&room_rotation.room_id)
                 .ok_or_else(|| Error::msg("assert-invariants auto_room_owner failed"))?;
             if assignment.operators_in(&room.id) != state.operators
                 || state.missing_seats
@@ -488,7 +616,7 @@ pub fn assert_auto_rotation_invariants(
             {
                 return Err(Error::msg("assert-invariants auto_shortfall failed"));
             }
-            if room.kind != recommendation.facility || !crate::layout::ordinary_workplace(room.kind)
+            if room.kind != room_rotation.facility || !crate::layout::ordinary_workplace(room.kind)
             {
                 return Err(Error::msg("assert-invariants auto_room_owner failed"));
             }
@@ -516,6 +644,17 @@ pub fn assert_auto_rotation_invariants(
             if state.power_charge_efficiency != power
                 || state.support_speed_bonus_pct != support
                 || state.control_effects != control
+                || state.recycle_efficiency
+                    != (room.kind == FacilityKind::Recycle)
+                        .then(|| {
+                            crate::recycle::evaluate_recycle(
+                                room.level,
+                                &state.operators,
+                                instances,
+                                table,
+                            )
+                        })
+                        .transpose()?
             {
                 return Err(Error::msg("assert-invariants auto_aux_efficiency failed"));
             }
@@ -546,7 +685,12 @@ pub fn assert_auto_rotation_invariants(
                         )
                     })
                     .collect::<Vec<_>>();
-                if !crate::search::manufacture_peers_compatible(&operators, table) {
+                if !state
+                    .operators
+                    .iter()
+                    .any(|operator| assignment.fallback_operators.contains(&operator.name))
+                    && !crate::search::manufacture_peers_compatible(&operators, table)
+                {
                     return Err(Error::msg(
                         "assert-invariants auto_manufacture_peer_group failed",
                     ));
@@ -563,12 +707,17 @@ pub fn assert_auto_rotation_invariants(
                 .filter(|(_, state)| !state.complete)
                 .map(move |(label, state)| {
                     format!(
-                        "{} {}缺{}人，建议不完整",
+                        "{} {}缺{}人，排班不完整",
                         room.room_id.0, label, state.missing_seats
                     )
                 })
         })
         .collect::<Vec<_>>();
+    if !report.main_assignment.fallback_operators.is_empty()
+        || !report.backup_assignment.fallback_operators.is_empty()
+    {
+        expected_warnings.push(FALLBACK_WARNING.to_string());
+    }
     expected_warnings.extend(auto_work_duration_issues(blueprint, instances, report)?);
     if report.warnings != expected_warnings {
         return Err(Error::msg(

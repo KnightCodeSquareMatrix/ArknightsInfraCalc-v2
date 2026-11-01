@@ -256,7 +256,7 @@ impl LayoutContext {
 }
 
 impl LayoutContext {
-    /// 建议模式使用请求窗口；定时搜索使用本阶段的明确窗口。
+    /// 自动轮换计算使用请求窗口；定时搜索使用本阶段的明确窗口。
     pub(crate) fn evaluation_hours(&self, hours: f64) -> crate::error::Result<f64> {
         if self.auto_rotation {
             self.work_hours.ok_or_else(|| {

@@ -78,6 +78,9 @@ pub fn build_power_pool_with_fillers(
     let mut names: Vec<_> = operbox.owned.keys().cloned().collect();
     names.sort();
     for name in names {
+        if !operbox.admits_facility(&name, crate::layout::FacilityKind::PowerPlant) {
+            continue;
+        }
         let progress = operbox.owned[&name];
         let tier = PromotionTier::from_progress(progress);
         // Unmodeled power skills must not silently become skillless fillers.

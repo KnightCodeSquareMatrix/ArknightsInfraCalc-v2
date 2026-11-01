@@ -1,4 +1,4 @@
-//! 自动建议只登记显式宿舍角色的归属，不发现潜在技能关系。
+//! 自动轮换只登记显式宿舍角色的归属，不发现潜在技能关系。
 use std::collections::BTreeMap;
 
 use super::plan::{ActiveDependency, SystemAnchor};

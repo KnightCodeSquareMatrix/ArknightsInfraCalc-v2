@@ -104,7 +104,9 @@ pub fn add_owned_jie_market_to_trade_pool(
     let Some(progress) = operbox.progress_of(JIE_TRADE_NAME) else {
         return;
     };
-    if progress.elite == 0 {
+    if progress.elite == 0
+        || !operbox.admits_facility(JIE_TRADE_NAME, crate::layout::FacilityKind::TradePost)
+    {
         return;
     }
     add_jie_market_to_trade_pool(pool, instances, table);

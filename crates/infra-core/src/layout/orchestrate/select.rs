@@ -102,7 +102,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     let mut catalog = load_rule_catalog(&default_rule_catalog_path()?)?;
     validate_rule_preferences(&catalog, preferences)?;
     if seed.auto_rotation {
-        super::rules::restrict_suggestion_catalog(&mut catalog);
+        super::rules::restrict_auto_rotation_catalog(&mut catalog);
     }
     if !support_combinations_enable && !seed.auto_rotation {
         for rule in &mut catalog.rules {

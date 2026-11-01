@@ -89,6 +89,6 @@ Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不
 | MAA 房间/班次字段错误 | `export/maa.rs`，确认 rotation assignment 已正确 |
 | Worker 与 CLI 行为不一致 | `plan_compute.rs` 共享入口、各自 adapter 的默认值和输出投影 |
 
-## 自动轮换建议分派
+## 自动轮换排班分派
 
-`plan --rotation auto@H1/H2`由公共core模式/时长请求解析后转入[自动轮换建议调用链](自动轮换建议.md)，加载同一蓝图、账号与技能数据。主备来源、Plan、搜索、普通完成复用core；输出独立逐站建议JSON/文本，`--json`只打印建议JSON。该入口不经过定时profile、Worker plan_compute或MAA，也不建立换班事件。
+`plan --rotation auto@H1/H2`由公共core模式/时长请求解析后转入[自动轮换调用链](自动轮换.md)，加载同一蓝图、账号与技能数据。主备来源、Plan、搜索、普通完成复用core；输出独立逐站排班JSON/文本，`--json`只打印排班JSON。该入口不经过定时profile、Worker plan_compute或MAA，也不建立换班事件。

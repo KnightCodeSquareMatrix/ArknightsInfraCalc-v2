@@ -67,11 +67,11 @@ Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 w
 
 排查结果错误时，先判断是参数/加载、共享编排、core 结算还是输出投影，避免在 CLI 层修机制。
 
-## 自动建议入口
+## 自动排班入口
 
-`plan --rotation auto@H1/H2` 通过公共模式/时长请求解析后分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出建议。支持 `--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站建议，`--json`时只输出建议JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚固定关闭。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整建议。仅最初中枢名单按ETA试算；后续心情不足保留正常结果与质量提示，显式gate核对提示准确性以及身份、Plan和快照。不再证明任意零散成员或主备混搭不存在偶发跨站协同（保证边界见`docs/自动轮换.md` §2.10）。第一次主力完成后固定；合法替补候选耗尽保留真实缺额并输出当前建议，不回选主力或缩短时长。Worker schema、plan_compute、MAA及网站未扩展。
+`plan --rotation auto@H1/H2` 通过公共模式/时长请求解析后分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出排班。支持 `--no-fiammetta`、`--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站排班，`--json`时只输出排班JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚按静态优先级配置，支持`--no-fiammetta`且gate核对请求开关。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整排班。正常工作技能候选在初始建池按对应设施及H1/H2试算，随机Fallback不做心情或技能检查；后续心情不足保留正常结果与质量提示，显式gate核对提示准确性以及身份、Plan和快照。不再证明任意零散成员或主备混搭不存在偶发跨站协同（保证边界见`docs/自动轮换.md` §2.10）。第一次主力完成后固定；合法替补候选耗尽保留真实缺额并输出当前排班，不回选主力或缩短时长。Worker plan_compute仍为定时契约；Check通过此独立CLI入口接自动排班。ping新增`auto_rotation.fiammetta_policy="static_priority"`能力声明，旧bundle未声明时不得静默接收开启请求。MAA未扩展。
 
-自动建议明确输入主力/替补两段时长，裸 `auto` 返回补时长错误；例如 `auto@24/12`。输出 `timing.shift_hours`保存输入，两态的`evaluation_hours`分别为H1/H2，ETA首人只解释可工作时间。CLI模式/时长解析共用core请求，Worker仍只接受既有定时合同。
+自动排班明确输入主力/替补两段时长，裸 `auto` 返回补时长错误；例如 `auto@24/12`。输出 `timing.shift_hours`保存输入，两态的`evaluation_hours`分别为H1/H2，ETA首人只解释可工作时间。CLI模式/时长解析共用core请求，Worker仍只接受既有定时合同。
 
 自动轮换 `plan --rotation auto@H1/H2` 现与普通 plan 共用性能 trace；标签为实际布局和 Box 路径，guard 包含数据加载、求解及终态验收，退出时输出 schema2 汇总。阶段耗时仍为包含子调用的口径，不能相加；失败和提前返回也保留汇总。
 

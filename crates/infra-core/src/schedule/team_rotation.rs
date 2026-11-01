@@ -2273,21 +2273,30 @@ fn first_fiammetta_assignment_target(
         .filter(|target| fiammetta_target_is_legal(profile, target))
         .filter(|target| !used.contains(*target))
         .find_map(|target| {
-            assignment.iter_rooms().find_map(|room| {
-                let production = blueprint.room(&room.room_id).is_some_and(|room| {
-                    matches!(
-                        room.kind,
-                        FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
-                    )
-                });
-                (production
-                    && room
-                        .operators
-                        .iter()
-                        .any(|operator| operator.name == target))
-                .then(|| (target.to_string(), room.room_id.clone()))
-            })
+            fiammetta_assignment_target_room(blueprint, assignment, target)
+                .map(|room| (target.to_string(), room))
         })
+}
+
+pub(crate) fn fiammetta_assignment_target_room(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    target: &str,
+) -> Option<RoomId> {
+    assignment.iter_rooms().find_map(|room| {
+        let production = blueprint.room(&room.room_id).is_some_and(|spec| {
+            matches!(
+                spec.kind,
+                FacilityKind::TradePost | FacilityKind::Factory | FacilityKind::PowerPlant
+            )
+        });
+        (production
+            && room
+                .operators
+                .iter()
+                .any(|operator| operator.name == target))
+        .then(|| room.room_id.clone())
+    })
 }
 
 fn validate_office_assignment_disjoint(

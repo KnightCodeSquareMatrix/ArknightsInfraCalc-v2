@@ -8,7 +8,7 @@ mod execute;
 mod plan;
 mod rules;
 mod select;
-pub(crate) use rules::{assert_suggestion_plan_policy, assert_support_combination_policy};
+pub(crate) use rules::{assert_auto_rotation_plan_policy, assert_support_combination_policy};
 
 pub use execute::{execute_plan, ExecuteResult};
 pub(crate) use plan::pack_production_components;

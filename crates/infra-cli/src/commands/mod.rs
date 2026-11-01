@@ -24,7 +24,7 @@ fn timed_rotation_request_from_args(
     match rotation_request_from_args(args)? {
         infra_core::schedule::RotationRequest::Timed(request) => Ok(request),
         infra_core::schedule::RotationRequest::Auto(_) => Err(infra_core::Error::msg(
-            "自动轮换建议使用 plan --rotation auto@H1/H2",
+            "自动轮换计算入口为 plan --rotation auto@H1/H2",
         )),
     }
 }

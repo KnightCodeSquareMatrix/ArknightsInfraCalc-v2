@@ -18,7 +18,7 @@ use crate::types::Action;
 const PER_OPERATOR_MILLIS: i32 = 10;
 
 /// 一座回收站在给定编制下的效率拆分。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct RecycleEfficiency {
     pub operator_count: usize,
     /// 等级基础 + 0.01 × 进驻人数。

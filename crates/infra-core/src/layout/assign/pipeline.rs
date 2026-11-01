@@ -914,7 +914,7 @@ fn assign_meeting_rooms(
     )?
     .layout_snapshot();
 
-    let roster = operbox.roster();
+    let roster = operbox.roster_for_facility(crate::layout::FacilityKind::MeetingRoom);
     for room in blueprint
         .rooms
         .iter()
@@ -1232,7 +1232,8 @@ fn best_available_office_pct(
         .max()
         .unwrap_or(0);
     let mut best_office_pct: Option<f64> = None;
-    for name in run.operbox.roster().names() {
+    let office_roster = run.operbox.roster_for_facility(FacilityKind::Office);
+    for name in office_roster.names() {
         if run.used.contains(name) && !office_occupants.contains(name) {
             continue;
         }

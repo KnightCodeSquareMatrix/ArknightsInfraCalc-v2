@@ -119,5 +119,5 @@
 | [ADR 0011: 二/三班通用时长排班与泡泡火神全局强制](ADR/0011-generic-two-three-shift-rotation.md) | `accepted` | 为普通二班/三班增加输入时长并共用终态收尾，在全部该范围内强制泡泡/火神源石预占 |
 | [ADR 0012: 十月排班需求的分项交付判定与关闭边界](ADR/0012-october-rotation-delivery-boundaries.md) | `accepted` | 记录六项十月排班需求在各自语义边界内的交付状态，不把局部实现或工作区草稿合并宣称为整体完成 |
 | [ADR 0013: 四赤金作为 Trade Core 候选](ADR/0013-four-gold-trade-core-candidate.md) | `accepted` | 明确四赤金是 Trade Core 候选中的专用跨站方案，并规定其与普通 Trade Core 的比较边界 |
-| [ADR 0014: 四赤金同场择优与自动轮换建议模式的实现路线](ADR/0014-four-gold-comparison-and-auto-rotation-roadmap.md) | `proposed` | 评估十月排班剩余两项（四赤金完整候选比较、自动轮换建议模式）的实现难度，列出必须由用户裁决的事项，并给出按单一意图拆分的修改路线 |
+| [ADR 0014: 四赤金同场择优与自动轮换模式的实现路线](ADR/0014-four-gold-comparison-and-auto-rotation-roadmap.md) | `proposed` | 评估十月排班剩余两项（四赤金完整候选比较、自动轮换模式）的实现难度，列出必须由用户裁决的事项，并给出按单一意图拆分的修改路线 |
 <!-- END GENERATED DECISIONS -->

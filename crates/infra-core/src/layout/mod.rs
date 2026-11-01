@@ -4,7 +4,7 @@ mod blueprint;
 mod context;
 mod orchestrate;
 pub(crate) use orchestrate::auto_support::claim_support_rooms;
-pub(crate) use orchestrate::{assert_suggestion_plan_policy, assert_support_combination_policy};
+pub(crate) use orchestrate::{assert_auto_rotation_plan_policy, assert_support_combination_policy};
 mod resolve;
 mod shift;
 mod system;

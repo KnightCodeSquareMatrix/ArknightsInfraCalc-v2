@@ -340,7 +340,7 @@ fn auto_rotation_cmd(
         "--fiammetta-candidates-out",
     ] {
         if args.iter().any(|arg| arg == option) {
-            return Err(Error::msg(format!("自动轮换建议不支持 {option}")));
+            return Err(Error::msg(format!("自动轮换排班不支持 {option}")));
         }
     }
     let operbox_path = operbox_path_from_args(args)?;
@@ -353,6 +353,7 @@ fn auto_rotation_cmd(
     let instances = OperatorInstances::load(&default_instances_path()?)?;
     let table = SkillTable::load(&default_skill_table_path()?)?;
     let options = AssignBaseOptions {
+        fiammetta_enable: !args.iter().any(|arg| arg == "--no-fiammetta"),
         top_k: args
             .windows(2)
             .find(|value| value[0] == "--top")
@@ -375,7 +376,12 @@ fn auto_rotation_cmd(
     };
     if args.iter().any(|arg| arg == "--assert-invariants") {
         infra_core::schedule::assert_auto_rotation_invariants(
-            &blueprint, &operbox, &instances, &table, &report,
+            &blueprint,
+            &operbox,
+            &instances,
+            &table,
+            &report,
+            options.fiammetta_enable,
         )?;
     }
     if let Some(path) = rotation_out_from_args(args)
@@ -386,14 +392,14 @@ fn auto_rotation_cmd(
             &path,
             format!("{}\n", serde_json::to_string_pretty(&report)?),
         )?;
-        eprintln!("自动轮换建议 JSON → {}", path.display());
+        eprintln!("自动轮换排班 JSON → {}", path.display());
     }
     if args.iter().any(|arg| arg == "--json") {
         println!("{}", serde_json::to_string_pretty(&report)?);
         return Ok(());
     }
     println!(
-        "自动轮换建议 · 主力/替补 · {}",
+        "自动轮换排班 · 主力/替补 · {}",
         if report.complete {
             "完整"
         } else {
@@ -468,6 +474,34 @@ fn auto_rotation_cmd(
                 .collect::<Vec<_>>()
                 .join(" / ")
         );
+    }
+    if report.fiammetta.enabled {
+        println!(
+            "菲亚梅塔静态优先级：{}",
+            report.fiammetta.priority.join(" → ")
+        );
+        for target in &report.fiammetta.targets {
+            println!(
+                "  {} · {} · {}",
+                target.target,
+                target.room_id.0,
+                if target.state == "main" {
+                    "主力"
+                } else {
+                    "替补"
+                }
+            );
+        }
+        if report.fiammetta.targets.is_empty() {
+            println!(
+                "  {}",
+                if report.fiammetta.available {
+                    "当前在岗名单没有优先级目标"
+                } else {
+                    "Box 未持有菲亚梅塔"
+                }
+            );
+        }
     }
     for warning in &report.warnings {
         println!("提示：{warning}");

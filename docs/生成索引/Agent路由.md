@@ -307,17 +307,17 @@
 
 **验证**：`infra-cli debug rerun --bundle <debug-bundle.json>`；`python3 scripts/codex/check_repository_facts.py`
 
-## `SCHEDULE.AUTO_ROTATION`：自动轮换逐站主备建议
+## `SCHEDULE.AUTO_ROTATION`：自动轮换逐站主备计算
 
 **优先级**：`85`
 
-**症状**：自动轮换、主备互斥、常驻挂件、建议不完整
+**症状**：自动轮换、主备互斥、常驻挂件、排班不完整
 
-**判别**：每站主备建议、禁止跨站成员关系、共享宿舍挂件或缺员标注时选择。
+**判别**：每站主备计算、禁止跨站成员关系、共享宿舍挂件或缺员标注时选择。
 
 **入口**：`crates/infra-core/src/schedule/auto_rotation.rs::schedule_auto_rotation`；`crates/infra-cli/src/commands/plan.rs::auto_rotation_cmd`
 
-**完整调用链**：[docs/调用链/自动轮换建议.md](../调用链/自动轮换建议.md)
+**完整调用链**：[docs/调用链/自动轮换.md](../调用链/自动轮换.md)
 
 **模块 owner**：[docs/模块/排班与轮换.md](../模块/排班与轮换.md)；[docs/模块/候选搜索与Bake.md](../模块/候选搜索与Bake.md)；[docs/接口/CLI与Worker.md](../接口/CLI与Worker.md)
 

@@ -487,18 +487,18 @@
     },
     {
       "id": "SCHEDULE.AUTO_ROTATION",
-      "title": "自动轮换逐站主备建议",
+      "title": "自动轮换逐站主备计算",
       "symptoms": [
         "自动轮换",
         "主备互斥",
         "常驻挂件",
-        "建议不完整"
+        "排班不完整"
       ],
       "entrypoints": [
         "crates/infra-core/src/schedule/auto_rotation.rs::schedule_auto_rotation",
         "crates/infra-cli/src/commands/plan.rs::auto_rotation_cmd"
       ],
-      "chain_doc": "docs/调用链/自动轮换建议.md",
+      "chain_doc": "docs/调用链/自动轮换.md",
       "module_docs": [
         "docs/模块/排班与轮换.md",
         "docs/模块/候选搜索与Bake.md",
@@ -514,7 +514,7 @@
         "docs/1-基础设定/设施与进驻/心情与宿舍.md"
       ],
       "priority": 85,
-      "when": "每站主备建议、禁止跨站成员关系、共享宿舍挂件或缺员标注时选择。"
+      "when": "每站主备计算、禁止跨站成员关系、共享宿舍挂件或缺员标注时选择。"
     }
   ],
   "vault_commit": "977b6ab0cc0430053194f269d7b3ee0242e7be48"

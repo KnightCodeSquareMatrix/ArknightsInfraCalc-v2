@@ -2,7 +2,7 @@ mod auto_rotation;
 mod base_rotation;
 pub use auto_rotation::{
     assert_auto_rotation_invariants, schedule_auto_rotation, AutoControlEffects,
-    AutoRoomRecommendation, AutoRoomState, AutoRotationReport,
+    AutoFiammettaConfig, AutoFiammettaTarget, AutoRoomRotation, AutoRoomState, AutoRotationReport,
 };
 pub(crate) mod control_rotation;
 mod cycle_mood;
@@ -21,7 +21,7 @@ pub use rotation_types::{
     TeamRotationReport, TeamShiftResult, TimedRotationProfile, TimedRotationRequest,
 };
 
-/// 两种输出分别保留其领域合同，共用模式/时长分派入口。
+/// 两种排班输出分别保留其领域合同，共用模式/时长分派入口。
 pub enum RotationReport {
     Timed(TeamRotationReport),
     Auto(AutoRotationReport),
