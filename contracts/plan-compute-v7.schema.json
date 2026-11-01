@@ -232,7 +232,8 @@
             "office",
             "meeting_room",
             "training_room",
-            "workshop"
+            "workshop",
+            "recycle"
           ]
         },
         "level": {

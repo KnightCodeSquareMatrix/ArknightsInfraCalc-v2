@@ -6,6 +6,8 @@
 
 v7 保持 v6 的 layout、operbox、labels、options 默认值和结果 envelope。`options.rotation` 继续接受 v6 的六个 named profile 字符串，并新增两种拓扑对象：
 
+v7 的 `layout.rooms[].kind` 也接受已建模的回收站 `recycle`。回收站仍由公共 blueprint 校验等级和数量，由现有 Plan、技能结算及补位逻辑处理；本契约不新增回收站计算。需要回收站或主动挂件组合的当前调用方可统一使用 v7（rotation 仍可使用 named 字符串）。v1–v6 机器契约保持原样，旧版不接受回收站输入；不得从新布局删除回收站以迎合旧契约。
+
 ```json
 {"topology":"main_backup","shift_hours":[8,16]}
 ```
