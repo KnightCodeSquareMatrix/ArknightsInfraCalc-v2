@@ -8,6 +8,7 @@ pub(crate) mod control_rotation;
 mod cycle_mood;
 mod dorm_finalizer;
 mod fiammetta_events;
+pub use fiammetta_events::FiammettaExchange;
 mod rotation_scoring;
 mod rotation_types;
 mod shift_bind;

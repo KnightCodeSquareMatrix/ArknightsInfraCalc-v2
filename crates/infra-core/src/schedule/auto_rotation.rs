@@ -78,13 +78,17 @@ pub struct AutoRotationReport {
     pub warnings: Vec<String>,
 }
 
-/// 静态目标队列，不承诺交换时刻、恢复预算或跨主备复用工作人员。
+/// Confirmed continuous targets and a repeated Fiammetta service cycle.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AutoFiammettaConfig {
     pub enabled: bool,
     pub available: bool,
     pub priority: Vec<String>,
     pub targets: Vec<AutoFiammettaTarget>,
+    pub dorm_room_id: Option<RoomId>,
+    pub service_period_hours: f64,
+    pub recovery_per_hour: f64,
+    pub exchanges: Vec<super::fiammetta_events::FiammettaExchange>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -98,38 +102,94 @@ fn configure_auto_fiammetta(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
     enabled: bool,
+    targets: &[(String, RoomId)],
+    dorm_room_id: Option<RoomId>,
+    period: f64,
     assignments: [&BaseAssignment; 2],
-) -> AutoFiammettaConfig {
+    instances: &OperatorInstances,
+) -> Result<AutoFiammettaConfig> {
     let priority = super::fiammetta_return_priority(blueprint);
     let available = operbox.owns("菲亚梅塔");
-    let targets = if enabled && available {
-        priority
-            .iter()
-            .flat_map(|target| {
-                assignments
-                    .iter()
-                    .zip(["main", "backup"])
-                    .filter_map(move |(assignment, state)| {
-                        super::team_rotation::fiammetta_assignment_target_room(
-                            blueprint, assignment, target,
-                        )
-                        .map(|room_id| AutoFiammettaTarget {
-                            target: target.to_string(),
-                            room_id,
-                            state,
-                        })
-                    })
+    let model = crate::mood::default_mood_model()?;
+    if let Some(dorm_id) = &dorm_room_id {
+        let dorm = blueprint
+            .room(dorm_id)
+            .ok_or_else(|| Error::FiammettaCandidateUnavailable("Fiammetta dorm absent".into()))?;
+        if dorm.kind != FacilityKind::Dormitory
+            || assignments.iter().any(|assignment| {
+                assignment
+                    .room_of_operator(super::fiammetta_events::FIAMMETTA_NAME)
+                    .map(|room| &room.room_id)
+                    != Some(dorm_id)
+                    || assignment.operators_in(dorm_id).len() >= dorm.operator_capacity()
             })
-            .collect()
-    } else {
-        Vec::new()
-    };
-    AutoFiammettaConfig {
+        {
+            return Err(Error::FiammettaCandidateUnavailable(
+                "Fiammetta dorm has no exchange seat".into(),
+            ));
+        }
+    }
+    let drains = continuous_target_drains(blueprint, instances, assignments, targets)?;
+    let exchanges = super::fiammetta_events::continuous_exchanges(model, &drains, period)?;
+    Ok(AutoFiammettaConfig {
         enabled,
         available,
         priority: priority.into_iter().map(str::to_string).collect(),
-        targets,
+        targets: targets
+            .iter()
+            .map(|(target, room_id)| AutoFiammettaTarget {
+                target: target.clone(),
+                room_id: room_id.clone(),
+                state: "continuous",
+            })
+            .collect(),
+        dorm_room_id,
+        service_period_hours: period,
+        recovery_per_hour: super::fiammetta_events::recovery_rate(model),
+        exchanges,
+    })
+}
+
+/// Each room can switch independently. Use the worst actual local/control drain
+/// for each supported target, without imposing new admission on other workers.
+fn continuous_target_drains(
+    blueprint: &BaseBlueprint,
+    instances: &OperatorInstances,
+    assignments: [&BaseAssignment; 2],
+    targets: &[(String, RoomId)],
+) -> Result<Vec<(String, f64)>> {
+    let model = crate::mood::default_mood_model()?;
+    let mut drains = vec![0.0_f64; targets.len()];
+    for assignment in assignments {
+        for control in assignments {
+            let mut trial = assignment.clone();
+            for room in blueprint
+                .rooms
+                .iter()
+                .filter(|room| room.kind == FacilityKind::ControlCenter)
+            {
+                trial.set_room(room.id.clone(), control.operators_in(&room.id).to_vec());
+            }
+            let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
+            for (index, (target, room)) in targets.iter().enumerate() {
+                let entry = eta
+                    .per_op
+                    .iter()
+                    .find(|entry| entry.name == *target && entry.room_id == room.0)
+                    .ok_or_else(|| {
+                        Error::FiammettaCandidateUnavailable(
+                            "continuous target missing from its production room".into(),
+                        )
+                    })?;
+                drains[index] = drains[index].max(entry.drain_per_hour.max(0.0));
+            }
+        }
     }
+    Ok(targets
+        .iter()
+        .zip(drains)
+        .map(|((target, _), drain)| (target.clone(), drain))
+        .collect())
 }
 
 pub(crate) fn select_control(
@@ -233,37 +293,153 @@ pub fn schedule_auto_rotation(
     crate::layout::complete_standalone_assignment(
         blueprint, &operbox, instances, table, &options, &mut main,
     )?;
-    // 第一次完整主力的工作名单在此冻结；替补不得预占成员或触发主力回选。
+    // 第一次完整主力的工作名单在此冻结；菲亚仅允许已确认目标同房续班。
     let mut backup_options = options.clone();
     backup_options.shift_hours = timing.shift_hours[1];
     backup_options.control_work_hours = Some(timing.shift_hours[1]);
     let backup_operbox =
         source.with_auto_roster_eta(blueprint, instances, timing.shift_hours[1])?;
-    let backup = super::team_rotation::solve_policy_disjoint_backup(
-        blueprint,
-        &backup_operbox,
-        instances,
-        table,
-        &backup_options,
-        &main.assignment,
-        timing.shift_hours[1],
-    )
-    .map_err(|error| fixed_main_backup_error("替补选人", error))?;
-    let available =
-        backup_operbox.excluding(&main.assignment.work_position_operator_names(blueprint));
-    let mut backup = AssignShiftResult {
-        assignment: backup.assignment,
-        plan: backup.plan,
+    let period = timing.shift_hours[0].min(timing.shift_hours[1]);
+    let solve_backup =
+        |main: &AssignShiftResult, targets: &[(String, RoomId)]| -> Result<AssignShiftResult> {
+            let backup = super::team_rotation::solve_policy_backup_with_continuous_targets(
+                blueprint,
+                &backup_operbox,
+                instances,
+                table,
+                &backup_options,
+                &main.assignment,
+                timing.shift_hours[1],
+                targets,
+            )?;
+            let mut excluded = main.assignment.work_position_operator_names(blueprint);
+            for (target, _) in targets {
+                excluded.remove(target);
+            }
+            let available = backup_operbox.excluding(&excluded);
+            let mut backup = AssignShiftResult {
+                assignment: backup.assignment,
+                plan: backup.plan,
+            };
+            crate::layout::complete_standalone_assignment(
+                blueprint,
+                &available,
+                instances,
+                table,
+                &backup_options,
+                &mut backup,
+            )?;
+            Ok(backup)
+        };
+    let mut selected_targets = Vec::new();
+    let mut selected_backup = None;
+    let mut selected_dorm = None;
+    if fiammetta_enabled && source_operbox.owns(super::fiammetta_events::FIAMMETTA_NAME) {
+        // Reserve Fiammetta plus one temporary target seat without evicting supports.
+        if let Some(dorm) = blueprint
+            .rooms
+            .iter()
+            .filter(|room| {
+                room.kind == FacilityKind::Dormitory
+                    && room.operator_capacity() >= main.assignment.operators_in(&room.id).len() + 2
+            })
+            .min_by_key(|room| main.assignment.operators_in(&room.id).len())
+        {
+            let mut candidate_main = main.clone();
+            let mut dorm_members = candidate_main.assignment.operators_in(&dorm.id).to_vec();
+            dorm_members.push(AssignedOperator::from_progress(
+                super::fiammetta_events::FIAMMETTA_NAME,
+                source_operbox
+                    .progress_of(super::fiammetta_events::FIAMMETTA_NAME)
+                    .unwrap(),
+            ));
+            candidate_main
+                .assignment
+                .set_room(dorm.id.clone(), dorm_members);
+            for target in super::fiammetta_return_priority(blueprint) {
+                let Some(room) = super::team_rotation::fiammetta_assignment_target_room(
+                    blueprint,
+                    &main.assignment,
+                    target,
+                ) else {
+                    continue;
+                };
+                if !backup_operbox.admits_facility(target, blueprint.room(&room).unwrap().kind) {
+                    continue;
+                }
+                let mut targets = selected_targets.clone();
+                targets.push((target.to_string(), room));
+                // Reject unsupported proposals before rebuilding the backup roster.
+                match configure_auto_fiammetta(
+                    blueprint,
+                    source_operbox,
+                    true,
+                    &targets,
+                    Some(dorm.id.clone()),
+                    period,
+                    [&candidate_main.assignment, &candidate_main.assignment],
+                    instances,
+                ) {
+                    Ok(_) => {}
+                    Err(Error::FiammettaCandidateUnavailable(_)) => continue,
+                    Err(error) => return Err(error),
+                }
+                let mut backup = match solve_backup(&candidate_main, &targets) {
+                    Ok(backup) => backup,
+                    Err(
+                        Error::NoCandidate(_)
+                        | Error::FiammettaCandidateUnavailable(_)
+                        | Error::OptionalTradeRoleInfeasible { .. }
+                        | Error::GoldFlowCoreInfeasible { .. }
+                        | Error::ManufactureAnchoredCompletionInfeasible { .. },
+                    ) => continue,
+                    Err(error) => return Err(error),
+                };
+                match configure_auto_fiammetta(
+                    blueprint,
+                    source_operbox,
+                    true,
+                    &targets,
+                    Some(dorm.id.clone()),
+                    period,
+                    [&candidate_main.assignment, &backup.assignment],
+                    instances,
+                ) {
+                    Ok(_) => {}
+                    Err(Error::FiammettaCandidateUnavailable(_)) => continue,
+                    Err(error) => return Err(error),
+                }
+                // Both Plan states declare the same supported production targets.
+                backup
+                    .plan
+                    .active_dependencies
+                    .push(crate::layout::ActiveDependency {
+                        consumers: targets.iter().map(|(target, _)| target.clone()).collect(),
+                        required: vec![super::fiammetta_events::FIAMMETTA_NAME.to_string()],
+                    });
+                selected_targets = targets;
+                selected_backup = Some(backup);
+                selected_dorm = Some(dorm.id.clone());
+            }
+            if selected_backup.is_some() {
+                main = candidate_main;
+                main.plan
+                    .active_dependencies
+                    .push(crate::layout::ActiveDependency {
+                        consumers: selected_targets
+                            .iter()
+                            .map(|(target, _)| target.clone())
+                            .collect(),
+                        required: vec![super::fiammetta_events::FIAMMETTA_NAME.to_string()],
+                    });
+            }
+        }
+    }
+    let mut backup = match selected_backup {
+        Some(backup) => backup,
+        None => solve_backup(&main, &[])
+            .map_err(|error| fixed_main_backup_error("替补选人与补位", error))?,
     };
-    crate::layout::complete_standalone_assignment(
-        blueprint,
-        &available,
-        instances,
-        table,
-        &backup_options,
-        &mut backup,
-    )
-    .map_err(|error| fixed_main_backup_error("替补补位", error))?;
     // 替补阶段新增的显式挂件成为两态常驻；归属继承固定主力的工作房。
     for room in blueprint
         .rooms
@@ -336,6 +512,11 @@ pub fn schedule_auto_rotation(
                     .per_op
                     .iter()
                     .filter(|entry| entry.room_id == room.id.0)
+                    .filter(|entry| {
+                        !selected_targets
+                            .iter()
+                            .any(|(target, _)| *target == entry.name)
+                    })
                     .filter_map(|entry| {
                         entry
                             .workable_hours
@@ -416,8 +597,12 @@ pub fn schedule_auto_rotation(
             blueprint,
             source_operbox,
             fiammetta_enabled,
+            &selected_targets,
+            selected_dorm,
+            period,
             [&main.assignment, &backup.assignment],
-        ),
+            instances,
+        )?,
         main_assignment: main.assignment,
         backup_assignment: backup.assignment,
         assignment_plans: vec![main.plan, backup.plan],
@@ -442,21 +627,107 @@ pub fn assert_auto_rotation_invariants(
     }
     crate::layout::assert_auto_rotation_plan_policy(&report.assignment_plans)?;
     report.timing.validate()?;
-    if report.fiammetta
-        != configure_auto_fiammetta(
-            blueprint,
-            operbox,
-            fiammetta_enabled,
-            [&report.main_assignment, &report.backup_assignment],
-        )
-        || [&report.main_assignment, &report.backup_assignment]
+    let targets = report
+        .fiammetta
+        .targets
+        .iter()
+        .map(|target| (target.target.clone(), target.room_id.clone()))
+        .collect::<Vec<_>>();
+    let priority = super::fiammetta_return_priority(blueprint);
+    let mut last_priority = None;
+    for target in &report.fiammetta.targets {
+        let position = priority
             .iter()
-            .any(|assignment| assignment.operator_names().contains("菲亚梅塔"))
+            .position(|name| *name == target.target)
+            .ok_or_else(|| Error::msg("assert-invariants auto_fiammetta_priority failed"))?;
+        if last_priority.is_some_and(|last| position <= last)
+            || target.state != "continuous"
+            || [&report.main_assignment, &report.backup_assignment]
+                .iter()
+                .any(|assignment| {
+                    super::team_rotation::fiammetta_assignment_target_room(
+                        blueprint,
+                        assignment,
+                        &target.target,
+                    )
+                    .as_ref()
+                        != Some(&target.room_id)
+                })
+            || report.assignment_plans.iter().any(|plan| {
+                !plan.active_dependencies.iter().any(|dependency| {
+                    dependency.consumers.contains(&target.target)
+                        && dependency
+                            .required
+                            .iter()
+                            .any(|name| name == super::fiammetta_events::FIAMMETTA_NAME)
+                })
+            })
+            || !report.assignment_plans[1].anchors.iter().any(|anchor| {
+                anchor.system_id == "fiammetta_continuous"
+                    && anchor.operator == target.target
+                    && anchor.room_id.as_ref() == Some(&target.room_id)
+            })
+        {
+            return Err(Error::msg(
+                "assert-invariants auto_fiammetta_continuous_placement failed",
+            ));
+        }
+        last_priority = Some(position);
+    }
+    if !(fiammetta_enabled && operbox.owns(super::fiammetta_events::FIAMMETTA_NAME))
+        && !targets.is_empty()
     {
         return Err(Error::msg(
-            "assert-invariants auto_fiammetta_static_priority failed",
+            "assert-invariants auto_fiammetta_disabled failed",
         ));
     }
+    if targets.is_empty() != report.fiammetta.dorm_room_id.is_none() {
+        return Err(Error::msg("assert-invariants auto_fiammetta_dorm failed"));
+    }
+    for assignment in [&report.main_assignment, &report.backup_assignment] {
+        let room = assignment.room_of_operator(super::fiammetta_events::FIAMMETTA_NAME);
+        if let Some(dorm_id) = &report.fiammetta.dorm_room_id {
+            let dorm = blueprint
+                .room(dorm_id)
+                .ok_or_else(|| Error::msg("assert-invariants auto_fiammetta_dorm failed"))?;
+            if dorm.kind != FacilityKind::Dormitory
+                || room.map(|room| &room.room_id) != Some(dorm_id)
+                || assignment.operators_in(dorm_id).len() >= dorm.operator_capacity()
+            {
+                return Err(Error::msg("assert-invariants auto_fiammetta_dorm failed"));
+            }
+        } else if room.is_some() {
+            return Err(Error::msg("assert-invariants auto_fiammetta_dorm failed"));
+        }
+    }
+    let model = crate::mood::default_mood_model()?;
+    let period = report.timing.shift_hours[0].min(report.timing.shift_hours[1]);
+    if report.fiammetta.enabled != fiammetta_enabled
+        || report.fiammetta.available != operbox.owns(super::fiammetta_events::FIAMMETTA_NAME)
+        || report.fiammetta.priority
+            != priority
+                .iter()
+                .map(|name| name.to_string())
+                .collect::<Vec<_>>()
+        || report.fiammetta.service_period_hours != period
+        || report.fiammetta.recovery_per_hour != super::fiammetta_events::recovery_rate(model)
+    {
+        return Err(Error::msg(
+            "assert-invariants auto_fiammetta_exchange_budget failed",
+        ));
+    }
+    let drains = continuous_target_drains(
+        blueprint,
+        instances,
+        [&report.main_assignment, &report.backup_assignment],
+        &targets,
+    )?;
+    super::fiammetta_events::validate_continuous_exchanges(
+        model,
+        &drains,
+        period,
+        &report.fiammetta.exchanges,
+    )?;
     validate_explicit_supports(
         blueprint,
         [&report.main_assignment, &report.backup_assignment],
@@ -504,11 +775,18 @@ pub fn assert_auto_rotation_invariants(
     let work = report
         .main_assignment
         .work_position_operator_names(blueprint);
-    if !work.is_disjoint(
-        &report
-            .backup_assignment
-            .work_position_operator_names(blueprint),
-    ) {
+    let backup_work = report
+        .backup_assignment
+        .work_position_operator_names(blueprint);
+    let actual_shared = work
+        .intersection(&backup_work)
+        .cloned()
+        .collect::<std::collections::HashSet<_>>();
+    let allowed_shared = targets
+        .iter()
+        .map(|(target, _)| target.clone())
+        .collect::<std::collections::HashSet<_>>();
+    if actual_shared != allowed_shared {
         return Err(Error::msg("assert-invariants auto_work_disjoint failed"));
     }
     for (index, assignment) in [&report.main_assignment, &report.backup_assignment]
@@ -662,6 +940,7 @@ pub fn assert_auto_rotation_invariants(
                 .per_op
                 .iter()
                 .filter(|entry| entry.room_id == room.id.0)
+                .filter(|entry| !allowed_shared.contains(&entry.name))
                 .filter_map(|entry| entry.workable_hours.map(|hours| (&entry.name, hours)))
                 .min_by(|left, right| left.1.total_cmp(&right.1))
                 .map(|(name, _)| name.clone());
@@ -784,6 +1063,14 @@ fn auto_work_duration_issues(
             }
             let eta = crate::mood::shift_eta_with_instances(model, blueprint, &trial, instances);
             for member in &eta.per_op {
+                if report
+                    .fiammetta
+                    .targets
+                    .iter()
+                    .any(|target| target.target == member.name)
+                {
+                    continue;
+                }
                 if blueprint
                     .room(&RoomId::from(member.room_id.as_str()))
                     .is_some_and(|room| room.kind == FacilityKind::ControlCenter)

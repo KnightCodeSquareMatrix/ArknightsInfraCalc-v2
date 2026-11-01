@@ -476,27 +476,29 @@ fn auto_rotation_cmd(
         );
     }
     if report.fiammetta.enabled {
-        println!(
-            "菲亚梅塔静态优先级：{}",
-            report.fiammetta.priority.join(" → ")
-        );
+        println!("菲亚梅塔优先级：{}", report.fiammetta.priority.join(" → "));
         for target in &report.fiammetta.targets {
             println!(
                 "  {} · {} · {}",
-                target.target,
-                target.room_id.0,
-                if target.state == "main" {
-                    "主力"
-                } else {
-                    "替补"
-                }
+                target.target, target.room_id.0, "主力 / 替补同房持续留岗"
             );
+        }
+        if let Some(dorm) = &report.fiammetta.dorm_room_id {
+            println!(
+                "  菲亚常驻宿舍 {}；目标交换后返回原岗；服务周期 {} 小时",
+                dorm.0, report.fiammetta.service_period_hours
+            );
+            for event in &report.fiammetta.exchanges {
+                println!("  {}：心情 {:.3} → {:.3}；菲亚 {:.3} → {:.3}，{:.3} 小时后恢复满心情；周期内偏移 {:.3} 小时",
+                    event.target, event.target_mood_before, event.target_mood_after,
+                    event.fiammetta_mood_before, event.fiammetta_mood_after, event.ready_after_hours, event.at_hours);
+            }
         }
         if report.fiammetta.targets.is_empty() {
             println!(
                 "  {}",
                 if report.fiammetta.available {
-                    "当前在岗名单没有优先级目标"
+                    "当前没有可确认持续留岗的菲亚目标"
                 } else {
                     "Box 未持有菲亚梅塔"
                 }

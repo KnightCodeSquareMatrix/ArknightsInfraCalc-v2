@@ -9019,13 +9019,41 @@ pub(crate) fn solve_policy_disjoint_backup(
     main: &BaseAssignment,
     shift_hours: f64,
 ) -> Result<OwnedRotationAssignment> {
+    solve_policy_backup_with_continuous_targets(
+        blueprint,
+        operbox,
+        instances,
+        table,
+        options,
+        main,
+        shift_hours,
+        &[],
+    )
+}
+
+/// Only the explicitly supported targets can cross the main/backup exclusion.
+/// Their room claims enter Plan before execution and ordinary teammate search.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn solve_policy_backup_with_continuous_targets(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    main: &BaseAssignment,
+    shift_hours: f64,
+    targets: &[(String, RoomId)],
+) -> Result<OwnedRotationAssignment> {
     // Two-team policy: the backup state is generated from the operators not
     // present anywhere in the complete main assignment.
-    let unavailable = if options.auto_rotation {
+    let mut unavailable = if options.auto_rotation {
         main.work_position_operator_names(blueprint)
     } else {
         main.operator_names()
     };
+    for (target, _) in targets {
+        unavailable.remove(target);
+    }
     let available = operbox.excluding(&unavailable);
     if options.auto_rotation {
         let mut seed = BaseAssignment::default();
@@ -9043,15 +9071,80 @@ pub(crate) fn solve_policy_disjoint_backup(
         super::auto_rotation::select_control(
             blueprint, &available, instances, table, options, &mut seed,
         )?;
-        return solve_owned_peak_seed(
+        if targets.is_empty() {
+            return solve_owned_peak_seed(
+                blueprint,
+                &available,
+                instances,
+                table,
+                options,
+                shift_hours,
+                &seed,
+            );
+        }
+        let mut planning_seed = seed.clone();
+        for (target, room) in targets {
+            let operator = main
+                .operators_in(room)
+                .iter()
+                .find(|op| op.name == *target)
+                .ok_or_else(|| Error::msg("continuous target absent from main room"))?;
+            let mut members = planning_seed.operators_in(room).to_vec();
+            members.push(operator.clone());
+            planning_seed.set_room(room.clone(), members);
+        }
+        let mut result = assign_shift_with_preclaimed_plan(
             blueprint,
             &available,
             instances,
             table,
             options,
-            shift_hours,
+            AssignShiftMode::Peak,
+            &planning_seed,
             &seed,
-        );
+            &HashSet::new(),
+            |plan| {
+                for (target, room_id) in targets {
+                    let room = blueprint
+                        .room(room_id)
+                        .ok_or_else(|| Error::msg("continuous target room absent"))?;
+                    let progress = available
+                        .progress_of(target)
+                        .ok_or_else(|| Error::msg("continuous target unavailable"))?;
+                    plan.anchors.push(SystemAnchor {
+                        system_id: "fiammetta_continuous".to_string(),
+                        operator: target.clone(),
+                        proactive_support: false,
+                        optional_trade_role: None,
+                        elite: progress.elite,
+                        facility: room.kind,
+                        room_id: Some(room_id.clone()),
+                        recipe: match &room.product {
+                            Some(RoomProduct::Factory { recipe }) => Some(*recipe),
+                            _ => None,
+                        },
+                        trade_order: match &room.product {
+                            Some(RoomProduct::Trade { order }) => Some(*order),
+                            _ => None,
+                        },
+                        work_mood: None,
+                        rest_facility: None,
+                        fill_policy: AnchorFillPolicy::Plain,
+                    });
+                }
+                Ok(())
+            },
+        )?;
+        result.plan.resolve_actual_producer_dependencies(
+            blueprint,
+            &result.assignment,
+            instances,
+            table,
+        )?;
+        return Ok(OwnedRotationAssignment {
+            assignment: result.assignment,
+            plan: result.plan,
+        });
     }
     solve_owned_peak_assignment(
         blueprint,

@@ -522,6 +522,8 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "auto_rotation": {
                     "entry": "plan --rotation auto@H1/H2",
                     "fiammetta_policy": "static_priority",
+                    "continuous_targets": true,
+                    "exchange_cycle": true,
                 },
                 "plan_contract_sha256": state.plan_contract_sha256_v1,
                 "plan_contract_sha256_by_version": {
