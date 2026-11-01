@@ -394,6 +394,40 @@ fn validate_bind_dependency_presence(
     Ok(())
 }
 
+fn validate_proactive_support_cycle(
+    blueprint: &BaseBlueprint,
+    report: &TeamRotationReport,
+) -> Result<(), String> {
+    if report.shifts.len() < 2 {
+        return Ok(());
+    }
+    let supports: HashSet<&str> = report
+        .assignment_plans
+        .iter()
+        .flat_map(|plan| plan.anchors.iter())
+        .filter(|anchor| anchor.proactive_support)
+        .map(|anchor| anchor.operator.as_str())
+        .collect();
+    for support in supports {
+        let work_shifts = report
+            .shifts
+            .iter()
+            .filter(|shift| {
+                shift
+                    .assignment
+                    .work_position_operator_names(blueprint)
+                    .contains(support)
+            })
+            .count();
+        if work_shifts == report.shifts.len() {
+            return Err(format!(
+                "rotation_bind: proactive support {support} works all {work_shifts} shifts"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Final-state bind evidence shared by normal finalization and `--assert-invariants`.
 /// Required supports from the same Plan are checked for presence while their consumer
 /// works; they stay outside the work-member topology so dorm/support duty is not split.
@@ -531,6 +565,7 @@ pub(crate) fn validate_final_bind_cycle(
         }
     }
     validate_bind_dependency_presence(blueprint, report)?;
+    validate_proactive_support_cycle(blueprint, report)?;
     Ok(())
 }
 

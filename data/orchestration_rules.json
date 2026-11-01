@@ -720,6 +720,46 @@
       ]
     },
     {
+      "id": "sees_receivers",
+      "priority": 13,
+      "tier": "cross_station",
+      "alternatives": [
+        {
+          "id": "makoto_actual_support",
+          "roles": [
+            {
+              "id": "makoto",
+              "facility": "factory",
+              "candidates": [{ "name": "结城理", "elite": 2 }],
+              "fill_to_capacity": true
+            },
+            {
+              "id": "sees_support",
+              "proactive_support": true,
+              "facility": "dormitory",
+              "facilities": ["workshop", "office", "power_plant"],
+              "candidates": [
+                { "name": "埃癸斯", "elite": 0 },
+                { "name": "岳羽由加莉", "elite": 0 },
+                { "name": "虎狼丸", "elite": 0 }
+              ],
+              "min_count": 1,
+              "max_count": 3,
+              "selection": "all_available",
+              "one_per_room": false
+            }
+          ],
+          "active_dependencies": [
+            {
+              "consumer_roles": ["makoto"],
+              "required_roles": ["sees_support"]
+            }
+          ],
+          "bind_all": true
+        }
+      ]
+    },
+    {
       "id": "rhine_receivers",
       "priority": 13,
       "tier": "cross_station",

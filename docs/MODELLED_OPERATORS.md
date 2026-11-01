@@ -24,6 +24,7 @@
 - 制造：配方效率、仓库、心情、部分 tagged/global inject；细节见 [`MANUFACTURE_STATUS.md`](MANUFACTURE_STATUS.md)。
 - 中枢：结构化效果 ledger、global resource/inject、control trace。
 - 发电/辅助：power、office、meeting 的有界静态求值；宿舍 global state 只在 collector 声明为 global 时进入链。
+- S.E.E.S.：结城理精二制造按实际进驻的 S.E.E.S. 标签人数结算；埃癸斯发电读取结城理是否实际在制造站；岳羽由加莉办公室心情减免和虎狼丸宿舍群体恢复进入公共心情模型。活动室和训练副手不计 S.E.E.S. presence。
 
 
 ## 具名机制族入口

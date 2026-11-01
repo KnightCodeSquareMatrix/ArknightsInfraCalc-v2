@@ -7069,6 +7069,117 @@
           "phase_order": 20
         }
       ]
-    }
+    },
+{
+      "id": "control_prod_spd_999",
+      "skill_name": "领袖魅力",
+      "facility": "control",
+      "tier": "tier_0",
+      "atoms": [
+          {
+              "id": "control_prod_spd_999:manufacture_productivity",
+              "action": {
+                  "kind": "global_inject_manu_eff",
+                  "params": {
+                      "value": 2.0
+                  }
+              },
+              "phase": "global_inject",
+              "phase_order": 10,
+              "tag": "manu_global_all"
+          }
+      ],
+      "control_candidate_role": "ordinary"
+  },
+  {
+      "id": "manu_prod_spd&bd_000",
+      "skill_name": "社群的意义",
+      "facility": "manufacture",
+      "tier": "tier_up",
+      "atoms": [
+          {
+              "id": "manu_prod_spd&bd_000:base",
+              "action": {
+                  "kind": "add_flat_eff",
+                  "params": {
+                      "value": 20.0
+                  }
+              },
+              "phase": "constant",
+              "phase_order": 20
+          },
+          {
+              "selector": {
+                  "tagged_count_in_base": {
+                      "tag": "cc_tag_sees"
+                  }
+              },
+              "id": "manu_prod_spd&bd_000:sees",
+              "action": {
+                  "kind": "add_flat_eff_from_selector",
+                  "params": {
+                      "multiplier": 5.0,
+                      "cap": 20.0
+                  }
+              },
+              "phase": "eff_var",
+              "phase_order": 20
+          }
+      ]
+  },
+  {
+      "id": "hire_spd_cost_999",
+      "skill_name": "独立调查",
+      "facility": "office",
+      "tier": "tier_0",
+      "atoms": [
+          {
+              "id": "hire_spd_cost_999:hire_speed",
+              "phase": "constant",
+              "phase_order": 10,
+              "action": {
+                  "kind": "add_flat_eff",
+                  "params": {
+                      "value": 30.0
+                  }
+              }
+          }
+      ]
+  },
+  {
+      "id": "power_rec_spd_P2_999",
+      "skill_name": "机械工学",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+          {
+              "action": {
+                  "kind": "add_flat_eff",
+                  "params": {
+                      "value": 15.0
+                  }
+              },
+              "phase": "constant",
+              "phase_order": 20,
+              "id": "power_rec_spd_P2_999:base"
+          },
+          {
+              "action": {
+                  "kind": "add_flat_eff",
+                  "params": {
+                      "value": 5.0
+                  }
+              },
+              "phase": "constant",
+              "phase_order": 21,
+              "id": "power_rec_spd_P2_999:manufacture_partner",
+              "condition": {
+                  "operator_in_manufacture": {
+                      "name": "结城理"
+                  }
+              }
+          }
+      ]
+  }
   ]
 }

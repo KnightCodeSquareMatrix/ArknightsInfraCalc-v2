@@ -18,6 +18,7 @@
     { "name": "若叶睦", "facility": "control", "elite": 2, "scope": "self", "conditional": "当与丰川祥子一起进驻中枢", "note": "互为半身：消除自身心情消耗影响" }
   ],
   "operator_mood_skills": [
+    {"name": "岳羽由加莉", "facility": "office", "elite": 0, "scope": "self", "drain_delta": -0.25, "skill": "独立调查"},
     { "name": "黍", "facility": "factory", "elite": 0, "scope": "room", "drain_delta": -0.1, "skill": "春雷响，万物长" },
     { "name": "红云", "facility": "factory", "elite": 0, "scope": "self", "drain_delta": -0.25, "skill": "拾荒者" },
     { "name": "清道夫", "facility": "factory", "elite": 1, "scope": "self", "drain_delta": -0.25, "skill": "拾荒者" },
@@ -146,6 +147,7 @@
     }
   ],
   "dorm_recovery_skills": [
+    {"name": "虎狼丸", "elite": 0, "kind": "group", "value": 0.1, "skill": "毛茸茸的抚慰"},
     { "name": "赫拉格", "elite": 0, "kind": "self", "value": 0.55, "skill": "超脱" },
     { "name": "赫拉格", "elite": 1, "kind": "group", "value": 0.1, "skill": "挣脱", "note": "除自身以外所有干员" },
     { "name": "赫拉格", "elite": 2, "kind": "self", "value": 0.55, "skill": "解脱", "also_group": 0.1 },

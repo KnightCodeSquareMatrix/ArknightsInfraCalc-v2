@@ -7,7 +7,9 @@ use serde::Deserialize;
 
 use crate::error::{Error, Result};
 use crate::instances::OperatorInstances;
-use crate::types::{BuffDenseId, CompiledAtom, SkillDef};
+use crate::types::{
+    Action, AtomScope, BuffDenseId, CompiledAtom, Condition, Phase, Selector, SkillDef,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SkillTableFile {
@@ -44,6 +46,35 @@ impl SkillTable {
             }
             let mut atom_ids = HashSet::new();
             for atom in &skill.atoms {
+                if let Some(Selector::TaggedCountInBase { tag }) = &atom.selector {
+                    if skill.facility != "manufacture"
+                        || atom.scope != AtomScope::Room
+                        || tag.trim().is_empty()
+                        || atom.condition.is_some()
+                        || atom.phase != Phase::EffVar
+                        || !matches!(atom.action, Action::AddFlatEffFromSelector { multiplier, cap, .. }
+                            if multiplier.is_finite() && cap.is_none_or(f64::is_finite))
+                    {
+                        return Err(Error::msg(format!(
+                            "skill {} tagged_count_in_base requires an unconditional Room manufacture efficiency atom",
+                            skill.id
+                        )));
+                    }
+                }
+                if let Some(Condition::OperatorInManufacture { name }) = &atom.condition {
+                    if skill.facility != "power"
+                        || atom.scope != AtomScope::Room
+                        || name.trim().is_empty()
+                        || atom.selector.is_some()
+                        || atom.phase != Phase::Constant
+                        || !matches!(atom.action, Action::AddFlatEff { value, recipe: None } if value.is_finite())
+                    {
+                        return Err(Error::msg(format!(
+                            "skill {} operator_in_manufacture requires a Room power constant efficiency atom",
+                            skill.id
+                        )));
+                    }
+                }
                 if let Some(atom_id) = atom.atom_id.as_deref().filter(|id| !id.trim().is_empty()) {
                     if !atom_ids.insert(atom_id) {
                         return Err(Error::msg(format!(

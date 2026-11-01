@@ -16,6 +16,8 @@
 
 L1 处理可复用的 selector/action/condition；L2 处理不能安全压平的领域状态（贸易订单、制造产线、发电聚合等）；L3 只对最终实际组合应用具名 shortcut。候选选择、Plan admission、排班和 export 不属于 atom interpreter。
 
+跨设施实际进驻有两类通用词汇：`tagged_count_in_base` 按姓名统计最终物理进驻的标签成员，活动室和训练副手不计；制造房搜索时把当前候选房成员并入计数，避免房间尚未写回最终 assignment 时漏算。`operator_in_manufacture` 判断指定干员是否实际进驻制造站。两者只表达结算事实，受益者和挂件的选入仍由 Plan 规则负责。
+
 ## 数据结构
 
 ```rust

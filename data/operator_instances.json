@@ -8198,6 +8198,128 @@
         "cc.g.rainbow"
       ],
       "facilities": {}
+    },
+    "岳羽由加莉@tier_up": {
+        "name": "岳羽由加莉",
+        "tier": "tier_up",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "office": {
+                "buff_ids": [
+                    "hire_spd_cost_999"
+                ],
+                "stepwise": true
+            }
+        }
+    },
+    "岳羽由加莉@tier_0": {
+        "name": "岳羽由加莉",
+        "tier": "tier_0",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "office": {
+                "buff_ids": [
+                    "hire_spd_cost_999"
+                ],
+                "stepwise": false
+            }
+        }
+    },
+    "结城理@tier_up": {
+        "name": "结城理",
+        "tier": "tier_up",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "control": {
+                "buff_ids": [
+                    "control_prod_spd_999"
+                ],
+                "stepwise": true
+            },
+            "manufacture": {
+                "buff_ids": [
+                    "manu_prod_spd&bd_000"
+                ],
+                "stepwise": true
+            }
+        }
+    },
+    "埃癸斯@tier_up": {
+        "name": "埃癸斯",
+        "tier": "tier_up",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "power": {
+                "buff_ids": [
+                    "power_rec_spd_P2_999"
+                ],
+                "stepwise": true
+            }
+        }
+    },
+    "结城理@tier_0": {
+        "name": "结城理",
+        "tier": "tier_0",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "control": {
+                "buff_ids": [
+                    "control_prod_spd_999"
+                ],
+                "stepwise": false
+            }
+        }
+    },
+    "虎狼丸@tier_0": {
+        "name": "虎狼丸",
+        "tier": "tier_0",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "dorm": {
+                "buff_ids": [],
+                "stepwise": false
+            }
+        }
+    },
+    "埃癸斯@tier_0": {
+        "name": "埃癸斯",
+        "tier": "tier_0",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "power": {
+                "buff_ids": [
+                    "power_rec_spd_P2_999"
+                ],
+                "stepwise": false
+            }
+        }
+    },
+    "虎狼丸@tier_up": {
+        "name": "虎狼丸",
+        "tier": "tier_up",
+        "tags": [
+            "cc_tag_sees"
+        ],
+        "facilities": {
+            "dorm": {
+                "buff_ids": [],
+                "stepwise": true
+            }
+        }
     }
   }
 }

@@ -834,6 +834,22 @@ fn resolve_selector_value(ctx: &ManuContext<'_>, selector: Option<&Selector>, ow
             .map_or(0.0, |operator| operator.mood_gap),
         Some(Selector::DroneCap) => ctx.layout.drone_cap as f64,
         Some(Selector::RhineLifeInBase) => f64::from(ctx.effective_rhine_life_in_base()),
+        Some(Selector::TaggedCountInBase { tag }) => {
+            let mut members: std::collections::HashSet<&str> = ctx
+                .layout
+                .base_tagged_members
+                .get(tag)
+                .into_iter()
+                .flatten()
+                .map(String::as_str)
+                .collect();
+            for operator in &ctx.operators {
+                if operator.tags.iter().any(|candidate| candidate == tag) {
+                    members.insert(&operator.name);
+                }
+            }
+            members.len() as f64
+        }
         Some(Selector::MetalFormulaSkillCountInRoom) => metal_formula_skill_count_in_room(ctx),
         Some(Selector::StandardSkillCountInRoom) => standard_skill_count_in_room(ctx),
         Some(Selector::RhineSkillCountInRoom) => {

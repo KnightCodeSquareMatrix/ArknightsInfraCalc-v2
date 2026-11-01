@@ -88,6 +88,9 @@ fn condition_met(cond: &Option<Condition>, ctx: &PowerContext, owner: &str) -> b
         Condition::OtherPlatformInPower {} => ctx.layout.other_platform_in_power,
         Condition::OtherLateranoInPower {} => ctx.layout.other_laterano_in_power,
         Condition::OperatorInPower { name } => ctx.layout.power_workforce.iter().any(|n| n == name),
+        Condition::OperatorInManufacture { name } => {
+            ctx.layout.manu_workforce.iter().any(|n| n == name)
+        }
         Condition::PartnerInRoom { name } => owner == name,
         Condition::TagPresentInRoom { tag } => ctx.operator.tags.iter().any(|t| t == tag),
         _ => false,

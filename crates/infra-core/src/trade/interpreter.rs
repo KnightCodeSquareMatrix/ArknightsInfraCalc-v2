@@ -330,6 +330,9 @@ fn condition_met(cond: &Option<Condition>, ctx: &TradeContext<'_>, owner: &str) 
             .any(|o| o.name != owner && o.tags.iter().any(|t| t == tag)),
         Condition::OperatorInBase { name } => ctx.layout.base_workforce.iter().any(|n| n == name),
         Condition::OperatorInPower { name } => ctx.layout.power_workforce.iter().any(|n| n == name),
+        Condition::OperatorInManufacture { name } => {
+            ctx.layout.manu_workforce.iter().any(|n| n == name)
+        }
         Condition::OperatorInTraining { name } => {
             ctx.layout.training_assist.iter().any(|n| n == name)
         }
@@ -596,6 +599,11 @@ fn resolve_selector_value(ctx: &TradeContext<'_>, selector: Option<&Selector>, o
             .iter()
             .filter(|o| o.tags.iter().any(|t| t == tag))
             .count() as f64,
+        Some(Selector::TaggedCountInBase { tag }) => ctx
+            .layout
+            .base_tagged_members
+            .get(tag)
+            .map_or(0.0, |members| members.len() as f64),
         Some(Selector::LimitContribSum) => ctx
             .operators
             .iter()

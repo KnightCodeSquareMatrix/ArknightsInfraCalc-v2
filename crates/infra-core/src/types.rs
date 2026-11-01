@@ -67,6 +67,10 @@ pub enum Selector {
     TaggedCountInRoom {
         tag: String,
     },
+    /// 实际进驻基建的标签人数，按姓名去重；活动室与训练副手不计。
+    TaggedCountInBase {
+        tag: String,
+    },
     /// Sum of per-operator `limit_contrib` (锏·冠军风采).
     LimitContribSum,
     MeetingMaxLevel,
@@ -197,6 +201,10 @@ pub enum Condition {
     },
     /// 干员进驻在发电站（森蚺·我寻思能行）。
     OperatorInPower {
+        name: String,
+    },
+    /// 指定干员实际进驻制造站。
+    OperatorInManufacture {
         name: String,
     },
     /// 干员在训练室协助位（PhonoR-0·咒文共鸣）。

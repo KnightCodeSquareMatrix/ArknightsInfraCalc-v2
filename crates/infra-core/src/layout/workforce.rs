@@ -68,6 +68,7 @@ pub struct WorkforceIndex {
     pub all_base_names: Vec<String>,
     /// 有效“在基建内”presence：排除会客室使用者和训练副手。
     pub effective_base_presence: Vec<String>,
+    pub base_tagged_members: HashMap<String, std::collections::HashSet<String>>,
     pub rhine_life_in_base: u8,
     /// 基建内杜林族干员数（际崖居民；不含副手，至多 4）。
     pub durin_in_base: u8,
@@ -191,6 +192,25 @@ impl WorkforceIndex {
         let durin_in_base =
             count_tagged_in_base_excluding(instances, &assigned_presence, &[], TAG_DURIN, 4);
 
+        // 通用标签读取只消费最终物理进驻。活动室不是工作位置；训练副手
+        // 不属于房间成员，训练主位按普通进驻计数。
+        let mut base_tagged_members: HashMap<String, std::collections::HashSet<String>> =
+            HashMap::new();
+        if let Some(instances) = instances {
+            for room in &blueprint.rooms {
+                for operator in
+                    operators_for_base_presence(room.kind, assignment.operators_in(&room.id))
+                {
+                    for tag in instances.tags_for(&operator.name, operator.tier()) {
+                        base_tagged_members
+                            .entry(tag)
+                            .or_default()
+                            .insert(operator.name.clone());
+                    }
+                }
+            }
+        }
+
         Self {
             by_room,
             power_stations,
@@ -200,6 +220,7 @@ impl WorkforceIndex {
             platform_rooms,
             all_base_names,
             effective_base_presence,
+            base_tagged_members,
             rhine_life_in_base,
             durin_in_base,
             training_assist,
@@ -271,6 +292,7 @@ impl WorkforceIndex {
         layout.control_workforce = self.control_workforce.clone();
         layout.control_operators = self.control_operators.clone();
         layout.base_workforce = self.effective_base_presence.clone();
+        layout.base_tagged_members = self.base_tagged_members.clone();
         layout.training_assist = self.training_assist.clone();
         layout.rhine_life_in_base = self.rhine_life_in_base;
         layout.durin_in_base = self.durin_in_base;

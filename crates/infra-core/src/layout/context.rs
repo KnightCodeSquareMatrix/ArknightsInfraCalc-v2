@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::global_resource::{GlobalInjectManifest, GlobalResourceKey, GlobalResourcePool};
@@ -68,6 +68,8 @@ pub struct LayoutContext {
     pub other_laterano_in_power: bool,
     /// Operators working anywhere in base (赫德雷·白手起家).
     pub base_workforce: Vec<String>,
+    /// 实际进驻基建的标签成员；活动室与训练副手不计。
+    pub base_tagged_members: HashMap<String, HashSet<String>>,
     /// 贸易站进驻干员（烈夏·患难拍档等跨设施条件）。
     pub trade_workforce: Vec<String>,
     /// 制造站进驻干员（涤火杰西卡/薇薇安娜等跨设施条件）。
@@ -124,6 +126,7 @@ impl Default for LayoutContext {
             other_platform_in_power: false,
             other_laterano_in_power: false,
             base_workforce: Vec::new(),
+            base_tagged_members: HashMap::new(),
             trade_workforce: Vec::new(),
             manu_workforce: Vec::new(),
             trade_tagged_count_sum: HashMap::new(),
