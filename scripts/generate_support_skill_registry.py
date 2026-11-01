@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the bounded office/reception registry from game data.
 
-The generated file covers only MECHANICS_REGISTRY rows 172-214 and 324-390.
+The registry retains MECHANICS_REGISTRY rows 172-214 and 324-390, plus explicit supplemental skills.
 Mechanics remain explicit below; game data only supplies buff ids and unlocks.
 """
 
@@ -28,8 +28,6 @@ IGNORED = {
     330: "unknown missing-clue probability",
     333: "next-clue event history",
     334: "next-clue event history",
-    342: "clue exchange mode",
-    343: "clue exchange mode",
     348: "unknown clue probability",
     349: "unknown clue probability",
     350: "unknown clue probability",
@@ -41,7 +39,7 @@ IGNORED = {
     356: "unknown clue probability",
     357: "unknown clue probability",
     373: "unknown owned-clue probability",
-    380: "clue exchange mode",
+    380: "unknown missing-clue probability",
     381: "unknown missing-clue probability",
     382: "unknown missing-clue probability",
     383: "unknown missing-clue probability",
@@ -97,6 +95,8 @@ MOOD_DELTA = {
 
 
 def effects_for(row_id: int, efficiency: str) -> list[dict]:
+    if row_id in {342, 343}:
+        return [{"kind": "speed_flat", "value": 30.0}]
     effects: list[dict] = []
     if efficiency and row_id not in SOLO_SPEED:
         effects.append({"kind": "speed_flat", "value": float(efficiency)})
@@ -186,7 +186,7 @@ def main() -> None:
                         "skill": row["技能名"],
                         "buff_id": buff_data["buffId"],
                         "slot": slot,
-                        "min_elite": int(cond["phase"].removeprefix("PHASE_")),
+                        "min_elite": int(str(cond["phase"]).removeprefix("PHASE_")),
                         "min_level": int(cond["level"]),
                         "effects": effects_for(row_id, row["效率值"]),
                         "ignored": IGNORED.get(row_id),
@@ -198,9 +198,35 @@ def main() -> None:
     if covered != wanted:
         raise SystemExit(f"coverage mismatch: missing={sorted(wanted - covered)} extra={sorted(covered - wanted)}")
 
+    # Stable supplemental row ids; unlocks and slots come from upstream data.
+    supplemental = [
+        (391, "埃癸斯", "跨领域交流", [{"kind": "speed_flat", "value": 10.0}], "unknown missing-clue probability"),
+        (392, "虎狼丸", "虎狼丸的报恩", [{"kind": "speed_flat", "value": 30.0}], None),
+        (393, "克莱门莎", "谈判技巧", [{"kind": "speed_flat", "value": 20.0}, {"kind": "mood_delta", "value": 1.0}], None),
+        (394, "克莱门莎", "合作原则", [{"kind": "speed_if_room_occupancy_at_least", "count": 2, "value": 15.0}, {"kind": "mood_if_room_occupancy_at_least", "count": 2, "value": 1.0}], None),
+        (395, "德·托莱多", "拉拢听众", [{"kind": "speed_flat", "value": 20.0}, {"kind": "mood_delta", "value": -0.25}], None),
+        (396, "德·托莱多", "聚众宣讲", [{"kind": "speed_flat", "value": 30.0}, {"kind": "mood_delta", "value": -0.25}], None),
+    ]
+    for row_id, name, skill_name, effects, ignored in supplemental:
+        matched = []
+        for slot, slot_data in enumerate(building["chars"][name_to_id[name]]["buffChar"]):
+            for buff_data in slot_data["buffData"]:
+                buff = building["buffs"][buff_data["buffId"]]
+                if buff["buffName"] == skill_name:
+                    cond = buff_data["cond"]
+                    matched.append({
+                        "row_id": row_id, "facility": "office" if buff["roomType"] == "HIRE" else "meeting",
+                        "operator": name, "skill": skill_name, "buff_id": buff_data["buffId"], "slot": slot,
+                        "min_elite": int(str(cond["phase"]).removeprefix("PHASE_")), "min_level": int(cond["level"]),
+                        "effects": effects, "ignored": ignored, "unsupported": None,
+                    })
+        if len(matched) != 1:
+            raise SystemExit(f"ambiguous supplemental game-data skill: {name} / {skill_name}")
+        entries.extend(matched)
+
     output = {
         "version": 1,
-        "scope": {"office_rows": [172, 214], "meeting_rows": [324, 390]},
+        "scope": {"office_rows": [172, 214], "meeting_rows": [324, 390], "supplemental_rows": [391, 396]},
         "entries": entries,
     }
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

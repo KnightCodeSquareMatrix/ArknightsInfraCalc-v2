@@ -50,21 +50,21 @@ fn room_clears_self(model: &MoodModel, inputs: &DrainInputs<'_>, sui_member: boo
 
 /// 自身技能对本人产生的消耗修正（受同房「消除自身消耗」抵消；recipe 门限校验）。
 fn self_skill_delta(model: &MoodModel, inputs: &DrainInputs<'_>, sui_member: bool) -> f64 {
-    let Some(skill) = model.operator_self_skill(inputs.name, inputs.facility, inputs.elite, None)
-    else {
-        return 0.0;
-    };
-    // recipe 门限：技能限定某配方，但当前配方不符 → 不生效。
-    if let Some(want) = &skill.recipe {
-        if inputs.recipe != Some(want.as_str()) {
-            return 0.0;
-        }
-    }
-    // 槐琥等在场：抵消同房所有干员自身技能的 mood 影响（正负都消）。
     if room_clears_self(model, inputs, sui_member) {
         return 0.0;
     }
-    skill.drain_delta
+    model
+        .operator_self_skills(inputs.name, inputs.facility, inputs.elite)
+        .into_iter()
+        .filter(|skill| inputs.room_ops.len() >= skill.min_room_occupancy)
+        .filter(|skill| {
+            skill
+                .recipe
+                .as_deref()
+                .is_none_or(|want| inputs.recipe == Some(want))
+        })
+        .map(|skill| skill.drain_delta)
+        .sum()
 }
 
 /// 同设施他人提供的 room / room_others 修正之和（黍/火哨/巫恋，可叠加）。

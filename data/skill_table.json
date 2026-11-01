@@ -7180,6 +7180,45 @@
               }
           }
       ]
-  }
+  },
+
+    {
+      "id": "hire_spd_cost[113]",
+      "skill_name": "拉拢听众",
+      "facility": "office",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "id": "hire_spd_cost[113]:hire_speed",
+          "phase": "constant",
+          "phase_order": 10,
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "hire_spd_cost[122]",
+      "skill_name": "聚众宣讲",
+      "facility": "office",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "id": "hire_spd_cost[122]:hire_speed",
+          "phase": "constant",
+          "phase_order": 10,
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          }
+        }
+      ]
+    }
   ]
 }

@@ -91,7 +91,42 @@
     { "name": "怒潮凛冬", "facility": "control", "elite": 2, "scope": "self", "drain_delta": 0.5, "skill": "“是，团长！”" },
     { "name": "麒麟R夜刀", "facility": "control", "elite": 0, "scope": "self", "drain_delta": 0.5, "skill": "耐力回复" },
     { "name": "重岳", "facility": "control", "elite": 0, "scope": "self", "drain_delta": 0.5, "skill": "知我为我" },
-    { "name": "夕", "facility": "control", "elite": 0, "scope": "self", "drain_delta": 0.5, "skill": "“不以己悲”" }
+    { "name": "夕", "facility": "control", "elite": 0, "scope": "self", "drain_delta": 0.5, "skill": "“不以己悲”" },
+    {
+      "name": "克莱门莎",
+      "facility": "reception",
+      "elite": 0,
+      "scope": "self",
+      "drain_delta": 1.0,
+      "skill": "谈判技巧",
+      "slot": 0
+    },
+    {
+      "name": "克莱门莎",
+      "facility": "reception",
+      "elite": 2,
+      "scope": "self",
+      "drain_delta": 1.0,
+      "skill": "合作原则",
+      "slot": 1,
+      "min_room_occupancy": 2
+    },
+    {
+      "name": "德·托莱多",
+      "facility": "office",
+      "elite": 0,
+      "scope": "self",
+      "drain_delta": -0.25,
+      "skill": "拉拢听众"
+    },
+    {
+      "name": "德·托莱多",
+      "facility": "office",
+      "elite": 2,
+      "scope": "self",
+      "drain_delta": -0.25,
+      "skill": "聚众宣讲"
+    }
   ],
   "control_global_recovery": [
     { "name": "玛恩纳", "elite": 2, "skill": "公事公办", "value": 0.1, "covers": ["power", "office", "reception"], "spread_smiley": true, "note": "取最高不叠加；把发电/办公/会客补齐-0.1，并把中枢笑脸类技能扩散全局" },

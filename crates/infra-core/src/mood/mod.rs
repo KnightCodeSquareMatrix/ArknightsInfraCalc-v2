@@ -44,6 +44,12 @@ pub fn facility_key(kind: FacilityKind) -> Option<&'static str> {
 /// 干员工作心情技能条目（消耗侧）。`drain_delta` 原样保留游戏符号（负=减免）。
 #[derive(Debug, Clone, Deserialize)]
 pub struct OperatorMoodSkill {
+    /// 同 slot 的高档替换低档；不同 slot 的自身消耗同时生效。
+    #[serde(default)]
+    pub slot: u8,
+    /// 实际同房人数（含自身）门槛；0 表示不限制。
+    #[serde(default)]
+    pub min_room_occupancy: usize,
     pub name: String,
     pub facility: String,
     #[serde(default)]
@@ -469,22 +475,30 @@ impl MoodModel {
         }
     }
 
-    /// 干员在某设施的自身消耗技能条目（scope=self/room_others 的自身项由调用方区分）。
-    /// 选取策略：匹配 name+facility 且 `elite ≤ op_elite` 中精英最高者；`active_skill` 可精确指定技能名。
-    pub fn operator_self_skill(
+    /// 自身消耗技能按 slot 取最高已解锁档，不同 slot 同时保留。
+    pub fn operator_self_skills(
         &self,
         name: &str,
         facility: FacilityKind,
         op_elite: u8,
-        active_skill: Option<&str>,
-    ) -> Option<&OperatorMoodSkill> {
-        let key = facility_key(facility)?;
-        self.operator_mood_skills
-            .iter()
-            .filter(|s| s.name == name && s.facility == key && s.elite <= op_elite)
-            .filter(|s| s.scope == "self")
-            .filter(|s| active_skill.is_none_or(|want| s.skill == want))
-            .max_by_key(|s| s.elite)
+    ) -> Vec<&OperatorMoodSkill> {
+        let Some(key) = facility_key(facility) else {
+            return Vec::new();
+        };
+        let mut slots: HashMap<u8, &OperatorMoodSkill> = HashMap::new();
+        for skill in self.operator_mood_skills.iter().filter(|s| {
+            s.name == name && s.facility == key && s.elite <= op_elite && s.scope == "self"
+        }) {
+            if slots
+                .get(&skill.slot)
+                .is_none_or(|current| skill.elite >= current.elite)
+            {
+                slots.insert(skill.slot, skill);
+            }
+        }
+        let mut skills: Vec<_> = slots.into_values().collect();
+        skills.sort_by_key(|skill| skill.slot);
+        skills
     }
 
     /// 干员在某设施提供给「同设施全员」的消耗修正（黍/火哨/巫恋）。

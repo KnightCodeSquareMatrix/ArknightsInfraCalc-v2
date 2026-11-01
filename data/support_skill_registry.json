@@ -8,6 +8,10 @@
     "meeting_rows": [
       324,
       390
+    ],
+    "supplemental_rows": [
+      391,
+      396
     ]
   },
   "entries": [
@@ -1337,8 +1341,13 @@
       "slot": 1,
       "min_elite": 1,
       "min_level": 1,
-      "effects": [],
-      "ignored": "clue exchange mode",
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 30.0
+        }
+      ],
+      "ignored": null,
       "unsupported": null
     },
     {
@@ -1350,8 +1359,13 @@
       "slot": 1,
       "min_elite": 2,
       "min_level": 1,
-      "effects": [],
-      "ignored": "clue exchange mode",
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 30.0
+        }
+      ],
+      "ignored": null,
       "unsupported": null
     },
     {
@@ -2350,7 +2364,7 @@
       "min_elite": 1,
       "min_level": 1,
       "effects": [],
-      "ignored": "clue exchange mode",
+      "ignored": "unknown missing-clue probability",
       "unsupported": null
     },
     {
@@ -2499,6 +2513,132 @@
       "min_level": 1,
       "effects": [],
       "ignored": "unknown clue probability",
+      "unsupported": null
+    },
+    {
+      "row_id": 391,
+      "facility": "meeting",
+      "operator": "埃癸斯",
+      "skill": "跨领域交流",
+      "buff_id": "meet_spd&bd[999]",
+      "slot": 1,
+      "min_elite": 2,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 10.0
+        }
+      ],
+      "ignored": "unknown missing-clue probability",
+      "unsupported": null
+    },
+    {
+      "row_id": 392,
+      "facility": "meeting",
+      "operator": "虎狼丸",
+      "skill": "虎狼丸的报恩",
+      "buff_id": "meet_spd&exchange[999]",
+      "slot": 1,
+      "min_elite": 0,
+      "min_level": 30,
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 30.0
+        }
+      ],
+      "ignored": null,
+      "unsupported": null
+    },
+    {
+      "row_id": 393,
+      "facility": "meeting",
+      "operator": "克莱门莎",
+      "skill": "谈判技巧",
+      "buff_id": "meet_spd&cost[110]",
+      "slot": 0,
+      "min_elite": 0,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 20.0
+        },
+        {
+          "kind": "mood_delta",
+          "value": 1.0
+        }
+      ],
+      "ignored": null,
+      "unsupported": null
+    },
+    {
+      "row_id": 394,
+      "facility": "meeting",
+      "operator": "克莱门莎",
+      "skill": "合作原则",
+      "buff_id": "meet_spd&cost_char[000]",
+      "slot": 1,
+      "min_elite": 2,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_if_room_occupancy_at_least",
+          "count": 2,
+          "value": 15.0
+        },
+        {
+          "kind": "mood_if_room_occupancy_at_least",
+          "count": 2,
+          "value": 1.0
+        }
+      ],
+      "ignored": null,
+      "unsupported": null
+    },
+    {
+      "row_id": 395,
+      "facility": "office",
+      "operator": "德·托莱多",
+      "skill": "拉拢听众",
+      "buff_id": "hire_spd_cost[113]",
+      "slot": 0,
+      "min_elite": 0,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 20.0
+        },
+        {
+          "kind": "mood_delta",
+          "value": -0.25
+        }
+      ],
+      "ignored": null,
+      "unsupported": null
+    },
+    {
+      "row_id": 396,
+      "facility": "office",
+      "operator": "德·托莱多",
+      "skill": "聚众宣讲",
+      "buff_id": "hire_spd_cost[122]",
+      "slot": 0,
+      "min_elite": 2,
+      "min_level": 1,
+      "effects": [
+        {
+          "kind": "speed_flat",
+          "value": 30.0
+        },
+        {
+          "kind": "mood_delta",
+          "value": -0.25
+        }
+      ],
+      "ignored": null,
       "unsupported": null
     }
   ]

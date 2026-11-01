@@ -73,6 +73,10 @@ impl SupportRegistry {
                 SupportFacility::Office
             } else if (324..=390).contains(&entry.row_id) {
                 SupportFacility::Meeting
+            } else if (391..=394).contains(&entry.row_id) {
+                SupportFacility::Meeting
+            } else if (395..=396).contains(&entry.row_id) {
+                SupportFacility::Office
             } else {
                 return Err(Error::msg(format!(
                     "support registry row {} is outside the bounded scope",
@@ -99,12 +103,12 @@ impl SupportRegistry {
                 )));
             }
         }
-        if rows.len() != 110
+        if rows.len() != 116
             || !(172..=214).all(|row| rows.contains(&row))
-            || !(324..=390).all(|row| rows.contains(&row))
+            || !(324..=396).all(|row| rows.contains(&row))
         {
             return Err(Error::msg(
-                "support registry does not cover the bounded 110 rows",
+                "support registry does not cover the 110 baseline and 6 supplemental rows",
             ));
         }
         Ok(())
@@ -151,6 +155,14 @@ pub enum SupportEffect {
         value: f64,
     },
     SpeedIfSolo {
+        value: f64,
+    },
+    SpeedIfRoomOccupancyAtLeast {
+        count: usize,
+        value: f64,
+    },
+    MoodIfRoomOccupancyAtLeast {
+        count: usize,
         value: f64,
     },
     SpeedIfPartner {
@@ -437,6 +449,24 @@ fn effect_value(
                 "speed_if_solo",
                 if active { *value } else { 0.0 },
                 EffectTarget::Speed,
+                active,
+            )
+        }
+        SupportEffect::SpeedIfRoomOccupancyAtLeast { count, value } => {
+            let active = input.operators.len() >= *count;
+            (
+                "speed_if_room_occupancy_at_least",
+                if active { *value } else { 0.0 },
+                EffectTarget::Speed,
+                active,
+            )
+        }
+        SupportEffect::MoodIfRoomOccupancyAtLeast { count, value } => {
+            let active = input.operators.len() >= *count;
+            (
+                "mood_if_room_occupancy_at_least",
+                if active { *value } else { 0.0 },
+                EffectTarget::Mood,
                 active,
             )
         }

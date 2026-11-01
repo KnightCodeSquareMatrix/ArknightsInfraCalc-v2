@@ -8320,6 +8320,32 @@
                 "stepwise": true
             }
         }
+    },
+    "德·托莱多@tier_0": {
+      "name": "德·托莱多",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "office": {
+          "buff_ids": [
+            "hire_spd_cost[113]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "德·托莱多@tier_up": {
+      "name": "德·托莱多",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "office": {
+          "buff_ids": [
+            "hire_spd_cost[122]"
+          ],
+          "stepwise": false
+        }
+      }
     }
   }
 }
