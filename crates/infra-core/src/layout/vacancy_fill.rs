@@ -254,8 +254,25 @@ pub(crate) fn fill_workplace_vacancies(
             continue;
         }
         let modeled = modeled_candidates(room.kind, &roster, instances, table, &registry)?;
-        for skillless in [true, false] {
-            for candidate in candidates {
+        // 回收技能优先于普通补位；其他设施保留原“无技能先补空位”的 policy。
+        let mut ranked = candidates.iter().collect::<Vec<_>>();
+        let skillless_order = if room.kind == FacilityKind::Recycle {
+            let mut scored = ranked
+                .into_iter()
+                .map(|candidate| {
+                    crate::recycle::recycle_skill_efficiency(instances, table, candidate)
+                        .map(|score| (candidate, score))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            scored
+                .sort_by(|(left, a), (right, b)| b.cmp(a).then_with(|| left.name.cmp(&right.name)));
+            ranked = scored.into_iter().map(|(candidate, _)| candidate).collect();
+            [false, true]
+        } else {
+            [true, false]
+        };
+        for skillless in skillless_order {
+            for candidate in &ranked {
                 if assignment.operators_in(&room.id).len() >= room.operator_capacity() {
                     break;
                 }
@@ -280,7 +297,7 @@ pub(crate) fn fill_workplace_vacancies(
                 }
                 let mut trial = assignment.clone();
                 let mut operators = trial.operators_in(&room.id).to_vec();
-                operators.push(candidate.clone());
+                operators.push((*candidate).clone());
                 trial.set_room(room.id.clone(), operators);
                 if !ordinary_room_compatible(blueprint, &trial, room, instances, table)
                     || !admits(&trial, room, candidate)
@@ -289,7 +306,7 @@ pub(crate) fn fill_workplace_vacancies(
                 }
                 *assignment = trial;
                 used.insert(candidate.name.clone());
-                placed.push((room.id.clone(), candidate.clone()));
+                placed.push((room.id.clone(), (*candidate).clone()));
             }
         }
     }

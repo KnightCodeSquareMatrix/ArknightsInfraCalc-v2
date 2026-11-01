@@ -4213,6 +4213,89 @@ fn collect_recycle_rotation_issues(
                     }
                 }
             });
+            check!("recycle_support_priority", {
+                let plan = report
+                    .assignment_plans
+                    .get(shift.plan_index)
+                    .ok_or_else(|| Error::msg("recycle_support_priority: missing Plan"))?;
+                let support_names: HashSet<_> = plan
+                    .anchors
+                    .iter()
+                    .filter(|anchor| {
+                        anchor.proactive_support && anchor.facility == FacilityKind::Recycle
+                    })
+                    .filter(|anchor| anchor.room_id.as_ref() == Some(&room.id))
+                    .filter(|anchor| operators.iter().any(|op| op.name == anchor.operator))
+                    .map(|anchor| anchor.operator.as_str())
+                    .collect();
+                if support_names.is_empty() {
+                    return Ok(());
+                }
+                let mut protected = HashSet::new();
+                for owner in &report.assignment_plans {
+                    protected.extend(owner.excluded_operators.iter().map(String::as_str));
+                    protected.extend(owner.anchors.iter().map(|anchor| anchor.operator.as_str()));
+                    protected.extend(
+                        owner
+                            .rotation_reserves
+                            .iter()
+                            .flat_map(|reserve| reserve.operators.iter().map(String::as_str)),
+                    );
+                }
+                protected.extend(
+                    report
+                        .runtime_shift_binds
+                        .iter()
+                        .flat_map(|bind| bind.operators.iter().map(String::as_str)),
+                );
+                for state in &report.shifts {
+                    if let Some(rest) = &state.dorm_rest {
+                        protected.extend(dorm_rest_members(rest));
+                    }
+                }
+                let occupied = shift.assignment.occupied_operator_names();
+                for (name, progress) in &operbox.owned {
+                    if occupied.contains(name) || protected.contains(name.as_str()) {
+                        continue;
+                    }
+                    let teams: Vec<_> = report
+                        .teams
+                        .iter()
+                        .filter(|team| team.operators.contains(name))
+                        .collect();
+                    if teams
+                        .iter()
+                        .any(|team| !shift.active_teams.contains(&team.label))
+                    {
+                        continue;
+                    }
+                    let candidate = AssignedOperator::from_progress(name, *progress);
+                    if crate::recycle::recycle_skill_efficiency(instances, table, &candidate)?
+                        .is_zero()
+                    {
+                        continue;
+                    }
+                    // 核对真实可用技能人能否替换一名已选无回收技能支持者；不重新选人或修 assignment。
+                    for support in &support_names {
+                        let mut trial = shift.assignment.clone();
+                        let mut members = operators
+                            .iter()
+                            .filter(|op| op.name != *support)
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        members.push(candidate.clone());
+                        trial.set_room(room.id.clone(), members);
+                        if crate::layout::plan_admits_workplace_candidate(
+                            plan, &trial, room, &candidate,
+                        ) {
+                            return Err(Error::msg(format!(
+                                "recycle_support_priority: shift {} support {} occupies an available skilled seat for {}",
+                                shift.index + 1, support, name
+                            )));
+                        }
+                    }
+                }
+            });
             check!("recycle_efficiency", {
                 let expected =
                     crate::recycle::evaluate_recycle(room.level, operators, instances, table)?;

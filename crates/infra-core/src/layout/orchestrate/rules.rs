@@ -221,6 +221,9 @@ pub(super) struct RoleSpec {
     pub facility: FacilityKind,
     #[serde(default)]
     pub facilities: Vec<FacilityKind>,
+    /// 这些设施允许与原有住员共享；one_per_room 仍限制本 role 每房一名。
+    #[serde(default)]
+    pub shared_room_facilities: Vec<FacilityKind>,
     #[serde(default)]
     pub recipe: Option<RecipeKind>,
     #[serde(default)]
@@ -1249,6 +1252,7 @@ fn enumerate_role_placements<'a>(
                     &placement,
                     &state.assignment,
                     ctx,
+                    &state.used,
                     existing_constraints,
                     new_constraints,
                 )
@@ -1275,6 +1279,7 @@ fn enumerate_role_placements<'a>(
                 &rooms,
                 &state.assignment,
                 ctx,
+                &state.used,
                 existing_constraints,
                 new_constraints,
                 &mut current,
@@ -1292,8 +1297,23 @@ fn enumerate_role_placements<'a>(
     let mut trial = state.assignment.clone();
     for (candidate, progress) in available {
         let Some(room) = rooms.iter().copied().find(|room| {
-            trial.operators_in(&room.id).len() < role_room_capacity(room)
-                && (!role.one_per_room || trial.operators_in(&room.id).is_empty())
+            trial.operators_in(&room.id).len()
+                < role_placement_capacity(
+                    role,
+                    room,
+                    ctx,
+                    &trial,
+                    &state.used,
+                    &candidate.name,
+                    existing_constraints,
+                    new_constraints,
+                )
+                && (!role.one_per_room
+                    || if role.shared_room_facilities.contains(&room.kind) {
+                        !placement.iter().any(|(id, _, _)| id == &room.id)
+                    } else {
+                        trial.operators_in(&room.id).is_empty()
+                    })
                 && room_allows_operator(
                     &candidate.name,
                     room,
@@ -1375,6 +1395,7 @@ fn manufacture_objective_candidates<'a>(
                 &placement,
                 &state.assignment,
                 ctx,
+                &state.used,
                 existing_constraints,
                 new_constraints,
             )
@@ -1461,6 +1482,7 @@ fn enumerate_distributed_placements<'a>(
     rooms: &[&RoomBlueprint],
     assignment: &BaseAssignment,
     ctx: &RuleCompileContext<'_>,
+    used: &HashSet<String>,
     existing_constraints: &[SystemConstraint],
     new_constraints: &[SystemConstraint],
     current: &mut RolePlacement<'a>,
@@ -1476,8 +1498,21 @@ fn enumerate_distributed_placements<'a>(
             .iter()
             .filter(|(room_id, _, _)| room_id == &room.id)
             .count();
-        if assignment.operators_in(&room.id).len() + pending >= role_room_capacity(room)
-            || (role.one_per_room && (!assignment.operators_in(&room.id).is_empty() || pending > 0))
+        if assignment.operators_in(&room.id).len() + pending
+            >= role_placement_capacity(
+                role,
+                room,
+                ctx,
+                assignment,
+                used,
+                &candidate.name,
+                existing_constraints,
+                new_constraints,
+            )
+            || (role.one_per_room
+                && (pending > 0
+                    || (!role.shared_room_facilities.contains(&room.kind)
+                        && !assignment.operators_in(&room.id).is_empty())))
         {
             continue;
         }
@@ -1487,6 +1522,7 @@ fn enumerate_distributed_placements<'a>(
             current,
             assignment,
             ctx,
+            used,
             existing_constraints,
             new_constraints,
         ) {
@@ -1497,6 +1533,7 @@ fn enumerate_distributed_placements<'a>(
                 rooms,
                 assignment,
                 ctx,
+                used,
                 existing_constraints,
                 new_constraints,
                 current,
@@ -1512,16 +1549,31 @@ fn placement_is_valid(
     placement: &RolePlacement<'_>,
     assignment: &BaseAssignment,
     ctx: &RuleCompileContext<'_>,
+    used: &HashSet<String>,
     existing_constraints: &[SystemConstraint],
     new_constraints: &[SystemConstraint],
 ) -> bool {
     let mut trial = assignment.clone();
+    let mut role_rooms = HashSet::new();
     for (room_id, candidate, progress) in placement {
         let Some(room) = ctx.blueprint.room(room_id) else {
             return false;
         };
-        if trial.operators_in(room_id).len() >= role_room_capacity(room)
-            || (role.one_per_room && !trial.operators_in(room_id).is_empty())
+        if trial.operators_in(room_id).len()
+            >= role_placement_capacity(
+                role,
+                room,
+                ctx,
+                &trial,
+                used,
+                &candidate.name,
+                existing_constraints,
+                new_constraints,
+            )
+            || (role.one_per_room
+                && (!role_rooms.insert(room_id)
+                    || (!role.shared_room_facilities.contains(&room.kind)
+                        && !assignment.operators_in(room_id).is_empty())))
             || !room_allows_operator(
                 &candidate.name,
                 room,
@@ -2055,6 +2107,49 @@ fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
         return false;
     }
     true
+}
+
+/// 主动支持只使用回收技能岗位之外的真实空位；技能干员仍由设施填房 owner 选入。
+fn role_placement_capacity(
+    role: &RoleSpec,
+    room: &RoomBlueprint,
+    ctx: &RuleCompileContext<'_>,
+    assignment: &BaseAssignment,
+    used: &HashSet<String>,
+    proposed: &str,
+    existing_constraints: &[SystemConstraint],
+    new_constraints: &[SystemConstraint],
+) -> usize {
+    let capacity = role_room_capacity(room);
+    if !role.proactive_support || room.kind != FacilityKind::Recycle {
+        return capacity;
+    }
+    let occupied = assignment.occupied_operator_names();
+    let reserved = ctx
+        .operbox
+        .owned
+        .iter()
+        .filter(|(name, progress)| {
+            name.as_str() != proposed
+                && !used.contains(*name)
+                && !occupied.contains(*name)
+                && room_allows_operator(
+                    name,
+                    room,
+                    assignment,
+                    existing_constraints,
+                    new_constraints,
+                )
+                && !ctx
+                    .instances
+                    .resolve_recycle_buff_ids(
+                        name,
+                        crate::tier::PromotionTier::from_progress(**progress),
+                    )
+                    .is_empty()
+        })
+        .count();
+    capacity.saturating_sub(reserved)
 }
 
 fn role_room_capacity(room: &RoomBlueprint) -> usize {
