@@ -79,9 +79,9 @@ Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 w
 
 最终release以隔离schema17完整表启动Worker，ping和两类v7普通拓扑请求均成功且开启终态断言；返回班时为8/8/8和8/16。未知方法返回单帧错误，EOF进程exit0。证据见`target/codex-runs/main-integration-20261031/worker-final-live/`。138s是含完整表冷加载、与Bake后校验并行的进程总时长，不作为热请求速度。未部署，也未覆盖所有历史schema、所有错误帧或debug rerun。制品以实际SHA关联源码冻结树；嵌入构建commit/时间可能来自Cargo先前缓存，本轮记录实际值，不把它当成当前源码HEAD证明。
 
-CLI全局 --no-bake 在启动求解前关闭Bake加载、serve预热与查表；默认启用，不改变其他搜索参数。serve此开关作用于进程所有请求。
+2026-11-02按用户裁决暂时关闭运行时Bake：Core默认关闭，CLI各入口固定关闭，serve启动及全部请求不再加载、预热或查表，使用原live搜索。保留 --no-bake 兼容既有调用；显式 bake all/trade/manufacture 仍可生成产物。当前没有运行时启用CLI参数；Worker协议、搜索参数及输出结构保持原契约。
 
-bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；首轮包含冷加载，后续轮复用常驻Bake表，用于区分冷/热计算耗时。输出文件请求会逐轮写入同一路径，最终保留最后一轮。
+bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；当前运行时Bake关闭，各轮均走live，不加载或复用Bake表。输出文件请求会逐轮写入同一路径，最终保留最后一轮。
 
 
 2026-11-02直接导入旁边RIIC-Web的原生serve-client模拟schema3内联请求：同Worker连续三班/主备各3次，开关响应除耗时一致，当前Box均零Bake命中。开启同步预热超过客户端ping的10秒超时，放宽诊断等待后成功；关闭约57ms握手成功。网站具名rotation、Worker定时v7均未暴露Rust auto，自动验收使用plan --rotation auto@H1/H2。未修改网站或Worker协议/timeout；完整测量与支持边界见docs/PERFORMANCE_ENGINEERING.md。

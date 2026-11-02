@@ -48,7 +48,7 @@ fn run() -> Result<(), Error> {
         return Ok(());
     }
 
-    infra_core::bake::set_bake_enabled(!args[2..].iter().any(|arg| arg == "--no-bake"));
+    infra_core::bake::set_bake_enabled(false);
     let perf_enabled = !args[2..].iter().any(|arg| arg == "--no-perf");
     infra_core::profile::set_solver_perf_enabled(perf_enabled);
     infra_core::profile::set_solver_perf_detail_enabled(
@@ -110,7 +110,7 @@ fn print_usage() {
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");
     eprintln!("  infra-cli trade yield <fixture> [--level <n>] [--shift <hours>] [-o <file.csv>] [--text]");
     eprintln!();
-    eprintln!("Global: --no-bake disables Bake loading and lookup; [perf] stderr summary is enabled; --perf-detail adds buffered events; --no-perf disables both");
+    eprintln!("Global: runtime Bake loading and lookup are temporarily disabled; --no-bake remains accepted; explicit bake generation is available; [perf] stderr summary is enabled; --perf-detail adds buffered events; --no-perf disables both");
     eprintln!("Output: CSV by default (UTF-8 BOM when writing to file). Use --text for human-readable stderr.");
 }
 

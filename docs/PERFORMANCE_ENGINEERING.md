@@ -322,7 +322,7 @@ v2 约 78–80% 制造时间准备没有暖机或心情 gap，仍需识别时间
 
 完整生成每批最多32,768个组合，Rayon仅评价当前批次；按原效率降序、制造仓库降序、有序状态ID升序排序后立即序列化。16路有界归并生成分层run，最终按原signature顺序拼接v17文件；不全量收集signature行。临时run由RAII释放，归并每路只持有一行及256KiB读取缓冲。候选、数值、执行顺序及排序不变，类别为safe reduction；limited入口仍用原有有界前缀堆。
 
-CLI全局参数 --no-bake 在请求前关闭加载、预热及查表，用于同输入live/Bake对比；默认启用。bench入口输出perf trace，记录bake_hits、live_calls、回退类别与冷阶段；不能仅凭总时间推断命中。
+2026-11-02按用户“先暂时禁用”的裁决，Core与CLI运行时Bake开关均关闭：普通搜索、定时/自动排班及serve不加载、不预热、不查表，直接使用live搜索。保留 --no-bake 参数兼容既有调用，显式 bake all/trade/manufacture 生成入口不受影响。当前CLI没有运行时启用参数；以后接通生产动态布局时再恢复。bench仍输出perf trace，可检查live_calls与冷阶段；不能仅凭总时间推断命中。
 
 ### 完整生成、开关测速与生产命中核查（2026-11-02）
 
@@ -357,3 +357,5 @@ CLI全局参数 --no-bake 在请求前关闭加载、预热及查表，用于同
 
 
 正例补证：positive.rs链接同一release infra-core，通过真实schedule_rotation获得auto=true、work_hours=Some(12)的assignment，清空工作房名单后resolve为表的静态基准。静态制造池Required实际命中1次，完整best/top字段与Disabled相同，combinations/evaluated均1。邻例加入实际AddEffRamp状态时Required返回Ramp错误、Auto执行live；未新增可修改私有模式字段的生产接口。该证据仅证明兼容自动子域可用，真实自动Box仍因其他布局依赖回退。缺失auto窗口邻例无法通过现有公开入口构造，未执行；代码按evaluation_hours错误返回InvalidShift。独立复审记录和所有原始结果留在本轮证据目录。
+
+2026-11-02临时禁用验收：普通serve（无 --no-bake）通过RIIC-Web原生客户端约50.4ms握手，三班/主备各3次请求全部成功，完整result与上一版显式关闭Bake一致；没有bake_cold阶段或Bake命中。补测Worker RSS每10ms采样峰值41,412KiB（约40.4MiB），是本次进程采样峰值，不是内核精确峰值。自动CLI同一high-owned Box的 --assert-invariants 通过；本次只改运行时开关，未重复全量Box门禁或全表生成。证据：target/codex-runs/bake-disabled-20261102/。

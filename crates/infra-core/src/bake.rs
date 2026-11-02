@@ -35,7 +35,8 @@ use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput, TradeSe
 use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::{Action, CompiledAtom, Condition, RecipeKind, Selector};
 
-static BAKE_ENABLED: AtomicBool = AtomicBool::new(true);
+// Temporarily opt out: production layouts currently fall back to live search.
+static BAKE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Process-wide CLI switch; set before starting searches or warming the table.
 pub fn set_bake_enabled(enabled: bool) {

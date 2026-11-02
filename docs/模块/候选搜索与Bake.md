@@ -119,9 +119,9 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 完整生成每批最多32,768个组合，Rayon仅评价当前批次；按原效率降序、制造仓库降序、有序状态ID升序排序后立即序列化。16路有界归并生成分层run，最终按原signature顺序拼接v17文件；不全量收集signature行。临时run由RAII释放，归并每路只持有一行及256KiB读取缓冲。候选、数值、执行顺序及排序不变，类别为safe reduction；limited入口仍用原有有界前缀堆。
 
-CLI全局参数 --no-bake 在请求前关闭加载、预热及查表，用于同输入live/Bake对比；默认启用。bench入口输出perf trace，记录bake_hits、live_calls、回退类别与冷阶段；不能仅凭总时间推断命中。
+2026-11-02按用户“先暂时禁用”的裁决，Core与CLI运行时Bake开关均关闭：普通搜索、定时/自动排班及serve不加载、不预热、不查表，直接使用live搜索。保留 --no-bake 参数兼容既有调用，显式 bake all/trade/manufacture 生成入口不受影响。当前CLI没有运行时启用参数；以后接通生产动态布局时再恢复。bench仍输出perf trace，可检查live_calls与冷阶段；不能仅凭总时间推断命中。
 
-bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；首轮包含冷加载，后续轮复用常驻Bake表，用于区分冷/热计算耗时。输出文件请求会逐轮写入同一路径，最终保留最后一轮。
+bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；当前运行时Bake关闭，各轮均走live，不加载或复用Bake表。输出文件请求会逐轮写入同一路径，最终保留最后一轮。
 
 ### 生产支持域与实测（2026-11-02）
 
@@ -131,3 +131,5 @@ bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace�
 
 
 实际兼容自动正例已用release core入口验证：auto=true、work_hours=Some(12)、其余为表基准的静态制造查询Required命中，best/top及计数与live一致；加入暖机状态后Required报Ramp、Auto回live。因此自动模式可用兼容Bake行，真实布局状态失配仍回live。验证不证明任意自动布局支持。
+
+本次禁用属于cache使用policy调整，恢复原live搜索，不改变候选、目标或完整性保证；显式生成及兼容性判断代码保留，供后续接通。
