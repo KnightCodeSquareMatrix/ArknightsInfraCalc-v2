@@ -334,6 +334,26 @@ CLI全局参数 --no-bake 在请求前关闭加载、预热及查表，用于同
 
 生产三班入口的28代表性与10高持有Box，开启/关闭各38次终态断言均通过，profile/rotation/MAA比较38份全部相同。开启时贸易和制造Bake命中均为0；已有记录中layout失配为贸易151、制造644，贸易predicate556、额外forbidden_pairs49。进一步用两个真实高持有Box交替各3次独占CLI测速，全部exit0及断言通过：b-101-424开启/关闭中位1.904s/2.108s，b-231-425为2.649s/2.578s，RSS峰值约31–33MiB，均零命中。没有稳定的生产Bake提速；这两盒并非全生产负载性能保证。
 
-根因在当前支持域：表按空assignment的固定search_baseline生成，work_hours为None；定时编排首次写入Some(shift_hours)，resolve继续写入真实workforce、标签计数及global注入，而热查询比较完整LayoutContext后拒绝。自动轮换在搜索调用方显式live，贸易predicate和额外禁配也明确不支持Bake。serve仍同步预热该全表，真实请求失配时可能承担冷启动和常驻内存而无收益。--no-bake可直接关闭该成本。本轮没有把动态输入强行读成固定行，也没有扩展Bake支持域；要让排班命中，需要另行确定依赖投影或动态响应表合同，不能通过取消适用条件得到正确结果。
+修复前根因（c661bee，后续字段误判已修正）：表按空assignment的固定search_baseline生成，work_hours为None；定时编排首次写入Some(shift_hours)，resolve继续写入真实workforce、标签计数及global注入，而热查询比较完整LayoutContext后拒绝。自动轮换在搜索调用方显式live，贸易predicate和额外禁配也明确不支持Bake。serve仍同步预热该全表，真实请求失配时可能承担冷启动和常驻内存而无收益。--no-bake可直接关闭该成本。本轮没有把动态输入强行读成固定行，也没有扩展Bake支持域；要让排班命中，需要另行确定依赖投影或动态响应表合同，不能通过取消适用条件得到正确结果。
 
 最终二进制SHA-256为512986ee3c517a88d88874b584d2ea867484cc77e50c5275c4d8e09dbc769e36。格式化、release构建、三项文档检查完成；未新增或运行源码测试。最终二进制的批量终态验收记录在batch-on-final/batch-off-final。
+
+### RIIC-Web真实调用与自动模式修正（2026-11-02）
+
+用户纠正“自动排版不需要绕过bake，这是agent的误解”。删除贸易和制造叶搜索的auto_rotation禁用，使自动与定时统一尝试查询；baked_layout_compatible不再将auto_rotation/work_hours与基准不同单独视为机制失配。它们仅选择search评价窗口；实际名单、global资源/注入及其他机制字段仍比较。制造按有效evaluation_hours判窗口与ramp适用性，自动Some(H)不能误用None的平均暖机表。这是cache/fallback支持域扩展，等价范围限定于其余真实依赖匹配且无被排除时间效果的输入；不改变候选、排序或输出，不增加动态响应表。
+
+只读核对旁边RIIC-Web（76b1a2e8）：src/server/infra.ts通过createPlanComputeParams构造schema3内联layout/operbox，top20、空system_preferences、maa_title和fiammetta_enable；serve-client.ts继承env、设置数据目录，启动infra-cli serve，先ping再同进程连续请求。直接导入该仓原生InfraCliServeClient做模拟，不启动网站业务、不写旁边仓库。实际网站layout为src/layouts/243.json、Box为持久b-101-424。4个Rayon线程；这不是部署机完整并发/环境模拟。
+
+原生ping固定10秒：最终开启Bake的首次握手10.006秒超时，诊断重启并放宽等待后27.283秒成功；关闭首次57.152ms成功。开启期间观测solver VmRSS约2,874,440KiB（约2.74GiB），为单次进程快照而非完整峰值测量。已定位同步全表预热与Web握手超时的耦合；本轮未修改网站timeout或Worker预热策略。
+
+同一常驻Worker顺序执行两模式各3次，开启/关闭原始响应除规定耗时后完全相同；abc_12_6_6中位wall1376.739/1297.843ms，solver1352/1278ms；main_backup_12_12中位wall3253.750/3156.894ms，solver3236/3140ms。开启均零hit，回退总计制造layout192、贸易layout27、predicate147。调度字段误判删除后，当前输入仍由真实布局依赖和predicate回退；不声称生产提速。修复前初步测量与编译并行或布局不同，不用于速度比较。
+
+网站公开rotation类型与API只允许具名定时profile，schema3和Worker v7都没有Rust AutoRotationTiming。曾探测auto对象的schema错误被记录，未计为成功求解。Rust自动排班仍用真实plan --rotation auto@12/12；同网站布局和Box，开启/关闭各3次断言成功，完整auto产物相同，中位1.428/1.578s。开启每次确实进入查询并记录trade layout14/manufacture layout10/predicate11，hit仍0；不会因自动模式在入口被跳过。当前真实样本没有兼容自动hit正例，不能将入口修复或fallback证明泛化成任意动态自动布局可直接读固定表。
+
+证据：target/codex-runs/bake-web-auto-20261102/中的web_probe.mjs、final-on/off.json、web-summary.json、auto_probe.py、auto-summary.json及auto/timed批量目录。该目录保留到交付、不提交；修改不需要重新生成组合表。
+
+
+最终release SHA-256为3084df0596ac4ca3dbd5d0364ad9bbfb138b953b8663f06321b682e290ca7941。定时与auto@12/12各38个Box开启/关闭，共152次终态断言全部完成，四类失败均0。定时38组完整产物相同；自动37组相同、1组仅随机Fallback补位姓名及其身份/首人红脸随之变化，均在fallback_operators集合内。既有vacancy_fill.rs使用每进程RandomState散列排序，不能把这处随机差异判成Bake选人变化，也不宣称自动38份逐字一致。真实Web12次、指定自动6次均成功且各自开关产物一致。正向命中及暖机邻例由target中的release core诊断入口补证，不新增或运行源码测试。
+
+
+正例补证：positive.rs链接同一release infra-core，通过真实schedule_rotation获得auto=true、work_hours=Some(12)的assignment，清空工作房名单后resolve为表的静态基准。静态制造池Required实际命中1次，完整best/top字段与Disabled相同，combinations/evaluated均1。邻例加入实际AddEffRamp状态时Required返回Ramp错误、Auto执行live；未新增可修改私有模式字段的生产接口。该证据仅证明兼容自动子域可用，真实自动Box仍因其他布局依赖回退。缺失auto窗口邻例无法通过现有公开入口构造，未执行；代码按evaluation_hours错误返回InvalidShift。独立复审记录和所有原始结果留在本轮证据目录。

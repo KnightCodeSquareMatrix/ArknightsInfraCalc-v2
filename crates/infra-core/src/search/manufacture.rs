@@ -345,19 +345,18 @@ fn search_manufacture_single_recipe(
     let start = Instant::now();
 
     let bake_started = Instant::now();
-    let baked_report =
-        if !options.layout.auto_rotation && options.bake_mode != crate::bake::BakeMode::Disabled {
-            crate::bake::try_baked_manufacture_search(
-                &sub,
-                table,
-                options,
-                recipe,
-                combinations,
-                start,
-            )?
-        } else {
-            None
-        };
+    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
+        crate::bake::try_baked_manufacture_search(
+            &sub,
+            table,
+            options,
+            recipe,
+            combinations,
+            start,
+        )?
+    } else {
+        None
+    };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
         if let Some(key) = memo_key {

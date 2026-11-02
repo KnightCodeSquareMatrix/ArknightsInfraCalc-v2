@@ -82,3 +82,6 @@ Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 w
 CLI全局 --no-bake 在启动求解前关闭Bake加载、serve预热与查表；默认启用，不改变其他搜索参数。serve此开关作用于进程所有请求。
 
 bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；首轮包含冷加载，后续轮复用常驻Bake表，用于区分冷/热计算耗时。输出文件请求会逐轮写入同一路径，最终保留最后一轮。
+
+
+2026-11-02直接导入旁边RIIC-Web的原生serve-client模拟schema3内联请求：同Worker连续三班/主备各3次，开关响应除耗时一致，当前Box均零Bake命中。开启同步预热超过客户端ping的10秒超时，放宽诊断等待后成功；关闭约57ms握手成功。网站具名rotation、Worker定时v7均未暴露Rust auto，自动验收使用plan --rotation auto@H1/H2。未修改网站或Worker协议/timeout；完整测量与支持边界见docs/PERFORMANCE_ENGINEERING.md。

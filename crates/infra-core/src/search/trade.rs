@@ -356,20 +356,19 @@ fn search_trade_single_order(
 
     let start = Instant::now();
     let bake_started = Instant::now();
-    let baked_report =
-        if !options.layout.auto_rotation && options.bake_mode != crate::bake::BakeMode::Disabled {
-            crate::bake::try_baked_trade_search(
-                &sub,
-                table,
-                options,
-                order_kind,
-                &filter,
-                combo_count,
-                start,
-            )?
-        } else {
-            None
-        };
+    let baked_report = if options.bake_mode != crate::bake::BakeMode::Disabled {
+        crate::bake::try_baked_trade_search(
+            &sub,
+            table,
+            options,
+            order_kind,
+            &filter,
+            combo_count,
+            start,
+        )?
+    } else {
+        None
+    };
     let bake_lookup_elapsed = bake_started.elapsed();
     if let Some(report) = baked_report {
         if let Some(key) = memo_key {

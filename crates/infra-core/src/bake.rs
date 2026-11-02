@@ -2404,7 +2404,11 @@ fn baked_trade_compatible(
         Some(BakeMissKind::Predicate)
     } else if !options.mood.is_finite() || options.mood <= 0.0 {
         Some(BakeMissKind::InvalidMood)
-    } else if !options.shift_hours.is_finite() {
+    } else if options
+        .layout
+        .evaluation_hours(options.shift_hours)
+        .map_or(true, |hours| !hours.is_finite())
+    {
         Some(BakeMissKind::InvalidShift)
     } else if !baked_layout_compatible(&options.layout) {
         Some(BakeMissKind::Layout)
@@ -2420,15 +2424,26 @@ fn baked_manufacture_compatible(
     options: &ManuSearchOptions,
     table: &SkillTable,
 ) -> Option<BakeMissKind> {
+    let shift_hours = if options.layout.auto_rotation {
+        match options
+            .layout
+            .evaluation_hours(options.shift_hours.unwrap_or(24.0))
+        {
+            Ok(hours) => Some(hours),
+            Err(_) => return Some(BakeMissKind::InvalidShift),
+        }
+    } else {
+        options.shift_hours
+    };
     if !options.mood.is_finite() || options.mood <= 0.0 {
         Some(BakeMissKind::InvalidMood)
-    } else if options.shift_hours.is_some_and(|hours| !hours.is_finite()) {
+    } else if shift_hours.is_some_and(|hours| !hours.is_finite()) {
         Some(BakeMissKind::InvalidShift)
     } else if !baked_layout_compatible(&options.layout) {
         Some(BakeMissKind::Layout)
     } else if mood_sensitive_pool(pool, |entry| &entry.buff_ids, table) {
         Some(BakeMissKind::MoodSensitive)
-    } else if options.shift_hours.is_some() && manufacture_ramp_pool(pool, table) {
+    } else if shift_hours.is_some() && manufacture_ramp_pool(pool, table) {
         Some(BakeMissKind::Ramp)
     } else if options.pool_has_peer_reset(pool, table) {
         Some(BakeMissKind::PeerReset)
@@ -2459,8 +2474,14 @@ fn baked_layout_compatible(layout: &LayoutContext) -> bool {
     let same_float = |actual: f64, expected: f64| {
         actual.is_finite() && expected.is_finite() && actual.to_bits() == expected.to_bits()
     };
+    // The mode and requested duration only select evaluation_hours in room search.
+    // Compare resolved mechanics, not these scheduling selectors; the query above
+    // checks the effective window and excludes shift-dependent manufacture ramps.
+    let mut expected_layout = baseline.clone();
+    expected_layout.auto_rotation = layout.auto_rotation;
+    expected_layout.work_hours = layout.work_hours;
     // PartialEq includes active_source_buffs; bit guards keep signed zero distinct.
-    if layout != baseline
+    if layout != &expected_layout
         || layout.global_inject.has_dynamic_trade_inject()
         || !layout.global_inject.manu_count_scaled().is_empty()
         || !layout

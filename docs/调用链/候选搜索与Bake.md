@@ -62,7 +62,7 @@ Auto 首次读取失败时同步生成并发布，失败回 live；Required 不�
 
 排查先用 `layout eval --explain-json` 确认固定编制能否结算，再用真实 live/Bake CLI 结果对比核对缓存，最后用 `plan --assert-invariants` 验证完整轮换。一次候选命中不能证明全局最优或知识库机制覆盖。
 
-自动轮换入口沿同一设施搜索调用链，新增运行时成员准入和候选自身窗口。请求memo包含模式及真实成员/固定主力快照；自动模式显式live，定时Bake兼容要求不变。入口和终态见 [自动轮换](自动轮换.md)。
+自动轮换入口沿同一设施搜索调用链，最初ETA名单资格由建池消费，后续搜索不复筛工作预算。请求memo保留实际收益layout、模式及H；自动与定时模式都尝试Bake，由真实状态和有效评价窗口判定适用性；调度模式本身不禁用。入口和终态见 [自动轮换](自动轮换.md)。
 
 
-2026-11-02实测：38个真实三班Box的开启/关闭产物相同，开启仍零命中。定时assignment写入work_hours并resolve实际名单/跨设施效果，已不同于空assignment的Bake基准；兼容bench真实命中，热搜索约3.79倍。因此预热成功不能证明排班使用Bake；排查必须读bake_hits和layout/predicate/forbidden_pairs回退计数。性能与内存口径见docs/PERFORMANCE_ENGINEERING.md。
+2026-11-02前轮38个真实三班Box开启/关闭产物相同且零命中是修复前证据。用户纠正自动禁用后，两域统一进入try_baked入口；布局比较不再用auto_rotation/work_hours单独判失配，真实名单及跨设施效果仍参与比较，制造ramp消费实际窗口。必须读bake_hits及layout/predicate回退计数，不以预热或开关耗时推断使用。RIIC-Web真实协议与测量见docs/PERFORMANCE_ENGINEERING.md。

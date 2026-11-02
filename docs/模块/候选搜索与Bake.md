@@ -68,7 +68,7 @@ v17 的 `operator_states` 保存姓名、entry 的精英阶段、有序 buff ID 
 
 热查询要求每个真人只出现一次，完整状态在相应设施 canonical 池中，且输入保留该池相对顺序。生产 signature 查找使用固定 13 个可空槽：贸易 level1/2/3 赤金及 level3 源石占四槽，制造三级 × 三配方占九槽；先严格核对 level 1–3 与 capacity 等于等级，赤金另核对实际金线数等于冷加载基准，源石沿原 key 不限制金线数。冷加载按每个 index 首行建立 signature 槽；磁盘 v17 与 manifest 保留原字符串协议，热查询不再格式化 signature 或查字符串 HashMap。每个 signature 建立长度 `C(状态数, 容量)` 的 dense colex rank 数组，未存储组合用 sentinel 表示；容量只支持 1–3，组合数、rank 与数组分配均 checked，溢出或分配失败给出可读原因。查询沿 live 的原组合字典序枚举，固定三槽仅复制状态 ID 后排序计算 rank，不改变解算或输出顺序；直接 lookup 取代扫描和排序整张表。最大堆只保留 `top_k.max(1)` 个轻量候选，按贸易效率与原枚举次序、制造效率/仓库/组合姓名次序比较，最后物化 best/top。`evaluated` 仍统计全部通过合法性和必选过滤的组合，`combinations` 保留调用方枚举口径；贸易零命中 miss 回 live，制造保留成功空报告。
 
-E0/E1 状态、full_pool 和有限班次可命中，不再固定 E2、24 心情或 24 小时；心情必须有限且大于零。实际技能中读取 Mood/OwnerMoodGap 或相关条件的池、制造 peer reset 继续 live，包括制造没有指定班次的情形。完整 LayoutContext 必须与 search baseline 相同，含 active_source_buffs；所有可参与计算的浮点值还核对有限性与 bit，静态注入 family map 核对实际遍历顺序和两域聚合结果，动态贸易注入与制造 count-scaled 注入回 live。传入 SkillTable 与 runtime 标准表的原始 JSON 文本逐字节匹配，结果按加载身份缓存；每个 entry 的预编译 atom 还按完整 seq、sort_key、atom 结构及浮点文本比较并缓存，持有 Arc 防止指针复用。制造 `None` 采用已匹配表的正常补编译语义，显式 `Some`（含空）必须与标准状态一致；贸易 legacy 空编译数组即使 live 可补编译，也会保守 miss。该临时 Debug 浮点比较只作表内门禁，不是持久化格式或通用 memo key。
+E0/E1 状态、full_pool 和有限班次可命中，不再固定 E2、24 心情或 24 小时；心情必须有限且大于零。实际技能中读取 Mood/OwnerMoodGap 或相关条件的池、制造 peer reset 继续 live，包括制造没有指定班次的情形。LayoutContext除调度选择字段auto_rotation/work_hours外必须与search baseline相同；有效评价窗口单独核对，时间相关制造ramp等不支持输入回live，含 active_source_buffs；所有可参与计算的浮点值还核对有限性与 bit，静态注入 family map 核对实际遍历顺序和两域聚合结果，动态贸易注入与制造 count-scaled 注入回 live。传入 SkillTable 与 runtime 标准表的原始 JSON 文本逐字节匹配，结果按加载身份缓存；每个 entry 的预编译 atom 还按完整 seq、sort_key、atom 结构及浮点文本比较并缓存，持有 Arc 防止指针复用。制造 `None` 采用已匹配表的正常补编译语义，显式 `Some`（含空）必须与标准状态一致；贸易 legacy 空编译数组即使 live 可补编译，也会保守 miss。该临时 Debug 浮点比较只作表内门禁，不是持久化格式或通用 memo key。
 
 
 Baked 行持久化单位贸易产出、单位赤金消耗、单位特殊赤金产出和单位源石消耗。命中时分别按实时路径用单位值 × `total_efficiency` 复原日产贸易与源石产出；特殊赤金产出再乘 `GSL_GOLD_UNIT_SCALE`，避免把普通订单赤金消耗误报为特殊产金。该恢复不改变候选集合、比较键或排序。
@@ -110,7 +110,7 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 自动模式在Plan入口删除禁用组合，整体跳过兼容registry与动态producer前缀竞争；允许域沿普通设施搜索、局部禁配、required和used。已删除CandidateAdmission、全站技能presence、资源来源复演及任意主备混搭穷举。按用户2026-10-30删减裁决，不再保证零散成员/任意混搭没有偶发禁用协同，此项属于approximation；没有新top-K或有限精查策略。
 
-所有排班模式仅保留最初中枢名单ETA试算；搜索不再做本房、双中枢或固定主力预算准入，memo移除这些状态，仅保留数值收益layout、模式与H。制造≥12小时负心情差身份排除已删除，真实积分与暖机保留。自动仍用live，普通Bake兼容门禁不变。
+所有排班模式仅保留最初中枢名单ETA试算；搜索不再做本房、双中枢或固定主力预算准入，memo移除这些状态，仅保留数值收益layout、模式与H。制造≥12小时负心情差身份排除已删除，真实积分与暖机保留。自动与定时均可尝试Bake，依真实结算状态及有效窗口决定适用性。
 
 终态核对实际结构、Plan、显式挂件归属与快照；工时不足仅诊断，显式 gate 核对提示准确性，不恢复每房两名单×两中枢工作预算拒绝或全站协同枚举。详见[自动轮换](../自动轮换.md)。
 制造体系试排直接调用原实时制造搜索，保留请求memo与实际收益上下文。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。
@@ -127,4 +127,7 @@ bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace�
 
 全量30,337,349行外部排序与旧payload逐字节相同，生成192.505s，GNU time峰值RSS65.35MiB、无swap。运行时仍加载完整compact表及dense索引：兼容bench首轮init26.08s，RSS约2.71GiB；5次热请求搜索中位开启0.961ms/关闭3.644ms，真实命中2次贸易+1次制造，结果相同。
 
-真实三班38个Box开启/关闭均零Bake命中且完整产物相同。表的空assignment基准work_hours=None，定时编排为Some(shift_hours)，真实名单和跨设施状态继续使完整LayoutContext失配；自动轮换显式live，predicate和额外禁配也不走表。serve预热不保证后续请求能命中。--no-bake可关闭预热与查表；本轮仅核查并记录支持边界，没有取消结果依赖条件或增加动态表。完整测量口径、旧中断基线及原始证据入口见docs/PERFORMANCE_ENGINEERING.md本轮验收段。
+前一轮三班38个Box开启/关闭零命中且完整产物相同，属于修复前证据。2026-11-02用户纠正“自动排版不需要绕过bake，这是agent的误解”：已移除两域搜索入口的自动禁用；布局兼容比较只排除选择评价窗口的auto_rotation/work_hours，真实名单、global注入等机制状态仍精确比较。有效评价窗口沿LayoutContext::evaluation_hours取值，自动制造也按该窗口拒绝固定行不能表达的ramp；mood和peer-reset等原条件保持。这是cache/fallback支持域扩展；等价依据限于调度字段不参与冻结响应且原动态依赖门禁仍成立，不改变候选、目标或机制；不是允许任意动态布局读固定表。serve预热不保证后续请求能命中。具体RIIC-Web原生客户端实测、自动CLI及验收见docs/PERFORMANCE_ENGINEERING.md后续段。
+
+
+实际兼容自动正例已用release core入口验证：auto=true、work_hours=Some(12)、其余为表基准的静态制造查询Required命中，best/top及计数与live一致；加入暖机状态后Required报Ramp、Auto回live。因此自动模式可用兼容Bake行，真实布局状态失配仍回live。验证不证明任意自动布局支持。
