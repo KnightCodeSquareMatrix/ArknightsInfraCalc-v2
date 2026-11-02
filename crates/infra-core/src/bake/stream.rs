@@ -1,8 +1,8 @@
-//! Generation-only row blocks keep at most one signature's rows in memory.
+//! Bounded sorted runs and external merge preserve the disk row order.
 
+use std::collections::{BTreeSet, BinaryHeap};
 use std::fs::{self, File, OpenOptions};
-use std::hash::Hasher;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -11,8 +11,9 @@ use bincode::Options;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    BakeComboTableFingerprint, BakeGeneratorFingerprint, BakedComboIndex, BakedComboRow,
-    BakedComboRowDisk, BakedComboTableDisk, OperatorState, BAKE_SCHEMA_VERSION,
+    BakeComboTableSummary, BakeGeneratorFingerprint, BakedComboIndex, BakedComboRow,
+    BakedComboRowDisk, BakedComboTableDisk, OperatorState, TradeRoomMechanismSignature,
+    BAKE_SCHEMA_VERSION,
 };
 use crate::error::{Error, Result};
 
@@ -49,40 +50,81 @@ impl SignatureRowBlocks {
         self.blocks.iter().map(|block| block.row_count).sum()
     }
 
-    pub(super) fn push(
+    pub(super) fn push_chunks(
         &mut self,
         facility: &'static str,
         signature_key: String,
-        rows: Vec<BakedComboRow>,
-    ) -> Result<()> {
-        let mut block = SignatureRowBlock {
-            facility,
-            signature_key,
-            row_count: rows.len(),
-            path: None,
-        };
-        if !rows.is_empty() {
+        chunks: impl Iterator<Item = Vec<BakedComboRow>>,
+    ) -> Result<RowSummary> {
+        let mut summary = RowSummary::default();
+        let mut levels: Vec<Vec<Run>> = Vec::new();
+        for mut rows in chunks {
+            if rows.is_empty() {
+                continue;
+            }
+            super::sort_signature_rows(&mut rows);
             let (path, file) = create_row_block(&self.out_dir)?;
-            block.path = Some(path);
-            let mut writer = BufWriter::new(file);
+            let run = Run {
+                path,
+                rows: rows.len(),
+            };
+            let mut writer = BufWriter::with_capacity(IO_BUFFER, file);
             for row in rows {
-                let disk = BakedComboRowDisk::from(&row);
-                drop(row);
-                // A block contains only row encodings, without a Vec length.
-                encode_into(&mut writer, &disk)?;
+                summary.row_count += 1;
+                if let Some(signature) = &row.trade_mechanism_signature {
+                    summary.mechanism_rows += 1;
+                    summary.mechanism_signatures.insert(signature.clone());
+                }
+                encode_into(&mut writer, &BakedComboRowDisk::from(&row))?;
             }
             writer.flush()?;
+            drop(writer);
+            let mut carry = run;
+            let mut level = 0;
+            loop {
+                if levels.len() == level {
+                    levels.push(Vec::new());
+                }
+                levels[level].push(carry);
+                if levels[level].len() < MERGE_FAN_IN {
+                    break;
+                }
+                carry = merge_runs(&self.out_dir, std::mem::take(&mut levels[level]))?;
+                level += 1;
+            }
         }
-        self.blocks.push(block);
-        Ok(())
+        let mut runs = levels.into_iter().flatten().collect::<Vec<_>>();
+        while runs.len() > 1 {
+            let mut next = Vec::new();
+            let mut remaining = runs.into_iter();
+            loop {
+                let group = remaining.by_ref().take(MERGE_FAN_IN).collect::<Vec<_>>();
+                if group.is_empty() {
+                    break;
+                }
+                next.push(if group.len() == 1 {
+                    group.into_iter().next().unwrap()
+                } else {
+                    merge_runs(&self.out_dir, group)?
+                });
+            }
+            runs = next;
+        }
+        let path = runs.pop().map(|mut run| std::mem::take(&mut run.path));
+        self.blocks.push(SignatureRowBlock {
+            facility,
+            signature_key,
+            row_count: summary.row_count,
+            path,
+        });
+        Ok(summary)
     }
 
     pub(super) fn write_table(
         mut self,
         operators: &[OperatorState],
         mask_words: usize,
-        generator: &Option<BakeGeneratorFingerprint>,
-    ) -> Result<BakeComboTableFingerprint> {
+    ) -> Result<BakeComboTableSummary> {
         self.blocks.sort_by(|a, b| {
             a.facility
                 .cmp(b.facility)
@@ -105,7 +147,7 @@ impl SignatureRowBlocks {
         let mut writer = BufWriter::new(File::create(&path)?);
         let header = ComboTableHeader {
             schema_version: BAKE_SCHEMA_VERSION,
-            generator,
+            generator: None,
             operator_count: operators.len(),
             operator_names: operators.iter().map(|state| state.name.as_str()).collect(),
             operator_states: operators,
@@ -122,16 +164,110 @@ impl SignatureRowBlocks {
         }
         writer.flush()?;
         drop(writer);
-        let (bytes, hash64) = hash_file(&path)?;
-        Ok(BakeComboTableFingerprint {
+        let bytes = fs::metadata(&path)?.len();
+        Ok(BakeComboTableSummary {
             bytes,
-            hash64,
             rows_by_signature: indexes
                 .into_iter()
                 .map(|index| (index.signature_key, index.len))
                 .collect(),
         })
     }
+}
+
+const MERGE_FAN_IN: usize = 16;
+const IO_BUFFER: usize = 256 * 1024;
+
+#[derive(Default)]
+pub(super) struct RowSummary {
+    pub row_count: usize,
+    pub mechanism_rows: usize,
+    pub mechanism_signatures: BTreeSet<TradeRoomMechanismSignature>,
+}
+
+struct Run {
+    path: PathBuf,
+    rows: usize,
+}
+impl Drop for Run {
+    fn drop(&mut self) {
+        if !self.path.as_os_str().is_empty() {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+struct MergeRow {
+    row: BakedComboRowDisk,
+    source: usize,
+}
+impl Ord for MergeRow {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // The heap returns the first row under the existing disk ordering.
+        compare_disk_rows(&other.row, &self.row).then_with(|| other.source.cmp(&self.source))
+    }
+}
+impl PartialOrd for MergeRow {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl PartialEq for MergeRow {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+impl Eq for MergeRow {}
+
+fn compare_disk_rows(a: &BakedComboRowDisk, b: &BakedComboRowDisk) -> std::cmp::Ordering {
+    super::compare_row_keys(
+        a.sort_efficiency_millis,
+        a.manufacture_storage_limit,
+        &a.operator_indices,
+        b.sort_efficiency_millis,
+        b.manufacture_storage_limit,
+        &b.operator_indices,
+    )
+}
+
+fn merge_runs(out_dir: &Path, runs: Vec<Run>) -> Result<Run> {
+    let (path, file) = create_row_block(out_dir)?;
+    let result = Run {
+        path,
+        rows: runs.iter().map(|run| run.rows).sum(),
+    };
+    let mut writer = BufWriter::with_capacity(IO_BUFFER, file);
+    let mut readers = runs
+        .iter()
+        .map(|run| {
+            File::open(&run.path).map(|file| (BufReader::with_capacity(IO_BUFFER, file), run.rows))
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let mut heap = BinaryHeap::new();
+    for (source, (reader, remaining)) in readers.iter_mut().enumerate() {
+        if *remaining > 0 {
+            heap.push(MergeRow {
+                row: decode_from(reader)?,
+                source,
+            });
+            *remaining -= 1;
+        }
+    }
+    while let Some(MergeRow { row, source }) = heap.pop() {
+        encode_into(&mut writer, &row)?;
+        let (reader, remaining) = &mut readers[source];
+        if *remaining > 0 {
+            heap.push(MergeRow {
+                row: decode_from(reader)?,
+                source,
+            });
+            *remaining -= 1;
+        }
+    }
+    writer.flush()?;
+    drop(writer);
+    drop(readers);
+    Ok(result)
 }
 
 // Field order and types encode exactly the BakedComboTableDisk prefix. Bincode
@@ -141,7 +277,7 @@ impl SignatureRowBlocks {
 #[derive(Serialize)]
 struct ComboTableHeader<'a> {
     schema_version: u32,
-    generator: &'a Option<BakeGeneratorFingerprint>,
+    generator: Option<BakeGeneratorFingerprint>,
     operator_count: usize,
     operator_names: Vec<&'a str>,
     operator_states: &'a [OperatorState],
@@ -176,34 +312,6 @@ fn create_row_block(out_dir: &Path) -> Result<(PathBuf, File)> {
             Err(error) => return Err(error.into()),
         }
     }
-}
-
-fn hash_file(path: &Path) -> Result<(u64, String)> {
-    hash_open_file(&mut File::open(path)?)
-}
-
-/// Hash and rewind one open immutable generation file, preserving slice Hash.
-pub(super) fn hash_open_file(file: &mut File) -> Result<(u64, String)> {
-    file.seek(SeekFrom::Start(0))?;
-    let bytes = file.metadata()?.len();
-    let len =
-        usize::try_from(bytes).map_err(|_| Error::msg("combo_table.bin length exceeds usize"))?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    // Preserve hash_bytes' [u8] Hash contract: hash the full length once, then
-    // feed all bytes in order. Hashing each chunk as a slice changes the hash.
-    hasher.write_usize(len);
-    let mut reader = BufReader::new(&mut *file);
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        let read = reader.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        hasher.write(&buffer[..read]);
-    }
-    drop(reader);
-    file.seek(SeekFrom::Start(0))?;
-    Ok((bytes, format!("{:016x}", hasher.finish())))
 }
 
 #[derive(Deserialize)]

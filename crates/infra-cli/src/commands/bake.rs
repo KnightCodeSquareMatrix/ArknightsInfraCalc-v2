@@ -2,19 +2,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use infra_core::{
-    bake_and_publish_catalogs, bake_catalogs, current_exe_generator_fingerprint,
-    default_baked_out_dir, validate_baked_catalog, verify_baked_catalog_responses, BakeOptions,
+    bake_and_publish_catalogs, bake_catalogs, default_baked_out_dir, BakeOptions,
     BakeProgressEvent, Error,
 };
-
-use super::verify::run_all_regressions;
 
 pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
     let mut options = BakeOptions::default();
     options.out_dir = default_baked_out_dir()?;
     let mut mode = "all";
-    let mut validate_only = false;
-    let mut verify_only = false;
     let mut action_seen = false;
 
     let mut i = 0usize;
@@ -25,22 +20,6 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
                     return Err(Error::msg("bake accepts exactly one action"));
                 }
                 mode = args[i].as_str();
-                action_seen = true;
-                i += 1;
-            }
-            "validate" => {
-                if action_seen {
-                    return Err(Error::msg("bake accepts exactly one action"));
-                }
-                validate_only = true;
-                action_seen = true;
-                i += 1;
-            }
-            "verify" => {
-                if action_seen {
-                    return Err(Error::msg("bake accepts exactly one action"));
-                }
-                verify_only = true;
                 action_seen = true;
                 i += 1;
             }
@@ -78,38 +57,7 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         }
     }
 
-    if (validate_only || verify_only) && options.limit_per_signature.is_some() {
-        return Err(Error::msg(
-            "--limit-per-signature is only valid while generating a catalog",
-        ));
-    }
-
     let _trace = infra_core::profile::ensure_solver_perf_trace("bake_cli", mode);
-    let generator = current_exe_generator_fingerprint()?;
-    if validate_only || verify_only {
-        validate_baked_catalog(&options.out_dir, &generator)?;
-        eprintln!(
-            "baked catalog is valid for current cli hash={} -> {}",
-            generator.hash64,
-            options.out_dir.display()
-        );
-        if verify_only {
-            let verified = verify_baked_catalog_responses(&options.out_dir, &generator)?;
-            eprintln!(
-                "baked catalog verification passed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={} skipped_queries={}",
-                verified.rows_checked,
-                verified.row_mismatches,
-                verified.queries_checked,
-                verified.query_mismatches,
-                verified.skipped_signatures,
-                verified.skipped_queries
-            );
-            run_all_regressions()?;
-            eprintln!("mechanism regressions passed");
-        }
-        return Ok(());
-    }
-    options.generator = Some(generator);
     options.progress = Some(Arc::new(print_bake_progress));
 
     match mode {
@@ -145,29 +93,15 @@ pub fn bake_cmd(args: &[String]) -> Result<(), Error> {
         report.elapsed_ms,
         report.out_dir.display()
     );
-    validate_baked_catalog(&options.out_dir, report.generator.as_ref().unwrap())?;
-    let verified =
-        verify_baked_catalog_responses(&options.out_dir, report.generator.as_ref().unwrap())?;
-    eprintln!(
-        "baked catalog validation passed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={} skipped_queries={}",
-        verified.rows_checked,
-        verified.row_mismatches,
-        verified.queries_checked,
-        verified.query_mismatches,
-        verified.skipped_signatures,
-        verified.skipped_queries
-    );
-    run_all_regressions()?;
-    eprintln!("mechanism regressions passed");
     Ok(())
 }
 
 fn print_bake_usage() {
     eprintln!("Usage:");
     eprintln!("  infra-cli bake [all|trade|manufacture] [--out <dir>] [--limit-per-signature <n>]");
-    eprintln!("  infra-cli bake validate [--out <dir>]");
-    eprintln!("  infra-cli bake verify [--out <dir>]");
-    eprintln!("      Generates and validates indexed 3/2/1-person combo_table.bin, then runs regressions.");
+    eprintln!(
+        "      Generates indexed 3/2/1-person combo_table.bin and publishes complete catalogs."
+    );
 }
 
 fn print_bake_progress(event: BakeProgressEvent) {

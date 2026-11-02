@@ -393,27 +393,16 @@ impl BakeMissKind {
 pub(crate) enum BakeColdPhase {
     Init,
     Generate,
-    Validate,
-    Verify,
     Index,
     Publish,
 }
 
 impl BakeColdPhase {
-    const ALL: [Self; 6] = [
-        Self::Init,
-        Self::Generate,
-        Self::Validate,
-        Self::Verify,
-        Self::Index,
-        Self::Publish,
-    ];
+    const ALL: [Self; 4] = [Self::Init, Self::Generate, Self::Index, Self::Publish];
     fn label(self) -> &'static str {
         match self {
             Self::Init => "init",
             Self::Generate => "generate",
-            Self::Validate => "validate",
-            Self::Verify => "verify",
             Self::Index => "index",
             Self::Publish => "publish",
         }
@@ -433,7 +422,7 @@ pub struct BakeMetrics {
     pub manufacture_misses: [u64; BakeMissKind::ALL.len()],
     pub trade_errors: u64,
     pub manufacture_errors: u64,
-    pub cold: [BakeColdMetrics; 6],
+    pub cold: [BakeColdMetrics; 4],
 }
 
 impl BakeMetrics {
@@ -469,7 +458,7 @@ impl BakeMetrics {
         result.manufacture_errors = self
             .manufacture_errors
             .saturating_sub(before.manufacture_errors);
-        for i in 0..6 {
+        for i in 0..BakeColdPhase::ALL.len() {
             result.cold[i] = BakeColdMetrics {
                 calls: self.cold[i].calls.saturating_sub(before.cold[i].calls),
                 errors: self.cold[i].errors.saturating_sub(before.cold[i].errors),

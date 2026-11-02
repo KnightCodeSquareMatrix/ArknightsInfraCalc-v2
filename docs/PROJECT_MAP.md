@@ -130,7 +130,7 @@ layout / operbox / runtime data
 | `search trade [--top N]` | 贸易候选搜索 |
 | `trade yield <fixture>` | 单站单位产出探测 |
 | `bench --operbox <path>` | 固定布局的贸易/制造搜索基准 |
-| `bake [all\|trade\|manufacture]` / `bake validate` / `bake verify` | 生成、兼容校验和响应验证 Bake catalog |
+| `bake [all\|trade\|manufacture]` | 生成并发布 Bake catalog；不执行校验 |
 | `debug rerun --bundle <path>` | 重放反馈 debug bundle，并可按房间、干员或班次缩小输出 |
 | `serve` | 启动前端 JSON line 常驻 worker；机器主入口为内联 `plan.compute` |
 | `layout test` | 自定义蓝图的单班搜索或指定 assignment 探测 |
@@ -149,7 +149,7 @@ layout / operbox / runtime data
 | `src/commands/serve.rs` | `plan.compute` 内联协议和 legacy 路径适配 |
 | `src/commands/layout.rs` | `layout test` / `team-rotation` / `analyze` / `eval` adapter |
 | `src/commands/advice.rs` | v2 练卡规则和 operbox adapter |
-| `src/commands/bake.rs` | Bake 生成、validate 和 verify adapter |
+| `src/commands/bake.rs` | Bake 生成与发布 adapter |
 | `src/commands/debug.rs` | debug bundle 校验、重放和诊断输出 adapter |
 | `src/commands/profile.rs` | layout、analysis 和 Bake dependency profile |
 | `src/commands/verify.rs` | `expect_rule_id` 回归断言和 fixture 选择 |
@@ -179,7 +179,7 @@ layout / operbox / runtime data
 | `REGRESSION_CASES.csv` / `UNIT_OUTPUT_ANCHORS.csv` | `verify` 回归和单位产出锚点 |
 | `fixtures/` / `layout/` / `schedule_243/` | 真实入口 fixture、蓝图模板和排班样例 |
 | `tags/` | Selector/规则使用的阵营与结构 tag |
-| `baked/` | 本地 Bake catalog；schema/输入不兼容时必须拒绝并走 live 路径 |
+| `baked/` | 本地 Bake catalog；信任本地表，运行时不校验指纹或完整性；更新后显式重建 |
 | `feedback_regression_seeds/` | 从反馈提炼的回归种子，不拥有领域语义 |
 | `prts_*` / `MECHANICS_REGISTRY.csv` | 外部原文快照和历史归档核对材料 |
 

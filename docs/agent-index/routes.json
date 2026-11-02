@@ -334,7 +334,7 @@
       "entrypoints": [
         "crates/infra-core/src/pool/base.rs::filter_pool",
         "crates/infra-core/src/search/trade.rs::search_trade_triples",
-        "crates/infra-core/src/bake.rs::validate_baked_catalog"
+        "crates/infra-core/src/bake.rs::bake_and_publish_catalogs"
       ],
       "chain_doc": "docs/调用链/候选搜索与Bake.md",
       "module_docs": [

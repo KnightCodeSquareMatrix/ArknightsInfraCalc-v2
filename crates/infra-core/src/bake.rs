@@ -7,8 +7,8 @@ use state::{build_variant_pools, distinct_names, OperatorState};
 
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
 use std::fs::{self, File};
-use std::hash::{Hash, Hasher};
-use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::hash::Hash;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -22,23 +22,25 @@ use crate::efficiency::Efficiency;
 use crate::error::{Error, Result};
 use crate::instances::{default_instances_path, OperatorInstances};
 use crate::layout::LayoutContext;
-use crate::pool::{
-    build_trade_combo_operators_vec, filter_general_manufacture_search_pool, n_choose_k_u64,
-};
-use crate::pool::{filter_standalone_exact_with, StandaloneFilter};
-use crate::pool::{HasName, ManuPool, PoolCore, TradePool};
+use crate::pool::{build_trade_combo_operators_vec, n_choose_k_u64};
+use crate::pool::{ManuPool, PoolCore, TradePool};
 use crate::profile::{BakeColdPhase, BakeMissKind};
 use crate::search::{
     ManuEfficiencyBreakdown, ManuSearchHit, ManuSearchOptions, ManuSearchReport,
     SearchTripleFilter, TradeEfficiencyBreakdown, TradeSearchHit, TradeSearchOptions,
     TradeSearchReport,
 };
-use crate::skill_table::{data_path, default_skill_table_path, SkillTable};
+use crate::skill_table::{default_skill_table_path, SkillTable};
 use crate::trade::input::{TradeOperator, TradeOrderKind, TradeRoomInput, TradeSearchOrderMode};
-use crate::trade::shortcut::trade_station_exclusive_violation;
 use crate::trade::solver::solve_trade_with_shift_prevalidated;
 use crate::types::{Action, CompiledAtom, Condition, RecipeKind, Selector};
-use crate::FacilityKind;
+
+static BAKE_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Process-wide CLI switch; set before starting searches or warming the table.
+pub fn set_bake_enabled(enabled: bool) {
+    BAKE_ENABLED.store(enabled, Ordering::Relaxed);
+}
 
 pub const BAKE_SCHEMA_VERSION: u32 = 17;
 
@@ -111,7 +113,6 @@ pub struct BakeOptions {
     pub include_trade: bool,
     pub include_manufacture: bool,
     pub limit_per_signature: Option<usize>,
-    pub generator: Option<BakeGeneratorFingerprint>,
     pub progress: Option<BakeProgressCallback>,
 }
 
@@ -122,7 +123,6 @@ impl Default for BakeOptions {
             include_trade: true,
             include_manufacture: true,
             limit_per_signature: None,
-            generator: None,
             progress: None,
         }
     }
@@ -135,7 +135,6 @@ impl std::fmt::Debug for BakeOptions {
             .field("include_trade", &self.include_trade)
             .field("include_manufacture", &self.include_manufacture)
             .field("limit_per_signature", &self.limit_per_signature)
-            .field("generator", &self.generator)
             .field("progress", &self.progress.as_ref().map(|_| "<callback>"))
             .finish()
     }
@@ -245,7 +244,7 @@ pub enum BakeProgressEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BakeGeneratorFingerprint {
+struct BakeGeneratorFingerprint {
     pub kind: String,
     pub path: String,
     pub bytes: u64,
@@ -264,8 +263,6 @@ pub struct BakeReport {
     pub manufacture_signatures: usize,
     pub manufacture_hits: usize,
     pub combo_table_rows: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub generator: Option<BakeGeneratorFingerprint>,
     pub elapsed_ms: u128,
 }
 
@@ -308,13 +305,12 @@ struct BakeManifest {
     generator: Option<BakeGeneratorFingerprint>,
     inputs: Vec<BakeInputFingerprint>,
     options: BakeManifestOptions,
-    combo_table: BakeComboTableFingerprint,
+    combo_table: BakeComboTableSummary,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct BakeComboTableFingerprint {
+struct BakeComboTableSummary {
     bytes: u64,
-    hash64: String,
     rows_by_signature: BTreeMap<String, usize>,
 }
 
@@ -447,9 +443,6 @@ impl From<&BakedComboRow> for BakedComboRowDisk {
 struct RuntimeBakedComboTable {
     table: compact::Table,
     operator_index_by_state: HashMap<OperatorState, usize>,
-    /// 每个 signature 实际出现过的干员位图（行 mask 的并集）。
-    /// 查询池必须是该集合的子集，否则 Bake 无法覆盖该池的全部组合，必须 miss 回退。
-    universe_mask_by_key: HashMap<String, Vec<u64>>,
     /// 贸易四种与制造九种合法 signature；磁盘仍保留原 String key。
     rank_rows_by_signature: [Option<Vec<u32>>; BAKED_SIGNATURE_SLOTS],
     trade_gold_lines: u32,
@@ -740,14 +733,14 @@ fn bake_catalogs_measured(options: &BakeOptions) -> Result<BakeReport> {
             rows: Some(combo_table_rows),
         },
     );
-    let combo_table = row_blocks.write_table(&operators, mask_words, &options.generator)?;
+    let combo_table = row_blocks.write_table(&operators, mask_words)?;
 
     let manifest = BakeManifest {
         schema_version: BAKE_SCHEMA_VERSION,
         generated_by: "infra-core::bake".to_string(),
         model: "binary_single_room_combo_table".to_string(),
-        generator: options.generator.clone(),
-        inputs: bake_input_fingerprints()?,
+        generator: None,
+        inputs: Vec::new(),
         options: BakeManifestOptions {
             include_trade: options.include_trade,
             include_manufacture: options.include_manufacture,
@@ -780,7 +773,6 @@ fn bake_catalogs_measured(options: &BakeOptions) -> Result<BakeReport> {
         manufacture_signatures,
         manufacture_hits,
         combo_table_rows,
-        generator: options.generator.clone(),
         elapsed_ms: start.elapsed().as_millis(),
     };
     emit_progress(
@@ -801,10 +793,10 @@ fn bake_catalogs_measured(options: &BakeOptions) -> Result<BakeReport> {
     Ok(report)
 }
 
-/// Generate and fully verify a fresh immutable generation, then atomically
+/// Generate a fresh immutable generation, then atomically
 /// publish CURRENT. Never replaces or edits the generation readers are using.
 pub fn bake_and_publish_catalogs(options: &BakeOptions) -> Result<BakeReport> {
-    publish_baked_catalogs(options, false)
+    publish_baked_catalogs(options)
 }
 
 struct BakeGeneration {
@@ -859,24 +851,17 @@ fn set_generation_readonly(path: &Path, readonly: bool) -> Result<()> {
     Ok(())
 }
 
-fn publish_baked_catalogs(options: &BakeOptions, prefer_existing: bool) -> Result<BakeReport> {
+fn publish_baked_catalogs(options: &BakeOptions) -> Result<BakeReport> {
     let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Publish);
-    let result = publish_baked_catalogs_measured(options, prefer_existing);
+    let result = publish_baked_catalogs_measured(options);
     cold.finish(&result);
     result
 }
 
-fn publish_baked_catalogs_measured(
-    options: &BakeOptions,
-    prefer_existing: bool,
-) -> Result<BakeReport> {
+fn publish_baked_catalogs_measured(options: &BakeOptions) -> Result<BakeReport> {
     if options.limit_per_signature.is_some() {
         return Err(Error::msg("limited catalogs cannot be published"));
     }
-    let generator = options
-        .generator
-        .as_ref()
-        .ok_or_else(|| Error::msg("catalog publication requires generator fingerprint"))?;
     fs::create_dir_all(&options.out_dir)?;
     static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
     let generation_name = format!(
@@ -897,22 +882,17 @@ fn publish_baked_catalogs_measured(
     let mut generation_options = options.clone();
     generation_options.out_dir = generation_path;
     let mut report = bake_catalogs(&generation_options)?;
-    verify_baked_catalog_responses(&generation_options.out_dir, generator)?;
 
     let lock_path = options.out_dir.join(".publish-lock");
     if let Err(error) = fs::create_dir(&lock_path) {
         // Never wait behind another publisher on a runtime request.
-        if validate_baked_catalog(&options.out_dir, generator).is_ok() {
+        if published_catalog_exists(&options.out_dir) {
             report.out_dir = options.out_dir.clone();
             return Ok(report);
         }
         return Err(Error::msg(format!("Bake publication unavailable: {error}")));
     }
     let _lock = BakePublishLock(lock_path);
-    if prefer_existing && validate_baked_catalog(&options.out_dir, generator).is_ok() {
-        report.out_dir = options.out_dir.clone();
-        return Ok(report);
-    }
     set_generation_readonly(&generation.path, true)?;
     let pointer_path = options.out_dir.join(format!(".CURRENT-{generation_name}"));
     let publish = || -> Result<()> {
@@ -933,6 +913,10 @@ fn publish_baked_catalogs_measured(
     generation.published = true;
     report.out_dir = options.out_dir.clone();
     Ok(report)
+}
+
+fn published_catalog_exists(out_dir: &Path) -> bool {
+    resolved_baked_catalog_dir(out_dir).is_ok_and(|dir| dir.join("combo_table.bin").is_file())
 }
 
 fn emit_progress(options: &BakeOptions, event: BakeProgressEvent) {
@@ -1019,11 +1003,14 @@ fn bake_trade_rows(
                 full_pool: false,
             };
 
-            let mut rows: Vec<_> = rank::combinations(pool.entries.len(), operator_capacity)
-                .par_bridge()
-                .filter_map(|combo| {
+            let rows = stream_signature_rows(
+                row_blocks,
+                "trade",
+                signature_key.clone(),
+                rank::combinations(pool.entries.len(), operator_capacity),
+                |combo| {
                     trade_combo_row(
-                        &pool,
+                        pool,
                         table,
                         &row_options,
                         order_kind,
@@ -1031,31 +1018,22 @@ fn bake_trade_rows(
                         operator_index,
                         mask_words,
                     )
-                })
-                .collect();
-            sort_signature_rows(&mut rows);
-            if let Some(limit) = options.limit_per_signature {
-                rows.truncate(limit);
-            }
-            baked.row_count += rows.len();
-            for signature in rows
-                .iter()
-                .filter_map(|row| row.trade_mechanism_signature.as_ref())
-            {
-                baked.mechanism_rows += 1;
-                baked.mechanism_signatures.insert(signature.clone());
-            }
+                },
+                options.limit_per_signature,
+            )?;
+            baked.row_count += rows.row_count;
+            baked.mechanism_rows += rows.mechanism_rows;
+            baked.mechanism_signatures.extend(rows.mechanism_signatures);
             emit_progress(
                 options,
                 BakeProgressEvent::SignatureFinished {
                     facility: "trade",
-                    signature_key: signature_key.clone(),
-                    rows: rows.len(),
+                    signature_key,
+                    rows: rows.row_count,
                     elapsed_ms: sig_start.elapsed().as_millis(),
                 },
             );
             baked.signatures += 1;
-            row_blocks.push("trade", signature_key, rows)?;
         }
     }
 
@@ -1093,7 +1071,7 @@ fn trade_combo_row(
     ))
 }
 
-/// 把 live 命中结构完整落进行里；Bake 行级对账用同一函数重建期望行。
+/// 把 live 命中结构完整保存为磁盘行。
 #[allow(clippy::too_many_arguments)]
 fn trade_row_from_hit(
     hit: &TradeSearchHit,
@@ -1193,11 +1171,14 @@ fn bake_manufacture_rows(
                 full_pool: false,
             };
 
-            let mut rows: Vec<_> = rank::combinations(pool.entries.len(), operator_capacity)
-                .par_bridge()
-                .filter_map(|combo| {
+            let rows = stream_signature_rows(
+                row_blocks,
+                "manufacture",
+                signature_key.clone(),
+                rank::combinations(pool.entries.len(), operator_capacity),
+                |combo| {
                     manufacture_combo_row(
-                        &pool,
+                        pool,
                         table,
                         &row_options,
                         recipe,
@@ -1205,24 +1186,20 @@ fn bake_manufacture_rows(
                         operator_index,
                         mask_words,
                     )
-                })
-                .collect();
-            sort_signature_rows(&mut rows);
-            if let Some(limit) = options.limit_per_signature {
-                rows.truncate(limit);
-            }
-            baked.row_count += rows.len();
+                },
+                options.limit_per_signature,
+            )?;
+            baked.row_count += rows.row_count;
             emit_progress(
                 options,
                 BakeProgressEvent::SignatureFinished {
                     facility: "manufacture",
-                    signature_key: signature_key.clone(),
-                    rows: rows.len(),
+                    signature_key,
+                    rows: rows.row_count,
                     elapsed_ms: sig_start.elapsed().as_millis(),
                 },
             );
             baked.signatures += 1;
-            row_blocks.push("manufacture", signature_key, rows)?;
         }
     }
 
@@ -1261,7 +1238,7 @@ fn manufacture_combo_row(
     ))
 }
 
-/// 把 live 命中结构完整落进行里；Bake 行级对账用同一函数重建期望行。
+/// 把 live 命中结构完整保存为磁盘行。
 #[allow(clippy::too_many_arguments)]
 fn manufacture_row_from_hit(
     hit: &ManuSearchHit,
@@ -1312,1021 +1289,165 @@ fn manufacture_row_from_hit(
     }
 }
 
+/// 有界收集签名行。
+///
+/// 全表生成只评价一个有界组合批次，排序块立即写盘并由 stream owner 外部归并。
+/// limited 入口沿原比较键保留前缀，不改变完整表生成的候选集合。
+fn stream_signature_rows<I, F>(
+    blocks: &mut stream::SignatureRowBlocks,
+    facility: &'static str,
+    signature_key: String,
+    mut combinations: I,
+    solve: F,
+    limit: Option<usize>,
+) -> Result<stream::RowSummary>
+where
+    I: Iterator<Item = [usize; 3]> + Send,
+    F: Fn([usize; 3]) -> Option<BakedComboRow> + Sync + Send,
+{
+    if let Some(limit) = limit {
+        let rows = combinations
+            .par_bridge()
+            .filter_map(solve)
+            .fold(
+                || BoundedRows::with_limit(limit.max(1)),
+                |mut acc, row| {
+                    acc.push(row);
+                    acc
+                },
+            )
+            .reduce(|| BoundedRows::with_limit(limit.max(1)), BoundedRows::merge)
+            .into_sorted_vec();
+        return blocks.push_chunks(facility, signature_key, std::iter::once(rows));
+    }
+    const COMBOS_PER_RUN: usize = 32_768;
+    let chunks = std::iter::from_fn(|| {
+        let combos = combinations
+            .by_ref()
+            .take(COMBOS_PER_RUN)
+            .collect::<Vec<_>>();
+        if combos.is_empty() {
+            return None;
+        }
+        Some(
+            combos
+                .into_par_iter()
+                .filter_map(&solve)
+                .collect::<Vec<_>>(),
+        )
+    });
+    blocks.push_chunks(facility, signature_key, chunks)
+}
+
+/// 固定容量的最大堆：只保留按 `compare_baked_rows` 排序后最靠前的 `limit` 行。
+struct BoundedRows {
+    limit: usize,
+    heap: BinaryHeap<HeapRow>,
+}
+
+struct HeapRow(BakedComboRow);
+
+impl BoundedRows {
+    fn with_limit(limit: usize) -> Self {
+        Self {
+            limit,
+            heap: BinaryHeap::with_capacity(limit.min(1024)),
+        }
+    }
+
+    /// 先放入再弹出堆顶，堆顶恒为当前最差的一行，因此只需常数级额外内存。
+    fn push(&mut self, row: BakedComboRow) {
+        self.heap.push(HeapRow(row));
+        if self.heap.len() > self.limit {
+            self.heap.pop();
+        }
+    }
+
+    fn merge(mut self, mut other: Self) -> Self {
+        if other.heap.len() > self.heap.len() {
+            std::mem::swap(&mut self, &mut other);
+        }
+        for HeapRow(row) in other.heap {
+            self.push(row);
+        }
+        self
+    }
+
+    fn into_sorted_vec(self) -> Vec<BakedComboRow> {
+        let mut rows: Vec<BakedComboRow> = self.heap.into_iter().map(|HeapRow(row)| row).collect();
+        sort_signature_rows(&mut rows);
+        rows
+    }
+}
+
+impl Ord for HeapRow {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        compare_baked_rows(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for HeapRow {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for HeapRow {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for HeapRow {}
+
 fn sort_signature_rows(rows: &mut [BakedComboRow]) {
     rows.sort_by(compare_baked_rows);
 }
 
 fn compare_baked_rows(a: &BakedComboRow, b: &BakedComboRow) -> std::cmp::Ordering {
-    b.sort_efficiency
-        .cmp(&a.sort_efficiency)
+    compare_row_keys(
+        a.sort_efficiency.millis(),
+        a.manufacture_storage_limit,
+        &a.operator_indices,
+        b.sort_efficiency.millis(),
+        b.manufacture_storage_limit,
+        &b.operator_indices,
+    )
+}
+
+fn compare_row_keys(
+    a_eff: i32,
+    a_storage: Option<i32>,
+    a_ids: &[usize],
+    b_eff: i32,
+    b_storage: Option<i32>,
+    b_ids: &[usize],
+) -> std::cmp::Ordering {
+    b_eff
+        .cmp(&a_eff)
         .then_with(|| {
-            b.manufacture_storage_limit
+            b_storage
                 .unwrap_or_default()
-                .cmp(&a.manufacture_storage_limit.unwrap_or_default())
+                .cmp(&a_storage.unwrap_or_default())
         })
-        .then_with(|| a.operator_indices.cmp(&b.operator_indices))
+        .then_with(|| a_ids.cmp(b_ids))
 }
 
-pub fn validate_baked_catalog(out_dir: &Path, generator: &BakeGeneratorFingerprint) -> Result<()> {
-    load_validated_baked_catalog(out_dir, generator).map(|_| ())
+fn load_baked_catalog(out_dir: &Path) -> Result<compact::Table> {
+    let dir = resolved_baked_catalog_dir(out_dir)?;
+    let mut reader = BufReader::new(File::open(dir.join("combo_table.bin"))?);
+    let (header, _) = stream::read_header(&mut reader)?;
+    compact::read(header, &mut reader)
 }
 
-struct ValidatedBakedCatalog {
-    table: compact::Table,
-    file: File,
-    trade_pool: Option<TradePool>,
-    trade_skill_table: Option<SkillTable>,
-}
-
-fn load_validated_baked_catalog(
-    out_dir: &Path,
-    generator: &BakeGeneratorFingerprint,
-) -> Result<ValidatedBakedCatalog> {
-    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Validate);
-    let result = load_validated_baked_catalog_measured(out_dir, generator);
-    cold.finish(&result);
-    result
-}
-
-fn load_validated_baked_catalog_measured(
-    out_dir: &Path,
-    generator: &BakeGeneratorFingerprint,
-) -> Result<ValidatedBakedCatalog> {
-    let resolved_dir = resolved_baked_catalog_dir(out_dir)?;
-    let out_dir = resolved_dir.as_path();
-    let manifest_path = out_dir.join("manifest.json");
-    let manifest: BakeManifest =
-        serde_json::from_reader(BufReader::new(File::open(&manifest_path)?))?;
-    if manifest.schema_version != BAKE_SCHEMA_VERSION {
-        return Err(Error::msg(format!(
-            "baked schema mismatch: found {}, expected {}; rerun `infra-cli bake --out {}`",
-            manifest.schema_version,
-            BAKE_SCHEMA_VERSION,
-            out_dir.display()
-        )));
-    }
-    if manifest.options.limit_per_signature.is_some() {
-        return Err(Error::msg(
-            "limited baked catalog is not complete enough for runtime publication",
-        ));
-    }
-    if !manifest.options.include_trade && !manifest.options.include_manufacture {
-        return Err(Error::msg("baked catalog contains no facility"));
-    }
-    let Some(baked_generator) = manifest.generator.as_ref() else {
-        return Err(Error::msg(format!(
-            "baked manifest has no generator fingerprint; rerun `infra-cli bake --out {}`",
-            out_dir.display()
-        )));
-    };
-    if baked_generator.hash64 != generator.hash64
-        || baked_generator.bytes != generator.bytes
-        || baked_generator.kind != generator.kind
-    {
-        return Err(Error::msg(format!(
-        "baked generator mismatch: baked hash={} bytes={}, current hash={} bytes={}; rerun `infra-cli bake --out {}`",
-        baked_generator.hash64,
-        baked_generator.bytes,
-        generator.hash64,
-        generator.bytes,
-        out_dir.display()
-    )));
-    }
-    validate_baked_input_fingerprints(&manifest, out_dir)?;
-    let combo_path = out_dir.join("combo_table.bin");
-    let mut file = File::open(&combo_path)
-        .map_err(|e| Error::msg(format!("read {}: {e}", combo_path.display())))?;
-    let (bytes, hash64) = stream::hash_open_file(&mut file)?;
-    if manifest.combo_table.bytes != bytes || manifest.combo_table.hash64 != hash64 {
-        return Err(Error::msg("baked combo table fingerprint mismatch"));
-    }
-    let mut reader = BufReader::new(file);
-    let (disk, row_count) = stream::read_header(&mut reader)?;
-    validate_baked_combo_table_header(&disk, row_count, generator, &manifest.options)?;
-    let rows_by_signature = disk
-        .indexes
-        .iter()
-        .map(|index| (index.signature_key.clone(), index.len))
-        .collect::<BTreeMap<_, _>>();
-    if rows_by_signature != manifest.combo_table.rows_by_signature {
-        return Err(Error::msg("baked combo table row counts mismatch"));
-    }
+pub fn load_complete_baked_trade_catalog(out_dir: &Path) -> Result<CompleteBakedTradeCatalog> {
+    let table = load_baked_catalog(out_dir)?;
     let instances = OperatorInstances::load(&default_instances_path()?)?;
-    let table = SkillTable::load(&default_skill_table_path()?)?;
-    let pools = build_variant_pools(&instances, &table)?;
-    let mut expected_states = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for state in pools
-        .trade
-        .entries
-        .iter()
-        .map(OperatorState::from_trade_entry)
-        .chain(
-            pools
-                .manufacture
-                .entries
-                .iter()
-                .map(OperatorState::from_manu_entry),
-        )
-    {
-        if seen.insert(state.clone()) {
-            expected_states.push(state);
-        }
-    }
-    if disk.operator_states != expected_states {
-        return Err(Error::msg(
-            "baked operator states differ from canonical live variants",
-        ));
-    }
-    let compact =
-        compact::read_validated(disk, &mut reader, &pools.trade, &pools.manufacture, &table)?;
-    let file = reader.into_inner();
-    let (trade_pool, trade_skill_table) = if manifest.options.include_trade {
-        (Some(pools.trade), Some(table))
-    } else {
-        (None, None)
-    };
-    Ok(ValidatedBakedCatalog {
-        table: compact,
-        file,
-        trade_pool,
-        trade_skill_table,
-    })
-}
-
-/// `bake verify` 的统计结果：行级全量对账与查询级差分的检查/不一致计数。
-#[derive(Debug, Clone, Copy, Default)]
-pub struct BakeVerifyReport {
-    pub rows_checked: usize,
-    pub row_mismatches: usize,
-    pub queries_checked: usize,
-    pub query_mismatches: usize,
-    pub skipped_signatures: usize,
-    pub skipped_queries: usize,
-}
-
-/// 每个 signature 的确定性查询样本数。
-pub const BAKE_VERIFY_QUERIES_PER_SIGNATURE: usize = 320;
-const BAKE_VERIFY_MAX_REPORTED_MISMATCHES: usize = 20;
-const BAKE_VERIFY_TOP_K: [usize; 5] = [1, 2, 3, 5, 8];
-
-/// 固定种子的确定性伪随机数（SplitMix64），避免依赖平台随机源。
-struct SplitMix64(u64);
-
-impl SplitMix64 {
-    fn new(seed: u64) -> Self {
-        Self(seed)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-}
-
-fn seeded_rng(key: &str) -> SplitMix64 {
-    let mut seed = 0x243F_6A88_85A3_08D3u64;
-    for byte in key.bytes() {
-        seed = seed.rotate_left(5) ^ u64::from(byte);
-        seed = seed.wrapping_mul(0x0000_0100_0000_01B3);
-    }
-    SplitMix64::new(seed)
-}
-
-/// 按真人抽样，再选一个状态；返回原池升序下标，每个姓名最多一次。
-fn sample_variant_subset<T: HasName>(
-    rng: &mut SplitMix64,
-    pool: &PoolCore<T>,
-    size: usize,
-) -> Vec<usize> {
-    let mut groups = BTreeMap::<&str, Vec<usize>>::new();
-    for (idx, entry) in pool.entries.iter().enumerate() {
-        groups.entry(entry.pool_name()).or_default().push(idx);
-    }
-    let mut groups = groups.into_values().collect::<Vec<_>>();
-    let count = size.min(groups.len());
-    let mut chosen = Vec::with_capacity(count);
-    for slot in 0..count {
-        let pick = slot + (rng.next_u64() as usize) % (groups.len() - slot);
-        groups.swap(slot, pick);
-        let group = &groups[slot];
-        chosen.push(group[(rng.next_u64() as usize) % group.len()]);
-    }
-    chosen.sort_unstable();
-    chosen
-}
-
-fn distinct_pool_name_count<T: HasName>(pool: &PoolCore<T>) -> usize {
-    pool.entries
-        .iter()
-        .map(HasName::pool_name)
-        .collect::<std::collections::HashSet<_>>()
-        .len()
-}
-
-fn sample_query_size(
-    rng: &mut SplitMix64,
-    universe_len: usize,
-    capacity: usize,
-    query_index: usize,
-) -> usize {
-    let range = universe_len - capacity + 1;
-    match query_index {
-        0 => universe_len,
-        1 => capacity,
-        _ => capacity + (rng.next_u64() as usize) % range,
-    }
-}
-
-/// 把两个 JSON 值的差异路径写进 `problems`（最多保留 8 条）。
-fn json_diff_paths(
-    left: &serde_json::Value,
-    right: &serde_json::Value,
-    prefix: &str,
-    problems: &mut Vec<String>,
-) {
-    if left == right || problems.len() >= 8 {
-        return;
-    }
-    match (left, right) {
-        (serde_json::Value::Object(left_map), serde_json::Value::Object(right_map)) => {
-            let mut keys: Vec<&str> = left_map.keys().map(String::as_str).collect();
-            keys.extend(
-                right_map
-                    .keys()
-                    .map(String::as_str)
-                    .filter(|key| !left_map.contains_key(*key)),
-            );
-            keys.sort_unstable();
-            for key in keys {
-                let path = if prefix.is_empty() {
-                    key.to_string()
-                } else {
-                    format!("{prefix}.{key}")
-                };
-                match (left_map.get(key), right_map.get(key)) {
-                    (Some(left_value), Some(right_value)) => {
-                        json_diff_paths(left_value, right_value, &path, problems);
-                    }
-                    _ => problems.push(path),
-                }
-            }
-        }
-        (serde_json::Value::Array(left_items), serde_json::Value::Array(right_items)) => {
-            for idx in 0..left_items.len().max(right_items.len()) {
-                let path = format!("{prefix}[{idx}]");
-                match (left_items.get(idx), right_items.get(idx)) {
-                    (Some(left_value), Some(right_value)) => {
-                        json_diff_paths(left_value, right_value, &path, problems);
-                    }
-                    _ => problems.push(path),
-                }
-            }
-        }
-        _ => problems.push(if prefix.is_empty() {
-            "<value>".to_string()
-        } else {
-            prefix.to_string()
-        }),
-    }
-}
-
-fn push_value_diff<T: Serialize>(live: &T, bake: &T, prefix: &str, problems: &mut Vec<String>) {
-    match (serde_json::to_value(live), serde_json::to_value(bake)) {
-        (Ok(live_value), Ok(bake_value)) => {
-            json_diff_paths(&live_value, &bake_value, prefix, problems);
-        }
-        _ => problems.push(format!("{prefix}: serialize failure")),
-    }
-}
-
-fn baked_signature_state_covered(
-    table: &RuntimeBakedComboTable,
-    key: &str,
-    state: &OperatorState,
-) -> bool {
-    let Some(universe) = table.universe_mask_by_key.get(key) else {
-        return false;
-    };
-    let Some(idx) = table.operator_index_by_state.get(state).copied() else {
-        return false;
-    };
-    universe
-        .get(idx / 64)
-        .is_some_and(|word| word & (1u64 << (idx % 64)) != 0)
-}
-
-fn filter_pool_to_signature_universe<T: Clone>(
-    pool: PoolCore<T>,
-    table: &RuntimeBakedComboTable,
-    key: &str,
-    identity: fn(&T) -> OperatorState,
-) -> PoolCore<T> {
-    PoolCore {
-        entries: pool
-            .entries
-            .into_iter()
-            .filter(|entry| baked_signature_state_covered(table, key, &identity(entry)))
-            .collect(),
-        skipped: pool.skipped,
-    }
-}
-
-enum RowVerifyContext {
-    Trade {
-        pool: TradePool,
-        state_index: HashMap<OperatorState, usize>,
-        options: TradeSearchOptions,
-    },
-    Manufacture {
-        pool: ManuPool,
-        state_index: HashMap<OperatorState, usize>,
-        options: ManuSearchOptions,
-    },
-}
-
-fn verify_baked_row(
-    actual: &BakedComboRowDisk,
-    row_id: usize,
-    signature_key: &str,
-    disk: &BakedComboTableDisk,
-    context: &RowVerifyContext,
-    table: &SkillTable,
-    operator_index: &HashMap<OperatorState, usize>,
-    compact: &compact::Table,
-    signature: usize,
-    offset: usize,
-) -> Option<String> {
-    let runtime_row = match compact.materialize(signature, offset) {
-        Ok(row) => row,
-        Err(error) => return Some(format!("row {row_id} {signature_key}: {error}")),
-    };
-    match context {
-        RowVerifyContext::Trade {
-            pool,
-            state_index,
-            options,
-        } => {
-            let Some(order) = actual.order_kind else {
-                return Some(format!("row {row_id} {signature_key}: missing order kind"));
-            };
-            let combo = match row_pool_indices(actual, disk, state_index) {
-                Ok(combo) => combo,
-                Err(error) => return Some(format!("row {row_id} {signature_key}: {error}")),
-            };
-            let Some((hit, result)) =
-                options.solve_trade_combo(pool, table, order, &combo, None, None)
-            else {
-                return Some(format!(
-                    "row {row_id} {signature_key}: live solver rejected the baked combo"
-                ));
-            };
-            let operators = build_trade_combo_operators_vec(pool, &combo, None, None);
-            let mechanism_signature = trade_room_mechanism_signature(&operators);
-            let indices =
-                match state_indices(operators.iter().map(trade_operator_state), operator_index) {
-                    Ok(indices) => indices,
-                    Err(error) => return Some(format!("row {row_id} {signature_key}: {error}")),
-                };
-            let expected = trade_row_from_hit(
-                &hit,
-                result.production.unit.gold_consumption_per_day,
-                "trade",
-                actual.room_level,
-                actual.operator_capacity,
-                Some(order),
-                None,
-                mechanism_signature,
-                &indices,
-                disk.mask_words,
-            );
-            if let Some(failure) = verify_stored_row(&expected, actual, row_id, signature_key) {
-                return Some(failure);
-            }
-            let Some(baked_hit) = row_to_trade_hit(&runtime_row) else {
-                return Some(format!(
-                    "row {row_id} {signature_key}: baked row has incomplete response"
-                ));
-            };
-            verify_hit_values(&hit, &baked_hit, row_id, signature_key)
-        }
-        RowVerifyContext::Manufacture {
-            pool,
-            state_index,
-            options,
-        } => {
-            let Some(recipe) = actual.recipe else {
-                return Some(format!("row {row_id} {signature_key}: missing recipe"));
-            };
-            let combo = match row_pool_indices(actual, disk, state_index) {
-                Ok(combo) => combo,
-                Err(error) => return Some(format!("row {row_id} {signature_key}: {error}")),
-            };
-            let Some(hit) = options.solve_manufacture_combo(pool, table, recipe, &combo) else {
-                return Some(format!(
-                    "row {row_id} {signature_key}: live solver rejected the baked combo"
-                ));
-            };
-            let indices = match state_indices(
-                combo
-                    .iter()
-                    .map(|idx| OperatorState::from_manu_entry(&pool.entries[*idx])),
-                operator_index,
-            ) {
-                Ok(indices) => indices,
-                Err(error) => return Some(format!("row {row_id} {signature_key}: {error}")),
-            };
-            let expected = manufacture_row_from_hit(
-                &hit,
-                "manufacture",
-                actual.room_level,
-                actual.operator_capacity,
-                recipe,
-                &indices,
-                disk.mask_words,
-            );
-            if let Some(failure) = verify_stored_row(&expected, actual, row_id, signature_key) {
-                return Some(failure);
-            }
-            let Some(baked_hit) = row_to_manu_hit(&runtime_row) else {
-                return Some(format!(
-                    "row {row_id} {signature_key}: baked row has incomplete response"
-                ));
-            };
-            verify_hit_values(&hit, &baked_hit, row_id, signature_key)
-        }
-    }
-}
-
-fn verify_stored_row(
-    expected: &BakedComboRow,
-    actual: &BakedComboRowDisk,
-    row_id: usize,
-    signature_key: &str,
-) -> Option<String> {
-    let expected_disk = BakedComboRowDisk::from(expected);
-    if expected_disk == *actual {
-        return None;
-    }
-    let mut problems = Vec::new();
-    match (
-        serde_json::to_value(&expected_disk),
-        serde_json::to_value(actual),
-    ) {
-        (Ok(left), Ok(right)) => json_diff_paths(&left, &right, "", &mut problems),
-        _ => problems.push("<stored row serialization>".to_string()),
-    }
-    Some(format!(
-        "row {row_id} {signature_key}: stored row differs at {}",
-        problems.join(", ")
-    ))
-}
-
-fn verify_hit_values<T: Serialize>(
-    live: &T,
-    bake: &T,
-    row_id: usize,
-    signature_key: &str,
-) -> Option<String> {
-    let live_value = match serde_json::to_value(live) {
-        Ok(value) => value,
-        Err(error) => {
-            return Some(format!(
-                "row {row_id} {signature_key}: serialize live hit: {error}"
-            ))
-        }
-    };
-    let bake_value = match serde_json::to_value(bake) {
-        Ok(value) => value,
-        Err(error) => {
-            return Some(format!(
-                "row {row_id} {signature_key}: serialize baked hit: {error}"
-            ))
-        }
-    };
-    if live_value == bake_value {
-        return None;
-    }
-    let mut problems = Vec::new();
-    json_diff_paths(&live_value, &bake_value, "", &mut problems);
-    Some(format!(
-        "row {row_id} {signature_key}: hit differs at {}",
-        problems.join(", ")
-    ))
-}
-
-pub fn verify_baked_catalog_responses(
-    out_dir: &Path,
-    generator: &BakeGeneratorFingerprint,
-) -> Result<BakeVerifyReport> {
-    let mut cold = crate::profile::start_bake_cold(BakeColdPhase::Verify);
-    let result = verify_baked_catalog_responses_measured(out_dir, generator);
-    cold.finish(&result);
-    result
-}
-
-fn verify_baked_catalog_responses_measured(
-    out_dir: &Path,
-    generator: &BakeGeneratorFingerprint,
-) -> Result<BakeVerifyReport> {
-    let validated = load_validated_baked_catalog(out_dir, generator)?;
-    let mut row_reader = BufReader::new(validated.file);
-    let runtime_table = runtime_baked_table_from_compact(validated.table)?;
-    let disk = &runtime_table.table.header;
-    let instances = OperatorInstances::load(&default_instances_path()?)?;
-    let table = SkillTable::load(&default_skill_table_path()?)?;
-    let pools = build_variant_pools(&instances, &table)?;
-    let trade_pool = pools.trade;
-    let manufacture_pool = pools.manufacture;
-    let operator_index: HashMap<OperatorState, usize> = disk
-        .operator_states
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(index, state)| (state, index))
-        .collect();
-    let trade_state_index = pool_state_index(&trade_pool, OperatorState::from_trade_entry);
-    let manu_state_index = pool_state_index(&manufacture_pool, OperatorState::from_manu_entry);
-    let layout = Arc::new(LayoutContext::search_baseline());
-    let gold_lines = if layout.gold_manu_line_count > 0 {
-        layout.gold_manu_line_count
-    } else {
-        TradeSearchOptions::default().gold_production_lines
-    };
-    let mut report = BakeVerifyReport::default();
-    let mut failures: Vec<String> = Vec::new();
-
-    // ---- 行级全量对账 ----
-    for (signature, index) in disk.indexes.iter().enumerate() {
-        row_reader.seek(SeekFrom::Start(runtime_table.table.byte_offsets[signature]))?;
-        let first = &runtime_table.table.signatures[signature];
-        report.rows_checked += index.len;
-        let context = if let Some(order) = first.order {
-            RowVerifyContext::Trade {
-                pool: trade_pool.clone(),
-                state_index: trade_state_index.clone(),
-                options: TradeSearchOptions {
-                    trade_level: first.level,
-                    operator_capacity: first.capacity,
-                    mood: 24.0,
-                    top_k: 1,
-                    gold_production_lines: gold_lines,
-                    layout: Arc::clone(&layout),
-                    shift_hours: 24.0,
-                    order_mode: TradeSearchOrderMode::Single(order),
-                    bake_mode: BakeMode::Disabled,
-                    full_pool: false,
-                },
-            }
-        } else if let Some(recipe) = first.recipe {
-            RowVerifyContext::Manufacture {
-                pool: manufacture_pool.clone(),
-                state_index: manu_state_index.clone(),
-                options: ManuSearchOptions {
-                    level: first.level,
-                    operator_capacity: first.capacity,
-                    recipe_mode: crate::manufacture::input::ManuSearchRecipeMode::Single(recipe),
-                    mood: 24.0,
-                    top_k: 1,
-                    layout: Arc::clone(&layout),
-                    shift_hours: None,
-                    must_include_name: None,
-                    bake_mode: BakeMode::Disabled,
-                    full_pool: false,
-                },
-            }
-        } else {
-            report.skipped_signatures += 1;
-            continue;
-        };
-        const VERIFY_ROW_CHUNK: usize = 4096;
-        let mut offset = 0;
-        while offset < index.len {
-            let len = VERIFY_ROW_CHUNK.min(index.len - offset);
-            let rows = (0..len)
-                .map(|_| stream::decode_from(&mut row_reader))
-                .collect::<Result<Vec<BakedComboRowDisk>>>()?;
-            let outcomes: Vec<Option<String>> = rows
-                .par_iter()
-                .enumerate()
-                .map(|(local, actual)| {
-                    verify_baked_row(
-                        actual,
-                        index.start + offset + local,
-                        &index.signature_key,
-                        disk,
-                        &context,
-                        &table,
-                        &operator_index,
-                        &runtime_table.table,
-                        signature,
-                        offset + local,
-                    )
-                })
-                .collect();
-            for failure in outcomes.into_iter().flatten() {
-                report.row_mismatches += 1;
-                if failures.len() < BAKE_VERIFY_MAX_REPORTED_MISMATCHES {
-                    failures.push(failure);
-                }
-            }
-            offset += len;
-        }
-    }
-
-    // ---- 查询级差分 ----
-    for (signature, index) in disk.indexes.iter().enumerate() {
-        if index.len == 0 {
-            report.skipped_signatures += 1;
-            continue;
-        }
-        let first = &runtime_table.table.signatures[signature];
-        if let Some(order) = first.order {
-            let capacity = first.capacity;
-            let level = first.level;
-            let standalone_universe = filter_standalone_exact_with(
-                &trade_pool,
-                FacilityKind::TradePost,
-                StandaloneFilter::for_order(order),
-            )
-            .unwrap_or_else(|| trade_pool.clone());
-            let standalone_universe = filter_pool_to_signature_universe(
-                standalone_universe,
-                &runtime_table,
-                &index.signature_key,
-                OperatorState::from_trade_entry,
-            );
-            if distinct_pool_name_count(&standalone_universe) < capacity {
-                report.skipped_signatures += 1;
-                continue;
-            }
-            // 默认路径：生产查表实际收到的是 standalone 过滤后的池。
-            run_trade_query_samples(
-                &index.signature_key,
-                level,
-                capacity,
-                order,
-                &standalone_universe,
-                false,
-                &table,
-                &layout,
-                &runtime_table,
-                gold_lines,
-                &mut report,
-                &mut failures,
-            );
-            // full_pool 路径：池就是调用方给的完整池，覆盖烘焙生成池的大小。
-            let full_universe = filter_pool_to_signature_universe(
-                trade_pool.clone(),
-                &runtime_table,
-                &index.signature_key,
-                OperatorState::from_trade_entry,
-            );
-            if distinct_pool_name_count(&full_universe) >= capacity {
-                run_trade_query_samples(
-                    &index.signature_key,
-                    level,
-                    capacity,
-                    order,
-                    &full_universe,
-                    true,
-                    &table,
-                    &layout,
-                    &runtime_table,
-                    gold_lines,
-                    &mut report,
-                    &mut failures,
-                );
-            }
-        } else if let Some(recipe) = first.recipe {
-            let universe = filter_general_manufacture_search_pool(&manufacture_pool);
-            let universe = filter_pool_to_signature_universe(
-                universe,
-                &runtime_table,
-                &index.signature_key,
-                OperatorState::from_manu_entry,
-            );
-            let capacity = first.capacity;
-            if distinct_pool_name_count(&universe) < capacity {
-                report.skipped_signatures += 1;
-                continue;
-            }
-            let level = first.level;
-            let mut rng = seeded_rng(&index.signature_key);
-            let standalone_universe = filter_standalone_exact_with(
-                &universe,
-                FacilityKind::Factory,
-                StandaloneFilter::for_recipe(recipe),
-            )
-            .unwrap_or_else(|| universe.clone());
-            for query_index in 0..BAKE_VERIFY_QUERIES_PER_SIGNATURE {
-                let full_pool = query_index % 2 == 1;
-                let sampled_universe = if full_pool {
-                    &universe
-                } else {
-                    &standalone_universe
-                };
-                if distinct_pool_name_count(sampled_universe) < capacity {
-                    report.skipped_queries += 1;
-                    continue;
-                }
-                let size = sample_query_size(
-                    &mut rng,
-                    distinct_pool_name_count(sampled_universe),
-                    capacity,
-                    query_index,
-                );
-                let chosen = sample_variant_subset(&mut rng, sampled_universe, size);
-                let pool = ManuPool {
-                    entries: chosen
-                        .iter()
-                        .map(|&position| sampled_universe.entries[position].clone())
-                        .collect(),
-                    skipped: Vec::new(),
-                };
-                if pool.entries.len() < capacity {
-                    report.skipped_queries += 1;
-                    continue;
-                }
-                let top_k = BAKE_VERIFY_TOP_K[query_index % BAKE_VERIFY_TOP_K.len()];
-                let must_name = if query_index % 7 == 6 {
-                    let position = (rng.next_u64() as usize) % pool.entries.len();
-                    Some(pool.entries[position].name.clone())
-                } else {
-                    None
-                };
-                let live_options = ManuSearchOptions {
-                    level,
-                    operator_capacity: capacity,
-                    recipe_mode: crate::manufacture::input::ManuSearchRecipeMode::Single(recipe),
-                    mood: [24.0, 12.0, 3.0][query_index % 3],
-                    top_k,
-                    layout: Arc::clone(&layout),
-                    shift_hours: [None, Some(12.0), Some(36.0), Some(0.0)][query_index % 4],
-                    must_include_name: must_name,
-                    bake_mode: BakeMode::Disabled,
-                    full_pool,
-                };
-                let mut bake_options = live_options;
-                bake_options.bake_mode = BakeMode::Required;
-                if baked_manufacture_compatible(&pool, &bake_options, &table).is_some()
-                    || canonical_manu_query_ids(&runtime_table, &pool).is_err()
-                {
-                    report.skipped_queries += 1;
-                    continue;
-                }
-                let mut live_options = bake_options.clone();
-                live_options.bake_mode = BakeMode::Disabled;
-                let live = crate::search::search_manufacture_triples(&pool, &table, &live_options);
-                let bake = baked_manufacture_report(
-                    &runtime_table,
-                    &pool,
-                    &bake_options,
-                    recipe,
-                    if bake_options.must_include_name.is_some() {
-                        n_choose_k_u64(pool.entries.len() - 1, capacity - 1)
-                    } else {
-                        n_choose_k_u64(pool.entries.len(), capacity)
-                    },
-                    StdInstant::now(),
-                    &mut None,
-                );
-                report.queries_checked += 1;
-                let failure = compare_manufacture_query(
-                    live,
-                    bake,
-                    query_index,
-                    &index.signature_key,
-                    size,
-                    top_k,
-                );
-                if let Some(failure) = failure {
-                    report.query_mismatches += 1;
-                    if failures.len() < BAKE_VERIFY_MAX_REPORTED_MISMATCHES {
-                        failures.push(failure);
-                    }
-                }
-            }
-        } else {
-            report.skipped_signatures += 1;
-        }
-    }
-
-    if report.row_mismatches > 0 || report.query_mismatches > 0 {
-        let mut message = format!(
-        "bake verify failed: rows_checked={} row_mismatches={} queries_checked={} query_mismatches={} skipped_signatures={} skipped_queries={}",
-        report.rows_checked,
-        report.row_mismatches,
-        report.queries_checked,
-        report.query_mismatches,
-        report.skipped_signatures,
-        report.skipped_queries
-    );
-        for failure in &failures {
-            message.push_str("\n  - ");
-            message.push_str(failure);
-        }
-        return Err(Error::msg(message));
-    }
-    Ok(report)
-}
-
-fn push_verify_failure(failures: &mut Vec<String>, failure: String) {
-    if failures.len() < BAKE_VERIFY_MAX_REPORTED_MISMATCHES {
-        failures.push(failure);
-    }
-}
-
-/// 对给定查询池跑固定种子的确定性查询差分，比较 live 与 Bake 的 best/top。
-#[allow(clippy::too_many_arguments)]
-fn run_trade_query_samples(
-    signature_key: &str,
-    level: u8,
-    capacity: usize,
-    order: TradeOrderKind,
-    universe: &TradePool,
-    full_pool: bool,
-    table: &SkillTable,
-    layout: &Arc<LayoutContext>,
-    runtime_table: &RuntimeBakedComboTable,
-    gold_lines: u32,
-    report: &mut BakeVerifyReport,
-    failures: &mut Vec<String>,
-) {
-    let mut rng = seeded_rng(&format!("{signature_key}|full_pool={full_pool}"));
-    for query_index in 0..BAKE_VERIFY_QUERIES_PER_SIGNATURE {
-        let size = sample_query_size(
-            &mut rng,
-            distinct_pool_name_count(universe),
-            capacity,
-            query_index,
-        );
-        let chosen = sample_variant_subset(&mut rng, universe, size);
-        let pool = TradePool {
-            entries: chosen
-                .iter()
-                .map(|&position| universe.entries[position].clone())
-                .collect(),
-            skipped: Vec::new(),
-        };
-        let top_k = BAKE_VERIFY_TOP_K[query_index % BAKE_VERIFY_TOP_K.len()];
-        let must_name = if query_index % 7 == 6 {
-            let position = (rng.next_u64() as usize) % pool.entries.len();
-            Some(pool.entries[position].name.clone())
-        } else {
-            None
-        };
-        let filter = SearchTripleFilter {
-            must_include_name: must_name,
-            ..SearchTripleFilter::default()
-        };
-        let live_options = TradeSearchOptions {
-            trade_level: level,
-            operator_capacity: capacity,
-            mood: [24.0, 12.0, 3.0][query_index % 3],
-            top_k,
-            gold_production_lines: gold_lines,
-            layout: Arc::clone(layout),
-            shift_hours: [24.0, 8.0, 0.0, -4.0][query_index % 4],
-            order_mode: TradeSearchOrderMode::Single(order),
-            bake_mode: BakeMode::Disabled,
-            full_pool,
-        };
-        if pool.entries.len() < capacity {
-            report.skipped_queries += 1;
-            continue;
-        }
-        let mut bake_options = live_options;
-        bake_options.bake_mode = BakeMode::Required;
-        let compatible = baked_trade_compatible(&pool, &bake_options, &filter, table).is_none();
-        let mut bake_filter = filter;
-        bake_filter.forbidden_pairs = crate::trade::legality::GLOBAL_FORBIDDEN_TRADE_PAIRS
-            .iter()
-            .map(|&(left, right)| (left.to_string(), right.to_string()))
-            .collect();
-        if !compatible || canonical_trade_query_ids(runtime_table, &pool).is_err() {
-            report.skipped_queries += 1;
-            continue;
-        }
-        let mut live_options = bake_options.clone();
-        live_options.bake_mode = BakeMode::Disabled;
-        let live = crate::search::search_trade_triples_filtered(
-            &pool,
-            table,
-            &live_options,
-            bake_filter.clone(),
-        );
-        let bake = baked_trade_report(
-            runtime_table,
-            &pool,
-            &bake_options,
-            order,
-            &bake_filter,
-            if bake_filter.has_must_include() {
-                n_choose_k_u64(pool.entries.len() - 1, capacity - 1)
-            } else {
-                n_choose_k_u64(pool.entries.len(), capacity)
-            },
-            StdInstant::now(),
-            &mut None,
-        );
-        report.queries_checked += 1;
-        if let Some(failure) =
-            compare_trade_query(live, bake, query_index, signature_key, size, top_k)
-        {
-            report.query_mismatches += 1;
-            push_verify_failure(failures, failure);
-        }
-    }
-}
-
-fn compare_trade_query(
-    live: Result<TradeSearchReport>,
-    bake: Result<Option<TradeSearchReport>>,
-    query_index: usize,
-    signature_key: &str,
-    size: usize,
-    top_k: usize,
-) -> Option<String> {
-    let mut problems = Vec::new();
-    match (live, bake) {
-        (Ok(live_report), Ok(Some(bake_report))) => {
-            push_value_diff(&live_report.best, &bake_report.best, "best", &mut problems);
-            push_value_diff(&live_report.top, &bake_report.top, "top", &mut problems);
-            if live_report.evaluated != bake_report.evaluated {
-                problems.push("evaluated differs".to_string());
-            }
-            if live_report.combinations != bake_report.combinations {
-                problems.push("combinations differs".to_string());
-            }
-        }
-        (Ok(_), Ok(None)) => problems.push("bake miss".to_string()),
-        (Ok(_), Err(error)) => problems.push(format!("bake error: {error}")),
-        (Err(live_error), Err(bake_error))
-            if live_error.to_string() == "no trade combo matched search filter"
-                && bake_error.to_string()
-                    == "required Bake miss: signature has no eligible trade combo" => {}
-        (Err(error), _) => problems.push(format!("live error: {error}")),
-    }
-    if problems.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "query {query_index} {signature_key} size={size} top_k={top_k}: {}",
-        problems.join(", ")
-    ))
-}
-
-fn compare_manufacture_query(
-    live: Result<ManuSearchReport>,
-    bake: Result<Option<ManuSearchReport>>,
-    query_index: usize,
-    signature_key: &str,
-    size: usize,
-    top_k: usize,
-) -> Option<String> {
-    let mut problems = Vec::new();
-    match (live, bake) {
-        (Ok(live_report), Ok(Some(bake_report))) => {
-            push_value_diff(&live_report.best, &bake_report.best, "best", &mut problems);
-            push_value_diff(&live_report.top, &bake_report.top, "top", &mut problems);
-            if live_report.evaluated != bake_report.evaluated {
-                problems.push("evaluated differs".to_string());
-            }
-            if live_report.combinations != bake_report.combinations {
-                problems.push("combinations differs".to_string());
-            }
-        }
-        (Ok(_), Ok(None)) => problems.push("bake miss".to_string()),
-        (Ok(_), Err(error)) => problems.push(format!("bake error: {error}")),
-        (Err(error), _) => problems.push(format!("live error: {error}")),
-    }
-    if problems.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "query {query_index} {signature_key} size={size} top_k={top_k}: {}",
-        problems.join(", ")
-    ))
-}
-
-pub fn load_complete_baked_trade_catalog(
-    out_dir: &Path,
-    generator: &BakeGeneratorFingerprint,
-) -> Result<CompleteBakedTradeCatalog> {
-    let validated = load_validated_baked_catalog(out_dir, generator)?;
-    let trade_pool = validated
-        .trade_pool
-        .ok_or_else(|| Error::msg("baked catalog does not include trade"))?;
-    let skill_table = validated
-        .trade_skill_table
-        .ok_or_else(|| Error::msg("baked catalog does not include trade"))?;
+    let skill_table = SkillTable::load(&default_skill_table_path()?)?;
+    let trade_pool = build_variant_pools(&instances, &skill_table)?.trade;
     let trade_state_index = pool_state_index(&trade_pool, OperatorState::from_trade_entry);
     Ok(CompleteBakedTradeCatalog {
-        table: validated.table,
+        table,
         trade_state_index,
         trade_pool,
         skill_table,
@@ -2503,280 +1624,6 @@ impl CompleteBakedTradeCatalog {
     }
 }
 
-fn validate_baked_combo_table_header(
-    table: &BakedComboTableDisk,
-    row_count: usize,
-    generator: &BakeGeneratorFingerprint,
-    options: &BakeManifestOptions,
-) -> Result<()> {
-    if table.schema_version != BAKE_SCHEMA_VERSION {
-        return Err(Error::msg("baked table schema mismatch"));
-    }
-    let Some(table_generator) = table.generator.as_ref() else {
-        return Err(Error::msg("baked table has no generator fingerprint"));
-    };
-    if table_generator.kind != generator.kind
-        || table_generator.bytes != generator.bytes
-        || table_generator.hash64 != generator.hash64
-    {
-        return Err(Error::msg("baked table generator mismatch"));
-    }
-    if table.operator_count != table.operator_states.len()
-        || table.operator_count != table.operator_names.len()
-        || table
-            .operator_states
-            .iter()
-            .zip(&table.operator_names)
-            .any(|(state, name)| &state.name != name)
-    {
-        return Err(Error::msg("baked table operator state/count mismatch"));
-    }
-    let unique_states = table
-        .operator_states
-        .iter()
-        .collect::<std::collections::HashSet<_>>();
-    if unique_states.len() != table.operator_states.len() {
-        return Err(Error::msg("baked table contains duplicate operator states"));
-    }
-    let expected_mask_words = table.operator_count.div_ceil(64).max(1);
-    if table.mask_words != expected_mask_words {
-        return Err(Error::msg("baked table mask width mismatch"));
-    }
-    let expected = expected_signature_keys(options);
-    let actual: std::collections::BTreeSet<_> = table
-        .indexes
-        .iter()
-        .map(|index| index.signature_key.clone())
-        .collect();
-    if actual != expected {
-        return Err(Error::msg(format!(
-            "baked signature set mismatch: expected {}, found {}",
-            expected.len(),
-            actual.len()
-        )));
-    }
-
-    let mut previous_end = 0usize;
-    let mut keys = std::collections::HashSet::new();
-    for index in &table.indexes {
-        if !keys.insert(index.signature_key.as_str()) {
-            return Err(Error::msg("duplicate baked signature"));
-        }
-        let Some(end) = index.start.checked_add(index.len) else {
-            return Err(Error::msg("baked index range overflow"));
-        };
-        if index.start != previous_end || end > row_count {
-            return Err(Error::msg(format!(
-                "invalid baked index range for {:?}",
-                index.signature_key
-            )));
-        }
-        if index.len == 0 {
-            return Err(Error::msg(format!(
-                "empty baked signature {:?}",
-                index.signature_key
-            )));
-        }
-        if row_facility_from_signature(&index.signature_key).is_empty() {
-            return Err(Error::msg(format!(
-                "unknown baked signature {:?}",
-                index.signature_key
-            )));
-        }
-        previous_end = end;
-    }
-    if previous_end != row_count {
-        return Err(Error::msg("baked indexes do not cover every row"));
-    }
-    Ok(())
-}
-
-fn expected_signature_keys(options: &BakeManifestOptions) -> BTreeSet<String> {
-    let mut keys = BTreeSet::new();
-    let gold_lines = baked_search_baseline().gold_manu_line_count;
-    if options.include_trade {
-        for level in 1..=3 {
-            keys.insert(trade_lookup_key(
-                level,
-                station_operator_capacity(level),
-                TradeOrderKind::Gold,
-                gold_lines,
-            ));
-        }
-        keys.insert(trade_lookup_key(
-            3,
-            station_operator_capacity(3),
-            TradeOrderKind::Originium,
-            gold_lines,
-        ));
-    }
-    if options.include_manufacture {
-        for level in 1..=3 {
-            for recipe in [
-                RecipeKind::Gold,
-                RecipeKind::BattleRecord,
-                RecipeKind::Originium,
-            ] {
-                keys.insert(manufacture_lookup_key(
-                    level,
-                    station_operator_capacity(level),
-                    recipe,
-                ));
-            }
-        }
-    }
-    keys
-}
-
-fn validate_baked_row_for_signature(row: &BakedComboRowDisk, key: &str) -> Result<()> {
-    if row.operator_capacity != station_operator_capacity(row.room_level) {
-        return Err(Error::msg(format!("invalid room capacity in {key:?}")));
-    }
-    if let Some(signature) = &row.trade_mechanism_signature {
-        let count_is_valid = |count: Option<u8>| {
-            count.is_none_or(|value| usize::from(value) <= row.operator_capacity)
-        };
-        if signature
-            .peer_count
-            .is_some_and(|value| usize::from(value) >= row.operator_capacity)
-            || !count_is_valid(signature.glasgow_count)
-            || !count_is_valid(signature.snhunt_count)
-            || !count_is_valid(signature.laterano_count)
-            || signature.is_empty()
-        {
-            return Err(Error::msg(format!(
-                "invalid trade mechanism signature in {key:?}"
-            )));
-        }
-    }
-    let expected_key = if let Some(order) = row.order_kind {
-        if row.recipe.is_some()
-            || !trade_response_fields_present(row)
-            || any_manufacture_response_field_present(row)
-        {
-            return Err(Error::msg(format!("invalid trade row fields in {key:?}")));
-        }
-        trade_lookup_key(
-            row.room_level,
-            row.operator_capacity,
-            order,
-            baked_search_baseline().gold_manu_line_count,
-        )
-    } else if let Some(recipe) = row.recipe {
-        if row.order_kind.is_some()
-            || row.trade_mechanism_signature.is_some()
-            || !manufacture_response_fields_present(row)
-            || any_trade_response_field_present(row)
-        {
-            return Err(Error::msg(format!(
-                "invalid manufacture row fields in {key:?}"
-            )));
-        }
-        manufacture_lookup_key(row.room_level, row.operator_capacity, recipe)
-    } else {
-        return Err(Error::msg(format!("baked row has no facility in {key:?}")));
-    };
-    if expected_key != key {
-        return Err(Error::msg(format!("baked row does not match {key:?}")));
-    }
-    let sort_efficiency = row
-        .trade_final_efficiency_millis
-        .or(row.manufacture_final_efficiency_millis)
-        .ok_or_else(|| Error::msg(format!("baked row has no final efficiency in {key:?}")))?;
-    if row.sort_efficiency_millis != sort_efficiency {
-        return Err(Error::msg(format!(
-            "baked row sort key mismatch in {key:?}"
-        )));
-    }
-    Ok(())
-}
-
-fn trade_response_fields_present(row: &BakedComboRowDisk) -> bool {
-    row.trade_base_efficiency_millis.is_some()
-        && row.trade_occupancy_efficiency_millis.is_some()
-        && row.trade_skill_efficiency_millis.is_some()
-        && row.trade_control_efficiency_millis.is_some()
-        && row.trade_paper_efficiency_millis.is_some()
-        && row.trade_mechanic_equivalent_efficiency_millis.is_some()
-        && row.trade_unit_output_multiplier_millis.is_some()
-        && row.trade_final_efficiency_millis.is_some()
-        && row.trade_equivalent_skill_efficiency_millis.is_some()
-        && row.trade_gold_equivalent_efficiency_millis.is_some()
-        && row.trade_combined_output_value_millis.is_some()
-        && row.trade_total_efficiency_millis.is_some()
-        && row.unit_trade_per_day.is_some()
-        && row.unit_gold_per_day.is_some()
-        && row.unit_gold_consumption_per_day.is_some()
-        && row.unit_originium_per_day.is_some()
-}
-
-fn manufacture_response_fields_present(row: &BakedComboRowDisk) -> bool {
-    row.manufacture_base_efficiency_millis.is_some()
-        && row.manufacture_occupancy_efficiency_millis.is_some()
-        && row.manufacture_skill_efficiency_millis.is_some()
-        && row.manufacture_global_efficiency_millis.is_some()
-        && row.manufacture_final_efficiency_millis.is_some()
-        && row.manufacture_storage_limit.is_some()
-        && row.manufacture_unit_output_per_day.is_some()
-        && row.manufacture_output_per_day.is_some()
-}
-
-fn any_trade_response_field_present(row: &BakedComboRowDisk) -> bool {
-    row.trade_base_efficiency_millis.is_some()
-        || row.trade_occupancy_efficiency_millis.is_some()
-        || row.trade_skill_efficiency_millis.is_some()
-        || row.trade_control_efficiency_millis.is_some()
-        || row.trade_paper_efficiency_millis.is_some()
-        || row.trade_mechanic_equivalent_efficiency_millis.is_some()
-        || row.trade_unit_output_multiplier_millis.is_some()
-        || row.trade_final_efficiency_millis.is_some()
-        || row.trade_equivalent_skill_efficiency_millis.is_some()
-        || row.trade_total_efficiency_millis.is_some()
-        || row.unit_trade_per_day.is_some()
-        || row.unit_gold_per_day.is_some()
-        || row.unit_gold_consumption_per_day.is_some()
-        || row.unit_originium_per_day.is_some()
-}
-
-fn any_manufacture_response_field_present(row: &BakedComboRowDisk) -> bool {
-    row.manufacture_base_efficiency_millis.is_some()
-        || row.manufacture_occupancy_efficiency_millis.is_some()
-        || row.manufacture_skill_efficiency_millis.is_some()
-        || row.manufacture_global_efficiency_millis.is_some()
-        || row.manufacture_final_efficiency_millis.is_some()
-        || row.manufacture_storage_limit.is_some()
-        || row.manufacture_unit_output_per_day.is_some()
-        || row.manufacture_output_per_day.is_some()
-}
-
-fn validate_baked_input_fingerprints(manifest: &BakeManifest, out_dir: &Path) -> Result<()> {
-    let expected = bake_input_fingerprints()?;
-    for current in expected {
-        let Some(name) = Path::new(&current.path).file_name() else {
-            continue;
-        };
-        let Some(baked) = manifest
-            .inputs
-            .iter()
-            .find(|input| Path::new(&input.path).file_name() == Some(name))
-        else {
-            return Err(Error::msg(format!(
-                "baked input mismatch: {} missing from manifest; rerun `infra-cli bake --out {}`",
-                name.to_string_lossy(),
-                out_dir.display()
-            )));
-        };
-        if baked.bytes != current.bytes || baked.hash64 != current.hash64 {
-            return Err(Error::msg(format!(
-                "baked input mismatch: {} changed; rerun `infra-cli bake --out {}`",
-                name.to_string_lossy(),
-                out_dir.display()
-            )));
-        }
-    }
-    Ok(())
-}
-
 pub fn try_baked_trade_search(
     pool: &TradePool,
     skill_table: &SkillTable,
@@ -2787,7 +1634,7 @@ pub fn try_baked_trade_search(
     start: StdInstant,
 ) -> Result<Option<TradeSearchReport>> {
     let mode = options.bake_mode;
-    if mode == BakeMode::Disabled {
+    if mode == BakeMode::Disabled || !BAKE_ENABLED.load(Ordering::Relaxed) {
         return Ok(None);
     }
     let mut miss = None;
@@ -2955,7 +1802,7 @@ pub fn try_baked_manufacture_search(
     start: StdInstant,
 ) -> Result<Option<ManuSearchReport>> {
     let mode = options.bake_mode;
-    if mode == BakeMode::Disabled {
+    if mode == BakeMode::Disabled || !BAKE_ENABLED.load(Ordering::Relaxed) {
         return Ok(None);
     }
     let mut miss = None;
@@ -3259,6 +2106,9 @@ fn runtime_atoms_match(
 }
 
 pub fn warm_runtime_baked_table() -> Result<bool> {
+    if !BAKE_ENABLED.load(Ordering::Relaxed) {
+        return Ok(false);
+    }
     Ok(load_runtime_baked_table(BakeMode::Auto, &mut None)?.is_some())
 }
 
@@ -3326,21 +2176,18 @@ fn load_runtime_baked_table_inner(regenerate: bool) -> Result<RuntimeBakedComboT
 
 fn load_runtime_baked_table_inner_measured(regenerate: bool) -> Result<RuntimeBakedComboTable> {
     let out_dir = default_baked_out_dir()?;
-    let generator = current_exe_generator_fingerprint()?;
-    match load_validated_baked_catalog(&out_dir, &generator) {
-        Ok(validated) => return runtime_baked_table_from_compact(validated.table),
+    match load_baked_catalog(&out_dir) {
+        Ok(table) => return runtime_baked_table_from_compact(table),
         Err(error) if !regenerate => return Err(error),
         Err(_) => {}
     }
     let _guard = RuntimeBakeGuard::acquire()?;
     let options = BakeOptions {
         out_dir: out_dir.clone(),
-        generator: Some(generator.clone()),
         ..BakeOptions::default()
     };
-    publish_baked_catalogs(&options, true)?;
-    let table = load_validated_baked_catalog(&out_dir, &generator)?.table;
-    runtime_baked_table_from_compact(table)
+    publish_baked_catalogs(&options)?;
+    runtime_baked_table_from_compact(load_baked_catalog(&out_dir)?)
 }
 
 fn runtime_baked_table_from_compact(table: compact::Table) -> Result<RuntimeBakedComboTable> {
@@ -3353,17 +2200,6 @@ fn runtime_baked_table_from_compact(table: compact::Table) -> Result<RuntimeBake
 fn runtime_baked_table_from_compact_measured(
     table: compact::Table,
 ) -> Result<RuntimeBakedComboTable> {
-    let mut universe_mask_by_key = HashMap::new();
-    for (signature, index) in table.signatures.iter().zip(&table.header.indexes) {
-        let mut universe = vec![0u64; table.header.mask_words];
-        for offset in 0..signature.len() {
-            for id in signature.indices(offset) {
-                let id = usize::from(*id);
-                universe[id / 64] |= 1u64 << (id % 64);
-            }
-        }
-        universe_mask_by_key.insert(index.signature_key.clone(), universe);
-    }
     let operator_index_by_state = table
         .header
         .operator_states
@@ -3425,9 +2261,6 @@ fn runtime_baked_table_from_compact_measured(
             let slot = ranks
                 .get_mut(position)
                 .ok_or_else(|| Error::msg("Bake row rank is out of range"))?;
-            if *slot != rank::INVALID_ROW {
-                return Err(Error::msg("duplicate Bake combo rank"));
-            }
             *slot = u32::try_from(offset)
                 .ok()
                 .filter(|id| *id != rank::INVALID_ROW)
@@ -3438,7 +2271,6 @@ fn runtime_baked_table_from_compact_measured(
     Ok(RuntimeBakedComboTable {
         table,
         operator_index_by_state,
-        universe_mask_by_key,
         rank_rows_by_signature,
         trade_gold_lines,
         trade_canonical,
@@ -3482,7 +2314,7 @@ fn runtime_skill_table_matches(runtime: &RuntimeBakedComboTable, table: &SkillTa
 
 const BAKED_SIGNATURE_SLOTS: usize = 13;
 
-/// 只接受磁盘完整验证允许的等级和容量，不把越界等级 clamp 成合法 signature。
+/// 只接受支持的等级和容量，不把越界等级 clamp 成合法 signature。
 fn trade_signature_slot(level: u8, capacity: usize, order: TradeOrderKind) -> Option<usize> {
     if !(1..=3).contains(&level) || capacity != usize::from(level) {
         return None;
@@ -3532,27 +2364,6 @@ fn manufacture_lookup_key(room_level: u8, operator_capacity: usize, recipe: Reci
         room_level, operator_capacity, recipe
     )
     .to_ascii_lowercase()
-}
-
-/// The executable fingerprint (including failures) is computed once per process.
-pub fn current_exe_generator_fingerprint() -> Result<BakeGeneratorFingerprint> {
-    static CACHE: OnceLock<std::result::Result<BakeGeneratorFingerprint, String>> = OnceLock::new();
-    CACHE
-        .get_or_init(|| {
-            let fingerprint = || -> Result<BakeGeneratorFingerprint> {
-                let path = std::env::current_exe()?;
-                let bytes = fs::read(&path)?;
-                Ok(BakeGeneratorFingerprint {
-                    kind: "infra-cli-exe".to_string(),
-                    path: path.to_string_lossy().to_string(),
-                    bytes: bytes.len() as u64,
-                    hash64: hash_bytes(&bytes),
-                })
-            };
-            fingerprint().map_err(|error| error.to_string())
-        })
-        .clone()
-        .map_err(Error::msg)
 }
 
 fn mood_sensitive_pool<T>(
@@ -3858,30 +2669,13 @@ fn runtime_row_pool_indices(
         .iter()
         .map(|id| {
             index
-                .get(&disk.operator_states[*id])
+                .get(
+                    disk.operator_states
+                        .get(*id)
+                        .ok_or_else(|| Error::msg("Bake state ID out of range"))?,
+                )
                 .copied()
                 .ok_or_else(|| Error::msg("baked operator state is absent from live pool"))
-        })
-        .collect()
-}
-
-fn row_pool_indices(
-    row: &BakedComboRowDisk,
-    disk: &BakedComboTableDisk,
-    index: &HashMap<OperatorState, usize>,
-) -> Result<Vec<usize>> {
-    row.operator_indices
-        .iter()
-        .map(|idx| {
-            index
-                .get(&disk.operator_states[*idx])
-                .copied()
-                .ok_or_else(|| {
-                    Error::msg(format!(
-                        "baked operator state is absent from live pool: {:?}",
-                        disk.operator_states[*idx]
-                    ))
-                })
         })
         .collect()
 }
@@ -3910,41 +2704,6 @@ fn row_facility_from_signature(signature_key: &str) -> &'static str {
 
 fn station_operator_capacity(level: u8) -> usize {
     level.clamp(1, 3) as usize
-}
-
-fn bake_input_fingerprints() -> Result<Vec<BakeInputFingerprint>> {
-    let mut paths = BTreeMap::new();
-    for name in [
-        "operator_instances.json",
-        "skill_table.json",
-        "standalone_roster.json",
-        "trade_shortcuts.json",
-        "trade_segments.json",
-        "base_systems.json",
-        "layout/243_use_this_.json",
-    ] {
-        let path = data_path(name)?;
-        paths.insert(name, path);
-    }
-    paths
-        .into_values()
-        .map(|path| fingerprint_file(&path))
-        .collect()
-}
-
-fn fingerprint_file(path: &Path) -> Result<BakeInputFingerprint> {
-    let bytes = fs::read(path)?;
-    Ok(BakeInputFingerprint {
-        path: path.to_string_lossy().to_string(),
-        bytes: bytes.len() as u64,
-        hash64: hash_bytes(&bytes),
-    })
-}
-
-fn hash_bytes(bytes: &[u8]) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
 }
 
 fn write_json(path: PathBuf, value: &impl Serialize) -> Result<()> {

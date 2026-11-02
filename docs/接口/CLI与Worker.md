@@ -26,7 +26,7 @@
 | `layout eval` | `commands/layout.rs::layout_eval_cmd` | layout、operbox、assignment | 固定编制结算；`--explain-json` 输出结构化 trace |
 | `debug rerun` | `commands/debug.rs::rerun_cmd` | 生产 debug bundle | 用当前 runtime 重跑并输出稳定行为投影；不是旧二进制重放 |
 | `verify` | `commands/verify.rs::verify_cmd` | case id 或 `--all` | 回归夹具与单位产出锚点断言 |
-| `bake` | `commands/bake.rs::bake_cmd` | all/trade/manufacture、输出目录 | 生成/验证本地候选 catalog；不改变 solver 语义 |
+| `bake` | `commands/bake.rs::bake_cmd` | all/trade/manufacture、输出目录 | 生成并原子发布本地候选 catalog；不执行 Bake 校验，更新后显式重建 |
 | `profile` | `commands/profile.rs::profile_cmd` | 性能分析参数 | 开发诊断；不提供产品结果 |
 
 主进程由 `main::run` 分发。未知命令返回错误并退出失败；没有子命令时只打印 usage 并成功返回。
@@ -78,3 +78,7 @@ Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 w
 ## 本地验收范围（2026-10-31）
 
 最终release以隔离schema17完整表启动Worker，ping和两类v7普通拓扑请求均成功且开启终态断言；返回班时为8/8/8和8/16。未知方法返回单帧错误，EOF进程exit0。证据见`target/codex-runs/main-integration-20261031/worker-final-live/`。138s是含完整表冷加载、与Bake后校验并行的进程总时长，不作为热请求速度。未部署，也未覆盖所有历史schema、所有错误帧或debug rerun。制品以实际SHA关联源码冻结树；嵌入构建commit/时间可能来自Cargo先前缓存，本轮记录实际值，不把它当成当前源码HEAD证明。
+
+CLI全局 --no-bake 在启动求解前关闭Bake加载、serve预热与查表；默认启用，不改变其他搜索参数。serve此开关作用于进程所有请求。
+
+bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace与请求memo；首轮包含冷加载，后续轮复用常驻Bake表，用于区分冷/热计算耗时。输出文件请求会逐轮写入同一路径，最终保留最后一轮。

@@ -19,10 +19,6 @@ pub fn verify_cmd(args: &[String]) -> Result<(), Error> {
     run_regressions(run_all, case_id)
 }
 
-pub(crate) fn run_all_regressions() -> Result<(), Error> {
-    run_regressions(true, None)
-}
-
 fn run_regressions(run_all: bool, case_id: Option<&str>) -> Result<(), Error> {
     let table = SkillTable::load(&default_skill_table_path()?)?;
     let cases = load_regression_cases(&data_path("REGRESSION_CASES.csv")?)?;

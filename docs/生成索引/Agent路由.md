@@ -215,7 +215,7 @@
 
 **判别**：候选未入池、排序/剪枝或 Bake catalog 异常时选择；若已选组合结算错误转到对应 SOLVER。
 
-**入口**：`crates/infra-core/src/pool/base.rs::filter_pool`；`crates/infra-core/src/search/trade.rs::search_trade_triples`；`crates/infra-core/src/bake.rs::validate_baked_catalog`
+**入口**：`crates/infra-core/src/pool/base.rs::filter_pool`；`crates/infra-core/src/search/trade.rs::search_trade_triples`；`crates/infra-core/src/bake.rs::bake_and_publish_catalogs`
 
 **完整调用链**：[docs/调用链/候选搜索与Bake.md](../调用链/候选搜索与Bake.md)
 

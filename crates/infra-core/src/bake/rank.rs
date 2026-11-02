@@ -28,12 +28,6 @@ pub(super) fn colex(ids: &[usize]) -> Result<usize> {
     let mut sorted = [0; 3];
     sorted[..ids.len()].copy_from_slice(ids);
     sorted[..ids.len()].sort_unstable();
-    if sorted[..ids.len()]
-        .windows(2)
-        .any(|pair| pair[0] == pair[1])
-    {
-        return Err(Error::msg("Bake rank contains duplicate state IDs"));
-    }
     let mut rank = 0usize;
     for (i, id) in sorted[..ids.len()].iter().enumerate() {
         rank = rank

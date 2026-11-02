@@ -4,7 +4,7 @@
 > 生命周期状态：current
 > 当前真源：docs/模块/候选搜索与Bake.md
 > 代码范围：`crates/infra-core/src/{bake.rs,pool,search,candidate.rs,profile.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
-> 代码锚点：`crates/infra-core/src/bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}`; `crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/trade.rs::search_trade_triples`; `crates/infra-core/src/search/manufacture.rs::search_manufacture_triples`; `crates/infra-core/src/layout/assign/pipeline.rs::{run_shift_pipeline,run_shift_pipeline_with_producer_pruning}`
+> 代码锚点：`crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}`; `crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/trade.rs::search_trade_triples`; `crates/infra-core/src/search/manufacture.rs::search_manufacture_triples`; `crates/infra-core/src/layout/assign/pipeline.rs::{run_shift_pipeline,run_shift_pipeline_with_producer_pruning}`
 > 关联链路：`docs/模块/候选搜索与Bake.md`; `docs/模块/中枢与跨设施状态.md`; `docs/SCORING_MODEL.md`
 > 核验基线：`947f1a2`
 
@@ -33,7 +33,7 @@
 
 ## Bake 生命周期
 
-全表生成与冷校验已使用完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥；热查询使用 checked colex rank 和有界 top-K 堆，并核对 canonical 相对顺序、完整布局、技能原文及编译 atom，生产候选政策保持现状。
+全表生成使用完整姓名/精英阶段/有序 buff/标签身份、五类练度代表元的真实建池准入及同名组合互斥；热查询使用 checked colex rank 和有界 top-K 堆，并核对 canonical 相对顺序、完整布局、技能原文及编译 atom，生产候选政策保持现状。
 
 <!-- knowledge:historical -->
 ### 旧暖机与预算政策的当轮验收
@@ -45,15 +45,13 @@
 ### 当前表身份与运行时行为
 
 
-`BAKE_SCHEMA_VERSION` 当前为 17。`bake_catalogs` 以同一 live solver 生成 catalog、manifest、operator/signature 和 combo table；manifest 保存当前可执行文件 hash、输入文件 fingerprint、生成选项、schema 和 row hash。exe 指纹成功与失败均在进程内缓存。`validate_baked_catalog` 在 schema、fingerprint、row 集或 hash 不匹配时拒绝；核心 `verify_baked_catalog_responses` 对每一行重算完整响应，另做确定性查询差分。
+2026-11-02 用户裁决：删除全部 Bake 校验及自动机制回归。生成后直接原子发布；加载仅解码 compact 行并建立查询索引，不检查 schema、exe/输入/文件指纹、签名集合、字段、排序、合法全集或执行顺序，不做逐行/抽样 live 对账。bake validate/verify 和对应 API 已删除。磁盘 v17 布局保留，指纹槽位不再填写。数据或计算实现更新后由调用方显式重建表。此为缓存信任 policy，取消运行时完整性与新鲜度保证；热查询适用条件、真实搜索禁配和必要的解码/类型转换/分配/索引错误仍保留。
 
-运行时 `BakeMode::Auto` 在兼容查询首次加载缺表/失效时生成完整表，全量核心校验通过才发布；生成和校验的 live 搜索显式 `Disabled`，RAII 标记防止递归。无参预热也用 Auto。进程内初始化及失败由 OnceLock 缓存，不在每次查询重复读取 exe；失败只 stderr 报告一次简短原因后回 live。`Disabled` 永不读取；`Required` 不主动生成，对任何 miss/error 失败。miss 已按固定类别接入 `[perf]`，热查询只累计整数，结束时统一格式化。
-
-发布使用独立 generation 目录与 CURRENT 指针的原子 rename，生成目录验证后只读；同进程只初始化一次，跨进程通过不等待的短发布锁复核目标，输方读取有效胜方或回 live，不发布未验证/limited 表。校验、verify、完整贸易 API 和 debug 指纹统一解析 CURRENT；旧平铺表仍可校验。默认目录优先规则与首次 release 输出位置见 [候选搜索与 Bake](模块/候选搜索与Bake.md)。`data/baked/` 已忽略；历史跟踪和旧目录已清理。生成物不能手工改成语义来源。
+发布保留只读 generation、CURRENT 原子 rename 与不等待的跨进程锁；竞争方只判断已发布文件是否存在。Auto 首次读取失败才同步生成，Required 不生成；OnceLock 同进程保活表。
 
 ## 诊断与验证
 
-性能报告至少记录 commit、输入 OperBox、pool size、组合数、evaluated、命中模式和 stage timing。正确性用 `bake validate`、`bake verify`、`infra-cli verify` 和最终 assignment gate；性能数据不能证明机制覆盖，全量行校验仍不能证明未覆盖查询上下文或全部子集排序的全局等价。
+性能报告至少记录 commit、输入 OperBox、pool size、组合数、evaluated、命中模式和 stage timing。正确性用真实 CLI 结果对比和最终 assignment gate；性能数据不能证明机制覆盖，有限结果对比不能证明未覆盖查询上下文或全部子集排序的全局等价。
 
 ## 常驻性能汇总
 
@@ -119,7 +117,7 @@
 
 ## Bake signature 的固定槽位与目录隔离
 
-生产 rank 查询只接受现有 13 种合法 signature，以四个贸易槽和九个制造槽取代字符串 HashMap。level 必须在 1–3 且 capacity 等于等级；贸易赤金的有效金线数必须等于冷加载的 search baseline，源石继续沿原 signature 不限制金线。冷加载从各 index 首行重建原字符串 key 并核对，拒绝不支持或重复槽；磁盘 v17、完整 signature 集合与逐行验证、rank 填充、heap、门禁和比较顺序不变。这是内部查找成本优化，不扩大 Bake 支持域。正常 signature miss 不构造诊断字符串，Required 才延迟格式化原 key。
+生产 rank 查询只接受现有 13 种合法 signature，以四个贸易槽和九个制造槽取代字符串 HashMap。level 必须在 1–3 且 capacity 等于等级；贸易赤金的有效金线数必须等于冷加载的 search baseline，源石继续沿原 signature 不限制金线。冷加载从各 index 首行建立槽位；磁盘 v17、rank 填充、heap、热查询适用条件和比较顺序保留，完整性校验已删除。这是内部查找成本优化，不扩大 Bake 支持域。正常 signature miss 不构造诊断字符串，Required 才延迟格式化原 key。
 
 `ARKNIGHTS_INFRA_BAKED_DIR` 单独指定默认 Bake 目录，设置后直接使用，不参与其他输入文件的 `data_path` 发现。它可将最终验收生成和运行时加载都隔离到临时目录，保持默认 layout/baseline 标签与冻结产物一致；未设置时完全保留原目录发现顺序，CLI 显式 `--out` 继续优先。
 
@@ -127,11 +125,11 @@
 
 ## Bake 生成与常驻表的内存边界（2026-10-29）
 
-生成按 signature 求值、完整排序并应用原 limit，然后独立落盘行块并释放该 signature 的行；固定组合迭代器通过 `par_bridge` 求值，不再先收集全部组合。最后按原 facility/signature 顺序拼接 schema17 的 header 与行块，空块不生成索引。长度前缀、字段顺序、fixint 小端编码与 `DefaultHasher` 的整段 bytes 合同保留；流式 hash 先写整段长度，再分块写字节。临时块由 RAII 只清理本次拥有的路径，不降低候选覆盖或数值精度。
+完整生成按signature以最多32,768个组合分批评价、排序并即时落盘，再16路分层外部归并。limited入口仍使用有界前缀堆。最后按原facility/signature顺序拼接schema17的header与行块，空块不生成索引；fixint小端字段布局保留，不再计算文件hash。临时块由RAII只清理本次拥有的路径，不改变候选覆盖、数值、执行顺序或排序。
 
 运行时每个 signature 保存 typed compact 行：贸易静态行大小预计 96B、制造 48B，这是类型布局估计，不是 RSS 测量。行保留有序 `u16` 状态下标、全部原始 `i32`/`f64`，rule 字符串以 checked `u32` 字典编号复用，colex rank 数组也使用 checked `u32` 与 sentinel。姓名、mask、facility 和机制元数据不再逐行常驻；选中行按 header 身份物化原 owned 命中，热查询没有 I/O，枚举、合法过滤、比较和输出合同保持。
 
-冷加载对同一已打开 File 分块 hash 后 rewind，流式读取 metadata 与单行，核对全部结构、排序、身份与实际合法组合。完整合法 universe 用 rank bitset 枚举清位，拒绝缺行、残行及数量不符；canonical 有序 IDs 仍重建并核对贸易链重排，不把状态集合当作可交换输入。全量 verify 按 signature offset 重读同一 File，每批 4096 行核对全部磁盘字段与 live，并额外比较实际 compact 物化命中；确定性 320 查询及 skip 口径保持。完整贸易 API 保留 signature+offset 标识与原签名，按需输出 owned 行；显式索取全 signature 的 owned Vec 仍可能有较大分配。
+冷加载直接流式解码 metadata 与单行并存入 compact 表，不 hash、重建组合、枚举合法全集或对账。完整贸易 API 保留 signature+offset 标识，按需输出 owned 行；显式索取全 signature 的 Vec 仍可能有较大分配。旧全量对账验收仅为历史证据，不能描述当前运行时保证。
 
 <!-- knowledge:historical -->
 ### 内存改动与连续暖机的历史证据
@@ -142,14 +140,14 @@
 
 ## Bake 查询分类、冷耗时与稀疏日志
 
-两域公开 `try_baked_*` 每次最多累计一个固定 `BakeMissKind`；compatibility 返回 typed 原因并只判断一次，内部 report helper、verify、load 与 warm 不重复记查询 miss。生成中和失效/不可用分别记 `generating` / `unavailable`；Required 按原原因冷格式化错误，Auto 不格式化 miss 诊断。原 rank/row/物化 Err 保留，单独计 query_errors；成功空制造报告和 rank sentinel 不算 miss。
+两域公开 `try_baked_*` 每次最多累计一个固定 `BakeMissKind`；compatibility 返回 typed 原因并只判断一次，内部 report helper、load 与 warm 不重复记查询 miss。生成中和失效/不可用分别记 `generating` / `unavailable`；Required 按原原因冷格式化错误，Auto 不格式化 miss 诊断。原 rank/row/物化 Err 保留，单独计 query_errors；成功空制造报告和 rank sentinel 不算 miss。
 
-冷阶段 init/generate/validate/verify/index/publish 以线程本地数字 calls/errors/nanos 累积，guard 保留错误或展开路径。真正 OnceLock initializer 才记录 init；CLI bake 的动作 trace 和 serve 启动同步 core warm 的独立 trace 让冷成本可见。serve 不再保留返回 None/false 的空桩，不引入后台生成竞态；warm 失败继续 live 与 ready。核心 Bake 校验、CLI 回归和已有错误不改变。
+冷阶段 init/generate/index/publish 以线程本地数字 calls/errors/nanos 累积，guard 保留错误或展开路径。真正 OnceLock initializer 才记录 init；CLI bake 的动作 trace 和 serve 启动同步 core warm 的独立 trace 让冷成本可见。serve 不再保留返回 None/false 的空桩，不引入后台生成竞态；warm 失败继续 live 与 ready。2026-11-02 已删除 Bake 校验与 baking 自动回归，读取/分配错误继续传播。
 
-冷指标与查询分类加入 snapshot 的累计/差分，trace 结束才映射标签和生成 JSON；没有 trace 不计数。operation 与 Bake 指标省略数值零项，schema 2 消费者须将缺字段解释为零。阶段框架字段保持；固定数值收集不向组合热循环引入 format/JSON/I/O。父子冷耗时 inclusive，禁止加总；真实重复验证照次累计。
+冷指标与查询分类加入 snapshot 的累计/差分，trace 结束才映射标签和生成 JSON；没有 trace 不计数。operation 与 Bake 指标省略数值零项，schema 2 消费者须将缺字段解释为零。阶段框架字段保持；固定数值收集不向组合热循环引入 format/JSON/I/O。父子冷耗时 inclusive，禁止加总；校验阶段及其统计已删除。
 
 本单元仅格式化、workspace 离线编译及文档/源差异检查；未运行求解、Bake、测量或测试，不能据此声称性能幅度或最终行为等价。
-性能报告至少记录 commit、输入 OperBox、pool size、组合数、evaluated、命中模式和 stage timing。正确性用 `bake validate`、`bake verify`、`infra-cli verify` 和最终 assignment gate；性能数据不能证明机制覆盖，Bake 校验也不能证明未抽样行的全局等价。
+性能报告至少记录 commit、输入 OperBox、pool size、组合数、evaluated、命中模式和 stage timing。正确性用真实 CLI 结果对比和最终 assignment gate；性能数据不能证明机制覆盖，Bake 校验也不能证明未抽样行的全局等价。
 
 ## 制造体系试排的缓存取舍（2026-10-31）
 
@@ -319,3 +317,23 @@ v2 约 78–80% 制造时间准备没有暖机或心情 gap，仍需识别时间
 | 基础仓容单位 | vault制造基础24/36/54称产品体积，两版10/15/20称格，尚未闭合单位映射 | 先分清体积、产品件数与槽位，再定换算，不能直接替换基础。红云/泡泡只取技能净增量，本轮不受基础争议影响 |
 
 完整原始报告沿用上节调查目录中的 `flat-classification-luna.md`、`manufacture-roster-luna.md`、`rotation-luna.md`、`mood-luna.md`、`trade-luna.md`、`aux-facilities-luna.md`、`cache-luna.md`、`input-luna.md` 和固定名单交叉结算产物。这里只记录下一步边界，不把静态调用次数泛化成真实profile，也不把尚未运行复现的风险写成已证实错误。
+
+### 流式生成与外部排序（2026-11-02）
+
+完整生成每批最多32,768个组合，Rayon仅评价当前批次；按原效率降序、制造仓库降序、有序状态ID升序排序后立即序列化。16路有界归并生成分层run，最终按原signature顺序拼接v17文件；不全量收集signature行。临时run由RAII释放，归并每路只持有一行及256KiB读取缓冲。候选、数值、执行顺序及排序不变，类别为safe reduction；limited入口仍用原有有界前缀堆。
+
+CLI全局参数 --no-bake 在请求前关闭加载、预热及查表，用于同输入live/Bake对比；默认启用。bench入口输出perf trace，记录bake_hits、live_calls、回退类别与冷阶段；不能仅凭总时间推断命中。
+
+### 完整生成、开关测速与生产命中核查（2026-11-02）
+
+本轮release、4个Rayon线程；证据在 target/codex-runs/bake-check-cost-20261102/。完整外部排序生成30,337,349行，CLI完成exit0，生成192.505s、含发布192.519s，GNU time峰值RSS66,916KiB（65.35MiB），进程树采样峰值68,324KiB，无swap。旧路径在生成完成后的自动校验阶段中断：生成178.597s，已观测进程树RSS6,506,476KiB、swap1,324,780KiB；旧运行没有完整退出耗时，不能据此计算全流程提速倍数。生成内存明显下降，外部排序增加磁盘I/O；本轮不声称生成CPU更快。
+
+与旧表比较全部30,337,349行payload、元数据和索引；内容及行序完全相同，payload SHA-256均为531a205bc871ff3c120ef00f5c73a34a3a7ef7ade8c5baf3bd9280df402d9740。该对比只证明存储算法等价，不是全部游戏机制oracle。测量后仅改共用比较器提取、诊断入口及checked消费者，没有改变生成算法或排序键。
+
+独占进程各跑6轮bench，首轮为冷启动、后5轮为独立请求的热表；输入为392名持有、排除当前不支持组的固定基准布局。开启Bake每轮贸易命中2次、制造1次、live为0；关闭每轮live为3。热搜索wall中位0.961ms/3.644ms（开启/关闭，约3.79倍），完整trace中位3.427ms/7.004ms，输出成员及数值相同。开启首轮init26,077.750ms（含index2,959.810ms），GNU time峰值RSS约2.71GiB，无swap。小池同样真实命中但live只需几十微秒，热Bake没有明显收益；不能用小池耗时判断未命中。
+
+生产三班入口的28代表性与10高持有Box，开启/关闭各38次终态断言均通过，profile/rotation/MAA比较38份全部相同。开启时贸易和制造Bake命中均为0；已有记录中layout失配为贸易151、制造644，贸易predicate556、额外forbidden_pairs49。进一步用两个真实高持有Box交替各3次独占CLI测速，全部exit0及断言通过：b-101-424开启/关闭中位1.904s/2.108s，b-231-425为2.649s/2.578s，RSS峰值约31–33MiB，均零命中。没有稳定的生产Bake提速；这两盒并非全生产负载性能保证。
+
+根因在当前支持域：表按空assignment的固定search_baseline生成，work_hours为None；定时编排首次写入Some(shift_hours)，resolve继续写入真实workforce、标签计数及global注入，而热查询比较完整LayoutContext后拒绝。自动轮换在搜索调用方显式live，贸易predicate和额外禁配也明确不支持Bake。serve仍同步预热该全表，真实请求失配时可能承担冷启动和常驻内存而无收益。--no-bake可直接关闭该成本。本轮没有把动态输入强行读成固定行，也没有扩展Bake支持域；要让排班命中，需要另行确定依赖投影或动态响应表合同，不能通过取消适用条件得到正确结果。
+
+最终二进制SHA-256为512986ee3c517a88d88874b584d2ea867484cc77e50c5275c4d8e09dbc769e36。格式化、release构建、三项文档检查完成；未新增或运行源码测试。最终二进制的批量终态验收记录在batch-on-final/batch-off-final。

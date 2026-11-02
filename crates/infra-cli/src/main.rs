@@ -48,6 +48,7 @@ fn run() -> Result<(), Error> {
         return Ok(());
     }
 
+    infra_core::bake::set_bake_enabled(!args[2..].iter().any(|arg| arg == "--no-bake"));
     let perf_enabled = !args[2..].iter().any(|arg| arg == "--no-perf");
     infra_core::profile::set_solver_perf_enabled(perf_enabled);
     infra_core::profile::set_solver_perf_detail_enabled(
@@ -55,7 +56,7 @@ fn run() -> Result<(), Error> {
     );
     let command_args: Vec<String> = args[2..]
         .iter()
-        .filter(|arg| !matches!(arg.as_str(), "--no-perf" | "--perf-detail"))
+        .filter(|arg| !matches!(arg.as_str(), "--no-perf" | "--perf-detail" | "--no-bake"))
         .cloned()
         .collect();
 
@@ -93,11 +94,9 @@ fn print_usage() {
     eprintln!("  infra-cli verify --all");
     eprintln!("  infra-cli pool [--trade] [--manufacture] [--roster <path>] [--operbox <path>] [-o <file.csv>] [--text]");
     eprintln!("  infra-cli search trade [--roster <path>] [--operbox <path>] [--top <n>] [-o <file.csv>] [--text|--json]");
-    eprintln!("  infra-cli bench --operbox <path> [--recipe gold|battle_record|originium] [--top <n>] [-o <file.csv>] [--text]");
+    eprintln!("  infra-cli bench --operbox <path> [--recipe gold|battle_record|originium] [--top <n>] [--runs <n>] [-o <file.csv>] [--text]");
     eprintln!("      (default manufacture: 4 lines = 2 gold + 2 battle_record; --recipe = single-line debug)");
     eprintln!("  infra-cli bake [all|trade|manufacture] [--out <dir>] [--limit-per-signature <n>]");
-    eprintln!("  infra-cli bake validate [--out <dir>]");
-    eprintln!("  infra-cli bake verify [--out <dir>]");
     eprintln!("  infra-cli debug rerun --bundle <debug-bundle.json> [--top <n>] [--rotation <named|main-backup@H1/H2|abc@H1/H2/H3>] [--room <room_id> | --operator <name>] [--shift <1-based>] [--output-dir <new-dir>] [--pretty]");
     eprintln!("  infra-cli serve");
     eprintln!("  infra-cli layout test --layout <path> --operbox <path> [--assignment <path>] [--top <n>] [-o <file.csv>] [--text]");
@@ -111,7 +110,7 @@ fn print_usage() {
     eprintln!("  infra-cli profile bake-dependencies [--layout <path>] [-o <report.json>]");
     eprintln!("  infra-cli trade yield <fixture> [--level <n>] [--shift <hours>] [-o <file.csv>] [--text]");
     eprintln!();
-    eprintln!("Global: [perf] stderr summary is enabled; --perf-detail adds buffered events; --no-perf disables both");
+    eprintln!("Global: --no-bake disables Bake loading and lookup; [perf] stderr summary is enabled; --perf-detail adds buffered events; --no-perf disables both");
     eprintln!("Output: CSV by default (UTF-8 BOM when writing to file). Use --text for human-readable stderr.");
 }
 
@@ -249,6 +248,27 @@ fn emit_manufacture_pool(
 }
 
 fn bench_cmd(args: &[String]) -> Result<(), Error> {
+    let runs = args
+        .windows(2)
+        .find(|pair| pair[0] == "--runs")
+        .map(|pair| {
+            pair[1]
+                .parse::<usize>()
+                .map_err(|_| Error::msg("invalid bench --runs"))
+        })
+        .transpose()?
+        .unwrap_or(1);
+    if runs == 0 {
+        return Err(Error::msg("bench --runs must be positive"));
+    }
+    for _ in 0..runs {
+        bench_once(args)?;
+    }
+    Ok(())
+}
+
+fn bench_once(args: &[String]) -> Result<(), Error> {
+    let _trace = infra_core::profile::ensure_solver_perf_trace("bench", "single_request");
     let out = OutputOptions::from_args(args);
     let operbox_path = operbox_path_from_args(args)?;
     let top_k = args

@@ -36,7 +36,6 @@ pub(super) struct Signature {
 pub(super) struct Table {
     pub header: BakedComboTableDisk,
     pub signatures: Vec<Signature>,
-    pub byte_offsets: Vec<u64>,
     pub rules: Vec<String>,
     pub signature_by_slot: [Option<usize>; BAKED_SIGNATURE_SLOTS],
 }
@@ -80,15 +79,24 @@ impl Table {
             .collect::<Vec<_>>();
         let names = ids
             .iter()
-            .map(|id| self.header.operator_names[*id].clone())
-            .collect();
+            .map(|id| {
+                self.header
+                    .operator_names
+                    .get(*id)
+                    .cloned()
+                    .ok_or_else(|| Error::msg("Bake state ID out of range"))
+            })
+            .collect::<Result<Vec<_>>>()?;
         let mut row = BakedComboRow {
             facility: row_facility_from_signature(&self.header.indexes[signature].signature_key)
                 .to_string(),
             room_level: meta.level,
             operator_capacity: meta.capacity,
             names,
-            operator_mask: operator_mask_from_indices(&ids, self.header.mask_words),
+            operator_mask: operator_mask_from_indices(
+                &ids,
+                self.header.operator_names.len().div_ceil(64).max(1),
+            ),
             operator_indices: ids,
             sort_efficiency: Efficiency::ZERO,
             order_kind: meta.order,
@@ -144,7 +152,7 @@ impl Table {
                     row.unit_gold_consumption_per_day,
                     row.unit_originium_per_day,
                 ] = data.units.map(Some);
-                row.sort_efficiency = row.trade_final_efficiency.unwrap();
+                row.sort_efficiency = Efficiency::from_millis(data.efficiencies[7]);
                 if data.rule != u32::MAX {
                     row.rule_id = Some(self.rules[data.rule as usize].clone());
                 }
@@ -163,39 +171,23 @@ impl Table {
                     row.manufacture_unit_output_per_day,
                     row.manufacture_output_per_day,
                 ] = data.outputs.map(Some);
-                row.sort_efficiency = row.manufacture_final_efficiency.unwrap();
+                row.sort_efficiency = Efficiency::from_millis(data.efficiencies[4]);
             }
         }
         Ok(row)
     }
 }
 
-pub(super) fn read_validated(
+pub(super) fn read(
     header: BakedComboTableDisk,
     reader: &mut std::io::BufReader<File>,
-    trade_pool: &TradePool,
-    manu_pool: &ManuPool,
-    skill_table: &SkillTable,
 ) -> Result<Table> {
-    use std::io::Seek;
     if header.operator_count > usize::from(u16::MAX) + 1 {
         return Err(Error::msg("Bake compact state IDs exceed u16"));
     }
-    let operator_index = header
-        .operator_states
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(id, state)| (state, id))
-        .collect::<HashMap<_, _>>();
-    let trade_canonical =
-        canonical_state_ranks(trade_pool, OperatorState::from_trade_entry, &operator_index)?;
-    let manu_canonical =
-        canonical_state_ranks(manu_pool, OperatorState::from_manu_entry, &operator_index)?;
     let mut result = Table {
         header,
         signatures: Vec::new(),
-        byte_offsets: Vec::new(),
         rules: Vec::new(),
         signature_by_slot: std::array::from_fn(|_| None),
     };
@@ -204,7 +196,6 @@ pub(super) fn read_validated(
         if index.len > u32::MAX as usize {
             return Err(Error::msg("Bake row ID exceeds u32"));
         }
-        result.byte_offsets.push(reader.stream_position()?);
         let first: BakedComboRowDisk = stream::decode_from(&mut *reader)?;
         let mut signature = Signature {
             level: first.room_level,
@@ -218,28 +209,12 @@ pub(super) fn read_validated(
             },
         };
         let slot = signature.slot()?;
-        if result.signature_by_slot[slot]
-            .replace(result.signatures.len())
-            .is_some()
-        {
-            return Err(Error::msg("duplicate Bake signature slot"));
-        }
+        result.signature_by_slot[slot] = Some(result.signatures.len());
         match &mut signature.rows {
             Rows::Trade(rows) => rows.try_reserve_exact(index.len),
             Rows::Manufacture(rows) => rows.try_reserve_exact(index.len),
         }
         .map_err(|error| Error::msg(format!("cannot allocate compact Bake rows: {error}")))?;
-        // One bit per possible combo, including illegal ones. Bits are cleared
-        // by enumerating the original legal universe after reading this signature.
-        let ranks = rank::choose(result.header.operator_count, signature.capacity)?;
-        let mut actual = Vec::new();
-        actual
-            .try_reserve_exact(ranks.div_ceil(64))
-            .map_err(|error| {
-                Error::msg(format!("cannot allocate Bake universe bitmap: {error}"))
-            })?;
-        actual.resize(ranks.div_ceil(64), 0u64);
-        let mut previous: Option<(i32, i32, Vec<usize>)> = None;
         let mut pending = Some(first);
         for _ in 0..index.len {
             let row = if let Some(row) = pending.take() {
@@ -247,96 +222,11 @@ pub(super) fn read_validated(
             } else {
                 stream::decode_from(&mut *reader)?
             };
-            validate_baked_row_for_signature(&row, &index.signature_key)?;
-            if row.operator_capacity != row.operator_indices.len()
-                || row
-                    .operator_indices
-                    .iter()
-                    .any(|id| *id >= result.header.operator_count)
-                || !distinct_names(
-                    row.operator_indices
-                        .iter()
-                        .map(|id| result.header.operator_names[*id].as_str()),
-                )
-            {
-                return Err(Error::msg(format!(
-                    "invalid baked row in {:?}",
-                    index.signature_key
-                )));
-            }
-            let position = rank::colex(&row.operator_indices)?;
-            if position >= ranks {
-                return Err(Error::msg("Bake row rank out of range"));
-            }
-            let bit = 1u64 << (position % 64);
-            if actual[position / 64] & bit != 0 {
-                return Err(Error::msg("duplicate Bake combo rank"));
-            }
-            actual[position / 64] |= bit;
-            let storage = row.manufacture_storage_limit.unwrap_or_default();
-            if previous.as_ref().is_some_and(|(eff, old_storage, ids)| {
-                *eff < row.sort_efficiency_millis
-                    || (*eff == row.sort_efficiency_millis
-                        && (*old_storage < storage
-                            || (*old_storage == storage && *ids > row.operator_indices)))
-            }) {
-                return Err(Error::msg(format!(
-                    "baked rows are not sorted for {:?}",
-                    index.signature_key
-                )));
-            }
-            previous = Some((
-                row.sort_efficiency_millis,
-                storage,
-                row.operator_indices.clone(),
-            ));
-            let canonical = if signature.order.is_some() {
-                &trade_canonical
-            } else {
-                &manu_canonical
-            };
-            let mut combo = row
-                .operator_indices
-                .iter()
-                .map(|id| {
-                    canonical.get(id).copied().ok_or_else(|| {
-                        Error::msg("baked state missing from canonical facility pool")
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?;
-            combo.sort_unstable();
-            let expected = if signature.order.is_some() {
-                let operators = build_trade_combo_operators_vec(trade_pool, &combo, None, None);
-                if trade_station_exclusive_violation(&operators, skill_table) {
-                    return Err(Error::msg("illegal baked trade combo"));
-                }
-                if trade_room_mechanism_signature(&operators) != row.trade_mechanism_signature {
-                    return Err(Error::msg("baked trade mechanism signature mismatch"));
-                }
-                state_indices(operators.iter().map(trade_operator_state), &operator_index)?
-            } else {
-                let operators = combo
-                    .iter()
-                    .map(|id| manu_pool.entries[*id].to_manu_operator())
-                    .collect::<Vec<_>>();
-                if !crate::search::manufacture_peers_compatible(&operators, skill_table) {
-                    return Err(Error::msg("illegal baked manufacture combo"));
-                }
-                state_indices(
-                    combo
-                        .iter()
-                        .map(|id| OperatorState::from_manu_entry(&manu_pool.entries[*id])),
-                    &operator_index,
-                )?
-            };
-            if expected != row.operator_indices {
-                return Err(Error::msg(
-                    "baked combo execution order differs from canonical construction",
-                ));
-            }
             let mut indices = [0u16; 3];
             for (slot, id) in row.operator_indices.iter().enumerate() {
-                indices[slot] =
+                *indices
+                    .get_mut(slot)
+                    .ok_or_else(|| Error::msg("cannot decode Bake row into three state slots"))? =
                     u16::try_from(*id).map_err(|_| Error::msg("Bake state ID exceeds u16"))?;
             }
             match &mut signature.rows {
@@ -359,24 +249,58 @@ pub(super) fn read_validated(
                     rows.push(TradeRow {
                         indices,
                         efficiencies: [
-                            row.trade_base_efficiency_millis.unwrap(),
-                            row.trade_occupancy_efficiency_millis.unwrap(),
-                            row.trade_skill_efficiency_millis.unwrap(),
-                            row.trade_control_efficiency_millis.unwrap(),
-                            row.trade_paper_efficiency_millis.unwrap(),
-                            row.trade_mechanic_equivalent_efficiency_millis.unwrap(),
-                            row.trade_unit_output_multiplier_millis.unwrap(),
-                            row.trade_final_efficiency_millis.unwrap(),
-                            row.trade_equivalent_skill_efficiency_millis.unwrap(),
-                            row.trade_gold_equivalent_efficiency_millis.unwrap(),
-                            row.trade_combined_output_value_millis.unwrap(),
-                            row.trade_total_efficiency_millis.unwrap(),
+                            row.trade_base_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_occupancy_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_skill_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_control_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_paper_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_mechanic_equivalent_efficiency_millis
+                                .ok_or_else(|| {
+                                    Error::msg("cannot decode missing Bake response value")
+                                })?,
+                            row.trade_unit_output_multiplier_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_final_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_equivalent_skill_efficiency_millis
+                                .ok_or_else(|| {
+                                    Error::msg("cannot decode missing Bake response value")
+                                })?,
+                            row.trade_gold_equivalent_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_combined_output_value_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.trade_total_efficiency_millis.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
                         ],
                         units: [
-                            row.unit_trade_per_day.unwrap(),
-                            row.unit_gold_per_day.unwrap(),
-                            row.unit_gold_consumption_per_day.unwrap(),
-                            row.unit_originium_per_day.unwrap(),
+                            row.unit_trade_per_day.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.unit_gold_per_day.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.unit_gold_consumption_per_day.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
+                            row.unit_originium_per_day.ok_or_else(|| {
+                                Error::msg("cannot decode missing Bake response value")
+                            })?,
                         ],
                         rule,
                     });
@@ -384,71 +308,35 @@ pub(super) fn read_validated(
                 Rows::Manufacture(rows) => rows.push(ManuRow {
                     indices,
                     efficiencies: [
-                        row.manufacture_base_efficiency_millis.unwrap(),
-                        row.manufacture_occupancy_efficiency_millis.unwrap(),
-                        row.manufacture_skill_efficiency_millis.unwrap(),
-                        row.manufacture_global_efficiency_millis.unwrap(),
-                        row.manufacture_final_efficiency_millis.unwrap(),
+                        row.manufacture_base_efficiency_millis.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
+                        row.manufacture_occupancy_efficiency_millis.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
+                        row.manufacture_skill_efficiency_millis.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
+                        row.manufacture_global_efficiency_millis.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
+                        row.manufacture_final_efficiency_millis.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
                     ],
-                    storage: row.manufacture_storage_limit.unwrap(),
+                    storage: row
+                        .manufacture_storage_limit
+                        .ok_or_else(|| Error::msg("cannot decode missing Bake response value"))?,
                     outputs: [
-                        row.manufacture_unit_output_per_day.unwrap(),
-                        row.manufacture_output_per_day.unwrap(),
+                        row.manufacture_unit_output_per_day.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
+                        row.manufacture_output_per_day.ok_or_else(|| {
+                            Error::msg("cannot decode missing Bake response value")
+                        })?,
                     ],
                 }),
             }
-        }
-        let n = if signature.order.is_some() {
-            trade_pool.entries.len()
-        } else {
-            manu_pool.entries.len()
-        };
-        let mut legal_count = 0usize;
-        for combo in rank::combinations(n, signature.capacity) {
-            let combo = &combo[..signature.capacity];
-            let ids = if signature.order.is_some() {
-                if !distinct_names(combo.iter().map(|id| trade_pool.entries[*id].name.as_str())) {
-                    continue;
-                }
-                let operators = build_trade_combo_operators_vec(trade_pool, combo, None, None);
-                if trade_station_exclusive_violation(&operators, skill_table) {
-                    continue;
-                }
-                state_indices(operators.iter().map(trade_operator_state), &operator_index)?
-            } else {
-                if !distinct_names(combo.iter().map(|id| manu_pool.entries[*id].name.as_str())) {
-                    continue;
-                }
-                let operators = combo
-                    .iter()
-                    .map(|id| manu_pool.entries[*id].to_manu_operator())
-                    .collect::<Vec<_>>();
-                if !crate::search::manufacture_peers_compatible(&operators, skill_table) {
-                    continue;
-                }
-                state_indices(
-                    combo
-                        .iter()
-                        .map(|id| OperatorState::from_manu_entry(&manu_pool.entries[*id])),
-                    &operator_index,
-                )?
-            };
-            let position = rank::colex(&ids)?;
-            let bit = 1u64 << (position % 64);
-            if actual[position / 64] & bit == 0 {
-                return Err(Error::msg(format!(
-                    "baked row universe is incomplete for {:?}",
-                    index.signature_key
-                )));
-            }
-            actual[position / 64] &= !bit;
-            legal_count += 1;
-        }
-        if legal_count != index.len || actual.iter().any(|word| *word != 0) {
-            return Err(Error::msg(format!(
-                "baked row universe is incomplete for {:?}",
-                index.signature_key
-            )));
         }
         result.signatures.push(signature);
     }

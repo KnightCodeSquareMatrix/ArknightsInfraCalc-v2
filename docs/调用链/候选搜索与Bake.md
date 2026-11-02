@@ -6,9 +6,9 @@
 > 摘要：从输入池、Plan 门禁和域搜索追踪到 comparator、Bake 命中或 live fallback
 > 代码范围：crates/infra-core/src/{pool,search,bake.rs,candidate.rs}; crates/infra-cli/src/commands/{bake,profile}.rs
 > 机制依赖：docs/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
-> 代码锚点：crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}; crates/infra-core/src/search/trade.rs::search_trade_triples; crates/infra-core/src/search/manufacture.rs::search_manufacture_triples; crates/infra-core/src/bake.rs::{bake_catalogs,validate_baked_catalog,try_baked_trade_search}
+> 代码锚点：crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}; crates/infra-core/src/search/trade.rs::search_trade_triples; crates/infra-core/src/search/manufacture.rs::search_manufacture_triples; crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}
 > 关联链路：docs/模块/候选搜索与Bake.md; docs/模块/中枢与跨设施状态.md; docs/调用链/跨设施状态刷新.md
-> 核验基线：bake validate/verify、domain search report、plan --assert-invariants
+> 核验基线：真实 CLI 结果对比、domain search report、plan --assert-invariants
 
 ## 触发与入口
 
@@ -44,9 +44,9 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 
 ## Bake 分支
 
-`bake_catalogs` 用 live solver 生成带 schema、输入 fingerprint 和 combo-table hash 的 catalog。`validate_baked_catalog` 先检查结构、hash 和 row；`BakeMode::Auto` 对查询不兼容回 live，首次加载缺表或失效时先生成并校验，成功后查表，失败才回 live。`Disabled` 直接 live，`Required` 只读有效表并对 miss/invalid 返回错误。Bake 是候选缓存，不是机制或排序真源。制造带班长且池含暖机 atom 时整体回 live，Some(h)按真实连续时长、不round/clamp；无班长默认20小时采用新连续暖机语义，表须由最终binary隔离再生并全量verify。新冻结连续暖机局部数值验收及指定P1/P2静态闭合已完成：1122full含72预期非有限错误，1050search中798获准精确一致、252由当时>=12h负心情扣减政策排除（该身份排除现已删除）；数学千分及公开f64合同零差异，不能称所有搜索获准。最终新语义隔离Bake与统一包已完成：29,783,417行/3,292兼容查询零差异、2,148查询跳过，CLI exit0且但书PASS；152盒147完成、5既有预算失败逐字同基线，新增/移除0，raw same5/changed147。全精二无断言profile11叶/rotation10叶变化、MAA相同；带断言同旧shift2预算失败，均无输出。5949叶差异归因已闭合，不称所有gate全绿。 普通段分段积分与f64微段求值边界保留，不能泛称所有实数精确。 不以旧表或首轮冻结证据替代最终验收。
+2026-11-02 用户裁决：删除全部 Bake 校验及自动机制回归。生成后直接原子发布；加载仅解码 compact 行并建立查询索引，不检查 schema、exe/输入/文件指纹、签名集合、字段、排序、合法全集或执行顺序，不做逐行/抽样 live 对账。bake validate/verify 和对应 API 已删除。磁盘 v17 布局保留，指纹槽位不再填写。数据或计算实现更新后由调用方显式重建表。此为缓存信任 policy，取消运行时完整性与新鲜度保证；热查询适用条件、真实搜索禁配和必要的解码/类型转换/分配/索引错误仍保留。
 
-完整贸易行集合经 catalog 校验后，在查询行时按同一黑键—巫恋禁配过滤，再取前 K 条；该全局产品禁配可在 `Required` 下命中。其他未表示的禁配仍按原有 miss 语义处理；可执行文件或输入指纹不匹配的旧表不能跳过验证。
+Auto 首次读取失败时同步生成并发布，失败回 live；Required 不生成，读取或查询失败返回错误；Disabled 直接 live。热查询完整状态、原子、上下文、输入顺序和同站禁配保留，制造带班长且含暖机仍回 live。
 
 贸易行还保存单位特殊赤金产出能力；Bake 命中时使用与 live solver 相同的单位换算和总效率还原 `gold_consumption_per_day`，再交给 assignment commit。该隐藏字段不决定候选排序，普通订单的特殊产金值保持为零。
 
@@ -57,9 +57,12 @@ pool builder 负责设施、tier、skill binding、人数和输入匹配；Plan 
 | 输入/池 | 干员未进候选、技能缺失 | OperBox、PromotionTier、instances、SkillTable 和 pool skip |
 | Plan | 体系未激活、干员被抢 | required anchor、claim/exclusion、used、capacity |
 | 搜索 | 组合未报告或结果顺序异常 | domain filter、comparator、具名 policy、top_k |
-| Bake | catalog miss、hash 不匹配 | schema、input fingerprint、combo-table hash、mode |
+| Bake | catalog miss、读取/解码失败 | 当前目录、显式重建状态、查询适用条件、mode |
 | 提交/刷新 | 下一房间看到旧状态 | assignment commit 后的 `resolve_base`、global manifest、room snapshot |
 
-排查先用 `layout eval --explain-json` 确认固定编制能否结算，再用 `bake validate/verify` 对账缓存，最后用 `plan --assert-invariants` 验证完整轮换。一次候选命中不能证明全局最优或知识库机制覆盖。
+排查先用 `layout eval --explain-json` 确认固定编制能否结算，再用真实 live/Bake CLI 结果对比核对缓存，最后用 `plan --assert-invariants` 验证完整轮换。一次候选命中不能证明全局最优或知识库机制覆盖。
 
 自动轮换入口沿同一设施搜索调用链，新增运行时成员准入和候选自身窗口。请求memo包含模式及真实成员/固定主力快照；自动模式显式live，定时Bake兼容要求不变。入口和终态见 [自动轮换](自动轮换.md)。
+
+
+2026-11-02实测：38个真实三班Box的开启/关闭产物相同，开启仍零命中。定时assignment写入work_hours并resolve实际名单/跨设施效果，已不同于空assignment的Bake基准；兼容bench真实命中，热搜索约3.79倍。因此预热成功不能证明排班使用Bake；排查必须读bake_hits和layout/predicate/forbidden_pairs回退计数。性能与内存口径见docs/PERFORMANCE_ENGINEERING.md。
