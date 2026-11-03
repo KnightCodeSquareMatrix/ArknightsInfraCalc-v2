@@ -1,0 +1,571 @@
+{
+  "source_commit": "0f5efc6352337e2d63f81c0d2ca6d469b2ce3d96",
+  "rule": "Exact reviewed description match; changed or unknown skills are retained.",
+  "skills": {
+    "control_clue_cost[000]": {
+      "description_sha256": "6a8ee96031d6e087530d9001123d173c8eaaea23ab0d7d2f1c8f6c34d0e7329f",
+      "reason": "仅线索倾向",
+      "room_type": "CONTROL"
+    },
+    "control_clue_cost[010]": {
+      "description_sha256": "7e5bdf47befc6fc316b2e4817f905128d0289dc29ddbe2608b7058fbccbfb880",
+      "reason": "仅线索倾向",
+      "room_type": "CONTROL"
+    },
+    "control_clue_cost[011]": {
+      "description_sha256": "4effbbdf72b5bd12c1c18875ea5e981522b40869730b058a864a2df26de880ac",
+      "reason": "仅线索倾向",
+      "room_type": "CONTROL"
+    },
+    "control_clue_faction[070]": {
+      "description_sha256": "c354bfdb4c1f6a84721e6cf4f66254e9e5a8443e8476d8aa25fcc2b729c97cf4",
+      "reason": "仅线索倾向",
+      "room_type": "CONTROL"
+    },
+    "control_clue_cost&faction[990]": {
+      "description_sha256": "6c03d2062c5ec965c16702bb8fe849191814cee924af157bf465f813277ccb29",
+      "reason": "仅线索倾向",
+      "room_type": "CONTROL"
+    },
+    "control_train_spd[010]": {
+      "description_sha256": "bef1bb5ec60e00dbcd86e43d8967830cd6d8e9e8bfb2b4d2a3d7687180b9b7b1",
+      "reason": "仅专精训练加成",
+      "room_type": "CONTROL"
+    },
+    "control_train_spd[011]": {
+      "description_sha256": "bef1bb5ec60e00dbcd86e43d8967830cd6d8e9e8bfb2b4d2a3d7687180b9b7b1",
+      "reason": "仅专精训练加成",
+      "room_type": "CONTROL"
+    },
+    "control_train_spd[012]": {
+      "description_sha256": "bef1bb5ec60e00dbcd86e43d8967830cd6d8e9e8bfb2b4d2a3d7687180b9b7b1",
+      "reason": "仅专精训练加成",
+      "room_type": "CONTROL"
+    },
+    "power_rec_spd&cost[000]": {
+      "description_sha256": "f6754296281f0a5222e9517252aa260026c394a974624f20bc5b88d2aae1cdd2",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "POWER"
+    },
+    "power_rec_spd&cost[010]": {
+      "description_sha256": "8cdc86598f7ab857bcf598273a3dbb78a307c883a2206ce6b01919ce31f25175",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "POWER"
+    },
+    "manu_cost_all[000]": {
+      "description_sha256": "96dbf269eb5c58156fbcd0b4acba2172b7057482946a8b2bf88f54967e3d50c5",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "MANUFACTURE"
+    },
+    "manu_cost[000]": {
+      "description_sha256": "e785addef656fbcdacbe76012950f990ec8d061d814811dde7042434405ec2b6",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "MANUFACTURE"
+    },
+    "trade_cost[000]": {
+      "description_sha256": "c9b5d681180d5147a683c8615418b51d4e3888e888ce76fbc38b0adda7126806",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "TRADING"
+    },
+    "trade_cost&bd2[000]": {
+      "description_sha256": "b2285f312c13e9a26778b2a828fda0a676137ee41c5c3b69075ca0328335228c",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "TRADING"
+    },
+    "trade_cost&bd2[001]": {
+      "description_sha256": "159518cf92f241812c47e13bbec35f4f8b4a94c8f5776befaf93cfe050d91c94",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "TRADING"
+    },
+    "trade_ord_limit&cost_P[010]": {
+      "description_sha256": "33f3fb15ec9d6850cbd120f6884879af8987674544ad65a856f0179aa12ce1ba",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "TRADING"
+    },
+    "dorm_rec_oneself[000]": {
+      "description_sha256": "f3100e82d35cfd0d132acc17ceee01d82644c7400d7bab2928e38a58e2d3aeb9",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[001]": {
+      "description_sha256": "f3100e82d35cfd0d132acc17ceee01d82644c7400d7bab2928e38a58e2d3aeb9",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[002]": {
+      "description_sha256": "f3100e82d35cfd0d132acc17ceee01d82644c7400d7bab2928e38a58e2d3aeb9",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[010]": {
+      "description_sha256": "fc146bf4c1a0274fcf13adbb420ef7bb2825515ca4862b82b4d4ad523e1cc76b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[011]": {
+      "description_sha256": "fc146bf4c1a0274fcf13adbb420ef7bb2825515ca4862b82b4d4ad523e1cc76b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[020]": {
+      "description_sha256": "9205025647afd3523240f600fca5aca3bca241e2185499ee4049f6c100476b73",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[040]": {
+      "description_sha256": "7e379480c5f7b1cb54f35ae6dc672a9fd72f99deb60c3025e5ad4557d97f68f0",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself[030]": {
+      "description_sha256": "4950270273f66cdb85737c19d22f5b378f990bde33c1f5758e2fad496e15bba0",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself2[000]": {
+      "description_sha256": "e08a2948623b1f73bbea0cab6cf9ee4feaa3637191b7b79fc61b137341535d2a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_oneself2[001]": {
+      "description_sha256": "e08a2948623b1f73bbea0cab6cf9ee4feaa3637191b7b79fc61b137341535d2a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[010]": {
+      "description_sha256": "2ab837e631cf7e726fa72ca33e1ecc6f4e026540a7adc272273a4f45e35ce6e2",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[1010]": {
+      "description_sha256": "2ab837e631cf7e726fa72ca33e1ecc6f4e026540a7adc272273a4f45e35ce6e2",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_power[100]": {
+      "description_sha256": "2ab837e631cf7e726fa72ca33e1ecc6f4e026540a7adc272273a4f45e35ce6e2",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[000]": {
+      "description_sha256": "d2e5294b99688bcc8dc490337cc845c80035cf2c5c702b337c72d7722f84a0bb",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[001]": {
+      "description_sha256": "d2e5294b99688bcc8dc490337cc845c80035cf2c5c702b337c72d7722f84a0bb",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[030]": {
+      "description_sha256": "73188989a6a7849205d07eec047cb905a9c1f81c529a6e7a286969f0a1d49119",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[031]": {
+      "description_sha256": "73188989a6a7849205d07eec047cb905a9c1f81c529a6e7a286969f0a1d49119",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[032]": {
+      "description_sha256": "73188989a6a7849205d07eec047cb905a9c1f81c529a6e7a286969f0a1d49119",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[033]": {
+      "description_sha256": "73188989a6a7849205d07eec047cb905a9c1f81c529a6e7a286969f0a1d49119",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single[020]": {
+      "description_sha256": "177448069d3dead88ba5bd1d08e7799f3863fbd058921a9ad19d2a4231952396",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_P[000]": {
+      "description_sha256": "6a58de354d787b8e2e14cc0e0bbfeba56fac66ad73097e60bb7c53867a8ac801",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_P[001]": {
+      "description_sha256": "324d925dfdcad54ca47a53de21b6961b5a7ab259da4391c3a19e76becf8298c5",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_P[002]": {
+      "description_sha256": "1839bd18fbcc9e36b85af11fb792a482dfe5ff70b2f6f8150e4d8de9c54e2323",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&tag[000]": {
+      "description_sha256": "097a4301aafadc6d34f114bd4367a234fbef0fbc919d92f1b2c230c3441bd6d7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[000]": {
+      "description_sha256": "3f69c5c38676f04262ffb6436a4a7d8178ee11083c3a7d715d19b7442223b2c6",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[010]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[011]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[012]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[013]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[014]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[017]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[020]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[021]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[022]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[027]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[028]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[999]": {
+      "description_sha256": "3f69c5c38676f04262ffb6436a4a7d8178ee11083c3a7d715d19b7442223b2c6",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&tag[000]": {
+      "description_sha256": "01262293ee56b2ab28a3a49efaaadf2f4611ef513f806a0f39282accd1acadc4",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&unfull[000]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&unfull[001]": {
+      "description_sha256": "cd9083aac922d9a7336d5f7574ffc1cca0f736f1b85c8ee7db70ce1f9b048521",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&unfull[100]": {
+      "description_sha256": "3a549bd81806d36a95f71242b654dd6e0880cc417c0d8e903e42578dc30c1aa6",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&single[000]": {
+      "description_sha256": "31b80a8c8359d10d62b81bfae66155fc12e40f1cc36a8029d5342294064cb898",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_powToRecAll[000]": {
+      "description_sha256": "3971c3212e3058f77aed2d9ab208595fd50906b1967c5ce8e5f531cdd16265ed",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_powToRecAll[010]": {
+      "description_sha256": "bd4dcacab3016d1f4082f3f170afdf6c31e079e6506a0b3e13897a7234bcad4a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_hireToRecAll[000]": {
+      "description_sha256": "2d48755e3f0a3395a97f3dd70700546f57578fcfd6af23cdea8e615fba03f6cd",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_hireToRecAll[002]": {
+      "description_sha256": "69af8d1b0cd5398e0ab08ae5f0f561837e56313c8d496e184b3b1e9942d388c1",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&lv[000]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&lv[100]": {
+      "description_sha256": "cae5a159b4c1fc2e21efd21c41cb3e20c8c76988c8b3f49e944f2185b45c44dc",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[000]": {
+      "description_sha256": "3bc3a7f62a7ec70774e95767659c8d9d9c4b0affb57d5334680a5f33df037d0a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[001]": {
+      "description_sha256": "253af1588a6c079e51a34ca65976a4e6674bc91166b3900adce89f049a34a22b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[010]": {
+      "description_sha256": "1a23eb7e1d9eeef9f901a60d0db59c5ab78124240764d6817af83d82b553a5e9",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[011]": {
+      "description_sha256": "7494a43ce68fdafccb14757c0e5e2eeb061bd4a8c64efac4d893605fd5ec3b67",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[012]": {
+      "description_sha256": "7494a43ce68fdafccb14757c0e5e2eeb061bd4a8c64efac4d893605fd5ec3b67",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[020]": {
+      "description_sha256": "e6842a13217ecde66e84827747e57a67234be8652be521cce307e9fae76eb0c3",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[021]": {
+      "description_sha256": "d8f84264aff11fa7df62427e3670a370c7a8c2d0cce6e57f496b9bf5249ebfbc",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_hireToRecAll[001]": {
+      "description_sha256": "69af8d1b0cd5398e0ab08ae5f0f561837e56313c8d496e184b3b1e9942d388c1",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_hireToRecAll[021]": {
+      "description_sha256": "1ccff8bdf17238c474e578c527921a392165dd17c84101afe1e8e8f6a1e8663c",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[030]": {
+      "description_sha256": "d8f84264aff11fa7df62427e3670a370c7a8c2d0cce6e57f496b9bf5249ebfbc",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single&oneself[040]": {
+      "description_sha256": "f7a70abcbe5377cbf9cfc3f274b33213c929571dbf3e0d6a4bbca7144e368ff8",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_power[000]": {
+      "description_sha256": "5af8b0e598c2c0e116cb7cc01ede1053724abd1c05795e783015edc3fe5251ee",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_single_power[001]": {
+      "description_sha256": "e3c3bb2d69917017a0473dc5047d33e7e44756d89767598004bd94b7483c12ed",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[000]": {
+      "description_sha256": "22785076cb69cc9b8c028b06e000180cf61af4318f12cca9452ffe3b570c96f4",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[001]": {
+      "description_sha256": "b74811df5551fc411313ea51eb3a63071e6d41794030dba1f4bd922416f4502e",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[010]": {
+      "description_sha256": "7e379480c5f7b1cb54f35ae6dc672a9fd72f99deb60c3025e5ad4557d97f68f0",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[011]": {
+      "description_sha256": "2e5524f48d3f496256f4e91babc0e48b735fef152863bd1a204a7fd3a2c31ed8",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[012]": {
+      "description_sha256": "4c3acf7f111007923def5d07871fd0021fca9cb84f7320ef0f5198ff36b1062b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[021]": {
+      "description_sha256": "4c3acf7f111007923def5d07871fd0021fca9cb84f7320ef0f5198ff36b1062b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[042]": {
+      "description_sha256": "4c3acf7f111007923def5d07871fd0021fca9cb84f7320ef0f5198ff36b1062b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&group[000]": {
+      "description_sha256": "a89c5fd52c6b3a26c210c8209d4e8bfb920043fc1283965b2637eb4f942965a9",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&oneself[022]": {
+      "description_sha256": "4c3acf7f111007923def5d07871fd0021fca9cb84f7320ef0f5198ff36b1062b",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&profession[000]": {
+      "description_sha256": "2905adee6b0e7fe2d70b3db5268989a234b544c5ec787c1ed70be092ff282023",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_recExcludeOther[000]": {
+      "description_sha256": "e54d024eb109f8c9643dfb76dcea9daf229abf51cdce66349042a1f3d4209c70",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[023]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[024]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[025]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[026]": {
+      "description_sha256": "347dcbff135522f5f93b6402c32735d3eaae40d08f6acbffeda0183cb6236bc7",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all[029]": {
+      "description_sha256": "9be4262205aaca90ea0eb8167ff4d463b8d132eea7f41e9217565527e668483a",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&bd[000]": {
+      "description_sha256": "f10883760e052c17fca1a4f2717a5dccd24fea1050cb3ff8874415087ddd0242",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&tired[000]": {
+      "description_sha256": "8b0327049e14e58f9cb5fbe7634ac23b62b7467ac970b13fef56545c563a255e",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "dorm_rec_all&tired[100]": {
+      "description_sha256": "57a22f843358a4eaec1c1479cc6e09d2a38af776eed39295909582770dce51d5",
+      "reason": "中枢以外纯心情加成",
+      "room_type": "DORMITORY"
+    },
+    "meet_team[020]": {
+      "description_sha256": "17f7474ff1d17c12fc7df3ca9cbafffd7e0e78771a03fde61207b39ccbfefe33",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_team[050]": {
+      "description_sha256": "3d1262b9eda5eac73d6d3f0399e3d9356ecb3c045ce4ac00acc5fc23819c7748",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_team[060]": {
+      "description_sha256": "a7cf0b4e988341086e7a30172e09362a5e90b56a15acd8440bf9ba4556bdaf4d",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_team[070]": {
+      "description_sha256": "032640d363d557ae98f48db150f8baf232f708e6037bf1f25a81d02e9f78f4ba",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_team&char[000]": {
+      "description_sha256": "9d97e654e9272a9ed3509755eab0de3944c44d5cd819b555f30440c8452cc145",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_flag[010]": {
+      "description_sha256": "d1777bef76c6c62fe6d6249d6fcde0987d8ad6f96b2d180666dc499120dfa6ff",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_flag[040]": {
+      "description_sha256": "f4f45e310b0a0d541b03e3bb3f427987eb3efc2692af6f8b1c4a764dfb22ebde",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_flag[050]": {
+      "description_sha256": "d4123a33684524d60a9c75d6cd82df07cbaa44f3cce1ffab78656226fb3a2983",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_flag[060]": {
+      "description_sha256": "c21de3086bd9f35b17087a2a9815a37c9a9f7a8a04c26fd57a7a8b8cc0b359d1",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_flag[070]": {
+      "description_sha256": "d236419e1f6b8f5708cba4f9d3deacc7ac51a2ef2df1ff93de37d02b95c09000",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned[000]": {
+      "description_sha256": "e80fecb99bff70cc18fca65c70d73bdbe74824b78f338cea6c40551ef61645ef",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned[001]": {
+      "description_sha256": "e80fecb99bff70cc18fca65c70d73bdbe74824b78f338cea6c40551ef61645ef",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned[002]": {
+      "description_sha256": "e80fecb99bff70cc18fca65c70d73bdbe74824b78f338cea6c40551ef61645ef",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned[003]": {
+      "description_sha256": "e80fecb99bff70cc18fca65c70d73bdbe74824b78f338cea6c40551ef61645ef",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned[004]": {
+      "description_sha256": "e80fecb99bff70cc18fca65c70d73bdbe74824b78f338cea6c40551ef61645ef",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_Owned[000]": {
+      "description_sha256": "6b3fda868acdf8c88845bc9a7fa2b2b06a68b017a8f3d458c74704d36808512a",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    },
+    "meet_spd_notOwned&exchange[000]": {
+      "description_sha256": "62aca42be263e450897cc0757f3823c46a54735d0ed86526bb77d359ce534ecf",
+      "reason": "仅线索倾向",
+      "room_type": "MEETING"
+    }
+  }
+}

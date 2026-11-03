@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 """List upstream operators whose building buff IDs are absent locally."""
 import argparse
+import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+EXCLUSIONS = json.loads(Path(__file__).with_name('building_skill_exclusions.json').read_text(encoding='utf-8'))['skills']
 
 
 def read(path):
-    return json.loads(path.read_text(encoding='utf-8'))
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f'{path}: duplicate JSON key {key}')
+            result[key] = value
+        return result
+    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique_object)
 
 
 def exclusion_reason(buff):
-    """Conservative text filter; retain effects that cannot be classified safely."""
-    text = re.sub(r'<[^>]*>', '', buff['description'])
+    """Only exclude whole facilities or exact descriptions already reviewed."""
     if buff['roomType'] in {'WORKSHOP', 'TRAINING'}:
         return '加工站或专精室技能'
-    # Include cross-facility effects that solely accelerate specialization.
-    if '专精' in text and '训练速度' in text and not re.search('生产力|订单|线索|联络|充能|转化', text):
-        return '仅专精训练加成'
-    if buff['roomType'] != 'CONTROL' and '心情' in text:
-        # Only discard clauses all describing mood effects; ambiguity stays visible.
-        clauses = [part.strip('，。 ') for part in re.split('[；;。]', text) if part.strip('，。 ')]
-        other_effect = re.search('生产力|订单|容量|线索|联络|充能|转化|互换|交换|效率|配方', text)
-        if not other_effect and all('心情' in part or '恢复效果' in part for part in clauses):
-            return '中枢以外纯心情加成'
+    entry = EXCLUSIONS.get(buff['buffId'])
+    if (entry and entry['room_type'] == buff['roomType'] and
+            entry['description_sha256'] == hashlib.sha256(buff['description'].encode()).hexdigest()):
+        return entry['reason']
     return None
 
 
@@ -41,7 +44,7 @@ def main():
     parser.add_argument('--facility', action='append', help='Upstream roomType, e.g. MANUFACTURE; repeatable')
     parser.add_argument('--json', action='store_true', help='Print full machine-readable report')
     parser.add_argument('--valuable', action='store_true',
-                        help='Exclude workshop/training and non-control pure mood bonuses; show original descriptions')
+                        help='Exclude workshop/training, non-control pure mood bonuses and clue tendency only; show descriptions')
     args = parser.parse_args()
     building, characters = read(args.building), read(args.characters)
     skills, instances = read(args.skill_table)['skills'], read(args.instances)['instances']
@@ -53,11 +56,29 @@ def main():
     if len(local_ids) != len(skills):
         raise ValueError('Duplicate local skill IDs')
     local_names = {instance['name'] for instance in instances.values()}
+    professions = {'PIONEER', 'WARRIOR', 'TANK', 'SNIPER', 'CASTER', 'MEDIC', 'SUPPORT', 'SPECIAL'}
+    playable = {cid for cid, char in characters.items()
+                if char.get('profession') in professions and char.get('isNotObtainable') is False}
+    building_ids = set(building['chars'])
+    if playable != building_ids:
+        raise ValueError(f'Upstream roster mismatch: no building entry={sorted(playable - building_ids)}, '
+                         f'not playable={sorted(building_ids - playable)}')
+    if len({characters[cid]['name'] for cid in playable}) != len(playable):
+        raise ValueError('Duplicate playable operator names; local name-based comparison is ambiguous')
+    for cid, char in building['chars'].items():
+        bindings = [binding for group in char['buffChar'] for binding in group['buffData']]
+        if not bindings:
+            raise ValueError(f'{cid}: empty building skill bindings')
+        for binding in bindings:
+            if binding['buffId'] not in building['buffs']:
+                raise ValueError(f'{cid}: unknown upstream buff {binding["buffId"]}')
+    all_missing = [{'char_id': cid, 'name': characters[cid]['name']}
+                   for cid in sorted(building_ids) if characters[cid]['name'] not in local_names]
     rooms = {room.upper() for room in args.facility or []}
     available_rooms = {buff['roomType'] for buff in building['buffs'].values()}
     if rooms - available_rooms:
         raise ValueError(f'Unknown facilities: {sorted(rooms - available_rooms)}')
-    rows, absent_instances, excluded = [], [], {}
+    rows, absent_instances, missing_operator_skills, excluded = [], [], [], {}
     operators_with_skills = 0
     for char_id, char in sorted(building['chars'].items()):
         entries = {}
@@ -85,6 +106,8 @@ def main():
         absent = name not in local_names
         if absent:
             absent_instances.append({'char_id': char_id, 'name': name})
+            missing_operator_skills.append({'char_id': char_id, 'name': name,
+                                            'skills': list(entries.values())})
         missing = [entry for buff_id, entry in entries.items() if buff_id not in local_ids]
         if missing:
             rows.append({'char_id': char_id, 'name': name, 'instance_absent': absent,
@@ -93,8 +116,12 @@ def main():
         'comparison': 'Exact upstream buff ID membership; gaps do not prove missing mechanics or incorrect unlocks.',
         'inputs': {key: str(getattr(args, key).resolve()) for key in ('building', 'characters', 'skill_table', 'instances')},
         'facilities': sorted(rooms), 'local_skill_count': len(local_ids),
+        'coverage': {'playable_operators': len(playable), 'building_operators': len(building_ids),
+                     'roster_equal': True, 'all_missing_instances': len(all_missing)},
+        'all_missing_instances': all_missing,
+        'missing_operator_skills_in_scope': missing_operator_skills,
         'valuable_filter': args.valuable,
-        'filter_guarantee': 'Conservative description heuristic; uncertain effects retained, not a mechanics audit.',
+        'filter_guarantee': 'Whole excluded facilities or reviewed exact description hashes only; unknown/changed effects retained.',
         'excluded_missing_buffs': excluded,
         'upstream_operators_with_skills': operators_with_skills,
         'operators_with_missing_skills': len(rows),
@@ -104,6 +131,7 @@ def main():
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
+        print('全部缺失干员（不受技能筛选影响）：' + '、'.join(item['name'] for item in all_missing))
         print(f"本地技能 {len(local_ids)}；上游有基建技能角色 {operators_with_skills}；技能 ID 未收录角色 {len(rows)}；角色实例缺失 {len(absent_instances)}")
         print('仅比较原始 ID；自定义 ID、委托及未支持设施需另行判断。')
         print(chr(9).join(['角色名', '角色ID', '实例缺失', '未收录/范围内技能数', '未收录技能（设施:名称:ID）'] +
