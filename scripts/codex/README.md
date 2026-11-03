@@ -49,6 +49,19 @@ python3 scripts/codex/query_runtime_data.py --shortcut gsl_docus_syracusa
 
 ### 上游基建技能缺失角色
 
+一键下载并比对（只写新证据目录）：
+
+使用 Python 3.9+ 与 curl，默认经本地 7890 代理直接请求 GitHub raw，不依赖 GitHub API。
+
+```bash
+python3 scripts/codex/check_upstream_building_skills.py
+python3 scripts/codex/check_upstream_building_skills.py --ref 0f5efc6352337e2d63f81c0d2ca6d469b2ce3d96 --facility MANUFACTURE
+```
+
+默认来源 yuanyan3060/ArknightsGameResource 的 main，按有价值技能筛选；--all-skills 关闭筛选，--repo Kengxxiao/ArknightsGameData 切换已登记来源，--proxy '' 直连，--data-dir 指定本地运行时目录。--output-dir 必须是 out/ 或 target/codex-runs/ 内的新子目录，拒绝覆盖。每个下载默认最多60秒，可用 --timeout 调整到1–300秒；失败后停止，不重试其他来源，不沿用旧文件。
+
+输出 building_data.json、character_table.json、原样提取的 building_skills.json、source.json、comparison.json 与“缺失干员与技能.md”。source 保存请求ref、下载URL、SHA-256及 completed/failed 状态；分支ref记为 unresolved_ref，不冒充同提交下载，完整40位提交格式ref记为 commit_ref_unverified（requested_commit保留输入，commit为空，不独立解析提交身份）。名册一致仅证明结构完整，不证明分支下载的版本一致；需要固定版本时显式传SHA。已有目录或下载/JSON/比对异常非零退出，失败目录保留来源和错误；完整报告仅在成功后生成。结果分列全部缺实例、缺实例角色范围内技能、已有角色原始技能ID差集。它不自动证明已有ID的绑定正确、别名或委托覆盖，后续实际覆盖核对仍由技能流程完成。
+
 下载固定提交的 building_data.json 与同提交 character_table.json 后运行：
 
 ```bash
