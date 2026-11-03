@@ -2,6 +2,7 @@
 """List upstream operators whose building buff IDs are absent locally."""
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -10,6 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def read(path):
     return json.loads(path.read_text(encoding='utf-8'))
+
+
+def exclusion_reason(buff):
+    """Conservative text filter; retain effects that cannot be classified safely."""
+    text = re.sub(r'<[^>]*>', '', buff['description'])
+    if buff['roomType'] in {'WORKSHOP', 'TRAINING'}:
+        return '加工站或专精室技能'
+    # Include cross-facility effects that solely accelerate specialization.
+    if '专精' in text and '训练速度' in text and not re.search('生产力|订单|线索|联络|充能|转化', text):
+        return '仅专精训练加成'
+    if buff['roomType'] != 'CONTROL' and '心情' in text:
+        # Only discard clauses all describing mood effects; ambiguity stays visible.
+        clauses = [part.strip('，。 ') for part in re.split('[；;。]', text) if part.strip('，。 ')]
+        other_effect = re.search('生产力|订单|容量|线索|联络|充能|转化|互换|交换|效率|配方', text)
+        if not other_effect and all('心情' in part or '恢复效果' in part for part in clauses):
+            return '中枢以外纯心情加成'
+    return None
 
 
 def main():
@@ -22,6 +40,8 @@ def main():
     parser.add_argument('--instances', type=Path, default=ROOT / 'data/operator_instances.json')
     parser.add_argument('--facility', action='append', help='Upstream roomType, e.g. MANUFACTURE; repeatable')
     parser.add_argument('--json', action='store_true', help='Print full machine-readable report')
+    parser.add_argument('--valuable', action='store_true',
+                        help='Exclude workshop/training and non-control pure mood bonuses; show original descriptions')
     args = parser.parse_args()
     building, characters = read(args.building), read(args.characters)
     skills, instances = read(args.skill_table)['skills'], read(args.instances)['instances']
@@ -37,7 +57,7 @@ def main():
     available_rooms = {buff['roomType'] for buff in building['buffs'].values()}
     if rooms - available_rooms:
         raise ValueError(f'Unknown facilities: {sorted(rooms - available_rooms)}')
-    rows, absent_instances = [], []
+    rows, absent_instances, excluded = [], [], {}
     operators_with_skills = 0
     for char_id, char in sorted(building['chars'].items()):
         entries = {}
@@ -46,6 +66,11 @@ def main():
                 buff_id = binding['buffId']
                 buff = building['buffs'][buff_id]
                 if rooms and buff['roomType'] not in rooms:
+                    continue
+                reason = exclusion_reason(buff) if args.valuable else None
+                if reason:
+                    if buff_id not in local_ids:
+                        excluded[buff_id] = reason
                     continue
                 entry = entries.setdefault(buff_id, {
                     'buff_id': buff_id, 'skill_name': buff['buffName'],
@@ -68,6 +93,9 @@ def main():
         'comparison': 'Exact upstream buff ID membership; gaps do not prove missing mechanics or incorrect unlocks.',
         'inputs': {key: str(getattr(args, key).resolve()) for key in ('building', 'characters', 'skill_table', 'instances')},
         'facilities': sorted(rooms), 'local_skill_count': len(local_ids),
+        'valuable_filter': args.valuable,
+        'filter_guarantee': 'Conservative description heuristic; uncertain effects retained, not a mechanics audit.',
+        'excluded_missing_buffs': excluded,
         'upstream_operators_with_skills': operators_with_skills,
         'operators_with_missing_skills': len(rows),
         'unique_missing_buff_count': len({skill['buff_id'] for row in rows for skill in row['missing_skills']}),
@@ -78,11 +106,16 @@ def main():
     else:
         print(f"本地技能 {len(local_ids)}；上游有基建技能角色 {operators_with_skills}；技能 ID 未收录角色 {len(rows)}；角色实例缺失 {len(absent_instances)}")
         print('仅比较原始 ID；自定义 ID、委托及未支持设施需另行判断。')
-        print('角色名	角色ID	实例缺失	未收录/上游技能数	未收录技能（设施:名称:ID）')
+        print(chr(9).join(['角色名', '角色ID', '实例缺失', '未收录/范围内技能数', '未收录技能（设施:名称:ID）'] +
+                         (['技能原文'] if args.valuable else [])))
         for row in rows:
             details = '; '.join(f"{s['facility']}:{s['skill_name']}:{s['buff_id']}" for s in row['missing_skills'])
-            print(chr(9).join([row['name'], row['char_id'], '是' if row['instance_absent'] else '否',
-                              f"{len(row['missing_skills'])}/{row['upstream_skill_count']}", details]))
+            columns = [row['name'], row['char_id'], '是' if row['instance_absent'] else '否',
+                       f"{len(row['missing_skills'])}/{row['upstream_skill_count']}", details]
+            if args.valuable:
+                columns.append('；'.join(s['skill_name'] + '：' + re.sub(r'<[^>]*>', '', s['description'])
+                                        for s in row['missing_skills']))
+            print(chr(9).join(columns))
         covered_absent = [item for item in absent_instances if item['char_id'] not in {row['char_id'] for row in rows}]
         if covered_absent:
             print('技能 ID 均已收录、但角色实例缺失：' + '、'.join(f"{x['name']}({x['char_id']})" for x in covered_absent))
