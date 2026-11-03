@@ -34,9 +34,3 @@
 跨设施能力应从 `scope=Global` atom、`GlobalResourceKey` 和 `GlobalInjectManifest` 追踪；要确认某名干员当前是否覆盖，运行 refs audit 并沿 `docs/调用链/跨设施状态刷新.md` 核对实际 assignment。
 
 具体 operator 名单必须从当前 JSON 与 `SkillTable::validate_operator_refs` 生成，手工表格只作为导航。新增或修正干员时同时更新 instance、skill table、相关 L2/L3 数据、回归锚点和本页覆盖说明。
-
-## 上游原始技能索引
-
-`data/prts_building_skills.csv` 保存原始技能描述、设施与解锁阶段，供对比和来源核对，不代表运行时能力覆盖。2026-11-03 更新至 ArknightsGameResource 固定提交 [`0f5efc6352337e2d63f81c0d2ca6d469b2ce3d96`](https://github.com/yuanyan3060/ArknightsGameResource/commit/0f5efc6352337e2d63f81c0d2ca6d469b2ce3d96)，数据版本 `79.0.0`（2026-10-28）：438 名可获得干员、944 条技能关联；相对此前索引新增 31 条，无删除或原文变更。
-
-更新入口为 `python3 scripts/sync_building_skills.py --source-dir <同提交的原始文件目录>`；目录须包含 `building_data.json`、`character_table.json`、`data_version.txt`，另保留提交与文件哈希证据。默认只更新原始索引；不要通过 `--add-missing` 将未确认机制补为空 atom。CSV 的 `phase_1` 是上游解锁阶段，不能直接当作运行时档位；技能表、实例、自定义 ID 和委托须另行核对。本次更新未改变运行时能力或选人范围。
