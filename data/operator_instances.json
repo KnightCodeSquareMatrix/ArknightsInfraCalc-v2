@@ -1645,33 +1645,6 @@
         }
       }
     },
-    "娜仁图亚@tier_0": {
-      "name": "娜仁图亚",
-      "tier": "tier_0",
-      "tags": [],
-      "facilities": {
-        "manufacture": {
-          "buff_ids": [
-            "manu_prod_limit&cost[011]"
-          ],
-          "stepwise": false
-        }
-      }
-    },
-    "娜仁图亚@tier_up": {
-      "name": "娜仁图亚",
-      "tier": "tier_up",
-      "tags": [],
-      "facilities": {
-        "manufacture": {
-          "buff_ids": [
-            "manu_prod_limit&cost[011]",
-            "manu_formula_spd&dorm&lv[000]"
-          ],
-          "stepwise": true
-        }
-      }
-    },
     "娜斯提@tier_0": {
       "name": "娜斯提",
       "tier": "tier_0",
