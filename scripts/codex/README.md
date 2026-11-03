@@ -47,6 +47,16 @@ python3 scripts/codex/query_runtime_data.py --shortcut gsl_docus_syracusa
 
 输出原始记录、来源字段和 JSON Pointer，关联精确相同的字符串值/键；干员查询另外附原始绑定的 skill 记录。不会用描述中的子串推断依赖，不合并 tier/stepwise，不重算效率或判断准入。`buff_ids_not_in_skill_table` 只是“该 ID 未收录”的事实，不能单独判断技能错误。缺 catalog、错误容器或重复记录 ID 明确报错。
 
+### 上游基建技能缺失角色
+
+下载固定提交的 building_data.json 与同提交 character_table.json 后运行：
+
+```bash
+python3 scripts/codex/report_missing_building_skills.py --building out/building-skills/<版本>/building_data.json --characters out/building-skills/<版本>/character_table.json
+```
+
+默认比较本工作树 data/skill_table.json 的精确 buff ID，逐角色输出未收录技能、设施、名称和 ID；另按 data/operator_instances.json 的姓名标记实例缺失。可用 --facility MANUFACTURE（可重复）筛选上游 roomType，--json 输出包含技能原文和解锁条件的完整 JSON。缺失是事实清单，不证明机制漏实现；不转换自定义 buff ID、不判定委托、不修改运行时数据。成功（含无差集）返回 0，读取或结构错误非零退出。产物保存在 out/，不提交。
+
 ### 调查报告与用户原话
 
 ```bash
