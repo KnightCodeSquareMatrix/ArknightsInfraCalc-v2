@@ -7,10 +7,6 @@
 
 本文只负责路由。任务分类、硬门禁和 Skill 选择唯一由根 [`AGENTS.md`](../AGENTS.md) 负责；本文不维护第二份分类表，也不复制第二套规则。机器可读的 route 注册表是 [`docs/agent-index/routes.json`](agent-index/routes.json)。当前运行事实必须回到代码锚点和对应 owner，历史计划不能解释当前行为。
 
-理解项目整体模型先读[项目逻辑内核](项目逻辑内核.md)；定位具体问题继续按下面路由读取。
-
-自动轮换最新交付：[删减实施与速度验收](ARCHIVE/done/自动轮换删减实施与速度验收-20261030.md)：已删除禁用搜索与全站证明；保证取舍、实施清单、单次速度对照和最终复审入口均在报告中。前轮[主力优先修复](ARCHIVE/done/自动轮换主力优先与准入性能修复-20261030.md)、[意图与性能审计](ARCHIVE/audits/自动轮换意图与性能审计-20261030.md)保留追溯。
-
 ## 1. 从症状开始
 
 先打开生成的 [Agent 路由](生成索引/Agent路由.md)，按症状找到链路 ID，再阅读链路页、模块页和验证入口。
@@ -63,7 +59,6 @@
 | CLI、Worker、协议和字段 | [CLI 与 Worker](接口/CLI与Worker.md)、[输入输出与兼容](接口/输入输出与兼容.md) |
 | 错误、bundle、反馈和复现 | [错误与诊断](接口/错误与诊断.md)、[debug 与验证](调用链/debug与验证.md) |
 | 正确性保证和证据 | [质量、求解保证与验证证据](QUALITY_AND_AUDIT.md)、[Evidence 工具](../scripts/codex/README.md) |
-| 两班、三班、自动轮换耗时与热点 | [挂件修正后排班性能评估](ARCHIVE/done/排班性能评估-20261029.md)、[性能后续交接](TODO/性能优化交接.md#413-挂件修正后详细profile2026-10-29) |
 | 生成模块和 route 索引 | [生成代码与文档地图](生成索引/代码与文档地图.md)、[路由注册表说明](agent-index/README.md) |
 | 当前源码模块 owner | [项目地图](PROJECT_MAP.md) |
 
@@ -119,6 +114,7 @@
 | [ADR 0011: 二/三班通用时长排班与泡泡火神全局强制](ADR/0011-generic-two-three-shift-rotation.md) | `accepted` | 为普通二班/三班增加输入时长并共用终态收尾，在全部该范围内强制泡泡/火神源石预占 |
 | [ADR 0012: 十月排班需求的分项交付判定与关闭边界](ADR/0012-october-rotation-delivery-boundaries.md) | `accepted` | 记录六项十月排班需求在各自语义边界内的交付状态，不把局部实现或工作区草稿合并宣称为整体完成 |
 | [ADR 0013: 四赤金作为 Trade Core 候选](ADR/0013-four-gold-trade-core-candidate.md) | `accepted` | 明确四赤金是 Trade Core 候选中的专用跨站方案，并规定其与普通 Trade Core 的比较边界 |
-| [ADR 0014: 四赤金同场择优与自动轮换模式的实现路线](ADR/0014-four-gold-comparison-and-auto-rotation-roadmap.md) | `proposed` | 评估十月排班剩余两项（四赤金完整候选比较、自动轮换模式）的实现难度，列出必须由用户裁决的事项，并给出按单一意图拆分的修改路线 |
+| [ADR 0014: 四赤金同场择优与自动轮换入口的实现路线](ADR/0014-four-gold-comparison-and-auto-rotation-roadmap.md) | `proposed` | 评估十月排班剩余两项（四赤金完整候选比较、自动轮换入口）的实现难度，列出必须由用户裁决的事项，并给出按单一意图拆分的修改路线 |
 | [ADR 0015：挂件统一选入与开关边界](ADR/0015-挂件统一选入与开关边界.md) | `accepted` | 普通挂件复用既有设施搜索决定受益者入选，由统一执行者提交或回退，不新增全域收益比较 |
+| [ADR 0016：怪猎低档协同与中枢光环选入](ADR/0016-怪猎低档协同与中枢光环选入.md) | `accepted` | 怪猎沿既有优先级串行选入，二人纯光环路径降至感知与龙门之后，不新增候选竞争或整体收益比较 |
 <!-- END GENERATED DECISIONS -->
