@@ -8319,6 +8319,97 @@
           "stepwise": false
         }
       }
+    },
+    "冻河@tier_0": {
+      "name": "冻河",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&share[100]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "冻河@tier_up": {
+      "name": "冻河",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "trade": {
+          "buff_ids": [
+            "trade_ord_spd&share[110]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "国度@tier_0": {
+      "name": "国度",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[100]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[018]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "国度@tier_up": {
+      "name": "国度",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[110]"
+          ],
+          "stepwise": false
+        },
+        "power": {
+          "buff_ids": [
+            "power_rec_spd[018]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "行铃@tier_0": {
+      "name": "行铃",
+      "tier": "tier_0",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[001]"
+          ],
+          "stepwise": false
+        }
+      }
+    },
+    "行铃@tier_up": {
+      "name": "行铃",
+      "tier": "tier_up",
+      "tags": [],
+      "facilities": {
+        "recycle": {
+          "buff_ids": [
+            "recycle_spd&cost[011]"
+          ],
+          "stepwise": false,
+          "min_elite": 2
+        }
+      }
     }
   }
 }

@@ -22,6 +22,9 @@ pub struct FacilityBinding {
     pub buff_ids: Vec<String>,
     #[serde(default)]
     pub stepwise: bool,
+    /// 回收站升级技能的真实精英解锁门槛；未达到时保留 tier_0 绑定。
+    #[serde(default)]
+    pub min_elite: u8,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -246,7 +249,12 @@ impl OperatorInstances {
         resolve_buff_ids(tier, binding, tier0)
     }
 
-    pub fn resolve_recycle_buff_ids(&self, name: &str, tier: PromotionTier) -> Vec<String> {
+    pub fn resolve_recycle_buff_ids(
+        &self,
+        name: &str,
+        progress: crate::roster::OperatorProgress,
+    ) -> Vec<String> {
+        let tier = PromotionTier::from_progress(progress);
         let tier_binding = self
             .get(name, tier)
             .and_then(|i| i.facilities.get("recycle"));
@@ -256,6 +264,11 @@ impl OperatorInstances {
         let tier0 = self
             .get(name, PromotionTier::Tier0)
             .and_then(|i| i.facilities.get("recycle"));
+        if progress.elite < binding.min_elite {
+            return tier0
+                .map(|binding| binding.buff_ids.clone())
+                .unwrap_or_default();
+        }
         resolve_buff_ids(tier, binding, tier0)
     }
 }

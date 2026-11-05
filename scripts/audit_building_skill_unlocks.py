@@ -22,12 +22,14 @@ FACILITIES = {
     "CONTROL": "control",
     "MANUFACT": "manufacture",
     "TRADE": "trade",
+    "TRADING": "trade",
     "POWER": "power",
     "DORMITORY": "dorm",
     "HIRE": "office",
     "MEETING": "meeting",
     "TRAINING": "training",
     "WORKSHOP": "workshop",
+    "RECYCLE": "recycle",
 }
 
 
@@ -170,6 +172,9 @@ def audit_instances(
 
             raw_t0 = list(t0.get("buff_ids", []))
             raw_up = list(up.get("buff_ids", []))
+            # 回收升级绑定可保留两态，并在真实精英解锁前回退初始技能。
+            if facility == "recycle" and target_phase < up.get("min_elite", 0):
+                raw_up = raw_t0
             actual_t0 = {mapped for buff_id in raw_t0 if (mapped := resolve_local(buff_id))}
             resolved_up = [mapped for buff_id in raw_up if (mapped := resolve_up(buff_id))]
             actual_up = (

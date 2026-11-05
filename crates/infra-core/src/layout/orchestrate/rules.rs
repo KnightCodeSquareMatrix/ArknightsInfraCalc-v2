@@ -1898,10 +1898,7 @@ fn role_placement_capacity(
                 )
                 && !ctx
                     .instances
-                    .resolve_recycle_buff_ids(
-                        name,
-                        crate::tier::PromotionTier::from_progress(**progress),
-                    )
+                    .resolve_recycle_buff_ids(name, **progress)
                     .is_empty()
         })
         .count();

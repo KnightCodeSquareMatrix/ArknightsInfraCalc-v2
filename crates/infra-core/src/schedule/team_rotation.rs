@@ -4306,6 +4306,45 @@ fn collect_recycle_rotation_issues(
                 }
             });
             check!("recycle_efficiency", {
+                for operator in operators {
+                    let progress = crate::roster::OperatorProgress::new(
+                        operator.elite,
+                        operator.level,
+                        operator.rarity,
+                    );
+                    let has_verified_upgrade = [
+                        crate::tier::PromotionTier::Tier0,
+                        crate::tier::PromotionTier::TierUp,
+                    ]
+                    .into_iter()
+                    .filter_map(|tier| instances.get(&operator.name, tier))
+                    .filter_map(|instance| instance.facilities.get("recycle"))
+                    .flat_map(|binding| binding.buff_ids.iter())
+                    .any(|buff| {
+                        matches!(
+                            buff.as_str(),
+                            "recycle_spd&cost[001]" | "recycle_spd&cost[011]"
+                        )
+                    });
+                    if has_verified_upgrade {
+                        // 上游固定 buff 的真实 E2 门槛，独立于实例 min_elite 配置。
+                        let expected_buff = if operator.elite >= 2 {
+                            "recycle_spd&cost[011]"
+                        } else {
+                            "recycle_spd&cost[001]"
+                        };
+                        let actual = instances.resolve_recycle_buff_ids(&operator.name, progress);
+                        let expected_efficiency = if operator.elite >= 2 { 0.30 } else { 0.20 };
+                        if actual != [expected_buff]
+                            || crate::recycle::recycle_skill_efficiency(instances, table, operator)?
+                                != Efficiency::from_decimal(expected_efficiency)
+                        {
+                            return Err(Error::msg(
+                                "recycle_skill_unlock: verified E2 upgrade mismatch",
+                            ));
+                        }
+                    }
+                }
                 let expected =
                     crate::recycle::evaluate_recycle(room.level, operators, instances, table)?;
                 let lines: Vec<_> = shift

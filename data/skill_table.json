@@ -7219,6 +7219,134 @@
           }
         }
       ]
+    },
+    {
+      "id": "trade_ord_spd&share[100]",
+      "skill_name": "“无用的人脉”",
+      "facility": "trade",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "selector": "room_peer_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 15.0
+            }
+          },
+          "phase": "peer_share",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "trade_ord_spd&share[110]",
+      "skill_name": "“真有用？”",
+      "facility": "trade",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "selector": "room_peer_count",
+          "action": {
+            "kind": "add_flat_eff_from_selector",
+            "params": {
+              "multiplier": 20.0
+            }
+          },
+          "phase": "peer_share",
+          "phase_order": 10
+        }
+      ]
+    },
+    {
+      "id": "recycle_spd&cost[100]",
+      "skill_name": "无差别回收",
+      "facility": "recycle",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "recycle_spd&cost[110]",
+      "skill_name": "无差别转化",
+      "facility": "recycle",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "recycle_spd&cost[001]",
+      "skill_name": "梅里塔精拣",
+      "facility": "recycle",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 20.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "recycle_spd&cost[011]",
+      "skill_name": "花椰菜甄选",
+      "facility": "recycle",
+      "tier": "tier_up",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 30.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
+    },
+    {
+      "id": "power_rec_spd[018]",
+      "skill_name": "人造物之畏",
+      "facility": "power",
+      "tier": "tier_0",
+      "atoms": [
+        {
+          "action": {
+            "kind": "add_flat_eff",
+            "params": {
+              "value": 15.0
+            }
+          },
+          "phase": "constant",
+          "phase_order": 20
+        }
+      ]
     }
   ]
 }

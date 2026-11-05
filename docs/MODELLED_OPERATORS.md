@@ -34,3 +34,7 @@
 跨设施能力应从 `scope=Global` atom、`GlobalResourceKey` 和 `GlobalInjectManifest` 追踪；要确认某名干员当前是否覆盖，运行 refs audit 并沿 `docs/调用链/跨设施状态刷新.md` 核对实际 assignment。
 
 具体 operator 名单必须从当前 JSON 与 `SkillTable::validate_operator_refs` 生成，手工表格只作为导航。新增或修正干员时同时更新 instance、skill table、相关 L2/L3 数据、回归锚点和本页覆盖说明。
+
+## 2026-11-06 新技能覆盖
+
+冻河贸易两档、国度回收两档与初始发电、行铃回收两档已接入原始上游 buff ID。行铃回收升级额外要求真实精二，四星精一仍为初始效果。国度回收减耗由公共心情模型消费。候选资格与最终比较沿既有流程，不保证新干员必定上岗。来源固定上游提交与解锁证据见输入与技能映射模块页。

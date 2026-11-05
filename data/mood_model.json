@@ -18,6 +18,7 @@
     { "name": "若叶睦", "facility": "control", "elite": 2, "scope": "self", "conditional": "当与丰川祥子一起进驻中枢", "note": "互为半身：消除自身心情消耗影响" }
   ],
   "operator_mood_skills": [
+    { "name": "国度", "facility": "recycle", "elite": 0, "scope": "self", "drain_delta": -0.1, "skill": "无差别回收／无差别转化" },
     {"name": "岳羽由加莉", "facility": "office", "elite": 0, "scope": "self", "drain_delta": -0.25, "skill": "独立调查"},
     { "name": "黍", "facility": "factory", "elite": 0, "scope": "room", "drain_delta": -0.1, "skill": "春雷响，万物长" },
     { "name": "红云", "facility": "factory", "elite": 0, "scope": "self", "drain_delta": -0.25, "skill": "拾荒者" },

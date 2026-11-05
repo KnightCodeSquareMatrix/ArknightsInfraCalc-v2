@@ -36,7 +36,9 @@ pub fn recycle_skill_efficiency(
     operator: &AssignedOperator,
 ) -> Result<Efficiency> {
     let mut total = Efficiency::ZERO;
-    for buff_id in instances.resolve_recycle_buff_ids(&operator.name, operator.tier()) {
+    let progress =
+        crate::roster::OperatorProgress::new(operator.elite, operator.level, operator.rarity);
+    for buff_id in instances.resolve_recycle_buff_ids(&operator.name, progress) {
         let skill = table.get(&buff_id).ok_or_else(|| {
             Error::msg(format!(
                 "{} references unknown skill_table id {buff_id}",

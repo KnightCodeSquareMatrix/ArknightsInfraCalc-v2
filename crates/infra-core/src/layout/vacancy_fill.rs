@@ -46,7 +46,14 @@ fn candidate_is_skillless(
             .resolve_power_buff_ids(&candidate.name, tier)
             .is_empty(),
         FacilityKind::Recycle => instances
-            .resolve_recycle_buff_ids(&candidate.name, tier)
+            .resolve_recycle_buff_ids(
+                &candidate.name,
+                crate::roster::OperatorProgress::new(
+                    candidate.elite,
+                    candidate.level,
+                    candidate.rarity,
+                ),
+            )
             .is_empty(),
         FacilityKind::Office | FacilityKind::MeetingRoom => !registry.entries.iter().any(|entry| {
             entry.facility
