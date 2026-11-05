@@ -47,7 +47,7 @@ run_user_rotation_probe_with_request_and_preferences(
 
 本次 WIP 提交的入口使用 `run_user_rotation_probe_with_request_and_preferences` 并调用 `schedule_timed_rotation_request`，将具名 profile 映射到兼容策略、将泛型 request 按 topology 与有序时长序列构造普通二/三班；这些改动仍未完成 fresh release 验收。Peak/shift assignment、Plan、resolve、房间搜索、跨设施状态和最终 rotation 都属于 `infra-core`；CLI 只接收 `LayoutProbe`。
 
-主动挂件开关从请求经 probe、`AssignBaseOptions` 进入 Plan 编译，缺省关闭。规则中 `proactive_support=true` 的角色在关闭时不参与落位；主角色和普通角色保持原有竞争，未选中的支持角色不产生 active dependency。开启时不改变当前规则。最终 `support_combination_policy` 断言按 Plan 认领及当班 assignment 检查，允许自然在岗读数，不按姓名或 tag 拒绝成员。该 policy 不序列化为输出字段。
+主动挂件开关从请求经 probe、`AssignBaseOptions` 进入 Plan 编译，缺省关闭。`configure_support_admission` 在删除主动支持角色之前，从声明的 active dependency 保留可选受益者身份；它不生成运行时依赖。开启和关闭均由 `complete_domain_roles` 调用原设施搜索，解除受益者临时预占及必选过滤，赢家包含受益者才整体提交角色、补齐成员、锚点及真实支持依赖，否则递归回退。关闭时不主动落位支持者，自然进驻效果仍按真实环境读取；迷迭香主链硬核心不属于该可选路径。旧逐角色 competitive 和整域二次评分已删除，既有目标、候选合法性与排序由设施 owner 负责。自动宿舍 1＋1 保留总开关豁免。最终 `support_combination_policy` 断言按 Plan 认领及当班 assignment 检查，不按姓名或 tag 拒绝成员；该 policy 不序列化为输出字段。准入 policy 与搜索保证边界见 [ADR 0015](../ADR/0015-挂件统一选入与开关边界.md)。
 
 `pozyomka_durin` 是 Trade Core 候选中的专用跨站候选，不是独立排班模式。其已确认条件是：四条真实赤金制造线、三名核心均精二、四名杜林可在实际基建中兑现，并且恰为两座或三座赤金金单贸易站。恰有两座时，绮良独占一站，鸿雪与图耶同站；恰有三座时三人各占一站，绮良优先与巫恋/龙舌兰组队，鸿雪优先与可露希尔组队，图耶优先与但书组队。四名队友只是优先建议，不是核心准入条件，也不是必需 anchor；候选缺失或其固定填房失败时，Plan 重编译并让该人回普通 Trade 搜索。若三人核心缺练度、四杜林无法兑现、布局不是上述两种贸易站数量，或完整核心填房/中枢准入不可行，则不留下半套核心，改由普通 `trade_core` / Trade 搜索继续排班。该候选类别与当前未实现的完整方案比较边界见 [ADR 0013](../ADR/0013-four-gold-trade-core-candidate.md) 和[贸易求解模块](../模块/贸易求解.md)。旧同房 `single_trade_gold_flow` 路径已按用户要求由跨站模板替换；这不禁止普通搜索按技能规则得到同房结果。
 

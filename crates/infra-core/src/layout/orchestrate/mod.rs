@@ -1,6 +1,6 @@
 //! 全基建进驻编排：`Rule → resolved Plan → Execute`。
 //!
-//! `select` 汇合高优先声明式规则、兼容 registry 与 late competitive 规则；
+//! `select` 汇合高优先声明式规则、兼容 registry 与 late 挂件规则；
 //! `execute` 只消费已解析 placement，不按体系 id 重判。
 
 pub(crate) mod auto_support;

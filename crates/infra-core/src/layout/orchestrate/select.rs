@@ -104,16 +104,10 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     if seed.auto_rotation {
         super::rules::restrict_auto_rotation_catalog(&mut catalog);
     }
-    if !support_combinations_enable && !seed.auto_rotation {
-        for rule in &mut catalog.rules {
-            for alternative in &mut rule.alternatives {
-                alternative.roles.retain(|role| !role.proactive_support);
-                for pack in &mut alternative.conditional_packs {
-                    pack.roles.retain(|role| !role.proactive_support);
-                }
-            }
-        }
-    }
+    super::rules::configure_support_admission(
+        &mut catalog,
+        support_combinations_enable || seed.auto_rotation,
+    );
     // Admit each possible fixed Rule member before a concrete alternative is
     // claimed. Removing an unqualified choice does not dismantle a live bind.
     if let Some(hours) = control_work_hours.or(registry_sustain_hours) {

@@ -250,9 +250,9 @@ pub(super) struct RoleSpec {
     /// 由对应生产域的统一 solver 补满已解析房间。
     #[serde(default)]
     pub fill_to_capacity: bool,
-    /// 普通模式按既有设施竞争政策比较；自动宿舍挂件由设施搜索直接决定受益者。
-    #[serde(default)]
-    pub competitive: bool,
+    /// 从主动支持依赖派生，开关过滤前保留；不是运行时支持承诺。
+    #[serde(skip)]
+    pub support_receiver: bool,
     #[serde(default)]
     pub work_mood: Option<u8>,
     /// Apply the explicit work mood only when this operator is already in the
@@ -489,7 +489,6 @@ pub(super) fn compile_rules(
             {
                 continue;
             }
-            let alternative_baseline = out.scratch.clone();
             let mut variants: Vec<(
                 Vec<RoleSpec>,
                 Vec<RelationSpec>,
@@ -535,7 +534,6 @@ pub(super) fn compile_rules(
                     &mut candidate_assignment,
                     &mut candidate_used,
                     &mut candidate_anchors,
-                    &alternative_baseline,
                 ) {
                     continue;
                 }
@@ -1009,7 +1007,6 @@ fn place_roles(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
     anchors: &mut Vec<SystemAnchor>,
-    alternative_baseline: &BaseAssignment,
 ) -> bool {
     let initial = RolePlacementState {
         assignment: assignment.clone(),
@@ -1026,7 +1023,6 @@ fn place_roles(
         existing_constraints,
         new_constraints,
         initial,
-        alternative_baseline,
     ) else {
         return false;
     };
@@ -1061,10 +1057,9 @@ fn place_role_recursive(
     existing_constraints: &[SystemConstraint],
     new_constraints: &[SystemConstraint],
     state: RolePlacementState,
-    alternative_baseline: &BaseAssignment,
 ) -> Option<RolePlacementState> {
     if role_index == roles.len() {
-        return complete_domain_roles(rule_id, roles, ctx, state, alternative_baseline);
+        return complete_domain_roles(rule_id, roles, ctx, state);
     }
     let role = &roles[role_index];
     // A constant dorm role can be inherited by the second state. It remains a
@@ -1114,7 +1109,6 @@ fn place_role_recursive(
                 existing_constraints,
                 new_constraints,
                 next,
-                alternative_baseline,
             );
         }
     }
@@ -1164,7 +1158,7 @@ fn place_role_recursive(
                     _ => AnchorFillPolicy::Plain,
                 },
             });
-            if role.fill_to_capacity || role.competitive {
+            if role.fill_to_capacity || role.support_receiver {
                 next.pending_domain_roles.push((role_index, room_id));
             }
         }
@@ -1176,7 +1170,6 @@ fn place_role_recursive(
             existing_constraints,
             new_constraints,
             next,
-            alternative_baseline,
         ) {
             return Some(resolved);
         }
@@ -1272,7 +1265,7 @@ fn enumerate_role_placements<'a>(
         return placements;
     }
 
-    if role.fill_to_capacity || role.competitive {
+    if role.fill_to_capacity || role.support_receiver {
         let max_count = available.len().min(role.max_count as usize);
         let min_count = exact_count.unwrap_or(role.min_count as usize);
         let mut placements = Vec::new();
@@ -1604,12 +1597,7 @@ fn complete_domain_roles(
     roles: &[RoleSpec],
     ctx: &RuleCompileContext<'_>,
     mut state: RolePlacementState,
-    alternative_baseline: &BaseAssignment,
 ) -> Option<RolePlacementState> {
-    let optional_dorm_support = state.assignment.auto_rotation
-        && roles
-            .iter()
-            .any(|role| role.proactive_support && role.facility == FacilityKind::Dormitory);
     state.pending_domain_roles.sort_by(|left, right| {
         left.1
              .0
@@ -1620,7 +1608,7 @@ fn complete_domain_roles(
         .pending_domain_roles
         .dedup_by(|left, right| left.0 == right.0 && left.1 == right.1);
     for (role_index, room_id) in state.pending_domain_roles.clone() {
-        if !complete_and_compare_domain_role(
+        if !complete_domain_role(
             rule_id,
             &roles[role_index],
             &room_id,
@@ -1628,8 +1616,7 @@ fn complete_domain_roles(
             &mut state.assignment,
             &mut state.used,
             &mut state.anchors,
-            alternative_baseline,
-            optional_dorm_support,
+            roles[role_index].support_receiver,
         ) {
             return None;
         }
@@ -1638,7 +1625,7 @@ fn complete_domain_roles(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn complete_and_compare_domain_role(
+fn complete_domain_role(
     rule_id: &str,
     role: &RoleSpec,
     room_id: &crate::layout::blueprint::RoomId,
@@ -1646,15 +1633,39 @@ fn complete_and_compare_domain_role(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
     anchors: &mut Vec<SystemAnchor>,
-    alternative_baseline: &BaseAssignment,
-    optional_dorm_support: bool,
+    optional_receiver: bool,
 ) -> bool {
     let Some(room) = ctx.blueprint.room(room_id) else {
         return false;
     };
-    match room.kind {
-        FacilityKind::TradePost if role.fill_to_capacity || assignment.auto_rotation => {
-            complete_trade_role(
+    let required: Vec<_> = assignment
+        .operators_in(room_id)
+        .iter()
+        .map(|op| op.name.clone())
+        .collect();
+    let selected = match room.kind {
+        FacilityKind::TradePost
+            if role.fill_to_capacity || optional_receiver || assignment.auto_rotation =>
+        {
+            if !complete_trade_role(
+                rule_id,
+                room,
+                ctx,
+                assignment,
+                used,
+                anchors,
+                optional_receiver,
+            ) {
+                return false;
+            }
+            assignment
+                .operators_in(room_id)
+                .iter()
+                .map(|op| op.name.clone())
+                .collect()
+        }
+        FacilityKind::Factory => {
+            if !complete_manufacture_role(
                 rule_id,
                 role,
                 room,
@@ -1662,29 +1673,25 @@ fn complete_and_compare_domain_role(
                 assignment,
                 used,
                 anchors,
-                alternative_baseline,
-                optional_dorm_support,
-            )
+                optional_receiver,
+            ) {
+                return false;
+            }
+            assignment
+                .operators_in(room_id)
+                .iter()
+                .map(|op| op.name.clone())
+                .collect()
         }
-        FacilityKind::Factory => complete_manufacture_role(
-            rule_id,
-            role,
-            room,
-            ctx,
-            assignment,
-            used,
-            anchors,
-            alternative_baseline,
-            optional_dorm_support,
-        ),
-        FacilityKind::PowerPlant if optional_dorm_support => {
-            power_role_selected_with_support(ctx, room, assignment, used)
+        FacilityKind::PowerPlant if optional_receiver => {
+            let Some(selected) = select_power_role(ctx, room, assignment, used) else {
+                return false;
+            };
+            selected
         }
-        FacilityKind::PowerPlant if role.competitive => {
-            power_role_beats_unplanned(ctx, assignment, used, alternative_baseline)
-        }
-        _ => !role.competitive,
-    }
+        _ => return !optional_receiver,
+    };
+    required.iter().all(|name| selected.contains(name))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1696,8 +1703,7 @@ fn complete_manufacture_role(
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
     anchors: &mut Vec<SystemAnchor>,
-    alternative_baseline: &BaseAssignment,
-    optional_dorm_support: bool,
+    optional_receiver: bool,
 ) -> bool {
     let Some(RoomProduct::Factory { recipe }) = room.product.as_ref() else {
         return false;
@@ -1727,7 +1733,7 @@ fn complete_manufacture_role(
     // 挂件是临时可兑现的环境，受益者必须由普通完整组合搜索选出。
     // 清掉本房预选成员，避免未入选的受益者残留在基内人数等结算事实中。
     let mut search_assignment = assignment.clone();
-    if optional_dorm_support {
+    if optional_receiver {
         search_assignment.set_room(room.id.clone(), Vec::new());
     }
     let Ok(candidate_resolved) = crate::layout::resolve_base(
@@ -1748,7 +1754,7 @@ fn complete_manufacture_role(
         shift_hours: Some(ctx.shift_hours),
         layout: Arc::new(candidate_resolved.layout),
         recipe_mode: crate::manufacture::ManuSearchRecipeMode::Single(recipe),
-        must_include_name: (!optional_dorm_support).then(|| required[0].clone()),
+        must_include_name: (!optional_receiver).then(|| required[0].clone()),
         full_pool: true,
         bake_mode: crate::bake::BakeMode::Disabled,
     };
@@ -1758,47 +1764,16 @@ fn complete_manufacture_role(
         return false;
     };
     let candidate = candidate_report.best;
-    if candidate.names.len() != room.operator_capacity()
-        || !required.iter().all(|name| candidate.names.contains(name))
-    {
+    if candidate.names.len() != room.operator_capacity() {
         return false;
     }
 
     let mut operators = Vec::new();
-    let mut candidate_used = used.clone();
     for name in &candidate.names {
         let Some(progress) = ctx.operbox.progress_of(name) else {
             return false;
         };
         operators.push(AssignedOperator::from_progress(name, progress));
-        candidate_used.insert(name.clone());
-    }
-    let mut candidate_assignment = assignment.clone();
-    candidate_assignment.set_room(room.id.clone(), operators.clone());
-    if role.competitive && !optional_dorm_support {
-        let baseline_used = alternative_baseline.operator_names();
-        let Some(candidate_manu) =
-            score_completed_manufacture(ctx, &candidate_assignment, &candidate_used)
-        else {
-            return false;
-        };
-        let Some(baseline_manu) =
-            score_completed_manufacture(ctx, alternative_baseline, &baseline_used)
-        else {
-            return false;
-        };
-        let Some(candidate_power) =
-            score_completed_power(ctx, &candidate_assignment, &candidate_used)
-        else {
-            return false;
-        };
-        let Some(baseline_power) = score_completed_power(ctx, alternative_baseline, &baseline_used)
-        else {
-            return false;
-        };
-        if candidate_manu <= baseline_manu || candidate_power < baseline_power {
-            return false;
-        }
     }
 
     for (name, operator) in candidate.names.iter().zip(&operators) {
@@ -1827,20 +1802,20 @@ fn complete_manufacture_role(
     true
 }
 
-fn power_role_selected_with_support(
+fn select_power_role(
     ctx: &RuleCompileContext<'_>,
     room: &RoomBlueprint,
     assignment: &BaseAssignment,
     used: &HashSet<String>,
-) -> bool {
+) -> Option<Vec<String>> {
     let required = assignment.operators_in(&room.id);
     if required.len() != 1 {
-        return false;
+        return None;
     }
     let Ok(pool) =
         crate::pool::build_power_pool_with_fillers(ctx.operbox, ctx.instances, ctx.table)
     else {
-        return false;
+        return None;
     };
     let mut excluded = used.clone();
     excluded.remove(&required[0].name);
@@ -1855,9 +1830,9 @@ fn power_role_selected_with_support(
         ctx.mood,
         None,
     ) else {
-        return false;
+        return None;
     };
-    crate::search::search_power_assignment(
+    let report = crate::search::search_power_assignment(
         &pool,
         ctx.table,
         &crate::search::PowerSearchOptions {
@@ -1867,235 +1842,8 @@ fn power_role_selected_with_support(
             layout: resolved.layout,
         },
     )
-    .is_ok_and(|report| {
-        report
-            .assignments
-            .first()
-            .is_some_and(|selected| selected.hit.name == required[0].name)
-    })
-}
-
-fn power_role_beats_unplanned(
-    ctx: &RuleCompileContext<'_>,
-    assignment: &BaseAssignment,
-    used: &HashSet<String>,
-    alternative_baseline: &BaseAssignment,
-) -> bool {
-    let baseline_used = alternative_baseline.operator_names();
-    let Some(candidate_power) = score_completed_power(ctx, assignment, used) else {
-        return false;
-    };
-    let Some(baseline_power) = score_completed_power(ctx, alternative_baseline, &baseline_used)
-    else {
-        return false;
-    };
-    // 最终判定要求 candidate_power > baseline_power。发电分不占优时结果必为 false，
-    // 逐房制造评分是纯函数且无副作用，跳过它不改变结果，只省掉两次全组合制造搜索。
-    if candidate_power <= baseline_power {
-        return false;
-    }
-    let Some(candidate_manu) = score_completed_manufacture(ctx, assignment, used) else {
-        return false;
-    };
-    let Some(baseline_manu) =
-        score_completed_manufacture(ctx, alternative_baseline, &baseline_used)
-    else {
-        return false;
-    };
-    candidate_power > baseline_power && candidate_manu >= baseline_manu
-}
-
-fn score_completed_manufacture(
-    ctx: &RuleCompileContext<'_>,
-    assignment: &BaseAssignment,
-    initially_used: &HashSet<String>,
-) -> Option<crate::Efficiency> {
-    let pool = crate::pool::build_manufacture_pool(
-        &ctx.operbox.manufacture_roster(ctx.instances),
-        ctx.instances,
-        ctx.table,
-    )
     .ok()?;
-    let mut scratch = assignment.clone();
-    let mut used = initially_used.clone();
-    let mut rooms: Vec<_> = ctx
-        .blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::Factory)
-        .collect();
-    rooms.sort_by(|left, right| left.id.0.cmp(&right.id.0));
-    for room in rooms {
-        if !scratch.operators_in(&room.id).is_empty() {
-            continue;
-        }
-        let Some(RoomProduct::Factory { recipe }) = room.product.as_ref() else {
-            continue;
-        };
-        let resolved = crate::layout::resolve_base(
-            ctx.blueprint,
-            &scratch,
-            Some(ctx.instances),
-            Some(ctx.table),
-            ctx.mood,
-            None,
-        )
-        .ok()?;
-        let sub = crate::pool::filter_manufacture_pool(&pool, &used);
-        let options = crate::search::ManuSearchOptions {
-            level: room.level,
-            operator_capacity: room.operator_capacity(),
-            top_k: 20,
-            mood: ctx.mood,
-            shift_hours: Some(ctx.shift_hours),
-            layout: Arc::new(resolved.layout),
-            recipe_mode: crate::manufacture::ManuSearchRecipeMode::Single(*recipe),
-            must_include_name: None,
-            full_pool: true,
-            bake_mode: crate::bake::BakeMode::Disabled,
-        };
-        let Ok(report) = crate::search::search_manufacture_triples(&sub, ctx.table, &options)
-        else {
-            continue;
-        };
-        let operators: Vec<_> = report
-            .best
-            .names
-            .iter()
-            .filter_map(|name| {
-                ctx.operbox
-                    .progress_of(name)
-                    .map(|progress| AssignedOperator::from_progress(name, progress))
-            })
-            .collect();
-        if operators.len() != report.best.names.len() {
-            return None;
-        }
-        used.extend(report.best.names);
-        scratch.set_room(room.id.clone(), operators);
-    }
-    let resolved = crate::layout::resolve_base(
-        ctx.blueprint,
-        &scratch,
-        Some(ctx.instances),
-        Some(ctx.table),
-        ctx.mood,
-        None,
-    )
-    .ok()?;
-    resolved
-        .manu_rooms
-        .iter()
-        .filter(|room| !room.operators.is_empty())
-        .map(|room| {
-            let input = crate::manufacture::ManuRoomInput {
-                level: room.level,
-                operators: room.operators.clone(),
-                active_recipe: room.recipe,
-                mood: ctx.mood,
-                layout: Arc::new(room.layout.clone()),
-            };
-            crate::manufacture::solve_manufacture_with_shift(&input, ctx.table, ctx.shift_hours)
-                .map(|result| result.final_efficiency)
-                .ok()
-        })
-        .collect::<Option<Vec<_>>>()
-        .map(|scores| scores.into_iter().sum())
-}
-
-fn score_completed_power(
-    ctx: &RuleCompileContext<'_>,
-    assignment: &BaseAssignment,
-    initially_used: &HashSet<String>,
-) -> Option<crate::Efficiency> {
-    let pool = crate::pool::build_power_pool(
-        &ctx.operbox.power_roster(ctx.instances),
-        ctx.instances,
-        ctx.table,
-    )
-    .ok()?;
-    let mut scratch = assignment.clone();
-    let mut used = initially_used.clone();
-    let mut rooms: Vec<_> = ctx
-        .blueprint
-        .rooms
-        .iter()
-        .filter(|room| room.kind == FacilityKind::PowerPlant)
-        .collect();
-    rooms.sort_by(|left, right| left.id.0.cmp(&right.id.0));
-    for room in rooms {
-        if !scratch.operators_in(&room.id).is_empty() {
-            continue;
-        }
-        let mut best: Option<(crate::Efficiency, AssignedOperator)> = None;
-        for entry in pool
-            .entries
-            .iter()
-            .filter(|entry| !used.contains(&entry.name))
-        {
-            let operator = AssignedOperator::from_progress(&entry.name, entry.progress);
-            let mut trial = scratch.clone();
-            trial.set_room(room.id.clone(), vec![operator.clone()]);
-            let resolved = crate::layout::resolve_base(
-                ctx.blueprint,
-                &trial,
-                Some(ctx.instances),
-                Some(ctx.table),
-                ctx.mood,
-                None,
-            )
-            .ok()?;
-            let power = resolved
-                .power_rooms
-                .iter()
-                .find(|candidate| candidate.id == room.id)?;
-            let score = crate::power::solve_power(
-                &crate::power::PowerRoomInput {
-                    operator: power.operator.clone(),
-                    mood: power.operator.work_mood.unwrap_or(ctx.mood),
-                    shift_hours: power.layout.evaluation_hours(ctx.shift_hours).ok()?,
-                    layout: power.layout.clone(),
-                },
-                ctx.table,
-            )
-            .ok()?
-            .final_efficiency;
-            if best.as_ref().is_none_or(|(current, _)| score > *current) {
-                best = Some((score, operator));
-            }
-        }
-        if let Some((_, operator)) = best {
-            used.insert(operator.name.clone());
-            scratch.set_room(room.id.clone(), vec![operator]);
-        }
-    }
-    let resolved = crate::layout::resolve_base(
-        ctx.blueprint,
-        &scratch,
-        Some(ctx.instances),
-        Some(ctx.table),
-        ctx.mood,
-        None,
-    )
-    .ok()?;
-    let scores = resolved
-        .power_rooms
-        .iter()
-        .map(|room| {
-            crate::power::solve_power(
-                &crate::power::PowerRoomInput {
-                    operator: room.operator.clone(),
-                    mood: room.operator.work_mood.unwrap_or(ctx.mood),
-                    shift_hours: room.layout.evaluation_hours(ctx.shift_hours).ok()?,
-                    layout: room.layout.clone(),
-                },
-                ctx.table,
-            )
-            .map(|result| result.final_efficiency)
-            .ok()
-        })
-        .collect::<Option<Vec<_>>>()?;
-    Some(crate::power::aggregate_power_efficiency(scores))
+    Some(vec![report.assignments.first()?.hit.name.clone()])
 }
 
 fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
@@ -2216,6 +1964,52 @@ fn compile_relations(relations: &[RelationSpec]) -> Vec<SystemConstraint> {
         .collect()
 }
 
+/// Preserve optional beneficiary provenance before removing proactive placement roles.
+/// Hard cores without an explicit support dependency remain mandatory.
+pub(super) fn configure_support_admission(catalog: &mut RuleCatalog, enabled: bool) {
+    for rule in &mut catalog.rules {
+        for alternative in &mut rule.alternatives {
+            let support_roles: HashSet<_> = alternative
+                .roles
+                .iter()
+                .chain(
+                    alternative
+                        .conditional_packs
+                        .iter()
+                        .flat_map(|pack| &pack.roles),
+                )
+                .filter(|role| role.proactive_support)
+                .map(|role| role.id.clone())
+                .collect();
+            let receivers: HashSet<_> = alternative
+                .active_dependencies
+                .iter()
+                .filter(|dependency| {
+                    dependency
+                        .required_roles
+                        .iter()
+                        .any(|id| support_roles.contains(id))
+                })
+                .flat_map(|dependency| dependency.consumer_roles.iter().cloned())
+                .collect();
+            for role in alternative.roles.iter_mut().chain(
+                alternative
+                    .conditional_packs
+                    .iter_mut()
+                    .flat_map(|pack| &mut pack.roles),
+            ) {
+                role.support_receiver = !role.proactive_support && receivers.contains(&role.id);
+            }
+            if !enabled {
+                alternative.roles.retain(|role| !role.proactive_support);
+                for pack in &mut alternative.conditional_packs {
+                    pack.roles.retain(|role| !role.proactive_support);
+                }
+            }
+        }
+    }
+}
+
 /// Product capability restriction happens before role placement. Tier alone is
 /// insufficient: it also labels legal single-station and building-count rules.
 pub(super) fn restrict_auto_rotation_catalog(catalog: &mut RuleCatalog) {
@@ -2258,14 +2052,12 @@ pub(super) fn restrict_auto_rotation_catalog(catalog: &mut RuleCatalog) {
 #[allow(clippy::too_many_arguments)]
 fn complete_trade_role(
     rule_id: &str,
-    role: &RoleSpec,
     room: &RoomBlueprint,
     ctx: &RuleCompileContext<'_>,
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
     anchors: &mut Vec<SystemAnchor>,
-    alternative_baseline: &BaseAssignment,
-    optional_dorm_support: bool,
+    optional_receiver: bool,
 ) -> bool {
     let Some(RoomProduct::Trade { order }) = room.product else {
         return false;
@@ -2284,7 +2076,7 @@ fn complete_trade_role(
     };
     let mut search_assignment = assignment.clone();
     let mut search_used = used.clone();
-    if optional_dorm_support {
+    if optional_receiver {
         search_assignment.set_room(room.id.clone(), Vec::new());
         for name in &required {
             search_used.remove(name);
@@ -2315,47 +2107,11 @@ fn complete_trade_role(
         order,
         room.level,
         &mut search_used,
-        if optional_dorm_support {
-            &[]
-        } else {
-            &required
-        },
-        optional_dorm_support,
+        if optional_receiver { &[] } else { &required },
+        optional_receiver,
     ) else {
         return false;
     };
-    if !required.iter().all(|name| hit.names.contains(name)) {
-        return false;
-    }
-    if role.competitive && !optional_dorm_support {
-        let Ok(baseline) = crate::layout::resolve_base(
-            ctx.blueprint,
-            alternative_baseline,
-            Some(ctx.instances),
-            Some(ctx.table),
-            ctx.mood,
-            None,
-        ) else {
-            return false;
-        };
-        let mut baseline_used = alternative_baseline.operator_names();
-        if let Ok(ordinary) = crate::layout::assign::trade_fill::pick_trade_meta_then_plain(
-            &pool,
-            ctx.table,
-            &baseline.layout,
-            ctx.blueprint.gold_manu_line_count(),
-            &options,
-            order,
-            room.level,
-            &mut baseline_used,
-            &[],
-            false,
-        ) {
-            if hit.final_efficiency <= ordinary.final_efficiency {
-                return false;
-            }
-        }
-    }
     let mut operators = Vec::new();
     for name in &hit.names {
         let Some(progress) = ctx.operbox.progress_of(name) else {

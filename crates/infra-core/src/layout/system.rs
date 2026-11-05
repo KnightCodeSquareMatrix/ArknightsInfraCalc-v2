@@ -1,7 +1,7 @@
 //! 尚未迁移体系的兼容 registry：小目录 + 贪心认领（`claim_base_systems`）。
 //!
 //! 数据：`data/base_systems.json`（来源：公孙长乐工具人表等固定组合）。
-//! 在高优先声明式 Rule 之后、late competitive Rule 之前认领。
+//! 在高优先声明式 Rule 之后、late 挂件 Rule 之前认领。
 
 use std::collections::HashSet;
 use std::path::Path;

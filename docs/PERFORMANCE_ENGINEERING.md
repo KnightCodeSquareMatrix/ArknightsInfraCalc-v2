@@ -151,7 +151,7 @@
 
 ## 制造体系试排的缓存取舍（2026-10-31）
 
-`complete_manufacture_role` 与 `score_completed_manufacture` 直接调用原实时制造搜索，保留请求memo、实际收益上下文与排序。已删除额外条件响应表及其计时阶段：完整动态上下文和保守预算使跨试排复用有限，首次全量生成和排序的成本超过收益。
+`complete_manufacture_role` 与 `score_completed_manufacture` 当时直接调用原实时制造搜索，保留请求memo、实际收益上下文与排序。已删除额外条件响应表及其计时阶段：完整动态上下文和保守预算使跨试排复用有限，首次全量生成和排序的成本超过收益。
 
 最终候选缓存版本与实时搜索消融的12对CLI结果共28对rotation/profile/MAA产物一致；定向response除elapsed的完整best/top/combinations/evaluated也一致。串行release、Rayon2、慢盒各3次，三班b-102-421中位数9.69s→4.41s，b-231-425约9.53s→5.09s；自动b-101-424约18.18s→实时约12s。最终发布版本速度以本轮整合归档的全样本测量为准；旧静态缓存结果不能代表真实定时预算下的收益。
 
@@ -359,3 +359,7 @@ v2 约 78–80% 制造时间准备没有暖机或心情 gap，仍需识别时间
 正例补证：positive.rs链接同一release infra-core，通过真实schedule_rotation获得auto=true、work_hours=Some(12)的assignment，清空工作房名单后resolve为表的静态基准。静态制造池Required实际命中1次，完整best/top字段与Disabled相同，combinations/evaluated均1。邻例加入实际AddEffRamp状态时Required返回Ramp错误、Auto执行live；未新增可修改私有模式字段的生产接口。该证据仅证明兼容自动子域可用，真实自动Box仍因其他布局依赖回退。缺失auto窗口邻例无法通过现有公开入口构造，未执行；代码按evaluation_hours错误返回InvalidShift。独立复审记录和所有原始结果留在本轮证据目录。
 
 2026-11-02临时禁用验收：普通serve（无 --no-bake）通过RIIC-Web原生客户端约50.4ms握手，三班/主备各3次请求全部成功，完整result与上一版显式关闭Bake一致；没有bake_cold阶段或Bake命中。补测Worker RSS每10ms采样峰值41,412KiB（约40.4MiB），是本次进程采样峰值，不是内核精确峰值。自动CLI同一high-owned Box的 --assert-invariants 通过；本次只改运行时开关，未重复全量Box门禁或全表生成。证据：target/codex-runs/bake-disabled-20261102/。
+
+## 挂件统一选入（2026-11-05）
+
+按 [ADR 0015](ADR/0015-挂件统一选入与开关边界.md)，普通与自动挂件统一消费原设施搜索赢家；已删除 score_completed 制造／发电整域评分及无挂件基线，不新增效率公式或第二套排名。真实环境刷新与原设施搜索结算仍保留。本次改变挂件准入 policy；不宣称候选完备或全基建最优，性能幅度以同输入 release 对照为准。

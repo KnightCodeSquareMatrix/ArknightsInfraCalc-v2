@@ -97,7 +97,7 @@ layout / operbox / runtime data
 | `layout/assign/commit.rs` | assignment 提交和 `used` 同步 |
 | `layout/assign/{control_fill,producer_fill,power_fill,trade_fill,manufacture_fill,team_fill}.rs` | 各设施或队伍的实际填房 owner |
 | `layout/orchestrate/rules.rs` | 声明式 Rule gate/role/relation 编译器 |
-| `layout/orchestrate/select.rs` | 高优先 Rule、legacy registry、late competitive Rule 汇合并生成 Plan |
+| `layout/orchestrate/select.rs` | 高优先 Rule、legacy registry、late 挂件 Rule 汇合并生成 Plan |
 | `layout/orchestrate/plan.rs` | 已解析 `AssignmentPlan`、anchor、bind、dependency 和 reserve |
 | `layout/orchestrate/execute.rs` | 执行已解析 placement；不按 system/rule id 重判 |
 | `layout/resolve.rs` | 蓝图 + assignment -> workforce、全局资源、注入和 resolved rooms |

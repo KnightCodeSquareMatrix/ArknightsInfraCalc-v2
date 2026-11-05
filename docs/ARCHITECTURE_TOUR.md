@@ -78,7 +78,7 @@ OperBoxEntry
 
 因此排查“账号有干员但没进池”时，应依次检查姓名匹配、练度 tier、设施绑定、`buff_id` 和池过滤，而不是先改搜索排序。
 
-## 5. `build_plan`：结构选型 + late competitive 比较，输出统一 Plan
+## 5. `build_plan`：结构选型 + 挂件统一选入，输出统一 Plan
 
 `schedule_timed_rotation_request` 按 `TimedRotationRequest` 分派具名 profile 或普通二/三班时长 topology；需要构造 Peak 的路径会调用 `assign_shift_with_plan_skip`，后者在 [layout/assign.rs](../crates/infra-core/src/layout/assign.rs) 中先调用 [orchestrate/select.rs](../crates/infra-core/src/layout/orchestrate/select.rs) 的 `build_plan`。默认 ABC 经由该路径生成 peak assignment 与 plan。
 
@@ -100,7 +100,7 @@ OperBoxEntry
 - actual active dependencies 与 continuous roles；
 - 中枢搜索候选要求。
 
-高优先硬规则只按结构不变量解析 required core，不靠 solver 决定硬核心；late competitive Rule 可调用已有制造/发电 domain solver，与普通基线做 Pareto 比较，resource gate 也可读取候选 assignment 的 `resolve_base` 结果，但规则层不复制机制公式。required anchor、`shift_bind` 和 shortcut 也不是同一种东西：anchor 保证进编，bind 约束已进编人员的跨班关系，shortcut 只负责最终组合结算。
+高优先硬规则只按结构不变量解析 required core，不靠 solver 决定硬核心；可选挂件受益者由统一编译执行者调用已有设施搜索，在真实环境中解除预占和必选过滤，赢家含受益者才整体提交，否则回退，resource gate 也可读取候选 assignment 的 `resolve_base` 结果，但规则层不复制机制公式。required anchor、`shift_bind` 和 shortcut 也不是同一种东西：anchor 保证进编，bind 约束已进编人员的跨班关系，shortcut 只负责最终组合结算。
 
 更详细的不变量见 [ORCHESTRATION_LAYER.md](ORCHESTRATION_LAYER.md) 和 [BASE_ASSIGNMENT.md](BASE_ASSIGNMENT.md)。
 

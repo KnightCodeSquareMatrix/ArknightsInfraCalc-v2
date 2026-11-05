@@ -772,14 +772,12 @@
               "facility": "factory",
               "recipe": "gold",
               "candidates": [{ "name": "娜斯提", "elite": 2 }],
-              "fill_to_capacity": true,
-              "competitive": true
+              "fill_to_capacity": true
             },
             {
               "id": "muelsyse",
               "facility": "power_plant",
-              "candidates": [{ "name": "缪尔赛思", "elite": 2 }],
-              "competitive": true
+              "candidates": [{ "name": "缪尔赛思", "elite": 2 }]
             },
             {
               "id": "rhine_support",
@@ -810,8 +808,7 @@
               "facility": "factory",
               "recipe": "gold",
               "candidates": [{ "name": "娜斯提", "elite": 2 }],
-              "fill_to_capacity": true,
-              "competitive": true
+              "fill_to_capacity": true
             },
             {
               "id": "rhine_support",
@@ -840,8 +837,7 @@
             {
               "id": "muelsyse",
               "facility": "power_plant",
-              "candidates": [{ "name": "缪尔赛思", "elite": 2 }],
-              "competitive": true
+              "candidates": [{ "name": "缪尔赛思", "elite": 2 }]
             },
             {
               "id": "rhine_support",
@@ -896,7 +892,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
@@ -943,7 +938,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
@@ -983,7 +977,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
@@ -1022,8 +1015,7 @@
                   "elite": 2
                 }
               ],
-              "fill_to_capacity": true,
-              "competitive": true
+              "fill_to_capacity": true
             }
           ],
           "active_dependencies": [
@@ -1061,8 +1053,7 @@
                   "elite": 2
                 }
               ],
-              "fill_to_capacity": true,
-              "competitive": true
+              "fill_to_capacity": true
             }
           ],
           "active_dependencies": [
@@ -1108,7 +1099,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
@@ -1147,8 +1137,7 @@
                   "elite": 2
                 }
               ],
-              "fill_to_capacity": true,
-              "competitive": true
+              "fill_to_capacity": true
             }
           ],
           "active_dependencies": [
@@ -1194,7 +1183,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
@@ -1234,7 +1222,6 @@
                 }
               ],
               "fill_to_capacity": true,
-              "competitive": true,
               "trade_order": "gold"
             }
           ],
