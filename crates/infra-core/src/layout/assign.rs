@@ -162,7 +162,11 @@ pub(super) fn tag_pool_from_plan<T: crate::pool::HasName + crate::pool::TierTagg
     plan: &AssignmentPlan,
     pool: &mut crate::pool::PoolCore<T>,
 ) {
-    for claim in &plan.registry_claims {
+    for claim in plan
+        .registry_claims
+        .iter()
+        .chain(plan.deferred_registry_claims.iter())
+    {
         let mut names = HashSet::new();
         for slot in &claim.slots {
             for op in &slot.operators {
@@ -181,7 +185,11 @@ pub(super) fn inject_search_anchor_pool_entries(
     trade_pool: &mut crate::pool::TradePool,
     manu_pool: &mut crate::pool::ManuPool,
 ) {
-    for claim in &plan.registry_claims {
+    for claim in plan
+        .registry_claims
+        .iter()
+        .chain(plan.deferred_registry_claims.iter())
+    {
         for slot in &claim.slots {
             if slot.fill != SlotFillMode::Search {
                 continue;
@@ -692,8 +700,8 @@ where
             stage_before,
             stage_after,
         );
-        let assignment = match assignment_result {
-            Ok(assignment) => assignment,
+        let (assignment, deferred_registry_claim) = match assignment_result {
+            Ok(result) => result,
             Err(Error::OptionalTradeRoleInfeasible {
                 system_id,
                 role_id,
@@ -723,6 +731,7 @@ where
             }
             Err(error) => return Err(error),
         };
+        plan.commit_deferred_registry_claim(deferred_registry_claim);
 
         let requires_final_pack_check = plan.rotation_reserves.iter().any(|reserve| {
             reserve.require_pre_split_halves

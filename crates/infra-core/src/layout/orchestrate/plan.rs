@@ -302,6 +302,11 @@ pub struct AssignmentPlan {
     pub activated: Vec<ActivatedSystem>,
     /// `base_systems.json` 认领明细（`execute_plan` 落位用）。
     pub registry_claims: Vec<RegistrySystemClaim>,
+    /// Serial candidates whose control commitment depends on production evidence from
+    /// the trade fill. These are intentionally absent from `registry_claims` until the
+    /// facade commits the single result selected from the actual assignment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) deferred_registry_claims: Vec<RegistrySystemClaim>,
     /// 声明式规则编译结果；一条 rule 最多选择一个 finite alternative。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selected_rules: Vec<SelectedRuleAlternative>,
@@ -344,6 +349,7 @@ impl AssignmentPlan {
             mode: AssignShiftMode::Peak,
             activated: Vec::new(),
             registry_claims: Vec::new(),
+            deferred_registry_claims: Vec::new(),
             selected_rules: Vec::new(),
             anchors: Vec::new(),
             producers: Vec::new(),
@@ -545,6 +551,21 @@ impl AssignmentPlan {
         });
         self.resolved_producer_dependencies = dependencies;
         Ok(())
+    }
+
+    /// Replace deferred candidates with the one claim selected from the completed
+    /// trade assignment. This runs before registry bind derivation.
+    pub(crate) fn commit_deferred_registry_claim(&mut self, selected: Option<RegistrySystemClaim>) {
+        self.deferred_registry_claims.clear();
+        let Some(claim) = selected else {
+            return;
+        };
+        self.activated
+            .retain(|system| system.system_id != claim.system_id);
+        self.activated.push(registry_as_activated(&claim));
+        self.registry_claims
+            .retain(|existing| existing.system_id != claim.system_id);
+        self.registry_claims.push(claim);
     }
 
     fn derive_registry_binds_from_actual_assignment(

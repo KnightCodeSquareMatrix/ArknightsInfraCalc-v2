@@ -599,6 +599,12 @@ pub fn select_registry_systems(
         sustain_hours,
         &mut admit_all,
     )
+    .selected
+}
+
+pub(crate) struct RegistrySystemSelection {
+    pub selected: Vec<RegistrySystemClaim>,
+    pub deferred: Vec<RegistrySystemClaim>,
 }
 
 pub(crate) fn select_registry_systems_with_admission(
@@ -611,15 +617,19 @@ pub(crate) fn select_registry_systems_with_admission(
     inherited_exclusive_groups: &HashSet<String>,
     sustain_hours: Option<f64>,
     admission: &mut dyn FnMut(&mut RegistrySystemClaim, &BaseAssignment) -> bool,
-) -> Vec<RegistrySystemClaim> {
+) -> RegistrySystemSelection {
     let Some(cache) = base_systems_cache() else {
-        return Vec::new();
+        return RegistrySystemSelection {
+            selected: Vec::new(),
+            deferred: Vec::new(),
+        };
     };
 
     let mut scratch = assignment.clone();
     let mut scratch_used = used.clone();
     let mut claimed_groups = inherited_exclusive_groups.clone();
     let mut selected = Vec::new();
+    let mut deferred = Vec::new();
 
     // Phase 1: 跨站体系优先
     select_tier(
@@ -635,6 +645,7 @@ pub(crate) fn select_registry_systems_with_admission(
         sustain_hours,
         admission,
         &mut selected,
+        &mut deferred,
     );
 
     // Phase 2: 同站组合居次
@@ -651,10 +662,20 @@ pub(crate) fn select_registry_systems_with_admission(
         sustain_hours,
         admission,
         &mut selected,
+        &mut deferred,
     );
 
-    selected
+    RegistrySystemSelection { selected, deferred }
 }
+
+fn is_deferred_monster_system(system_id: &str) -> bool {
+    matches!(
+        system_id,
+        "snhunt_monhun_control" | "snhunt_monhun_control_factory"
+    )
+}
+
+const DEFERRED_MONSTER_FALLBACK_ID: &str = "lungmen_manu_pair";
 
 /// 解释每条 registry system 在当前蓝图 / 练度 / 已占用状态下的选型结果。
 /// 该函数只做旁路观测，不调用 trade/manu/power solve，也不修改传入编制。
@@ -723,6 +744,7 @@ fn select_tier(
     sustain_hours: Option<f64>,
     admission: &mut dyn FnMut(&mut RegistrySystemClaim, &BaseAssignment) -> bool,
     out: &mut Vec<RegistrySystemClaim>,
+    deferred: &mut Vec<RegistrySystemClaim>,
 ) {
     for system in systems_by_tier_and_priority(cache, tier) {
         if skip_system_ids.contains(&system.id) {
@@ -750,6 +772,52 @@ fn select_tier(
         let mut trial_used = scratch_used.clone();
         apply_registry_claim_to_assignment(&plan.claim, &mut trial, &mut trial_used);
         if !admission(&mut plan.claim, &trial) {
+            continue;
+        }
+        if mode == AssignShiftMode::Peak
+            && tier == OperatorTier::CrossStation
+            && is_deferred_monster_system(&system.id)
+        {
+            let fallback = cache
+                .systems
+                .iter()
+                .find(|candidate| candidate.id == DEFERRED_MONSTER_FALLBACK_ID)
+                .and_then(|fallback_system| {
+                    if skip_system_ids.contains(&fallback_system.id)
+                        || !mode_allowed(fallback_system, mode)
+                    {
+                        return None;
+                    }
+                    let mut fallback = plan_registry_system_detailed(
+                        blueprint,
+                        operbox,
+                        scratch,
+                        scratch_used,
+                        fallback_system,
+                    )
+                    .ok()?;
+                    if sustain_hours
+                        .is_some_and(|hours| !claim_control_pins_sustain(&fallback.claim, hours))
+                    {
+                        return None;
+                    }
+                    let mut trial = scratch.clone();
+                    let mut trial_used = scratch_used.clone();
+                    apply_registry_claim_to_assignment(
+                        &fallback.claim,
+                        &mut trial,
+                        &mut trial_used,
+                    );
+                    admission(&mut fallback.claim, &trial).then_some(fallback.claim)
+                });
+            deferred.push(plan.claim.clone());
+            if let Some(fallback) = fallback {
+                deferred.push(fallback);
+            }
+            apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);
+            if let Some(group) = system.exclusive_group.clone() {
+                claimed_groups.insert(group);
+            }
             continue;
         }
         apply_registry_claim_to_assignment(&plan.claim, scratch, scratch_used);

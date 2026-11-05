@@ -237,10 +237,13 @@ fn compile_plan_once(
     let inherited_excluded: std::collections::HashSet<_> =
         compiled.excluded_operators.iter().cloned().collect();
     used.extend(inherited_excluded.iter().cloned());
-    let registry_claims: Vec<crate::layout::system::RegistrySystemClaim> = if seed.auto_rotation {
+    let registry_selection = if seed.auto_rotation {
         // Auto's restricted catalog has already removed the searchable systems; retrying the
         // legacy registry can only prepare and reject the remaining cross/same-station entries.
-        Vec::new()
+        crate::layout::system::RegistrySystemSelection {
+            selected: Vec::new(),
+            deferred: Vec::new(),
+        }
     } else {
         let mut mood_admission = registry_mood_admission(
             control_work_hours.or(registry_sustain_hours),
@@ -265,6 +268,8 @@ fn compile_plan_once(
             &mut admission,
         )
     };
+    let registry_claims = registry_selection.selected;
+    let deferred_registry_claims = registry_selection.deferred;
     for claim in &registry_claims {
         crate::layout::system::apply_registry_system_claim(
             blueprint,
@@ -273,6 +278,23 @@ fn compile_plan_once(
             &mut used,
         )?;
     }
+    if let Some(trial) = deferred_registry_claims.iter().find(|claim| {
+        matches!(
+            claim.system_id.as_str(),
+            "snhunt_monhun_control" | "snhunt_monhun_control_factory"
+        )
+    }) {
+        crate::layout::system::apply_registry_system_claim(
+            blueprint,
+            trial,
+            &mut scratch,
+            &mut used,
+        )?;
+    }
+    let deferred_claimed_exclusive_groups: std::collections::HashSet<_> = deferred_registry_claims
+        .iter()
+        .filter_map(|claim| claim.exclusive_group.clone())
+        .collect();
     // priority <= 18 的软候选只读取主要体系和 registry 都落位后的真实空位。
     let late = compile_rules(
         catalog,
@@ -297,6 +319,7 @@ fn compile_plan_once(
                     .iter()
                     .filter_map(|claim| claim.exclusive_group.clone()),
             )
+            .chain(deferred_claimed_exclusive_groups.iter().cloned())
             .collect(),
         &registry_skip,
         disabled_conditional_packs,
@@ -306,34 +329,41 @@ fn compile_plan_once(
     // Mujica is the lowest-priority complete control combination: any other
     // combination that can claim control, including ABC's deferred Abyssal
     // branch, must suppress it. Generic bonuses do not set this flag.
-    let has_other_cross_station = registry_claims.iter().any(|claim| {
-        claim.tier == OperatorTier::CrossStation
-            && claim.system_id != "trade_core"
-            && claim
-                .slots
-                .iter()
-                .any(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
-    }) || compiled.activated.iter().chain(late.activated.iter()).any(
-        |system| {
-            system.tier == OperatorTier::CrossStation
-                && system.system_id != "trade_core"
-                && system.slots.iter().any(|slot| {
-                    matches!(
-                        slot,
-                        super::plan::SlotFill::Fixed {
-                            facility: crate::layout::FacilityKind::ControlCenter,
-                            ..
-                        } | super::plan::SlotFill::OptionalFixed {
-                            facility: crate::layout::FacilityKind::ControlCenter,
-                            ..
-                        } | super::plan::SlotFill::PickOne {
-                            facility: crate::layout::FacilityKind::ControlCenter,
-                            ..
-                        }
-                    )
-                })
-        },
-    ) || has_usable_abyssal_combination(operbox, instances, &scratch);
+    let has_other_cross_station = registry_claims
+        .iter()
+        .chain(deferred_registry_claims.iter())
+        .any(|claim| {
+            claim.tier == OperatorTier::CrossStation
+                && claim.system_id != "trade_core"
+                && claim
+                    .slots
+                    .iter()
+                    .any(|slot| slot.facility == crate::layout::FacilityKind::ControlCenter)
+        })
+        || compiled
+            .activated
+            .iter()
+            .chain(late.activated.iter())
+            .any(|system| {
+                system.tier == OperatorTier::CrossStation
+                    && system.system_id != "trade_core"
+                    && system.slots.iter().any(|slot| {
+                        matches!(
+                            slot,
+                            super::plan::SlotFill::Fixed {
+                                facility: crate::layout::FacilityKind::ControlCenter,
+                                ..
+                            } | super::plan::SlotFill::OptionalFixed {
+                                facility: crate::layout::FacilityKind::ControlCenter,
+                                ..
+                            } | super::plan::SlotFill::PickOne {
+                                facility: crate::layout::FacilityKind::ControlCenter,
+                                ..
+                            }
+                        )
+                    })
+            })
+        || has_usable_abyssal_combination(operbox, instances, &scratch);
     let mut mujica_catalog = catalog.clone();
     mujica_catalog
         .rules
@@ -361,6 +391,7 @@ fn compile_plan_once(
                     .iter()
                     .filter_map(|claim| claim.exclusive_group.clone()),
             )
+            .chain(deferred_claimed_exclusive_groups.iter().cloned())
             .collect(),
         &registry_skip,
         disabled_conditional_packs,
@@ -395,6 +426,7 @@ fn compile_plan_once(
                         .iter()
                         .filter_map(|claim| claim.exclusive_group.clone()),
                 )
+                .chain(deferred_claimed_exclusive_groups.iter().cloned())
                 .collect(),
             &registry_skip,
             disabled_conditional_packs,
@@ -450,8 +482,10 @@ fn compile_plan_once(
     // 有序集合：该列表会原样写入 rotation 输出，HashSet 的迭代顺序每次运行都不同。
     let mut control_exclusions: std::collections::BTreeSet<_> =
         compiled.inactive_control_exclusions.into_iter().collect();
+    let mut registry_scope = registry_claims.clone();
+    registry_scope.extend(deferred_registry_claims.iter().cloned());
     control_exclusions
-        .extend(crate::layout::system::control_exclusions_for_unclaimed_systems(&registry_claims));
+        .extend(crate::layout::system::control_exclusions_for_unclaimed_systems(&registry_scope));
     for claim in &registry_claims {
         for operator in &claim.control_allowed_operators {
             control_exclusions.remove(operator);
@@ -471,6 +505,7 @@ fn compile_plan_once(
         mode,
         activated,
         registry_claims,
+        deferred_registry_claims,
         selected_rules: compiled.selected,
         anchors: compiled.anchors,
         producers: Vec::new(),
