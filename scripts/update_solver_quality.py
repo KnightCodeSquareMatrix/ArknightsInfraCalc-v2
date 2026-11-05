@@ -12,6 +12,7 @@ left to an explicit, separate Quality API request.
 from __future__ import annotations
 
 import hashlib
+import argparse
 import os
 import shlex
 import subprocess
@@ -74,8 +75,10 @@ def current_commit() -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 1:
-        raise SystemExit("usage: python3 scripts/update_solver_quality.py")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ssh-target", default=REMOTE_TARGET)
+    args = parser.parse_args()
+    remote_target = args.ssh_target
 
     checkpoint("1/5 WORKSPACE", f"repository={ROOT}")
     branch, dirty = workspace_status()
@@ -97,7 +100,7 @@ def main() -> int:
         env={**os.environ, "SOLVER_GIT_COMMIT": solver_git_commit, "SOLVER_BUILT_AT": solver_built_at},
     )
 
-    local_elf = LOCAL_ELF
+    local_elf = Path(os.environ.get("CARGO_TARGET_DIR", str(ROOT / "target"))) / "release" / "infra-cli"
     ensure_elf(local_elf)
     executable_sha256 = sha256(local_elf)
 
@@ -105,11 +108,11 @@ def main() -> int:
     print(f"  path={local_elf}")
     print(f"  sha256={executable_sha256}")
 
-    checkpoint("4/5 PUSH", f"target={REMOTE_TARGET} incoming={REMOTE_INCOMING}")
+    checkpoint("4/5 PUSH", f"target={remote_target} incoming={REMOTE_INCOMING}")
 
     partial = f"{REMOTE_INCOMING}/infra-cli.{executable_sha256}.partial"
     final = f"{REMOTE_INCOMING}/infra-cli"
-    run(["scp", str(local_elf), f"{REMOTE_TARGET}:{partial}"])
+    run(["scp", str(local_elf), f"{remote_target}:{partial}"])
     remote_script = (
         "set -euo pipefail\n"
         f"partial={shlex.quote(partial)}\n"
@@ -129,7 +132,7 @@ def main() -> int:
         f"mv \"$partial\" \"$final\"\n"
         "ls -la \"$(dirname \"$final\")\"\n"
     )
-    run(["ssh", REMOTE_TARGET, "bash", "-s"], stdin=remote_script)
+    run(["ssh", remote_target, "bash", "-s"], stdin=remote_script)
 
     checkpoint("5/5 HANDOFF", "ELF atomically handed to the runner; no job created")
     print("\n[RESULT] HANDED OFF: runner installation is asynchronous")

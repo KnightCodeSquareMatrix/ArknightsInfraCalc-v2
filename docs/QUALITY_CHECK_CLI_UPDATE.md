@@ -6,8 +6,9 @@
 > 摘要：记录将求解器 Linux CLI 更新到 quality-check 的操作规则与热路径部署
 
 `scripts/update_solver_quality.py` 是指向远端 quality-check（114.66.55.78）的点对点投递脚本，
-无参数运行。它只构建并原子投递 Linux ELF，完成 partial → final handoff 后退出；runner
-异步建立不可变 bundle，但不会自动创建 job。
+无参数运行。它只构建并原子投递 Linux ELF，完成 partial → final handoff 后退出；runner异步建立不可变 bundle，但不会自动创建 job。
+
+可用 `--ssh-target deepseek-harness-211` 投递至211（211.161.232.77）；不传参数仍使用旧默认目标。脚本读取`CARGO_TARGET_DIR/release/infra-cli`，未设置时使用仓库`target/release/infra-cli`。211的Quality入口为`http://211.161.232.77/quality`，服务与runner分别是`arknights-infra-quality.service`、`arknights-infra-quality-runner.service`，API内部端口4375，incoming目录与下表相同。以下114环境记录不代表211运行时。
 不要直接覆盖已有 bundle、运行中的 CLI 或共享 data 目录。
 
 ## 1. 更新前提
