@@ -216,6 +216,9 @@ fn inject_trade_anchor(
     table: &SkillTable,
     pool: &mut crate::pool::TradePool,
 ) {
+    if !operbox.admits_facility(name, FacilityKind::TradePost) {
+        return;
+    }
     if pool.entry(name).is_some() {
         return;
     }
@@ -247,6 +250,9 @@ fn inject_manu_anchor(
     table: &SkillTable,
     pool: &mut crate::pool::ManuPool,
 ) {
+    if !operbox.admits_facility(name, FacilityKind::Factory) {
+        return;
+    }
     if pool.entry(name).is_some() {
         return;
     }
@@ -282,6 +288,8 @@ pub fn assign_shift_with_plan(
     seed: &BaseAssignment,
 ) -> Result<AssignShiftResult> {
     let _memo_scope = crate::search::ensure_search_memo_scope();
+    let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let operbox = &admitted;
     let enabled = assign_shift_with_preclaimed_plan(
         blueprint,
         operbox,
@@ -336,6 +344,8 @@ pub(crate) fn complete_standalone_assignment(
     options: &AssignBaseOptions,
     result: &mut AssignShiftResult,
 ) -> Result<()> {
+    let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let operbox = &admitted;
     let control_operbox;
     let forbidden_control_names = if options.auto_rotation {
         control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
@@ -630,6 +640,8 @@ where
 {
     let _memo_scope = crate::search::ensure_search_memo_scope();
     blueprint.validate()?;
+    let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let operbox = &admitted;
 
     let mut planning_seed = planning_seed.clone();
     let mut execution_seed = execution_seed.clone();

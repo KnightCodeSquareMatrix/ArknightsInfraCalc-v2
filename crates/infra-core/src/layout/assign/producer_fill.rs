@@ -26,7 +26,7 @@ pub(super) fn place_system_producers(
     let mood_model = default_mood_model()?;
     for producer in producers {
         let name = producer.operator.as_str();
-        if used.contains(name) {
+        if used.contains(name) || !operbox.admits_facility(name, producer.facility) {
             continue;
         }
         match producer.facility {

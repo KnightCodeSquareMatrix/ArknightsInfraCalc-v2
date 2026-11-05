@@ -187,6 +187,19 @@ impl OperBox {
         )
     }
 
+    /// 按调用方已有计划窗口建立普通工作候选资格；已有初筛资格保持冻结。
+    pub(crate) fn with_roster_eta(
+        &self,
+        blueprint: &crate::layout::BaseBlueprint,
+        instances: &OperatorInstances,
+        hours: f64,
+    ) -> Result<Self> {
+        if !self.facility_eta_exclusions.is_empty() {
+            return Ok(self.clone());
+        }
+        self.with_auto_roster_eta(blueprint, instances, hours)
+    }
+
     /// 初始单人试算 policy：满中枢基础减耗、计划满房人数、自身技能；不借未来同房/中枢技能减免。
     pub(crate) fn with_auto_roster_eta(
         &self,
@@ -204,6 +217,10 @@ impl OperBox {
             if room.kind == crate::layout::FacilityKind::ControlCenter {
                 continue;
             }
+            result
+                .facility_eta_exclusions
+                .entry(key.to_string())
+                .or_default();
             for (name, progress) in &self.owned {
                 if !crate::mood::auto_roster_room_fits(
                     model, blueprint, room, instances, name, *progress, hours,

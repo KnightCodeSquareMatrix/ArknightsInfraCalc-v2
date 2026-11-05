@@ -326,10 +326,12 @@ fn resolve_pick_one(
     operbox: &OperBox,
     pick: &SystemOperatorPickOne,
     used: &HashSet<String>,
+    facility: Option<FacilityKind>,
 ) -> Option<ResolvedOperator> {
     for candidate in &pick.pick_one {
         let name = candidate.name();
-        if used.contains(name) {
+        if used.contains(name) || facility.is_some_and(|kind| !operbox.admits_facility(name, kind))
+        {
             continue;
         }
         let Some(progress) = operbox.progress_of(name) else {
@@ -359,6 +361,17 @@ fn explain_slot_operators(
     for spec in &slot.operators {
         match spec {
             SystemOperatorSpec::Fixed(fixed) => {
+                if facility_kind(&slot.facility)
+                    .is_some_and(|kind| !operbox.admits_facility(&fixed.name, kind))
+                {
+                    if slot.fill == SlotFillMode::Search {
+                        continue;
+                    }
+                    return Err(SystemExplainReason::new(
+                        "initial_eta_admission",
+                        format!("{} did not pass the initial facility roster", fixed.name),
+                    ));
+                }
                 if slot_used.contains(&fixed.name) {
                     if slot.fill == SlotFillMode::Search {
                         continue;
@@ -424,7 +437,9 @@ fn explain_slot_operators(
                 });
             }
             SystemOperatorSpec::PickOne(pick) => {
-                let Some(op) = resolve_pick_one(operbox, pick, &slot_used) else {
+                let Some(op) =
+                    resolve_pick_one(operbox, pick, &slot_used, facility_kind(&slot.facility))
+                else {
                     if slot.fill == SlotFillMode::Search {
                         continue;
                     }

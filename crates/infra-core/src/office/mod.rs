@@ -35,7 +35,7 @@ pub(crate) fn rank_candidates(
     shift_hours: f64,
     excluded: &std::collections::HashSet<String>,
 ) -> Vec<AssignedOperator> {
-    let roster = operbox.roster();
+    let roster = operbox.roster_for_facility(FacilityKind::Office);
     let mut registry = None;
     let winter_available = roster.names().any(|name| {
         !excluded.contains(name.as_str())

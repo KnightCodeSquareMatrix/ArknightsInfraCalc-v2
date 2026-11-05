@@ -814,7 +814,7 @@ fn meeting_candidates(
 ) -> Vec<AssignedOperator> {
     let registry = crate::support_facility::SupportRegistry::load_default_shared()
         .expect("support registry loads in meeting candidate build");
-    let roster = operbox.roster();
+    let roster = operbox.roster_for_facility(FacilityKind::MeetingRoom);
     let winter_available = roster.names().any(|name| {
         !excluded.contains(name.as_str())
             && name == "忍冬"
@@ -1251,7 +1251,7 @@ fn recycle_candidates(
     table: &SkillTable,
     excluded: &HashSet<String>,
 ) -> Result<(Vec<AssignedOperator>, Vec<AssignedOperator>)> {
-    let roster = operbox.roster();
+    let roster = operbox.roster_for_facility(FacilityKind::Recycle);
     let mut skilled = Vec::new();
     let mut fallback = Vec::new();
     for name in roster
@@ -3705,7 +3705,11 @@ fn owned_abyssal_hunters(
     let mut hunters: Vec<_> = operbox
         .entries
         .iter()
-        .filter(|entry| entry.own && !used_ab.contains(&entry.name))
+        .filter(|entry| {
+            entry.own
+                && !used_ab.contains(&entry.name)
+                && operbox.admits_facility(&entry.name, FacilityKind::Factory)
+        })
         .filter(|entry| {
             let tier =
                 PromotionTier::from_elite_rarity_level(entry.elite, entry.rarity, entry.level);
@@ -3731,6 +3735,9 @@ fn abyssal_manu_entry(
     instances: &OperatorInstances,
     table: &SkillTable,
 ) -> Option<ManuPoolEntry> {
+    if !operbox.admits_facility(name, FacilityKind::Factory) {
+        return None;
+    }
     let progress = operbox.progress_of(name)?;
     let tier = PromotionTier::from_progress(progress);
     let buff_ids = instances.resolve_manufacture_buff_ids(name, tier);
@@ -4689,6 +4696,28 @@ pub fn collect_final_rotation_issues(
                 .ok_or_else(|| {
                     Error::msg("assert-invariants ordinary_fallback_admission failed: missing Plan")
                 })?;
+            let admitted = operbox.with_roster_eta(
+                blueprint,
+                instances,
+                shift.assignment.work_hours.unwrap_or(shift.duration_hours),
+            )?;
+            for anchor in &plan.anchors {
+                if shift
+                    .assignment
+                    .room_of_operator(&anchor.operator)
+                    .is_some_and(|room| {
+                        blueprint.room(&room.room_id).is_some_and(|spec| {
+                            !admitted.admits_facility(&anchor.operator, spec.kind)
+                        })
+                    })
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants initial_eta_plan_admission failed in shift {} for {}",
+                        shift.index + 1,
+                        anchor.operator
+                    )));
+                }
+            }
             let mut names = HashSet::new();
             for room in shift.assignment.iter_rooms() {
                 for operator in &room.operators {
@@ -7626,6 +7655,12 @@ fn schedule_abc_rotation_once(
     let mut peak_perf = crate::profile::start_solver_stage("rotation_abc", "peak");
     let cycle_hours: f64 = shift_hours.iter().sum();
     blueprint.validate()?;
+    let admitted = operbox.with_roster_eta(
+        blueprint,
+        instances,
+        shift_hours[0] + shift_hours[1].max(shift_hours[2]),
+    )?;
+    let operbox = &admitted;
 
     let durin_plan = operbox.durin_dorm_planning_count(instances);
     let mut originium_pair = if enable_originium_pair {
@@ -8763,6 +8798,13 @@ fn originium_pair_operator(
     name: &str,
     room_id: &RoomId,
 ) -> Result<AssignedOperator> {
+    if !operbox.admits_facility(name, FacilityKind::Factory) {
+        return Err(Error::OptionalRotationPlacementInfeasible {
+            message: format!(
+                "{ORIGINIUM_PAIR_SYSTEM_ID}: {name} did not pass the initial factory roster"
+            ),
+        });
+    }
     let progress = operbox.progress_of(name).ok_or_else(|| {
         Error::msg(format!(
             "{ORIGINIUM_PAIR_SYSTEM_ID}: {name} is not owned for room {}",
@@ -8793,6 +8835,8 @@ fn assign_originium_pair_peak(
     on_shifts: u8,
     off_shifts: u8,
 ) -> Result<crate::layout::AssignShiftResult> {
+    let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let operbox = &admitted;
     let mut stage_perf = crate::profile::start_solver_stage("rotation_abc", "originium_pair");
     let result = (|| {
         let mut planning_seed = BaseAssignment::default();
@@ -9418,6 +9462,8 @@ fn fill_owner_office_seats(
     if !has_office {
         return Ok(());
     }
+    let admitted = operbox.with_roster_eta(blueprint, instances, shift_hours)?;
+    let operbox = &admitted;
     let layout = crate::layout::resolve_base(
         blueprint,
         &owner.assignment,
@@ -10365,6 +10411,8 @@ fn solve_abyssal_profile_main(
     table: &SkillTable,
     options: &AssignBaseOptions,
 ) -> Result<ProfileOwnerCandidate> {
+    let admitted = operbox.with_roster_eta(blueprint, instances, 7.0)?;
+    let operbox = &admitted;
     let empty = HashSet::new();
     let Some(producer) = abyssal_control_producer(operbox, instances, &empty) else {
         return Ok(ProfileOwnerCandidate::Unavailable(

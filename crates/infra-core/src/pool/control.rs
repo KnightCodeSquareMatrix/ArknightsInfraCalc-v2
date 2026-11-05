@@ -82,7 +82,7 @@ pub fn build_control_pool_with_fillers(
         .map(|entry| entry.name.clone())
         .chain(pool.skipped.iter().map(|(name, _, _)| name.clone()))
         .collect();
-    let roster = operbox.roster();
+    let roster = operbox.roster_for_facility(crate::layout::FacilityKind::ControlCenter);
     let mut filler_names: Vec<_> = roster
         .names()
         .filter(|name| !existing.contains(*name))

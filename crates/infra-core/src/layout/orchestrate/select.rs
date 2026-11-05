@@ -58,6 +58,9 @@ pub fn build_plan_with_runtime(
     skip_system_ids: &std::collections::HashSet<String>,
 ) -> Result<AssignmentPlan> {
     let mut disabled_conditional_packs = std::collections::HashSet::new();
+    let admitted =
+        operbox.with_roster_eta(blueprint, instances, seed.work_hours.unwrap_or(24.0))?;
+    let operbox = &admitted;
     build_plan_with_runtime_and_disabled_packs(
         blueprint,
         operbox,
