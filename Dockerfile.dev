@@ -1,0 +1,44 @@
+# Development toolchain; source code lives in a named volume.
+# Pulls the base image and the agent CLIs from the network. On a machine where
+# Docker Hub or apt is unreachable, use Dockerfile.dev.offline instead.
+ARG BASE_IMAGE=rust:1.96.0-slim-trixie
+FROM ${BASE_IMAGE}
+USER root
+
+ARG DEV_UID=1000
+ARG DEV_GID=1000
+ARG CODEX_VERSION=0.166.0
+ARG RTK_VERSION=1.1.0
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl git pkg-config \
+        python3 python3-venv gdb; \
+    rm -rf /var/lib/apt/lists/*; \
+    if ! getent group "${DEV_GID}" >/dev/null 2>&1; then groupadd --gid "${DEV_GID}" developer; fi; \
+    if ! id -u developer >/dev/null 2>&1; then \
+        useradd --uid "${DEV_UID}" --gid "${DEV_GID}" \
+            --create-home --shell /bin/bash developer; \
+    fi; \
+    mkdir -p /workspace /home/developer/target \
+        /usr/local/cargo/registry /usr/local/cargo/git; \
+    chown -R developer:developer \
+        /workspace /home/developer /usr/local/cargo /usr/local/rustup
+
+RUN set -eux; \
+    curl -fsSL "https://registry.npmjs.org/@openai/codex/-/codex-${CODEX_VERSION}-linux-x64.tgz" -o /tmp/codex.tgz; \
+    curl -fsSL "https://github.com/rtk-ai/rtk/releases/download/v${RTK_VERSION}/rtk-x86_64-unknown-linux-musl.tar.gz" -o /tmp/rtk.tar.gz; \
+    tar -xzf /tmp/codex.tgz -C /tmp; \
+    mv /tmp/package/vendor/x86_64-unknown-linux-musl /opt/codex; \
+    ln -sf /opt/codex/bin/codex /usr/local/bin/codex; \
+    ln -sf /opt/codex/codex-path/rg /usr/local/bin/rg; \
+    mkdir -p /tmp/rtk-unpack; \
+    tar -xzf /tmp/rtk.tar.gz -C /tmp/rtk-unpack; \
+    install -m 0755 /tmp/rtk-unpack/rtk /usr/local/bin/rtk; \
+    rm -rf /tmp/package /tmp/codex.tgz /tmp/rtk.tar.gz /tmp/rtk-unpack
+
+ENV CARGO_TARGET_DIR=/home/developer/target
+WORKDIR /workspace
+USER developer
+CMD ["sleep", "infinity"]

@@ -23,7 +23,7 @@
 
 1. 用户和其他 writer 的既有改动不覆盖、不清理、不 stash、不混入本任务提交。开始和结束都看 `git status --short`。
 2. 不做 destructive git：`reset --hard`、force push、amend、rebase、丢弃改动的 checkout、`clean`。只 stage 本任务的显式路径，不用 `git add .`。
-3. 项目按单人线性方式维护。除非用户在当前指令中明确要求创建或切换分支/worktree，任何 agent 不得使用 `git branch`、`git switch -c`、`git checkout -b`、`git worktree add` 或其他方式新建分支/worktree。所有写入都在用户指定的当前分支和当前工作树串行完成；子代理默认只读，不并行写共享工作区，也不得为了调查、隔离、交接或并行收益自行创建分支/worktree。 固定工作目录为 `/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127`；不得改到另一个 checkout 继续任务。
+3. 项目按单人线性方式维护。除非用户在当前指令中明确要求创建或切换分支/worktree，任何 agent 不得使用 `git branch`、`git switch -c`、`git checkout -b`、`git worktree add` 或其他方式新建分支/worktree。所有写入都在用户指定的当前分支和当前工作树串行完成；子代理默认只读，不并行写共享工作区，也不得为了调查、隔离、交接或并行收益自行创建分支/worktree。 容器开发的固定工作目录为 `/workspace`（Docker 命名卷 `arknights-v2-source`）；旧 Ubuntu 目录 `/home/knightcode/Projects/ArknightsInfraCalc-v2-remote-61.184.13.127` 仅保留为迁移源，不返回该目录继续开发。不得改到另一个 checkout 继续任务。
 4. 分层边界：L1 interpreter 只认 `buff_id`，不认干员名；L3 shortcut 只结算实际组合，不负责选型或进编；CLI / export 只编排调用和忠实输出，不写机制、公式，也不重新决策。生产搜索使用各域具名目标，多目标优先显式词典序，中枢或 global heuristic 必须具名。
 5. Layout 主路径是 `build_plan -> execute_plan -> fill -> resolve`，排班不绕过 Plan 修 admission。`shift_bind`、tag、priority、shortcut 只消费各自语义，不能代替 required admission。
 6. 不为单一 operbox、room id、Shift 下标、fixture 或当前 top hit 写补偿特判。
@@ -67,7 +67,7 @@
 
 ## 3. 环境与命令
 
-- 生产构建、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo build --release -p infra-cli`、`target/release/infra-cli`。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary target/release/infra-cli` 覆盖。
+- 生产构建、批量 box 求解和 `--assert-invariants` 验收一律用 release 构建：`cargo build --release -p infra-cli`、`$CARGO_TARGET_DIR/release/infra-cli`。批量脚本默认指向 `target/debug/infra-cli` 时，用 `--binary "$CARGO_TARGET_DIR/release/infra-cli"` 覆盖。
 - 修改 Rust 后运行 `cargo fmt --all`。
 - 需要长期留痕的证据（命令包装、失败集合对比、汇总报告）：见 `scripts/codex/README.md`。
 - 文档检查：`python3 scripts/codex/generate_agent_index.py --check`、`python3 scripts/codex/docs_inventory.py --check`、`python3 scripts/codex/check_repository_facts.py`。
@@ -125,7 +125,7 @@
 - memory 只记可丢弃的检索提示和协作偏好，注明来源、日期、适用范围和复核 / 失效条件；区分用户原话、转述和 agent 推断，阶段性授权不升为长期默认。新裁决覆盖旧条目时更新当前摘要，历史原话保留。领域语义、用户裁决、实现、架构和活动任务进版本化 owner 文档。
 - 不能遗漏且可程序化的约束，按具体任务落实到类型、断言、检查脚本、CI、权限或 writer 锁；文档说明理由、入口和实际保证。新增门禁用违规例子验证能阻断，未实现的自动执行明确注明；表达偏好不做强制门禁。
 - 验证方式来源：用户 2026-10-31 明确裁决“本项目不需要添加测试，以前的也要删掉。我们有其他方法去检查他的错误。”保留生产终态断言、批量 Box、真实 CLI 与文档检查。
-- 本轮补充及调整来源：用户 2026-10-29 在工作习惯提取、联网评估后明确批准，并裁决“子代理人数我不觉得需要固定，现在的agent足够聪明能进行这个分配”。
+- 本轮补充及调整来源：用户 2026-10-29 在工作习惯提取、联网评估后明确批准，并裁决“子代理人数我不觉得需要固定，现在的agent足够聪明能进行这个分配”。用户 2026-10-30 明确纠正：项目是单人线性维护，不需要为任务、调查、隔离或并行收益创建分支/worktree；agent 未经用户当次明确要求不得创建分支。
 
 <!-- 线性维护约束来源：用户 2026-10-30 明确纠正，不得为了调查、隔离或并行收益自行创建分支/worktree。 -->
 

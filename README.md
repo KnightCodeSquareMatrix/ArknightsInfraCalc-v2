@@ -91,6 +91,139 @@ cargo run -q -p infra-cli -- bake validate
 
 `plan`、`layout team-rotation`、`layout eval`、`trade yield` 等完整参数见 [docs/INFRA_CLI.md](docs/INFRA_CLI.md)。
 
+## Rust 开发容器（WSL）
+
+本配置只提供开发工具链，不是生产镜像，不增加 HTTP 服务，也不修改求解器接口。Docker Desktop 使用独立 WSL 2 后端；不在 Ubuntu 中安装 Engine。源码与运行时数据位于外部命名卷 `arknights-v2-source`，挂载到容器 `/workspace`；日常启动和开发不依赖 Ubuntu。修改源码不需要重建镜像。容器默认使用 UID/GID 1000 的普通用户，包含固定 Rust 1.96.0 工具链、Git、C/C++ 构建工具、GDB、Python 3 与 venv。
+
+Windows 只保留启动配置文件：`Dockerfile.dev`（联网构建）、`Dockerfile.dev.offline`（本机离线构建，见下）、`Dockerfile.dev.dockerignore`、`compose.dev.yaml`，放在 Windows 的 `arknights-v2-container` 控制目录。不挂载 Windows 源码目录，也不使用 Ubuntu 路径作为构建上下文。Compose 项目名固定为 `arknights-v2-dev`，避免移动控制目录时意外创建另一套缓存卷。
+
+首次准备需要：
+
+1. 安装/启动 Windows Docker Desktop，启用 WSL 2 engine 与 Linux containers；无需启用 Ubuntu WSL Integration。
+2. 一次性从原 Ubuntu 仓库复制源码、运行数据、contracts、脚本、文档和 `.git` 到 `arknights-v2-source`，保留已修改及未跟踪的工作文件；不只 clone 已提交的 HEAD。原仓库保留，不删除、不移动。编译缓存、运行证据及密钥是否复制需分别确认；迁移后对比文件内容、Git 状态和 UID/GID。
+3. 源码卷应对 developer（默认 UID/GID 1000）可写。单独的空卷并不代表迁移成功；确认 `/workspace/Cargo.toml` 和预期数据存在后才开始构建。
+
+源码卷声明 `external: true`，不会由 Compose 自动创建或随 `down -v` 删除；首次迁移需显式创建并填充它。Windows PowerShell 在控制目录执行：
+
+```powershell
+# NUL 是 Windows 空设备，避免 Compose 自动读取 .env。
+docker compose --env-file NUL -f compose.dev.yaml up -d --build
+docker compose --env-file NUL -f compose.dev.yaml exec rust-dev bash
+```
+
+Windows Git Bash 调用 Windows `docker.exe` 时也可使用 `NUL`；如设置 `MSYS_NO_PATHCONV=1`，不可用 `/dev/null`，否则可能被当作不存在的 Windows 文件。编辑源码推荐在支持 Dev Containers 的编辑器中选择“Attach to Running Container”，连接本配置的 `rust-dev` 容器并打开 `/workspace`；不要在宿主机直接编辑 Docker 内部磁盘或把 `docker-desktop` 当成开发发行版。
+
+进入容器后：
+
+```bash
+cargo build --release --locked -p infra-cli
+"$CARGO_TARGET_DIR/release/infra-cli" --help
+# 一次真实求解；输出写入源码卷内的 out/。
+"$CARGO_TARGET_DIR/release/infra-cli" plan \
+  --operbox data/fixtures/243/operbox_full_e2.json \
+  --profile-out out/container-profile.json \
+  --maa-out out/container-maa.json \
+  --assert-invariants
+# 文档维护检查不依赖模型/向量库。
+python3 scripts/codex/generate_agent_index.py --check
+python3 scripts/codex/docs_inventory.py --check
+python3 scripts/codex/check_repository_facts.py
+```
+
+Cargo 下载缓存与构建产物分别保存在 Compose 命名卷中。容器的 `CARGO_TARGET_DIR=/home/developer/target`，**不是**仓库的 `target/`，不混用 WSL 宿主机的既有二进制；批量验收或依赖默认 target 路径的脚本应显式传入 `--binary "$CARGO_TARGET_DIR/release/infra-cli"`。本项目按 `AGENTS.md` 使用 release、真实 CLI、终态断言和文档检查，不运行源码测试。
+
+Worker 是 stdin/stdout JSONL，需关闭 TTY；从 Windows PowerShell 验证握手：
+
+```powershell
+'{"id":"dev-ping","method":"ping"}' | docker compose --env-file NUL -f compose.dev.yaml exec -T rust-dev /home/developer/target/release/infra-cli serve
+```
+
+如需 Python 第三方依赖，在容器内创建项目虚拟环境后按实际脚本需求安装；本镜像不自动安装 `pyproject.toml` 中的模型/向量库重依赖，也不执行数据同步、Bake 或外部部署。默认不挂载宿主机 SSH、AWS、Docker socket，不提供特权或端口。**容器中的源码、Git 和输出保存在源码卷，不会自动同步回原 Ubuntu 仓库。若把 `.env`、`.aws` 等文件导入源码卷，容器同样能读取它们；命名卷不是密钥保险箱。** 源码卷现在是开发真源，未提交工作应定期导出到 Windows 独立备份文件，Git 提交也只存在本地卷，不能代替异地备份；重置/卸载 Docker Desktop 可能丢失卷。 构建专用忽略规则使这些文件不会发送到镜像构建上下文。
+
+停止并移除开发容器但保留源码和编译缓存（Windows PowerShell）：
+
+```powershell
+docker compose --env-file NUL -f compose.dev.yaml down
+```
+
+不要随意加 `-v`，否则会删除本配置的 Cargo 命名卷缓存（外部源码卷不会随此命令删除）。修改工具链、系统包或 UID/GID 后需重建镜像；已有卷的所有权不会随 UID/GID 自动迁移，迁移前应先核对并保留所需缓存。
+
+### 容器内的 Codex 与 RTK
+
+镜像固定安装 Codex CLI 0.166.0 与 RTK 1.1.0，二者都不提交进仓库。`~/.codex` 与 `~/.config/rtk` 各由独立命名卷持久化，重建容器不丢配置与统计。
+
+模型调用链是 Codex → 本机清洗代理（`127.0.0.1:13427`）→ Magpie 网关（`127.0.0.1:13425`）。容器内通过 `host.docker.internal` 访问；这两个服务是 Windows 上的前台进程，不是常驻服务，容器启动前需要先在两个 PowerShell 窗口分别运行 `tools/start-magpie-windows.ps1 -Service gateway` 和 `-Service sanitize`。
+
+Windows 上的 Magpie 不能占用 3425/3427：`.wslconfig` 启用了 `networkingMode=mirrored`，WSL 内的 Magpie 已经占住这两个 Windows 本地端口。换端口后链路行为一致，只有端口号与原 WSL 不同。
+
+Codex 自带沙箱依赖 bwrap。Docker 默认 seccomp 禁止创建用户命名空间，因此 Compose 设置了 `security_opt: seccomp=unconfined`；否则容器内任何命令都会以 `bwrap: No permissions to create a new namespace` 失败。
+
+RTK 通过 `~/.codex/hooks.json` 的 `PreToolUse` 调用 `rtk hook codex`，首次运行需要在交互会话里批准一次 hook 信任；`codex exec` 无人值守时需要显式加 `--dangerously-bypass-hook-trust`。`rtk gain` 可查看压缩统计。
+
+本机 Docker Hub 元数据与 apt 均超时，因此 `compose.dev.yaml` 指向 `Dockerfile.dev.offline`：Rust 层使用本地标签 `arknights-v2-dev-base:rust-1.96.0`，Codex/RTK 使用 `vendor/` 内的归档（校验值在 `vendor/SHA256SUMS`）。网络正常时改用 `Dockerfile.dev` 可从上游重建。`vendor/` 体积较大，不提交。
+
+进入本项目的 Codex（一条命令，脚本自己起代理、起容器、退出时收代理）：
+
+```powershell
+& "C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/arknights-v2-container/codex-dev.ps1"
+```
+
+常用变体：
+
+```powershell
+# 传参给 codex
+& ".../codex-dev.ps1" exec --ephemeral "检查 git status"
+# 只要容器 shell，不进 Codex
+& ".../codex-dev.ps1" -Shell
+# Codex 退出后保留代理
+& ".../codex-dev.ps1" -KeepStack
+# 停掉所有代理
+& ".../codex-dev.ps1" -Stop
+```
+
+脚本会检查 13425/13427 是否已在监听，已在则复用；Docker 引擎没起会自动拉起；容器已存在则复用。若后台启动失败（例如 PowerShell 环境变量异常），会打印需要手动执行的那一条命令。
+
+Windows PowerShell 5.1 可能同时存在 `Path`/`PATH`/`path` 三个键，导致 `Start-Process` 报 `Item has already been added`。脚本启动时会先合并这三个键，避免该问题。
+
+手动分窗口启动仍然可用（调试代理本身时更方便）：
+
+```powershell
+& ".../tools/start-magpie-windows.ps1" -Service gateway
+& ".../tools/start-magpie-windows.ps1" -Service sanitize
+```
+
+### SSH 密钥
+
+容器需要 SSH 客户端才能用 `git@` 远端；镜像已装 `openssh-client`。密钥放在独立命名卷 `arknights-v2-ssh`，挂到 `/home/developer/.ssh`，权限为目录 700、私钥 600。
+
+密钥按目标主机 IP 命名：`114.66.55.78_id_rsa`、`114.66.55.78_ed25519`（含 `.pub`）。`110.42.33.126_id_rsa` 与 `211.161.232.77_id_rsa` 是指向 `114.66.55.78_id_rsa` 的符号链接，因为这三个主机共用同一把私钥；`config` 的 `IdentityFile` 已同步为新名字。`id_rsa` 保留为兼容链接，`scripts/export_quality_feedback.py` 等按旧名引用密钥的脚本不受影响。原 WSL 与 Windows 的 `~/.ssh` 均未改动。
+
+**这是新增的一份私钥副本**：任何能执行 `docker` 或进入容器的人都能读到它。不要在共享机器上保留该卷；不再需要时用 `docker volume rm arknights-v2-ssh` 删除（容器需先停止）。
+
+### 代理常驻（登录自启）
+
+Magpie 与清洗代理不在容器里，也不由编辑器管理。日常可用 `codex-dev.ps1` 临时拉起，但它退出时会收掉代理。
+
+需要开机即用（尤其是随时打开 Magpie Web UI）时，注册一个当前用户级的计划任务：
+
+```powershell
+$name = 'ArknightsV2 Magpie Stack'
+$script = 'C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/tools/start-agent-stack-hidden.ps1'
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Principal $principal
+```
+
+- 手动触发：`Start-ScheduledTask -TaskName 'ArknightsV2 Magpie Stack'`
+- 查看状态：`Get-ScheduledTask -TaskName 'ArknightsV2 Magpie Stack'`
+- 取消自启：`Unregister-ScheduledTask -TaskName 'ArknightsV2 Magpie Stack' -Confirm:$false`
+- 运行日志：`private/windows-proxy-runtime/autostart.log`
+
+脚本只补起未在监听的端口，重复执行不会起第二份；`codex-dev.ps1` 检测到端口已监听时也只复用、退出时不会停掉自启的实例。
+
+验证状态（2026-11-04）：已安装并启动 Docker Desktop 4.98.0（当前用户安装，WSL 2 后端）；Windows 控制目录为 `C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/arknights-v2-container`。已复制源码、Git 与未提交改动（含用户明确批准的 `.env`/`.aws`），未复制根 target、虚拟环境和 Python 缓存；原 Ubuntu 项目保留。镜像构建、普通用户卷权限、容器内 release 构建、Worker ping（v1–v7）通过。归档流 SHA256 核对 37908 个文件无内容差异（排除可变 Git index），但核对期间原 `.git` 目录变化导致 tar 非零退出，不宣称严格冻结快照。Agent 路由和文档清单检查通过；repository facts 检查因历史 Ubuntu 绝对链接及未迁移 target 证据失败，未改写历史文档。完整 plan 求解、批量终态验收和 GDB 调试尚未运行；不修改机制，不新增或运行源码测试。后续开发只在卷内进行，原 Ubuntu 仓库不会自动同步。
+
 ## 正确性优先，也认真对待性能
 
 组合搜索会很快膨胀，但本项目不会用不透明剪枝换取一个看似漂亮的答案。

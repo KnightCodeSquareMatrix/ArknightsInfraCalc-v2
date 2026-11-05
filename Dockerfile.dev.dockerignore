@@ -1,0 +1,8 @@
+# Only the build definition and vendored CLI archives enter the image context.
+# Repository source, outputs and credentials never do.
+**
+!Dockerfile.dev
+!Dockerfile.dev.offline
+!Dockerfile.dev.dockerignore
+!vendor/
+!vendor/**

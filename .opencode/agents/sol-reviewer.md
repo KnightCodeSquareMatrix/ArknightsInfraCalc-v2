@@ -1,7 +1,7 @@
 ---
 description: 只读审阅高风险结论、架构边界和实际变更；检查领域不变量、回归、安全与验证缺口。
 mode: subagent
-model: codesonline/gpt-6.1-sol
+model: magpie/group/gpt-6.1-sol
 
 variant: high
 steps: 99

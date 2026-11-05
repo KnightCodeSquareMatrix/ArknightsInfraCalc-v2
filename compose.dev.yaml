@@ -1,0 +1,52 @@
+name: arknights-v2-dev
+
+services:
+  rust-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        DEV_UID: "${DEV_UID:-1000}"
+        DEV_GID: "${DEV_GID:-1000}"
+    init: true
+    # Codex sandboxes its own shell commands with bwrap, which needs user
+    # namespaces that Docker's default seccomp profile blocks.
+    security_opt:
+      - seccomp=unconfined
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: ["sleep", "infinity"]
+    volumes:
+      - type: volume
+        source: codex-home
+        target: /home/developer/.codex
+      - type: volume
+        source: rtk-config
+        target: /home/developer/.config/rtk
+      - type: volume
+        source: source
+        target: /workspace
+      - type: volume
+        source: cargo-registry
+        target: /usr/local/cargo/registry
+      - type: volume
+        source: cargo-git
+        target: /usr/local/cargo/git
+      - type: volume
+        source: cargo-target
+        target: /home/developer/target
+
+volumes:
+  source:
+    name: arknights-v2-source
+    external: true
+  cargo-registry:
+  cargo-git:
+  cargo-target:
+  codex-home:
+    name: arknights-v2-codex-home
+    external: true
+  rtk-config:
+    name: arknights-v2-rtk-config
+    external: true
