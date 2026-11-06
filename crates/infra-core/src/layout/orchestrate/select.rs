@@ -502,7 +502,8 @@ fn compile_plan_once(
         control_exclusions.remove(&anchor.operator);
     }
     control_exclusions.extend(compiled.excluded_operators.iter().cloned());
-    let plan = AssignmentPlan {
+    let mut plan = AssignmentPlan {
+        trade_placement_domains: Vec::new(),
         support_combinations_enable: false,
         auto_rotation: seed.auto_rotation,
         mode,
@@ -523,6 +524,7 @@ fn compile_plan_once(
         rotation_reserves: compiled.rotation_reserves,
         control_candidate_requirements,
     };
+    super::trade_placement::retain_trade_domains(catalog, blueprint, &mut plan);
     plan.control_requirement_sources()?;
     Ok((plan, final_scratch))
 }

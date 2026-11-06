@@ -293,6 +293,10 @@ pub struct ControlCandidateRequirement {
 /// 单班进驻前的编排计划；`execute_plan` 将其落成 `BaseAssignment`。
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct AssignmentPlan {
+    /// Legal domains retained from role declarations, before default room preference.
+    /// Internal search provenance; final public Plan still contains resolved rooms.
+    #[serde(skip)]
+    pub(crate) trade_placement_domains: Vec<super::trade_placement::TradePlacementDomain>,
     #[serde(skip)]
     pub(crate) support_combinations_enable: bool,
     #[serde(skip)]
@@ -344,6 +348,7 @@ impl AssignmentPlan {
     /// 空 Peak 计划：无体系、无 anchor、无约束。
     pub(crate) fn empty() -> Self {
         Self {
+            trade_placement_domains: Vec::new(),
             support_combinations_enable: false,
             auto_rotation: false,
             mode: AssignShiftMode::Peak,

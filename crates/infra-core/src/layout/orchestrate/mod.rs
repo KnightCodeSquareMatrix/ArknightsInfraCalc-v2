@@ -8,6 +8,7 @@ mod execute;
 mod plan;
 mod rules;
 mod select;
+mod trade_placement;
 pub(crate) use rules::{assert_auto_rotation_plan_policy, assert_support_combination_policy};
 
 pub use execute::{execute_plan, ExecuteResult};

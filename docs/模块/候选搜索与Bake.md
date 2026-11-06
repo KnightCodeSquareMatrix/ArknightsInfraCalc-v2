@@ -6,7 +6,7 @@
 > 机制依赖：docs/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
 > 摘要：定位候选池、Plan 门禁、域搜索、排序与 Bake 回退的完整链路。
 > 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
-> 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,joint_trade}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}`
+> 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,trade_allocation}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}`
 > 关联链路：`docs/调用链/技能到房间结算.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`01cbec5`; `target/codex-runs/trade-final-efficiency-unit-20261020-r2/`; `out/trade-final-efficiency-unit-20261020/baked-final-r2/`
 
@@ -26,7 +26,7 @@ pool/admission、容量、required anchor、互斥和输入匹配是 hard constr
 
 ## 域入口
 
-`search_trade_triples`、`search_manufacture_triples`、`search_control_combos`、`search_power_assignment` 各自负责域内比较；`joint_trade` 只处理具名跨域 candidate policy。遇到“候选没被考虑”，按 pool skip → Plan claim/exclusion → used → capacity → domain filter → comparator 排查。
+`search_trade_triples`、`search_manufacture_triples`、`search_control_combos`、`search_power_assignment` 各自负责单域入口；手动Peak和γ自有房间的贸易联合选择使用`search_trade_allocation`，按金贸/源石词典序比较完整房间组合，不截断每房top-K。它复用单房真实结算，在caller给定的共享状态内缓存无变化组合（含失败），再用各房独立最优乐观上界剪枝；局部缓存只存在于本次联合调用，不进入单房report memo或Bake。支持上下文、Plan绑定、已建模状态及暂缓范围见[贸易求解](贸易求解.md#搜索与跨站)。遇到“候选没被考虑”，按 pool skip → Plan claim/exclusion → used → capacity → domain filter → comparator 排查。
 
 `ControlFillPolicy::LayeredFill` 当前走中枢专用顺序入口：先满足适用候选组，再按贸易、制造、训练（没有专精上下文时保持 `Unsupported`）、办公室、会客室、心情和普通补位逐位消费“当前已选 + 当前候选”。前序席位锁定后，后序候选不能用匿名加权分数替换它。`build_control_pool_with_fillers` 只增加真实没有设施技能的干员；带未建模 buff 的干员留在 `skipped`，不会被清空技能后重新加入。
 

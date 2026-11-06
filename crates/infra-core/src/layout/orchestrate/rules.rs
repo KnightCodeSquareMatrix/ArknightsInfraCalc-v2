@@ -740,7 +740,7 @@ pub(super) fn compile_rules(
     Ok(out)
 }
 
-fn roles_with_conditional_pack(
+pub(super) fn roles_with_conditional_pack(
     base_roles: &[RoleSpec],
     pack: &ConditionalPackSpec,
 ) -> Vec<RoleSpec> {
@@ -1846,7 +1846,7 @@ fn select_power_role(
     Some(vec![report.assignments.first()?.hit.name.clone()])
 }
 
-fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
+pub(super) fn role_matches_room(role: &RoleSpec, room: &RoomBlueprint) -> bool {
     if room.level < role.min_room_level
         || (room.kind != role.facility && !role.facilities.contains(&room.kind))
     {

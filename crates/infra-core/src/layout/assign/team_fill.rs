@@ -47,6 +47,7 @@ pub fn assign_team_producer_rooms(
         trade_rooms,
         assignment,
         used,
+        None,
     )?;
     assign_team_manu_rooms(
         blueprint,
@@ -104,6 +105,7 @@ pub fn assign_team_gamma_half(
         trade_rooms,
         assignment,
         used,
+        Some(plan),
     )?;
     assign_team_manu_rooms(
         blueprint,
@@ -147,7 +149,35 @@ fn assign_team_trade_meta_rooms(
     trade_rooms: &[RoomId],
     assignment: &mut BaseAssignment,
     used: &mut HashSet<String>,
+    plan: Option<&AssignmentPlan>,
 ) -> Result<()> {
+    if !options.auto_rotation {
+        let mut current = coexist_assignment.clone();
+        for room in assignment.iter_rooms() {
+            current.set_room_assignment(room.clone());
+        }
+        let mut joint_used = used.clone();
+        if super::trade_joint::assign_trade_joint(
+            blueprint,
+            trade_pool,
+            table,
+            instances,
+            options,
+            durin_dorm_planning,
+            plan,
+            Some(trade_rooms),
+            &mut current,
+            &mut joint_used,
+        )? {
+            for room in trade_rooms {
+                if let Some(result) = current.room_assignment(room) {
+                    assignment.set_room_assignment(result.clone());
+                }
+            }
+            *used = joint_used;
+            return Ok(());
+        }
+    }
     let gold_lines = blueprint.gold_manu_line_count();
     let mut rooms = trade_rooms
         .iter()

@@ -6,6 +6,7 @@ pub(crate) mod memo;
 mod power;
 mod role_pick;
 mod trade;
+pub(crate) mod trade_allocation;
 
 pub use memo::{ensure_search_memo_scope, SearchMemoScopeGuard};
 

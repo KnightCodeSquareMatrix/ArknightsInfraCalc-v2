@@ -1755,18 +1755,33 @@ fn finish_peak_prefix<'a>(
         &mut run.used,
         run.instances,
     )?;
-    assign_trade_remainder_with_plan_anchors(
-        run.blueprint,
-        &trade_pool,
-        run.table,
-        run.instances,
-        gold_lines,
-        run.options,
-        Some(run.durin_plan),
-        &plan.anchors,
-        &mut run.assignment,
-        &mut run.used,
-    )?;
+    let joint = !run.options.auto_rotation
+        && super::trade_joint::assign_trade_joint(
+            run.blueprint,
+            &trade_pool,
+            run.table,
+            run.instances,
+            run.options,
+            Some(run.durin_plan),
+            Some(plan),
+            None,
+            &mut run.assignment,
+            &mut run.used,
+        )?;
+    if !joint {
+        assign_trade_remainder_with_plan_anchors(
+            run.blueprint,
+            &trade_pool,
+            run.table,
+            run.instances,
+            gold_lines,
+            run.options,
+            Some(run.durin_plan),
+            &plan.anchors,
+            &mut run.assignment,
+            &mut run.used,
+        )?;
+    }
     cleanup_unused_sphinx_urrbian_dorm_anchor(run.blueprint, &mut run.assignment, &mut run.used);
     finalize_deferred_monster_claim(&mut run, plan, control_pool, control_exclusions)?;
 
