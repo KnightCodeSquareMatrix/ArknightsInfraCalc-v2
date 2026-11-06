@@ -18,6 +18,7 @@ use crate::trade::input::{
 };
 use crate::trade::shortcut::trade_station_exclusive_violation_refs;
 use crate::trade::solver::{solve_trade_with_shift_prevalidated_view, TradeResult};
+use crate::types::{Action, AtomScope};
 
 use super::enumerate::{evaluate_flat_combinations, flat_combinations};
 
@@ -98,7 +99,8 @@ pub struct TradeSearchOptions {
     pub top_k: usize,
     /// 制造站赤金真实生产线数（公孙长乐基准常用 4）。
     pub gold_production_lines: u32,
-    /// 全基建布局上下文（进驻编制派生的 OperatorInBase、空弦/石英/风絮/状态链等）.
+    /// 整基建布局快照，尚未扣回当前候选房的 Global 产出。
+    /// 已进驻的候选贡献由搜索按实际贸易名单扣回，未进驻的候选在房内首次执行。
     pub layout: SharedLayout,
     /// 上班时长（小时）；产量公式用 `eff × (shift/24) × 单位产出`。
     pub shift_hours: f64,
@@ -653,11 +655,34 @@ fn trade_combo_layout(base: &SharedLayout, operators: &[TradeOperatorRef<'_>]) -
             .iter()
             .any(|operator| operator.tags.contains(&rule.target_tag))
     });
-    if changes_dynamic_tag_count || trade_operator_refs_require_candidate_projection(operators) {
+    let projected = if changes_dynamic_tag_count
+        || trade_operator_refs_require_candidate_projection(operators)
+    {
         project_trade_combo_layout(base, operators)
     } else {
         Arc::clone(base)
+    };
+    let mut accounted_atoms = operators
+        .iter()
+        .filter(|operator| {
+            base.trade_workforce
+                .iter()
+                .any(|name| name == operator.name)
+        })
+        .map(|operator| operator.compiled_atoms)
+        .filter(|atoms| {
+            atoms.iter().any(|compiled| {
+                compiled.atom.scope == AtomScope::Global
+                    && matches!(compiled.atom.action, Action::StateProduce { .. })
+            })
+        })
+        .peekable();
+    if accounted_atoms.peek().is_none() {
+        return projected;
     }
+    let mut room_layout = (*projected).clone();
+    crate::layout::deduct_room_global_atoms(&mut room_layout, accounted_atoms, &projected);
+    Arc::new(room_layout)
 }
 
 /// 把尚未提交的当前贸易房候选投影进跨设施上下文。

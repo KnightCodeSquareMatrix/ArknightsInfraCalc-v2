@@ -52,7 +52,7 @@ EffectAtom {
 
 ## Room 与 Global
 
-`scope=Room` 是默认值，由 trade/manufacture/power/support interpreter 消费。`scope=Global` 由 `cross_facility::collect_global_atoms` 收集，当前 `orchestrate_global_atoms` 实际执行 StateWrite；control 的 GlobalInject 在 `control/interpreter.rs` 单独执行。per-room 路径必须跳过 Global，避免重复计算。
+`scope=Room` 是默认值，由 trade/manufacture/power/support interpreter 消费。`scope=Global` 由 `cross_facility::collect_global_atoms` 收集，当前 `orchestrate_global_atoms` 实际执行 StateWrite；control 的 GlobalInject 在 `control/interpreter.rs` 单独执行。全局已汇总的贡献不能在房内重复计入。当前贸易/制造房的Global StateProduce由resolve先扣回本房贡献，再在房内执行一次；贸易搜索只扣回原快照中已有候选的贡献，未进驻候选在房内首次执行。各路径共用resolve的扣回计算，输入合同见[贸易求解](模块/贸易求解.md#搜索与跨站)。
 
 Global 条件上下文有限：collector 只提供当前 assignment、设施等级、标签和 layout counts；跨设施 interpreter 对不可用 selector/condition 使用明确的 delegated/零贡献策略。需要真实同房条件的 atom 不应伪装成 global。
 
