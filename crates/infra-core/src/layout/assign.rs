@@ -694,38 +694,43 @@ where
         let stage_before = crate::profile::solver_perf_snapshot();
         let mut variant_stage = crate::profile::start_solver_stage("shift", "trade_plan_variants");
         let variants = plan.trade_placement_variants(blueprint, &execution_seed);
-        let mut winner = None;
-        let mut first_error = None;
-        for variant in variants {
-            match pipeline::run_shift_pipeline(
-                blueprint,
-                operbox,
-                instances,
-                table,
-                options,
-                mode,
-                &execution_seed,
-                &variant,
-            ) {
-                Ok((assignment, deferred)) => {
-                    let score = trade_assignment_score(blueprint, &assignment);
-                    if winner.as_ref().is_none_or(|(_, _, _, best)| score > *best) {
-                        winner = Some((variant, assignment, deferred, score));
+        let assignment_result = (|| {
+            let mut winner = None;
+            let mut first_retry_error = None;
+            for variant in variants {
+                match pipeline::run_shift_pipeline(
+                    blueprint,
+                    operbox,
+                    instances,
+                    table,
+                    options,
+                    mode,
+                    &execution_seed,
+                    &variant,
+                ) {
+                    Ok((assignment, deferred)) => {
+                        let score = trade_assignment_score(blueprint, &assignment);
+                        if winner.as_ref().is_none_or(|(_, _, _, best)| score > *best) {
+                            winner = Some((variant, assignment, deferred, score));
+                        }
                     }
-                }
-                Err(error) => {
-                    if first_error.is_none() {
-                        first_error = Some(error);
+                    Err(
+                        error @ (Error::OptionalTradeRoleInfeasible { .. }
+                        | Error::GoldFlowCoreInfeasible { .. }),
+                    ) => {
+                        first_retry_error.get_or_insert(error);
                     }
+                    Err(error) => return Err(error),
                 }
             }
-        }
-        let assignment_result = if let Some((selected_plan, assignment, deferred, _)) = winner {
-            plan = selected_plan;
-            Ok((assignment, deferred))
-        } else {
-            Err(first_error.unwrap_or_else(|| Error::no_candidate("no legal trade Plan placement")))
-        };
+            if let Some((selected_plan, assignment, deferred, _)) = winner {
+                plan = selected_plan;
+                Ok((assignment, deferred))
+            } else {
+                Err(first_retry_error
+                    .unwrap_or_else(|| Error::no_candidate("no legal trade Plan placement")))
+            }
+        })();
         variant_stage.record_result(&assignment_result);
         drop(variant_stage);
         let stage_after = crate::profile::solver_perf_snapshot();
