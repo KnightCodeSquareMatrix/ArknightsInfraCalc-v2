@@ -26,6 +26,8 @@ build_plan 解析 PickOne、OptionalFixed、required count、scope 和 alternati
 
 ## 变更时的调用链定位
 
+回收 `recycle_skilled` 在普通设施填充前进入 Plan，`recycle_objective` 按实际解锁回收技能效率排序并保留最多两席，同房成员通过 Plan 绑定轮换。ABC 中没有生产或中枢成员可继承的独立绑定组，按实际累计工作窗口最大的 Team 归属，平局保留首标签；归属由共同绑定 helper 生成，不能静默漏掉 anchors。该规则属于“回收技能优先于普通发电补位”的 policy，不换算两个设施的产出，也不承诺全基建最优。莱茵支持角色允许使用同一宿舍的多个空床；容量、回收技能预留、实际 receiver 赢家与整条 alternative 的提交/回退继续由原编译执行 owner 负责。
+
 - 组合未进入岗位：先查 build_plan 是否有 required admission/alternative，再查 execute_plan 是否提交 anchor；不要先调 facility solver。
 - 组合进入但收益为零：查 runtime capability、scope 和实际同房/同班 presence，再查 resolve_base；不要按名字增加 shortcut。
 - 跨房 consumer 缺 producer：查 resolved_producer_dependencies 是否产生 exact_presence/requires_presence；没有 dependency 时 schedule 不应生成 shift_bind。

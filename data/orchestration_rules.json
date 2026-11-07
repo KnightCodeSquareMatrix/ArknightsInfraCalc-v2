@@ -2,6 +2,32 @@
   "version": 1,
   "rules": [
     {
+      "id": "recycle_skilled",
+      "priority": 14,
+      "tier": "cross_station",
+      "alternatives": [
+        {
+          "id": "recycle_skill_priority",
+          "roles": [
+            {
+              "id": "recycle_workers",
+              "facility": "recycle",
+              "candidates": [
+                { "name": "国度", "elite": 0 },
+                { "name": "旅骨", "elite": 0 },
+                { "name": "行铃", "elite": 0 }
+              ],
+              "min_count": 1,
+              "max_count": 2,
+              "same_room": true,
+              "selection": "recycle_objective"
+            }
+          ],
+          "bind_all": true
+        }
+      ]
+    },
+    {
       "id": "mujica_fallback",
       "priority": -10,
       "tier": "cross_station",
@@ -789,7 +815,7 @@
               "min_count": 1,
               "max_count": 4,
               "selection": "ordered",
-              "one_per_room": true
+              "one_per_room": false
             }
           ],
           "active_dependencies": [
@@ -820,7 +846,7 @@
               "min_count": 1,
               "max_count": 4,
               "selection": "ordered",
-              "one_per_room": true
+              "one_per_room": false
             }
           ],
           "active_dependencies": [
@@ -849,7 +875,7 @@
               "min_count": 1,
               "max_count": 5,
               "selection": "ordered",
-              "one_per_room": true
+              "one_per_room": false
             }
           ],
           "active_dependencies": [

@@ -187,6 +187,21 @@ impl OperBox {
         )
     }
 
+    /// 普通辅助岗位由班次 owner 按当前心情和实际班长准入，不继承生产 peak 窗口。
+    /// 只释放这两个设施的初始 ETA；保留调用方已裁剪的 owned 和其他设施资格。
+    pub(crate) fn with_auxiliary_shift_admission(&self) -> Self {
+        let mut result = self.clone();
+        for facility in [
+            crate::layout::FacilityKind::Office,
+            crate::layout::FacilityKind::MeetingRoom,
+        ] {
+            if let Some(key) = crate::mood::facility_key(facility) {
+                result.facility_eta_exclusions.remove(key);
+            }
+        }
+        result
+    }
+
     /// 按调用方已有计划窗口建立普通工作候选资格；已有初筛资格保持冻结。
     pub(crate) fn with_roster_eta(
         &self,

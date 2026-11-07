@@ -56,4 +56,8 @@ Peak 复用动态中枢 presence 枚举，每个分支按当前贸易 role/房�
 
 ## 核验
 
+普通 ABC 中枢选位前，办公室 owner 按本班合法候选和逐班预算实际落位；`resolve_control_input_layout` 从这些已提交人员取得联络速度，交给既有琴柳选位条件。中枢选人消费办公室占用，不能再抢走该成员；不保留另一套办公室预测名单。技能阈值仍只由原中枢解释器结算。
+
+办公室先落位属于顺序 policy，不能据此声称办公室与中枢联合选人的全局最优。辅助岗位的终态心情预算是已确认的硬约束；构造时的排序、试放顺序和普通补位仍是各自具名 policy。
+
 检查 control trace、ledger records、global inject explanation、最终 assignment invariant。固定候选用 `layout eval --explain-json`；整班用 `plan --assert-invariants` 和 243/high-owned fixture。中枢技能原文与同种效果规则回知识库引用，本文只记录实现责任和状态流。

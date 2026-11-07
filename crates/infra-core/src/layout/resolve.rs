@@ -902,6 +902,7 @@ fn to_power_operator(
 ) -> Result<PowerOperator> {
     let buff_ids = resolve_buff_ids(instances, op, "power")?;
     let mut power = PowerOperator::new(op.name.clone(), op.elite, buff_ids);
+    power.tags = instance_tags(instances, &op.name, op.tier());
     power.work_mood = op.work_mood.map(f64::from);
     Ok(power)
 }

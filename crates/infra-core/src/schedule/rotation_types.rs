@@ -617,6 +617,9 @@ pub struct DailyProduction {
 #[derive(Debug, Clone, Serialize)]
 pub struct TeamRotationReport {
     pub profile: TimedRotationProfile,
+    /// 普通辅助岗位的逐班心情状态起点；不改变报告 wire。
+    #[serde(skip)]
+    pub(crate) auxiliary_initial_mood: f64,
     /// peak 班编排计划（只读；α/β 切半与 γ 贸易 role 填充均据此对齐）。
     pub peak_plan: AssignmentPlan,
     /// Every independently solved assignment keeps its own Plan owner.

@@ -198,6 +198,7 @@ pub(super) enum RoleSelection {
     Ordered,
     AllAvailable,
     ManufactureObjective,
+    RecycleObjective,
 }
 
 #[derive(Debug, Clone, Copy, Default, Deserialize)]
@@ -1207,6 +1208,28 @@ fn enumerate_role_placements<'a>(
             available,
         );
     }
+    if matches!(role.selection, RoleSelection::RecycleObjective) {
+        let mut scored: Vec<_> = available
+            .into_iter()
+            .filter_map(|(candidate, progress)| {
+                let operator = AssignedOperator::from_progress(&candidate.name, progress);
+                crate::recycle::recycle_skill_efficiency(ctx.instances, ctx.table, &operator)
+                    .ok()
+                    .filter(|skill| !skill.is_zero())
+                    .map(|skill| (skill, candidate, progress))
+            })
+            .collect();
+        scored.sort_by(|left, right| {
+            right
+                .0
+                .cmp(&left.0)
+                .then_with(|| left.1.name.cmp(&right.1.name))
+        });
+        available = scored
+            .into_iter()
+            .map(|(_, candidate, progress)| (candidate, progress))
+            .collect();
+    }
     if available
         .iter()
         .any(|(candidate, _)| !candidate.fallback_if_no_other_candidates)
@@ -1216,6 +1239,7 @@ fn enumerate_role_placements<'a>(
     match role.selection {
         RoleSelection::Ordered => available.truncate(role.max_count as usize),
         RoleSelection::ManufactureObjective => available.truncate(role.max_count as usize),
+        RoleSelection::RecycleObjective => available.truncate(role.max_count as usize),
         RoleSelection::AllAvailable if available.len() > role.max_count as usize => {
             return Vec::new();
         }

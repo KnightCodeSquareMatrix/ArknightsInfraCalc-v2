@@ -295,6 +295,7 @@ fn probe_shell(
         manu_report,
         rotation: TeamRotationReport {
             profile: crate::schedule::TimedRotationProfile::default(),
+            auxiliary_initial_mood: 24.0,
             peak_plan: AssignmentPlan::empty(),
             assignment_plans: vec![AssignmentPlan::empty()],
             runtime_shift_binds: vec![],
