@@ -25,7 +25,7 @@
 | 核心求解 | 11 | `proposal` 4、`ready-on-request` 7 | [核心求解](核心求解.md) |
 | 排班轮换 | 11 | `blocked` 2、`proposal` 6、`ready-on-request` 3 | [排班轮换](排班轮换.md) |
 | 接口产品 | 6 | `blocked` 1、`proposal` 3、`ready-on-request` 2 | [接口产品](接口产品.md) |
-| 性能质量 | 7 | `proposal` 3、`ready-on-request` 4 | [性能质量](性能质量.md) |
+| 性能质量 | 8 | `in-progress` 1、`proposal` 3、`ready-on-request` 4 | [性能质量](性能质量.md) |
 | 文档协作 | 2 | `blocked` 1、`ready-on-request` 1 | [文档协作](文档协作.md) |
 <!-- END GENERATED WORKSTREAMS -->
 
