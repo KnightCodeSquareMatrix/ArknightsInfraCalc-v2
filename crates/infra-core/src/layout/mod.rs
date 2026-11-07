@@ -50,6 +50,7 @@ pub use resolve::{
     ResolvedTradeRoom,
 };
 pub use shift::AssignShiftMode;
+pub(crate) use system::SlotFillMode;
 pub use system::{
     apply_registry_system_claim, claim_base_systems, default_base_systems_path, load_base_systems,
     select_registry_systems, RegistrySlotClaim, RegistrySystemClaim, SystemExplainEntry,

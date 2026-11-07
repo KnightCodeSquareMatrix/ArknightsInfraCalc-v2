@@ -33,6 +33,8 @@ pub(super) struct AssignmentRun<'a> {
     pub durin_plan: u8,
     pub assignment: BaseAssignment,
     pub used: HashSet<String>,
+    /// Plan/seed members precede the temporary deferred provider and ordinary fill.
+    pub control_prefix_names: HashSet<String>,
     pub resolved_deferred_registry_claim: Option<RegistrySystemClaim>,
     pub deferred_monster_provider_active: bool,
     pub peak_control_dynamic_set: Option<(HashSet<String>, HashSet<String>)>,
@@ -50,6 +52,11 @@ impl<'a> AssignmentRun<'a> {
         used: HashSet<String>,
     ) -> Self {
         let durin_plan = operbox.durin_dorm_planning_count(instances);
+        let control_prefix_names = assignment
+            .control_operators()
+            .into_iter()
+            .map(|operator| operator.name)
+            .collect();
         Self {
             blueprint,
             operbox,
@@ -59,6 +66,7 @@ impl<'a> AssignmentRun<'a> {
             durin_plan,
             assignment,
             used,
+            control_prefix_names,
             resolved_deferred_registry_claim: None,
             deferred_monster_provider_active: false,
             peak_control_dynamic_set: None,

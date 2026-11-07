@@ -541,6 +541,148 @@ fn preserves_deferred_monster_consumption(
     !resolved_three || assignment_has_matatabi_consumption(run.blueprint, candidate)
 }
 
+fn try_commit_deferred_control_claim(
+    run: &mut AssignmentRun<'_>,
+    plan: &AssignmentPlan,
+    control_pool: &ControlPool,
+    control_exclusions: &HashSet<String>,
+    claim: Option<&crate::layout::system::RegistrySystemClaim>,
+) -> Result<bool> {
+    let mut trial = run.clone();
+    let (mut required, excluded) = run.peak_control_dynamic_set.clone().unwrap_or_default();
+    let mut protected = run.control_prefix_names.clone();
+    protected.extend(required.iter().cloned());
+    if let Some(claim) = claim {
+        let claimed: Vec<_> = claim
+            .slots
+            .iter()
+            .filter(|slot| {
+                slot.facility == FacilityKind::ControlCenter
+                    && slot.fill != crate::layout::system::SlotFillMode::Search
+            })
+            .flat_map(|slot| slot.operators.iter().cloned())
+            .collect();
+        let claimed_names: HashSet<_> = claimed
+            .iter()
+            .map(|operator| operator.name.clone())
+            .collect();
+        required.extend(claimed_names.iter().cloned());
+        let mut control = trial.assignment.control_operators();
+        for operator in claimed {
+            if !control
+                .iter()
+                .any(|existing| existing.name == operator.name)
+            {
+                control.push(operator);
+            }
+        }
+        let result = crate::control::solve_control(
+            &crate::control::ControlRoomInput {
+                operators: control
+                    .iter()
+                    .map(|operator| crate::control::ControlOperator {
+                        name: operator.name.clone(),
+                        elite: operator.elite,
+                        buff_ids: run
+                            .instances
+                            .resolve_control_buff_ids(&operator.name, operator.tier()),
+                        tags: run.instances.tags_for(&operator.name, operator.tier()),
+                    })
+                    .collect(),
+                mood: run.options.mood,
+                layout: trial.resolve_snapshot(true)?,
+            },
+            run.table,
+        );
+        let claimed_keys: HashSet<_> = result
+            .effect_ledger
+            .records()
+            .iter()
+            .filter(|record| claimed_names.contains(&record.source_operator))
+            .map(|record| record.key)
+            .collect();
+        let released: HashSet<_> = result
+            .effect_ledger
+            .records()
+            .iter()
+            .filter(|record| {
+                claimed_keys.contains(&record.key)
+                    && !claimed_names.contains(&record.source_operator)
+                    && !protected.contains(&record.source_operator)
+            })
+            .map(|record| record.source_operator.clone())
+            .collect();
+        trial
+            .assignment
+            .remove_operators_where(|room_id, operator| {
+                room_id.0 == "control" && released.contains(&operator.name)
+            });
+        trial.used.retain(|name| !released.contains(name));
+        // Control members enter through the common search as required sources;
+        // appending them after ordinary fill would bypass EffectKey admission.
+        let mut placements = claim.clone();
+        placements
+            .slots
+            .retain(|slot| slot.facility != FacilityKind::ControlCenter);
+        match crate::layout::system::apply_registry_system_claim(
+            run.blueprint,
+            &placements,
+            &mut trial.assignment,
+            &mut trial.used,
+        ) {
+            Ok(()) => {}
+            Err(Error::ScheduleQuality(_)) => return Ok(false),
+            Err(error) => return Err(error),
+        }
+    }
+    let producer_layout = trial.resolve_snapshot(true)?;
+    let saileach_required = required.contains("琴柳")
+        || trial
+            .assignment
+            .control_operators()
+            .iter()
+            .any(|operator| operator.name == "琴柳")
+        || plan
+            .control_candidate_requirements
+            .iter()
+            .any(|requirement| {
+                requirement.min_count > 0
+                    && requirement.candidates.len() == 1
+                    && requirement.candidates.iter().any(|name| name == "琴柳")
+            });
+    if !assign_control_matching_dynamic_set_with_saileach(
+        &mut trial.assignment,
+        control_pool,
+        run.table,
+        &producer_layout,
+        run.options,
+        &plan.control_candidate_requirements,
+        &required,
+        &excluded,
+        control_exclusions,
+        run.peak_control_saileach_best_office_pct,
+        saileach_required,
+        None,
+        &mut trial.used,
+    )? {
+        return Ok(false);
+    }
+    let control = trial.assignment.control_operators();
+    let capacity = run
+        .blueprint
+        .rooms
+        .iter()
+        .find(|room| room.kind == FacilityKind::ControlCenter)
+        .map(|room| room.operator_capacity())
+        .unwrap_or(0);
+    if control.len() != capacity {
+        return Ok(false);
+    }
+    trial.resolved_deferred_registry_claim = claim.cloned();
+    *run = trial;
+    Ok(true)
+}
+
 fn finalize_deferred_monster_claim(
     run: &mut AssignmentRun<'_>,
     plan: &AssignmentPlan,
@@ -574,60 +716,39 @@ fn finalize_deferred_monster_claim(
         .iter()
         .find(|claim| claim.system_id != monster.system_id);
     if let Some(fallback) = fallback {
-        let mut trial = run.assignment.clone();
-        let mut trial_used = run.used.clone();
-        match crate::layout::system::apply_registry_system_claim(
-            run.blueprint,
-            fallback,
-            &mut trial,
-            &mut trial_used,
-        ) {
-            Ok(()) => {
-                run.assignment = trial;
-                run.used = trial_used;
-                run.resolved_deferred_registry_claim = Some(fallback.clone());
-                return Ok(());
-            }
-            Err(Error::ScheduleQuality(_)) => {}
-            Err(error) => return Err(error),
+        if try_commit_deferred_control_claim(
+            run,
+            plan,
+            control_pool,
+            control_exclusions,
+            Some(fallback),
+        )? {
+            return Ok(());
         }
     }
 
-    let dynamic_set = run.peak_control_dynamic_set.clone();
-    let dynamic_refs = dynamic_set
-        .as_ref()
-        .map(|(required, excluded)| (required, excluded));
-    let producer_layout = run.resolve_snapshot(true)?;
-    let mut ordinary = run.clone();
-    if fill_peak_control(
-        &mut ordinary,
-        plan,
-        control_pool,
-        &producer_layout,
-        control_exclusions,
-        dynamic_refs,
-        run.peak_control_saileach_best_office_pct,
-        0,
-    )? {
-        let control = ordinary.assignment.control_operators();
+    if try_commit_deferred_control_claim(run, plan, control_pool, control_exclusions, None)? {
+        let control = run.assignment.control_operators();
         let pair_is_selected = MONHUN_CONTROL_PAIR
             .iter()
             .all(|name| control.iter().any(|operator| operator.name == *name));
         if pair_is_selected {
-            ordinary.resolved_deferred_registry_claim = Some(monster_pair_claim(monster));
+            run.resolved_deferred_registry_claim = Some(monster_pair_claim(monster));
         }
-        *run = ordinary;
         return Ok(());
     }
 
-    let pair = monster_pair_claim(monster);
-    crate::layout::system::apply_registry_system_claim(
-        run.blueprint,
-        &pair,
-        &mut run.assignment,
-        &mut run.used,
-    )?;
-    run.resolved_deferred_registry_claim = Some(pair);
+    if !try_commit_deferred_control_claim(
+        run,
+        plan,
+        control_pool,
+        control_exclusions,
+        Some(&monster_pair_claim(monster)),
+    )? {
+        run.assignment
+            .construction_warnings
+            .push("control: no legal fill after deferred monster withdrawal".into());
+    }
     Ok(())
 }
 

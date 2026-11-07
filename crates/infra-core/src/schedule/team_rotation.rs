@@ -3957,13 +3957,33 @@ fn enumerate_abyssal_counts(
 
 /// 从编排计划中提取体系绑定的实际中枢干员名。
 fn system_control_operators(plan: &AssignmentPlan, peak_ctrl: &HashSet<String>) -> HashSet<String> {
-    plan.anchors
-        .iter()
-        .filter(|anchor| {
-            anchor.facility == FacilityKind::ControlCenter && peak_ctrl.contains(&anchor.operator)
-        })
-        .map(|anchor| anchor.operator.clone())
+    fixed_plan_control_members(plan)
+        .filter(|(_, name)| peak_ctrl.contains(*name))
+        .map(|(_, name)| name.to_string())
         .collect()
+}
+
+fn fixed_plan_control_members(plan: &AssignmentPlan) -> impl Iterator<Item = (&str, &str)> {
+    let anchors = plan
+        .anchors
+        .iter()
+        .filter(|anchor| anchor.facility == FacilityKind::ControlCenter)
+        .map(|anchor| (anchor.system_id.as_str(), anchor.operator.as_str()));
+    let registry = plan.registry_claims.iter().flat_map(|claim| {
+        claim
+            .slots
+            .iter()
+            .filter(|slot| {
+                slot.facility == FacilityKind::ControlCenter
+                    && slot.fill != crate::layout::SlotFillMode::Search
+            })
+            .flat_map(move |slot| {
+                slot.operators
+                    .iter()
+                    .map(move |operator| (claim.system_id.as_str(), operator.name.as_str()))
+            })
+    });
+    anchors.chain(registry)
 }
 
 /// 判断体系的控制中枢干员应归属哪个队伍（基于生产 slot 所在半区）。
@@ -4007,22 +4027,19 @@ fn build_team_control_map(
     let mut team_map: HashMap<TeamLabel, Vec<String>> = HashMap::new();
 
     // Step 1: 体系实际落位的中枢干员归属到对应队伍。
-    for anchor in plan
-        .anchors
-        .iter()
-        .filter(|anchor| anchor.facility == FacilityKind::ControlCenter)
-    {
+    for (system_id, name) in fixed_plan_control_members(plan) {
         let team = plan
             .activated
             .iter()
-            .find(|system| system.system_id == anchor.system_id)
+            .find(|system| system.system_id == system_id)
             .and_then(|system| system_control_team(system, h1))
             .unwrap_or(TeamLabel::Alpha);
-        if peak_set.contains(&anchor.operator) {
-            team_map
-                .entry(team)
-                .or_default()
-                .push(anchor.operator.clone());
+        if peak_set.contains(name)
+            && !team_map
+                .values()
+                .any(|members| members.iter().any(|member| member == name))
+        {
+            team_map.entry(team).or_default().push(name.to_string());
         }
     }
 
@@ -4120,6 +4137,7 @@ fn pick_control_plugin_team(
 fn balance_control_plugin_class(
     team_ctrl: &mut HashMap<TeamLabel, Vec<String>>,
     entry_by_name: &HashMap<String, crate::pool::ControlPoolEntry>,
+    protected: &HashSet<String>,
     class: fn(&crate::pool::ControlPoolEntry) -> bool,
 ) {
     loop {
@@ -4133,6 +4151,11 @@ fn balance_control_plugin_class(
         let Some(from_team) = TeamLabel::ALL
             .into_iter()
             .filter(|team| team_control_class_count(team_ctrl, entry_by_name, *team, class) > 1)
+            .filter(|team| {
+                team_ctrl.get(team).into_iter().flatten().any(|name| {
+                    !protected.contains(name) && entry_by_name.get(name).is_some_and(class)
+                })
+            })
             .max_by_key(|team| {
                 (
                     team_control_class_count(team_ctrl, entry_by_name, *team, class),
@@ -4150,7 +4173,9 @@ fn balance_control_plugin_class(
             names
                 .iter()
                 .enumerate()
-                .filter(|(_, name)| entry_by_name.get(*name).is_some_and(class))
+                .filter(|(_, name)| {
+                    !protected.contains(*name) && entry_by_name.get(*name).is_some_and(class)
+                })
                 .max_by(|(_, a), (_, b)| {
                     let aw = entry_by_name
                         .get(*a)
@@ -8135,8 +8160,18 @@ fn schedule_abc_rotation_once(
             .unwrap_or_else(|| pick_control_plugin_team(entry, &team_ctrl, &entry_by_name));
         team_ctrl.entry(team).or_default().push(entry.name.clone());
     }
-    balance_control_plugin_class(&mut team_ctrl, &entry_by_name, control_entry_trade_inject);
-    balance_control_plugin_class(&mut team_ctrl, &entry_by_name, control_entry_manu_inject);
+    balance_control_plugin_class(
+        &mut team_ctrl,
+        &entry_by_name,
+        &system_ctrl_names,
+        control_entry_trade_inject,
+    );
+    balance_control_plugin_class(
+        &mut team_ctrl,
+        &entry_by_name,
+        &system_ctrl_names,
+        control_entry_manu_inject,
+    );
     normalize_control_team_membership(&mut team_ctrl, &production_team_by_name);
     // 跨设施 shift bind 是最终归属约束，不能被中枢均衡策略再次拆开。
     for bind in &shift_binds {
