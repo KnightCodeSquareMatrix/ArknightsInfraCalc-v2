@@ -20,7 +20,7 @@
         "docs/模块/排班与轮换.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#solver-文档的引用格式"
+        "docs/机制/知识库引用.md#3-solver-文档的引用格式"
       ],
       "verification": [
         "infra-cli plan --operbox <path> --profile-out out/<task>-profile.json --maa-out out/<task>-maa.json"
@@ -53,7 +53,7 @@
         "docs/模块/中枢与跨设施状态.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "verification": [
         "infra-cli layout test --layout <path> --operbox <path>"
@@ -84,7 +84,7 @@
         "docs/模块/输入与技能映射.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "verification": [
         "infra-cli verify --all",
@@ -116,10 +116,10 @@
       "module_docs": [
         "docs/模块/排班与轮换.md",
         "docs/模块/导出与岗位状态.md",
-        "docs/泡泡火神源石优先.md"
+        "docs/排班/泡泡火神源石优先.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "verification": [
         "cargo build --release -p infra-cli",
@@ -131,7 +131,7 @@
         "docs/1-基础设定/设施与进驻/心情与宿舍.md"
       ],
       "priority": 70,
-      "when": "profile、班次互斥、shift_bind、连续工作、dorm_rest，或普通二/三班泡泡/火神源石预占未成立/被拆开时选择；资格、选房、班次、保护和 gate 细节读 docs/泡泡火神源石优先.md。"
+      "when": "profile、班次互斥、shift_bind、连续工作、dorm_rest，或普通二/三班泡泡/火神源石预占未成立/被拆开时选择；资格、选房、班次、保护和 gate 细节读 docs/排班/泡泡火神源石优先.md。"
     },
     {
       "id": "EXPORT.MAA",
@@ -150,7 +150,7 @@
         "docs/接口/输入输出与兼容.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#唯一边界"
+        "docs/机制/知识库引用.md#1-唯一边界"
       ],
       "verification": [
         "infra-cli plan --operbox <path> --maa-out out/<task>-maa.json"
@@ -179,7 +179,7 @@
         "docs/模块/候选搜索与Bake.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#不可混淆的四种内容"
+        "docs/机制/知识库引用.md#5-不可混淆的四种内容"
       ],
       "verification": [
         "infra-cli debug rerun --bundle <debug-bundle.json>"
@@ -208,7 +208,7 @@
         "docs/模块/输入与技能映射.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/1-基础设定/设施与进驻/制造站机制.md",
@@ -238,10 +238,10 @@
       "module_docs": [
         "docs/模块/心情与辅助设施.md",
         "docs/模块/导出与岗位状态.md",
-        "docs/DRONES.md"
+        "docs/机制/DRONES.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/1-基础设定/设施与进驻/发电站机制.md",
@@ -271,11 +271,11 @@
       "chain_doc": "docs/调用链/跨设施状态刷新.md",
       "module_docs": [
         "docs/模块/中枢与跨设施状态.md",
-        "docs/CONTROL_CENTER_ASSIGNMENT.md",
+        "docs/机制/CONTROL_CENTER_ASSIGNMENT.md",
         "docs/INTERNAL/CROSS_FACILITY.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/1-基础设定/设施与进驻/控制中枢机制.md",
@@ -305,11 +305,11 @@
       "chain_doc": "docs/调用链/技能到房间结算.md",
       "module_docs": [
         "docs/模块/输入与技能映射.md",
-        "docs/MODELLED_OPERATORS.md",
-        "docs/EFFECT_ATOM_DESIGN.md"
+        "docs/机制/MODELLED_OPERATORS.md",
+        "docs/机制/EFFECT_ATOM_DESIGN.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/2-干员技能/README.md",
@@ -339,11 +339,11 @@
       "chain_doc": "docs/调用链/候选搜索与Bake.md",
       "module_docs": [
         "docs/模块/候选搜索与Bake.md",
-        "docs/SCORING_MODEL.md",
-        "docs/PERFORMANCE_ENGINEERING.md"
+        "docs/机制/SCORING_MODEL.md",
+        "docs/质量与维护/PERFORMANCE_ENGINEERING.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/1-基础设定/设施与进驻/基建总览.md",
@@ -374,10 +374,10 @@
       "module_docs": [
         "docs/模块/心情与辅助设施.md",
         "docs/模块/排班与轮换.md",
-        "docs/DRONES.md"
+        "docs/机制/DRONES.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/1-基础设定/设施与进驻/心情与宿舍.md",
@@ -406,11 +406,11 @@
       "chain_doc": "docs/调用链/debug与验证.md",
       "module_docs": [
         "docs/接口/错误与诊断.md",
-        "docs/求解错误分析报告.md",
+        "docs/质量与维护/求解错误分析报告.md",
         "docs/模块/候选搜索与Bake.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#不可混淆的四种内容"
+        "docs/机制/知识库引用.md#5-不可混淆的四种内容"
       ],
       "vault_refs": [
         "docs/1-基础设定/README.md"
@@ -436,12 +436,12 @@
       ],
       "chain_doc": "docs/调用链/plan请求.md",
       "module_docs": [
-        "docs/练卡推荐相关/README.md",
-        "docs/练卡推荐相关/玩家输出口径.md",
+        "docs/产品与训练/README.md",
+        "docs/产品与训练/玩家输出口径.md",
         "docs/接口/输入输出与兼容.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "vault_refs": [
         "docs/2-干员技能/README.md",
@@ -469,11 +469,11 @@
       "chain_doc": "docs/调用链/debug与验证.md",
       "module_docs": [
         "docs/接口/错误与诊断.md",
-        "docs/求解错误分析报告.md",
+        "docs/质量与维护/求解错误分析报告.md",
         "docs/文档生命周期.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#不可混淆的四种内容"
+        "docs/机制/知识库引用.md#5-不可混淆的四种内容"
       ],
       "vault_refs": [
         "docs/1-基础设定/README.md"
@@ -505,7 +505,7 @@
         "docs/接口/CLI与Worker.md"
       ],
       "mechanics": [
-        "docs/知识库引用.md#可引用范围"
+        "docs/机制/知识库引用.md#2-可引用范围"
       ],
       "verification": [
         "infra-cli plan --operbox <path> --rotation auto@24/12 --rotation-out out/auto_rotation.json --assert-invariants"

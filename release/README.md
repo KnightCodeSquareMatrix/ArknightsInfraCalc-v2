@@ -123,5 +123,5 @@ Windows 可双击 `release\layout-gen\index.html`，或运行 `start release\lay
 
 ## 文档
 
-- 完整前端/CLI 契约：`release/docs/FRONTEND_CLI.md`
-- CLI 输出参考：`release/plans/cli-format-reference.md`
+- 发布包内完整前端/CLI 契约：`docs/FRONTEND_CLI.md`（源文件 `docs/接入与前端/FRONTEND_CLI.md`）
+- 发布包内 CLI 输出参考：`plans/cli-format-reference.md`（源文件 `release/plans/cli-format-reference.md`）

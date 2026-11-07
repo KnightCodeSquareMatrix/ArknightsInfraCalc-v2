@@ -2,7 +2,7 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/MAINTENANCE_MODE.md；docs/文档生命周期.md
+> 当前真源：docs/质量与维护/MAINTENANCE_MODE.md；docs/文档生命周期.md
 > 摘要：说明本地生产反馈 bundle 和 evidence ledger 边界
 
 This directory stores production feedback bundles copied from deployed services. `sync_feedback.py`

@@ -140,7 +140,7 @@
           "path": "data/MECHANICS_REGISTRY.csv"
         },
         {
-          "path": "docs/BASE_ASSIGNMENT.md"
+          "path": "docs/架构/BASE_ASSIGNMENT.md"
         }
       ],
       "review": {
@@ -545,7 +545,7 @@
           "path": "data/MECHANICS_REGISTRY.csv"
         },
         {
-          "path": "docs/FIREWORKS.md",
+          "path": "docs/机制/FIREWORKS.md",
           "heading": "已确认分支"
         }
       ],

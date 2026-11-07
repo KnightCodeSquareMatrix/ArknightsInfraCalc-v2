@@ -7,6 +7,7 @@
 > 代码锚点：`crates/infra-core/src/trade/interpreter.rs::{TradeContext,collect_atoms,apply_trade_phases}`; `crates/infra-core/src/trade/interpreter.rs::{apply_atom,apply_eff_action,apply_limit_action,apply_peer_absorb}`; `crates/infra-core/src/trade/solver.rs::solve_trade_with_shift`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/SHORTCUT_MATCHING.md`
 > 核验基线：`947f1a2`
+> 摘要：说明贸易 L1 phase、状态、限制和订单机制的内部结算顺序
 
 `apply_trade_phases` 从每名 runtime operator 的 buff id 收集 atom，按 `Phase::sort_key` 和 `phase_order` 排序，依次处理 condition、state、eff、limit、order tag、peer absorb 和 mood。跨过 Limit 阶段会重算 order limit；赤金订单的 `gold_flow::apply_gold_flow_chain` 在进入 PeerAbsorb 前或循环末执行一次；循环结束再做最终 limit recompute。
 

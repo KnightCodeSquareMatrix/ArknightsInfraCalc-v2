@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from urllib.parse import unquote
 
 import docs_inventory
+import doc_layout
 import generate_agent_index
 from check_feedback_evidence import check_tracking
 
@@ -28,8 +31,10 @@ PROJECT_MAP_RETRIEVAL_FACTS = (
 
 INDEX_RETRIEVAL_FACTS = (
     "[Agent 路由](生成索引/Agent路由.md)",
-    "[知识库引用合同](知识库引用.md)",
+    "[知识库引用合同](机制/知识库引用.md)",
     "[生成代码与文档地图](生成索引/代码与文档地图.md)",
+    "[生成文档目录](生成索引/文档目录.md)",
+    "query_project_knowledge.py --query",
 )
 
 
@@ -38,8 +43,8 @@ PROJECT_MAP_PROTECTED_FACTS = (
     "`src/commands/plan_compute.rs` | `plan` / `serve` 共用的单次 rotation + profile/MAA 编排",
     "机器主入口为内联 `plan.compute`",
     "`plan.compute` 内联协议和 legacy 路径适配",
-    "[FRONTEND_CLI.md](FRONTEND_CLI.md)",
-    "[FRONTEND_SERVE_GUIDE.md](FRONTEND_SERVE_GUIDE.md)",
+    "[FRONTEND_CLI.md](接入与前端/FRONTEND_CLI.md)",
+    "[FRONTEND_SERVE_GUIDE.md](接入与前端/FRONTEND_SERVE_GUIDE.md)",
     "Next BFF 使用 `serve` / `plan.compute`；一次性调用使用 `plan` / `--maa-out`。",
     "`expect_rule_id`",
 ) + PROJECT_MAP_RETRIEVAL_FACTS
@@ -240,10 +245,89 @@ def parse_profile_actions(text: str) -> tuple[set[str], str | None]:
     return actions, None
 
 
+def _markdown_heading_text(value: str) -> str:
+    value = re.sub(r"!\[([^]]*)\]\([^)]*\)", r"\1", value)
+    value = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", value)
+    value = re.sub(r"<[^>]+>", "", value)
+    value = html.unescape(value)
+    value = re.sub(r"\\([\\`*{}\[\]()#+.!_>~-])", r"\1", value)
+    return value.replace("`", "").strip()
+
+
+def _github_slug(value: str) -> str:
+    """Approximate GitHub's heading slugger for Unicode prose headings."""
+    value = re.sub(r"\s+", " ", _markdown_heading_text(value).lower())
+    kept: list[str] = []
+    for character in value:
+        category = unicodedata.category(character)
+        if character in {"-", " "} or category.startswith(("L", "N", "M")) or category == "Pc":
+            kept.append(character)
+    return "".join(kept).strip().replace(" ", "-")
+
+
+def _markdown_anchors(text: str) -> set[str]:
+    anchors: set[str] = set()
+    heading_counts: dict[str, int] = {}
+    headings: list[str] = []
+    lines = text.splitlines()
+    fence_character: str | None = None
+    fence_length = 0
+    for index, line in enumerate(lines):
+        fence = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if fence_character is not None:
+            if (
+                fence
+                and fence.group(1)[0] == fence_character
+                and len(fence.group(1)) >= fence_length
+                and not fence.group(2).strip()
+            ):
+                fence_character = None
+                fence_length = 0
+            continue
+        if fence:
+            fence_character = fence.group(1)[0]
+            fence_length = len(fence.group(1))
+            continue
+
+        anchors.update(
+            match.group(1)
+            for match in re.finditer(r"\b(?:id|name)\s*=\s*[\"']([^\"']+)[\"']", line, re.IGNORECASE)
+        )
+        heading = re.match(r"^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$", line)
+        if heading:
+            headings.append(heading.group(1))
+            continue
+        if index + 1 < len(lines) and line.strip():
+            underline = re.match(r"^ {0,3}(?:=+|-+)[ \t]*$", lines[index + 1])
+            if underline and not line.lstrip().startswith(("#", "|", ">", "- ", "* ", "+ ")):
+                headings.append(line.strip())
+
+    for heading in headings:
+        base = _github_slug(heading)
+        if not base:
+            continue
+        occurrence = heading_counts.get(base, 0)
+        anchors.add(base if occurrence == 0 else f"{base}-{occurrence}")
+        heading_counts[base] = occurrence + 1
+    return anchors
+
+
+def _markdown_link_inputs(repo: Path, documents: list[str]) -> list[str]:
+    paths = set(documents)
+    for name in ("README.md", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md"):
+        if (repo / name).is_file():
+            paths.add(name)
+    contracts = repo / "contracts"
+    if contracts.is_dir():
+        paths.update(path.relative_to(repo).as_posix() for path in contracts.rglob("*.md"))
+    return sorted(paths)
+
+
 def check_markdown_links(repo: Path, documents: list[str]) -> list[str]:
     errors: list[str] = []
     link_re = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
-    for document in documents:
+    anchor_cache: dict[Path, set[str]] = {}
+    for document in _markdown_link_inputs(repo, documents):
         path = repo / document
         if path.suffix.lower() != ".md" or not path.is_file():
             continue
@@ -254,11 +338,33 @@ def check_markdown_links(repo: Path, documents: list[str]) -> list[str]:
                 target = target[1 : target.index(">")]
             else:
                 target = target.split(" ", 1)[0]
-            if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+            if (
+                not target
+                or target.startswith("//")
+                or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target)
+            ):
                 continue
-            local = unquote(target.split("#", 1)[0])
-            if not (path.parent / local).resolve(strict=False).exists():
+            local_raw, separator, fragment_raw = target.partition("#")
+            local = unquote(local_raw)
+            if local:
+                if local.startswith("/"):
+                    target_path = (repo / local.lstrip("/")).resolve(strict=False)
+                else:
+                    target_path = (path.parent / local).resolve(strict=False)
+            else:
+                target_path = path.resolve(strict=False)
+            if not target_path.exists():
                 errors.append(f"broken Markdown link in {document}: {raw_target}")
+                continue
+            if not separator or not fragment_raw or target_path.suffix.lower() != ".md":
+                continue
+            anchors = anchor_cache.get(target_path)
+            if anchors is None:
+                anchors = _markdown_anchors(target_path.read_text(encoding="utf-8"))
+                anchor_cache[target_path] = anchors
+            fragment = unquote(fragment_raw)
+            if fragment not in anchors:
+                errors.append(f"broken Markdown fragment in {document}: {raw_target}")
     return errors
 
 
@@ -266,7 +372,7 @@ def check_cli_help_map(repo: Path) -> list[str]:
     errors: list[str] = []
     main_path = repo / "crates/infra-cli/src/main.rs"
     layout_path = repo / "crates/infra-cli/src/commands/layout.rs"
-    map_path = repo / "docs/PROJECT_MAP.md"
+    map_path = repo / doc_layout.PROJECT_MAP
     for path in (main_path, layout_path, map_path):
         if not path.is_file():
             return [f"cli-help-map input is missing: {path}"]
@@ -338,7 +444,7 @@ def check_project_map_owner_contract(repo: Path) -> list[str]:
     lib_path = repo / "crates/infra-core/src/lib.rs"
     bake_path = repo / "crates/infra-cli/src/commands/bake.rs"
     profile_path = repo / "crates/infra-cli/src/commands/profile.rs"
-    map_path = repo / "docs/PROJECT_MAP.md"
+    map_path = repo / doc_layout.PROJECT_MAP
     for path in (lib_path, bake_path, profile_path, map_path):
         if not path.is_file():
             return [f"project-map owner input is missing: {path}"]
@@ -443,8 +549,8 @@ def check_project_map_protected_facts(map_text: str) -> list[str]:
 def check_navigation_contract(repo: Path) -> list[str]:
     errors: list[str] = []
     agents_path = repo / "AGENTS.md"
-    index_path = repo / "docs/INDEX.md"
-    glossary_path = repo / "docs/GLOSSARY.md"
+    index_path = repo / doc_layout.INDEX
+    glossary_path = repo / "docs/指南/GLOSSARY.md"
     for path in (agents_path, index_path, glossary_path):
         if not path.is_file():
             return [f"navigation contract input is missing: {path}"]
@@ -457,11 +563,11 @@ def check_navigation_contract(repo: Path) -> list[str]:
     if "本文不维护第二份分类表" not in index_text:
         errors.append("INDEX.md does not defer task classification to AGENTS.md")
     expected_sections = [
-        "## 1. 从症状开始",
-        "## 2. 按入口阅读",
-        "## 3. 按模块阅读",
-        "## 4. 接口与验证",
-        "## 5. 外部机制与历史材料",
+        "## 1. 先确定检索路径",
+        "## 2. 按问题进入领域",
+        "## 3. 按代码或协议进入",
+        "## 4. 当前工作与历史",
+        "## 5. 文档维护与验证",
     ]
     actual_sections = re.findall(r"^## .+$", index_text, re.MULTILINE)
     if actual_sections != expected_sections:
@@ -481,6 +587,11 @@ def check_navigation_contract(repo: Path) -> list[str]:
     for fact in INDEX_RETRIEVAL_FACTS:
         if fact not in index_text:
             errors.append(f"INDEX.md is missing bounded owner retrieval route: {fact}")
+
+    for readme in doc_layout.DOMAIN_READERS.values():
+        link = f"({Path(readme).relative_to('docs').as_posix()})"
+        if link not in index_text:
+            errors.append(f"INDEX.md does not route to domain hub: {readme}")
 
     stale_glossary = (
         "当前默认项目阶段",
@@ -502,7 +613,7 @@ def check_navigation_contract(repo: Path) -> list[str]:
             for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
                 if section_reference.search(line):
                     errors.append(f"fragile AGENTS section-number reference: {relative}:{line_no}")
-    if "docs/agent-index/routes.json" not in index_text:
+    if doc_layout.ROUTES not in index_text:
         errors.append("INDEX.md does not name the machine-readable route registry")
     return errors
 
@@ -510,9 +621,9 @@ def check_navigation_contract(repo: Path) -> list[str]:
 def check_agent_index(repo: Path) -> list[str]:
     """Check generated Agent navigation without rewriting it."""
     errors: list[str] = []
-    registry_path = repo / "docs/agent-index/routes.json"
+    registry_path = repo / doc_layout.ROUTES
     if not registry_path.is_file():
-        return ["missing machine-readable Agent route registry: docs/agent-index/routes.json"]
+        return [f"missing machine-readable Agent route registry: {doc_layout.ROUTES}"]
     try:
         registry = generate_agent_index.load_registry(repo)
     except (OSError, UnicodeError, ValueError) as error:
@@ -525,10 +636,7 @@ def check_agent_index(repo: Path) -> list[str]:
     routes = registry.get("routes")
     if not isinstance(routes, list):
         return errors + ["Agent route registry routes must be a list"]
-    expected = {
-        repo / "docs/生成索引/Agent路由.md": generate_agent_index.render_routes(repo, registry),
-        repo / "docs/生成索引/代码与文档地图.md": generate_agent_index.render_code_map(repo, registry),
-    }
+    expected = generate_agent_index.expected_outputs(repo, registry)
     for path, content in expected.items():
         if not path.is_file():
             errors.append(f"missing generated Agent index: {path.relative_to(repo)}")
@@ -568,7 +676,7 @@ def check_agent_index(repo: Path) -> list[str]:
                 if not (repo / target.split("#", 1)[0]).is_file():
                     errors.append(f"Agent route {route_id} points to missing {field}: {target}")
         for target in route.get("vault_refs", []):
-            if not isinstance(target, str) or not target.startswith("docs/") or target.startswith("docs/知识库引用.md"):
+            if not isinstance(target, str) or not target.startswith("docs/") or target == "docs/机制/知识库引用.md":
                 errors.append(f"Agent route {route_id} has invalid vault reference: {target!r}")
         for entrypoint in route.get("entrypoints", []):
             source = entrypoint.split("::", 1)[0]

@@ -1,11 +1,11 @@
 # 候选搜索与 Bake 调用链
 
-> 文档角色：call-chain
+> 文档角色：current-reference
 > 生命周期状态：current
 > 当前真源：docs/模块/候选搜索与Bake.md
 > 摘要：从输入池、Plan 门禁和域搜索追踪到 comparator、Bake 命中或 live fallback
 > 代码范围：crates/infra-core/src/{pool,search,bake.rs,candidate.rs}; crates/infra-cli/src/commands/{bake,profile}.rs
-> 机制依赖：docs/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
+> 机制依赖：docs/机制/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
 > 代码锚点：crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}; crates/infra-core/src/search/trade.rs::search_trade_triples; crates/infra-core/src/search/manufacture.rs::search_manufacture_triples; crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}
 > 关联链路：docs/模块/候选搜索与Bake.md; docs/模块/中枢与跨设施状态.md; docs/调用链/跨设施状态刷新.md
 > 核验基线：真实 CLI 结果对比、domain search report、plan --assert-invariants
@@ -65,4 +65,4 @@ Auto 首次读取失败时同步生成并发布，失败回 live；Required 不�
 自动轮换入口沿同一设施搜索调用链，最初ETA名单资格由建池消费，后续搜索不复筛工作预算。请求memo保留实际收益layout、模式及H；自动与定时模式都尝试Bake，由真实状态和有效评价窗口判定适用性；调度模式本身不禁用。入口和终态见 [自动轮换](自动轮换.md)。
 
 
-2026-11-02前轮38个真实三班Box开启/关闭产物相同且零命中是修复前证据。用户纠正自动禁用后，两域统一进入try_baked入口；布局比较不再用auto_rotation/work_hours单独判失配，真实名单及跨设施效果仍参与比较，制造ramp消费实际窗口。必须读bake_hits及layout/predicate回退计数，不以预热或开关耗时推断使用。RIIC-Web真实协议与测量见docs/PERFORMANCE_ENGINEERING.md。
+2026-11-02前轮38个真实三班Box开启/关闭产物相同且零命中是修复前证据。用户纠正自动禁用后，两域统一进入try_baked入口；布局比较不再用auto_rotation/work_hours单独判失配，真实名单及跨设施效果仍参与比较，制造ramp消费实际窗口。必须读bake_hits及layout/predicate回退计数，不以预热或开关耗时推断使用。RIIC-Web真实协议与测量见docs/质量与维护/PERFORMANCE_ENGINEERING.md。

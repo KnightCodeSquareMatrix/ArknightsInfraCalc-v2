@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/BASE_ASSIGNMENT.md
+> 替代项：docs/架构/ORCHESTRATION_LAYER.md；docs/架构/BASE_ASSIGNMENT.md
 > 历史原因：编排引擎初稿，当前 System-Plan-Execute 契约已由 current owner 接管
 > 快照日期：2026-07-18
 > 摘要：保存编排引擎早期设计和候选接口
@@ -685,7 +685,7 @@ L4 orchestrate                   跨房方案枚举+评分裁决    新增
 | `layout/mod.rs` | 导出 `orchestrate` 模块 |
 | `search/role_pick.rs` | hit_filter bridge 改为 trait 或保持现状（可选） |
 | `orchestrate/` | 新建 |
-| `docs/EFFECT_ATOM_DESIGN.md` | 新增 §8.14 编排层 |
+| `docs/机制/EFFECT_ATOM_DESIGN.md` | 新增 §8.14 编排层 |
 | `docs/INTERNAL/ASSIGN.md` | 新建内部地图 |
 
 ### 8.4 不碰的

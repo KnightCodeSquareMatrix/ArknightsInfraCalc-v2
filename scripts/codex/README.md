@@ -17,7 +17,7 @@ python3 scripts/codex/query_project_knowledge.py --id <返回ID> --parent --full
 python3 scripts/codex/query_project_knowledge.py --check
 ```
 
-本地关键词、Markdown父段与Rust声明导航，默认排除历史/提案，`--history`显式纳入；不是embedding语义检索。返回原文、owner、hash、HEAD、dirty、历史身份与完整回取，不裁决业务。详见[Agent知识库](../../docs/Agent知识库.md)、[检查与删减导航](../../docs/检查与删减导航.md)。源码声明是正则导航，不能证明AST或真实调用。缓存放target，hash改变按文件更新；文档/源码同时变化时查询会要求重读。
+本地关键词、Markdown父段与Rust声明导航，默认排除历史/提案，`--history`显式纳入；不是embedding语义检索。返回原文、owner、hash、HEAD、dirty、历史身份与完整回取，不裁决业务。详见[Agent知识库](../../docs/指南/Agent知识库.md)、[检查与删减导航](../../docs/指南/检查与删减导航.md)。源码声明是正则导航，不能证明AST或真实调用。缓存放target，hash改变按文件更新；文档/源码同时变化时查询会要求重读。
 
 ### 排班报告
 
@@ -143,16 +143,31 @@ python3 scripts/assert_rotation_invariants.py \
 
 ## 完成检查
 
+### 文档信息架构与生成导航
+
+文档入口按“问题 → 当前 owner → 代码/证据”组织：[文档总入口](../../docs/INDEX.md) 提供症状、七个主题领域、代码/协议、活动和历史路径；七个主题目录的 `README.md` 是领域入口，`docs/TODO/README.md` 汇总五个工作流，具体活动只放在 `docs/TODO/详情/<工作流>/`。不确定领域时先查生成的 Agent 路由，已知代码入口时查 `docs/PROJECT_MAP.md`，仍无法定位时才浏览全量文档目录。
+
+新增或关闭详情页时先修改页面正文和元数据，再由确定性生成器维护所有列表。`--write-indexes` 会先校验页面结构，再重建 canonical、ADR、五个工作流、tracker、领域目录和全量目录；`--check` 随后验证每个详情由对应 tracker 恰好链接一次，并检查所有生成区段无漂移。这样新增详情不会因为 tracker 尚未更新而阻塞首次生成。
+
 ```bash
+python3 scripts/codex/docs_inventory.py --write-indexes
+python3 scripts/codex/generate_agent_index.py
 python3 scripts/codex/docs_inventory.py --check
+python3 scripts/codex/generate_agent_index.py --check
 python3 scripts/codex/check_repository_facts.py
+python3 scripts/codex/query_project_knowledge.py --check --no-cache
+```
+
+不要把生成表复制回正文，也不要让 tracker 重写详情的状态和边界。身份、角色、工作流归属和摘要仍由详情元数据拥有；生成器只负责让人和 Agent 能从总板、领域入口与全量目录到达同一页面。
+
+```bash
 scripts/codex/check_task_scope.py --manifest target/codex-runs/<task>/manifest.json
 scripts/codex/render_evidence.py \
   --manifest target/codex-runs/<task>/manifest.json \
   --output target/codex-runs/<task>/reports/evidence.md
 ```
 
-`docs_inventory.py` 统一解析 [文档生命周期](../../docs/文档生命周期.md) 元数据，检查角色/状态/路径矩阵、唯一领域 owner、结构化页的代码锚点和关联链路。`generate_agent_index.py` 从 route registry、Rust 公共模块和 CLI dispatch 生成 Agent 路由与代码地图；`check_repository_facts.py` 再检查稳定 Markdown 链接、feedback ledger、CLI 命令地图和当前模块事实。生成器不把符号存在性冒充调用语义证明；跨层行为变更仍由作者声明触点并人工复核。
+`docs_inventory.py` 统一解析 [文档生命周期](../../docs/文档生命周期.md) 元数据，检查角色/状态/路径矩阵、唯一领域 owner、TODO 目录结构、结构化页的代码锚点和关联链路。`generate_agent_index.py` 从 route registry、Rust 公共模块和 CLI dispatch 生成 Agent 路由与代码地图；`check_repository_facts.py` 再检查当前 Markdown 的路径和章节锚点、feedback ledger、CLI 命令地图和当前模块事实。生成器不把符号存在性冒充调用语义证明；跨层行为变更仍由作者声明触点并人工复核。
 
 `check_task_scope.py` 检查实际 changed paths 是否属于 `change_scope`、带理由的 scope expansion 或证明路径；文档路径和其他消费者一样显式声明。显式 deferred 路径和 deferred side finding 被修改时硬失败。完成检查还要求 reviewer 登记最终不变量、精确 changed paths 和全部 expansion id。
 

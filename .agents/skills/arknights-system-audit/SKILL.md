@@ -14,7 +14,7 @@ description: 改动或审计涉及体系硬核、producer、同房/跨站/基内
 - Team 成员、Shift 上下班、绑定、闭合与降级；
 - 数值 scope、效果原子、用户选择的 policy。
 
-代码、数据、fixture、测试和当前 top hit 只是实现证据，不是规则来源。用户要求严格逐项审计，或 canonical 互相冲突时，完整读 `docs/SYSTEM_AUDIT_WORKFLOW.md` 并遵守其中两次等待。
+代码、数据、fixture、测试和当前 top hit 只是实现证据，不是规则来源。用户要求严格逐项审计，或 canonical 互相冲突时，完整读 `docs/质量与维护/SYSTEM_AUDIT_WORKFLOW.md` 并遵守其中两次等待。
 
 ## 追踪时要分开的几对概念
 

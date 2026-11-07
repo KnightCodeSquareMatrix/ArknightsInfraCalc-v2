@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 替代项：feedback/TRACKING.md；docs/MAINTENANCE_MODE.md
+> 替代项：feedback/TRACKING.md；docs/质量与维护/MAINTENANCE_MODE.md
 > 历史原因：生产反馈批次已关闭，维护入口已由 feedback ledger 和维护文档接管
 > 快照日期：2026-07-18
 > 摘要：保存生产反馈信任恢复和关闭审计的完成记录
@@ -40,7 +40,7 @@
 |------|------|
 | [../../feedback/](../../../feedback/) | 生产反馈原始证据 |
 | [../../feedback/TRACKING.md](../../../feedback/TRACKING.md) | 反馈 ledger，记录状态、疑似层、下一步 |
-| [../MAINTENANCE_MODE.md](../../MAINTENANCE_MODE.md) | 单个 bug 的复现、定位、修复流程 |
+| [../MAINTENANCE_MODE.md](../../质量与维护/MAINTENANCE_MODE.md) | 单个 bug 的复现、定位、修复流程 |
 | [../PROJECT_MAP.md](../../PROJECT_MAP.md) | 代码边界与入口 |
 
 ## 3. 工作流

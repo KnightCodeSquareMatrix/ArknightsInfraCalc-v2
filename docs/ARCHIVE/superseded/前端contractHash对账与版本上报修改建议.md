@@ -2,9 +2,9 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 当前真源：docs/FRONTEND_CLI.md
+> 当前真源：docs/接入与前端/FRONTEND_CLI.md
 > 摘要：给前端团队的接口修改建议：feedback 携带 solver 构建版本、移除运行时契约 hash 门禁、更新防呆改为发布对账
-> 替代项：[Worker 契约 hash 治理与前端版本上报](../../TODO/Worker契约hash治理与前端版本上报.md)
+> 替代项：[Worker 契约 hash 治理与前端版本上报](../../TODO/详情/接口产品/Worker契约hash治理与前端版本上报.md)
 
 ## 背景
 

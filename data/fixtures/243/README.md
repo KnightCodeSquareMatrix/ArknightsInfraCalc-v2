@@ -2,8 +2,8 @@
 
 仓库默认的 layout + operbox 组合。
 
-- **用户说「跑一遍模拟」**：`layout team-rotation` + 本目录夹具 + `--maa-out out/243_maa.json`（见 [Debug 指南的“复现入口”](../../../docs/MAINTENANCE_MODE.md#22-复现入口)）
-- **改机制 smoke test**：`layout test` + 本目录夹具（见 [Debug 指南的“复现入口”](../../../docs/MAINTENANCE_MODE.md#22-复现入口)）
+- **用户说「跑一遍模拟」**：`layout team-rotation` + 本目录夹具 + `--maa-out out/243_maa.json`（见 [Debug 指南的“复现入口”](../../../docs/质量与维护/MAINTENANCE_MODE.md#22-复现入口)）
+- **改机制 smoke test**：`layout test` + 本目录夹具（见 [Debug 指南的“复现入口”](../../../docs/质量与维护/MAINTENANCE_MODE.md#22-复现入口)）
 
 | 文件 | 格式 | 说明 |
 |------|------|------|

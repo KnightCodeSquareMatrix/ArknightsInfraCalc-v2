@@ -2,18 +2,18 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 替代项：docs/EFFICIENCY_MODEL.md；docs/SCORING_MODEL.md
+> 替代项：docs/机制/EFFICIENCY_MODEL.md；docs/机制/SCORING_MODEL.md
 > 历史原因：兼容量纲方案已被无兼容直接效率硬切替代
 > 快照日期：2026-07-18
 > 摘要：保存贸易站社区等效效率架构的被替代设计
 
 > 历史原状态：历史设计稿；当前已完成无兼容硬切。现行架构以
-> [../EFFICIENCY_MODEL.md](../../EFFICIENCY_MODEL.md) 为准。下文保留用于追溯最初的贸易域设计，
+> [../EFFICIENCY_MODEL.md](../../机制/EFFICIENCY_MODEL.md) 为准。下文保留用于追溯最初的贸易域设计，
 > 其中“迁移期兼容”与旧字段方案不再适用。
 > 日期：2026-07-11
 > 范围：贸易站纸面效率、社区等效换算、搜索排序与产出预估
 > 需求依据：`排班表图片生成器.md`「三、需求模块二：效率与预期产出计算」
-> 关联文档：[../SCORING_MODEL.md](../../SCORING_MODEL.md)、[../SCORING_REFACTOR_PLAN.md](../plans/SCORING_REFACTOR_PLAN.md)、[../EFFECT_ATOM_DESIGN.md](../../EFFECT_ATOM_DESIGN.md)、[../INTERNAL/SHORTCUT_MATCHING.md](../../INTERNAL/SHORTCUT_MATCHING.md)
+> 关联文档：[../SCORING_MODEL.md](../../机制/SCORING_MODEL.md)、[../SCORING_REFACTOR_PLAN.md](../plans/SCORING_REFACTOR_PLAN.md)、[../EFFECT_ATOM_DESIGN.md](../../机制/EFFECT_ATOM_DESIGN.md)、[../INTERNAL/SHORTCUT_MATCHING.md](../../INTERNAL/SHORTCUT_MATCHING.md)
 
 ## 1. 背景
 

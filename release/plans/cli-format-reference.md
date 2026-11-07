@@ -1,6 +1,6 @@
 # infra-cli 输入/输出格式完整参考
 
-> 基于 `release/docs/FRONTEND_CLI.md` + `fixtures/` 样例 + `VERSION.txt` 整理
+> 基于发布包内 `../docs/FRONTEND_CLI.md`（源文件 `docs/接入与前端/FRONTEND_CLI.md`）+ `fixtures/` 样例 + `VERSION.txt` 整理
 > 用途：调试页面开发前的格式摸底
 
 ---

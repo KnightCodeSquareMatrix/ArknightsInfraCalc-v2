@@ -2,13 +2,13 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/EFFICIENCY_MODEL.md；docs/SCORING_MODEL.md
+> 替代项：docs/机制/EFFICIENCY_MODEL.md；docs/机制/SCORING_MODEL.md
 > 历史原因：百分比兼容方案已被直接效率硬切替代，剩余开放项由 current owner 记录
 > 快照日期：2026-07-18
 > 摘要：保存评分口径收敛与分量化的历史实施计划
 
 > 历史原状态：历史计划；百分比与兼容字段已被 2026-07-11 的直接效率硬切取代。当前实现见
-> [EFFICIENCY_MODEL.md](../../EFFICIENCY_MODEL.md) 与 [SCORING_MODEL.md](../../SCORING_MODEL.md)。
+> [EFFICIENCY_MODEL.md](../../机制/EFFICIENCY_MODEL.md) 与 [SCORING_MODEL.md](../../机制/SCORING_MODEL.md)。
 > 已完成：Phase 0 首轮审计、Phase 1 注释修正、Phase 2 排序 key 显式化、Phase 3 `scoring` 分量策略入口、Phase 4 当前行为锁定测试；安全 warning hygiene 已完成。
 > 当前结论：公孙长乐确认**不需要贸易-制造平衡公式**。龙舌兰、可露希尔、但书等特殊贸易机制已给出等效效率，直接进入贸易站赤金订单总效率；制造站继续拆为赤金效率、经验效率。
 > 待做：把输出、文档和后续实现统一为分量化口径，不再等待或设计跨贸易/制造的单一复合分。
@@ -96,7 +96,7 @@
 
 ### Phase 0：评分口径审计（已完成）
 
-产出：[SCORING_MODEL.md](../../SCORING_MODEL.md)
+产出：[SCORING_MODEL.md](../../机制/SCORING_MODEL.md)
 
 已列出所有 `score` / `composite_score` / `total_score` / `weighted_*` 字段，标记单位、用途、是否参与排序。
 
@@ -236,7 +236,7 @@ pub struct ComponentScore {
 
 ## 8. 建议验收标准
 
-- [x] `docs/SCORING_MODEL.md` 完成首轮审计表；
+- [x] `docs/机制/SCORING_MODEL.md` 完成首轮审计表；
 - [x] 主要 score 字段注释与实际代码一致；
 - [x] 所有搜索模块有明确 sort key 入口或明确注释；
 - [x] `scoring` 模块不再宣称等待贸易-制造平衡公式；

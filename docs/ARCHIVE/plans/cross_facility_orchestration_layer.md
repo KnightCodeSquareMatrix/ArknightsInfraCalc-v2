@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/INTERNAL/CROSS_FACILITY.md
+> 替代项：docs/架构/ORCHESTRATION_LAYER.md；docs/INTERNAL/CROSS_FACILITY.md
 > 历史原因：跨设施编排层早期设计，当前责任边界已进入 current owner
 > 快照日期：2026-07-18
 > 摘要：保存跨设施编排层的历史设计分析

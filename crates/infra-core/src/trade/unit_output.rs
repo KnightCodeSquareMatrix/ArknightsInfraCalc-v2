@@ -1,4 +1,4 @@
-//! **场景产量层**（见 `docs/EFFECT_ATOM_DESIGN.md` §8.11）：单位产出 / 倍率 / 无人机。
+//! **场景产量层**（见 `docs/机制/EFFECT_ATOM_DESIGN.md` §8.11）：单位产出 / 倍率 / 无人机。
 //! 不新增 EffectAtom；由 L2 分布 + 订单效率% 与上班时长组合。
 
 use serde::Serialize;

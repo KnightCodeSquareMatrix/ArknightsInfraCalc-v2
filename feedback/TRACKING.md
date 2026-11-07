@@ -2,7 +2,7 @@
 
 > 文档角色：evidence
 > 生命周期状态：closed
-> 当前真源：docs/MAINTENANCE_MODE.md
+> 当前真源：docs/质量与维护/MAINTENANCE_MODE.md
 > 摘要：记录已关闭生产反馈批次的证据和回归矩阵
 
 > Scope: production beta/test feedback after launch.

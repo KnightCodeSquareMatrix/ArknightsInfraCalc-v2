@@ -29,7 +29,7 @@
 
 贸易站是目前分层最完整的领域（L1 + L2 + L3）；制造、发电、中枢、全局资源和编排已经进入同一条全基建主路径，但各自的机制深度并不相同。当前事实地图见 [docs/PROJECT_MAP.md](docs/PROJECT_MAP.md)。
 
-当前数据包含 727 条机制登记、298 个技能定义和 487 个练度实例（282 个逻辑干员）；编排同时使用 6 条声明式 Rule、8 个兼容 registry System 和 4 个中枢制造注入器，另有 16 个贸易 shortcut。仅控制中枢、贸易站、制造站的设施全集就分别对应 `C(55,5)=3,478,761`、`C(77,3)=73,150`、`C(90,3)=117,480` 个原始满房组合。这些数字不是“覆盖率 100%”的营销口号，而是为什么项目必须同时建设机制分层、候选池、Bake 与严格回归的工程尺度。事实入口见 [项目地图](docs/PROJECT_MAP.md)、[性能工程](docs/PERFORMANCE_ENGINEERING.md) 和 [已建模干员](docs/MODELLED_OPERATORS.md)。
+当前数据包含 727 条机制登记、298 个技能定义和 487 个练度实例（282 个逻辑干员）；编排同时使用 6 条声明式 Rule、8 个兼容 registry System 和 4 个中枢制造注入器，另有 16 个贸易 shortcut。仅控制中枢、贸易站、制造站的设施全集就分别对应 `C(55,5)=3,478,761`、`C(77,3)=73,150`、`C(90,3)=117,480` 个原始满房组合。这些数字不是“覆盖率 100%”的营销口号，而是为什么项目必须同时建设机制分层、候选池、Bake 与严格回归的工程尺度。事实入口见 [项目地图](docs/PROJECT_MAP.md)、[性能工程](docs/质量与维护/PERFORMANCE_ENGINEERING.md) 和 [已建模干员](docs/机制/MODELLED_OPERATORS.md)。
 
 ## 架构一览
 
@@ -54,7 +54,7 @@ runtime data + operbox + BaseBlueprint
 
 这里有一条重要边界：shortcut 负责“这个实际组合怎样结算”，不能代替“谁必须进编”；`shift_bind` 负责已入选成员怎样同上同下，也不能代替 required anchor。正因为这些责任被分开，项目才能同时容纳硬体系和自然搜索。
 
-Agent 首先按症状读取 [docs/INDEX.md](docs/INDEX.md) 和生成的 [Agent 路由](docs/生成索引/Agent路由.md)；游戏机制通过 [知识库引用合同](docs/知识库引用.md) 跳转到固定版本的相邻知识库。人类读者仍可从 [docs/OVERVIEW.md](docs/OVERVIEW.md) 和 [docs/GLOSSARY.md](docs/GLOSSARY.md) 开始。
+Agent 首先按症状读取 [docs/INDEX.md](docs/INDEX.md) 和生成的 [Agent 路由](docs/生成索引/Agent路由.md)；游戏机制通过 [知识库引用合同](docs/机制/知识库引用.md) 跳转到固定版本的相邻知识库。人类读者仍可从 [docs/指南/OVERVIEW.md](docs/指南/OVERVIEW.md) 和 [docs/指南/GLOSSARY.md](docs/指南/GLOSSARY.md) 开始。
 
 ## 直接运行一套真实方案
 
@@ -89,7 +89,7 @@ cargo run -q -p infra-cli -- bake all
 cargo run -q -p infra-cli -- bake validate
 ```
 
-`plan`、`layout team-rotation`、`layout eval`、`trade yield` 等完整参数见 [docs/INFRA_CLI.md](docs/INFRA_CLI.md)。
+`plan`、`layout team-rotation`、`layout eval`、`trade yield` 等完整参数见 [docs/接入与前端/INFRA_CLI.md](docs/接入与前端/INFRA_CLI.md)。
 
 ## Rust 开发容器（WSL）
 
@@ -236,7 +236,7 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 - Bake 不兼容、缺失或过期时回退到实时 solver。缓存失效只应影响速度，不能改变语义；
 - `Efficiency` 用千分整数保存和排序，避免浮点尾差改变候选次序。
 
-当前单班编制仍是领域约束下的分阶段、逐房搜索，不宣称全基建整数规划意义上的全局最优。动态贸易 producer 的统一联合搜索与完整候选列 Bake（A+）是**未来计划**，尚不是当前能力；设计边界见 [docs/TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](docs/TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
+当前单班编制仍是领域约束下的分阶段、逐房搜索，不宣称全基建整数规划意义上的全局最优。动态贸易 producer 的统一联合搜索与完整候选列 Bake（A+）是**未来计划**，尚不是当前能力；设计边界见 [docs/TODO/详情/性能质量/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md](docs/TODO/详情/性能质量/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md)。
 
 ## 为什么结果值得审计
 
@@ -247,7 +247,7 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 3. `skill_table.id == buff_id`，干员与技能归属只在 `operator_instances.json` 维护。
 4. L1 解释器只认 `buff_id`，不会按干员中文名偷偷改公式。
 5. 生产域统一输出三位小数直接效率；机制等效效率只作解释，不会重复乘入产出。
-6. CSV 回归锚点、单位产出锚点、Rust 测试和真实 CLI 夹具覆盖不同责任层。
+6. CSV 回归锚点、单位产出锚点、终端不变量和真实 CLI 夹具覆盖不同责任层；源码测试不参与当前验证。
 7. Debug 流程要求先复现、定位生命周期边界、删除冲突旧路径、补不变量回归，并保留可点击验证日志和 JSON 产物。
 
 这不意味着仓库永远没有 bug；它意味着一个结果可以追到文档口径、数据条目、解释阶段、搜索边界、回归断言和实际 CLI 输出，而不是只能相信一张最终截图。
@@ -256,16 +256,19 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 
 | 你是谁 / 想做什么 | 入口 |
 |-------------------|------|
-| 第一次了解项目 | [docs/OVERVIEW.md](docs/OVERVIEW.md) → [docs/GLOSSARY.md](docs/GLOSSARY.md) |
-| Agent 按症状定位问题 | [docs/INDEX.md](docs/INDEX.md) → [Agent 路由](docs/生成索引/Agent路由.md) → `docs/调用链/` |
+| 第一次了解项目 | [docs/指南/OVERVIEW.md](docs/指南/OVERVIEW.md) → [docs/指南/GLOSSARY.md](docs/指南/GLOSSARY.md) |
+| Agent 按症状定位问题 | [Agent 路由](docs/生成索引/Agent路由.md) → `docs/调用链/` → 对应模块与机制 owner |
+| 已知问题属于哪个领域 | [docs/INDEX.md](docs/INDEX.md) → 七个领域入口 `README.md` → canonical |
 | 想沿一次真实请求看代码 | [docs/调用链/plan请求.md](docs/调用链/plan请求.md)、[docs/EXAMPLES/243_FULL_E2.md](docs/EXAMPLES/243_FULL_E2.md) |
-| 懂基建策略，不关心代码 | [docs/GONGSUN_RUNTIME_OVERVIEW.md](docs/GONGSUN_RUNTIME_OVERVIEW.md) |
+| 懂基建策略，不关心代码 | [docs/指南/GONGSUN_RUNTIME_OVERVIEW.md](docs/指南/GONGSUN_RUNTIME_OVERVIEW.md) |
 | 想运行 CLI 或接前端 | [docs/接口/CLI与Worker.md](docs/接口/CLI与Worker.md)、[docs/接口/输入输出与兼容.md](docs/接口/输入输出与兼容.md) |
-| 想判断结果或性能是否可信 | [docs/QUALITY_AND_AUDIT.md](docs/QUALITY_AND_AUDIT.md)、[docs/PERFORMANCE_ENGINEERING.md](docs/PERFORMANCE_ENGINEERING.md) |
-| 想理解机制映射 | [docs/知识库引用.md](docs/知识库引用.md) → [输入与技能映射](docs/模块/输入与技能映射.md) |
+| 想判断结果或性能是否可信 | [docs/质量与维护/QUALITY_AND_AUDIT.md](docs/质量与维护/QUALITY_AND_AUDIT.md)、[docs/质量与维护/PERFORMANCE_ENGINEERING.md](docs/质量与维护/PERFORMANCE_ENGINEERING.md) |
+| 想理解机制映射 | [docs/机制/知识库引用.md](docs/机制/知识库引用.md) → [输入与技能映射](docs/模块/输入与技能映射.md) |
 | 想理解编排与轮换 | [排班与轮换](docs/模块/排班与轮换.md)、[定时轮换调用链](docs/调用链/定时轮换.md) |
-| 想修 bug / 审计体系 | [AGENTS.md](AGENTS.md)、[错误与诊断](docs/接口/错误与诊断.md)、[docs/QUALITY_AND_AUDIT.md](docs/QUALITY_AND_AUDIT.md) |
+| 想修 bug / 审计体系 | [AGENTS.md](AGENTS.md)、[错误与诊断](docs/接口/错误与诊断.md)、[docs/质量与维护/QUALITY_AND_AUDIT.md](docs/质量与维护/QUALITY_AND_AUDIT.md) |
 | 想查文件和模块 | [docs/INDEX.md](docs/INDEX.md)、[docs/PROJECT_MAP.md](docs/PROJECT_MAP.md) |
+| 想查当前开放工作 | [TODO 总板](docs/TODO/README.md) |
+| 想追溯 ADR、完成记录或旧方案 | [决策与历史入口](docs/INDEX.md#4-当前工作与历史) |
 
 ## 明确的非目标
 

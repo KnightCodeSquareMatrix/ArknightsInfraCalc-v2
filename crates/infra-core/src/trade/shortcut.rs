@@ -384,7 +384,7 @@ pub(crate) fn is_closure_station_refs(ops: &[TradeOperatorRef<'_>], table: &Skil
 /// 公孙：但书单走最终效率 = 纸面效率 × 社区单位产出倍率。
 pub const DOCUS_MECHANIC_GOLD_PCT: f64 = 55.0;
 
-/// **L3 组合短路**（见 `docs/EFFECT_ATOM_DESIGN.md` §8.7）：工具人表最优解查表。
+/// **L3 组合短路**（见 `docs/机制/EFFECT_ATOM_DESIGN.md` §8.7）：工具人表最优解查表。
 pub fn resolve_trade_shortcut(
     ops: &[TradeOperator],
     table: &SkillTable,

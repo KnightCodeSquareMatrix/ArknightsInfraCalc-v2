@@ -68,7 +68,7 @@ Shift 2 = Team B + Team C
 Shift 3 = Team C + Team A
 ```
 
-`Shift 4` 不等于出现 `Team D`。四次轮班可能只是菲亚梅塔或特殊体系把已有排班状态拆得更细。菲亚梅塔是具名的心情交换动作，会让高价值主力多上一班或持续上班；她不是普通宿管，也不是第四套替补队。具体规则见 [Fiammetta.md](../../Fiammetta.md)。
+`Shift 4` 不等于出现 `Team D`。四次轮班可能只是菲亚梅塔或特殊体系把已有排班状态拆得更细。菲亚梅塔是具名的心情交换动作，会让高价值主力多上一班或持续上班；她不是普通宿管，也不是第四套替补队。具体规则见 [Fiammetta.md](../../排班/Fiammetta.md)。
 
 ### 2.3 领域知识与工程责任
 
@@ -586,9 +586,9 @@ Full suite、性能和完整 CLI 是否必跑，应由改动风险和用户入�
 
 后续一次性修改至少需要重新审视：
 
-- `docs/MAINTENANCE_MODE.md`：从项目总状态降为局部修复工作流；
-- `docs/SYSTEM_AUDIT_WORKFLOW.md`：保留 strict audit 与领域冲突等待点；
-- `docs/QUALITY_AND_AUDIT.md`：加入风险分层和求解保证等级；
+- `docs/质量与维护/MAINTENANCE_MODE.md`：从项目总状态降为局部修复工作流；
+- `docs/质量与维护/SYSTEM_AUDIT_WORKFLOW.md`：保留 strict audit 与领域冲突等待点；
+- `docs/质量与维护/QUALITY_AND_AUDIT.md`：加入风险分层和求解保证等级；
 - `docs/INDEX.md`：增加任务模式和 solver assurance 路由；
 - `docs/PROJECT_MAP.md`：只记录当前实现事实，不写项目永远处于维护期；
 - 排班文档：统一 Team / Shift 术语和不同换班模式边界。
@@ -664,7 +664,7 @@ Full suite、性能和完整 CLI 是否必跑，应由改动风险和用户入�
 7. 证据矩阵怎样按风险分层，又不削弱高风险体系和搜索改动的完成证明；
 8. 哪些 session 中的长期设计决定需要补成 ADR；
 9. `quality-refactor` 与 feature 能否在同一个纵向任务中组合，以及何时必须拆开；
-10. 二次 / 四次轮班进入实现前，`docs/定时换班.md` 还需要哪些领域裁决。
+10. 二次 / 四次轮班进入实现前，`docs/排班/定时换班.md` 还需要哪些领域裁决。
 
 ## 12. 一句话原则
 

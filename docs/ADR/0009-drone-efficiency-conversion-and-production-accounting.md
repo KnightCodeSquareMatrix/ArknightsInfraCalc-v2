@@ -2,13 +2,13 @@
 
 > 文档角色：decision
 > 生命周期状态：accepted
-> 当前真源：docs/DRONES.md；docs/EFFICIENCY_MODEL.md
+> 当前真源：docs/机制/DRONES.md；docs/机制/EFFICIENCY_MODEL.md
 > 摘要：记录发电效率、无人机库存、目标分配与制造贸易额外产出的统一裁决
 
 > 日期：2026-08-26
 > 决策状态：accepted
 > 实现状态：未实现，供后续 agent 按 canonical 实施
-> 当前规则：[无人机生成、分配与产出结算](../DRONES.md)
+> 当前规则：[无人机生成、分配与产出结算](../机制/DRONES.md)
 
 ## 背景
 

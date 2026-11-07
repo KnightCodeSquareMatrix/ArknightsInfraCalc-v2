@@ -26,12 +26,13 @@
 ## 查询顺序
 
 ```text
+已知领域 → docs/INDEX.md 七个领域入口 → 对应 canonical/current owner
 症状/关键词 → docs/生成索引/Agent路由.md → chain_doc → module_docs
-→ docs/知识库引用.md + vault_refs 指向的机制原文 → verification
+→ docs/机制/知识库引用.md + vault_refs 指向的机制原文 → verification
 ```
 
-代码锚点以源码为准，当前文件和符号位置由 `docs/生成索引/代码与文档地图.md` 提供快速入口。
+代码锚点以源码为准，当前文件和符号位置由 `docs/生成索引/代码与文档地图.md` 提供快速入口。领域和 route 都无法收敛时，再用 [`docs/生成索引/文档目录.md`](../生成索引/文档目录.md) 按目录、角色、状态和摘要兜底。
 
 ## 检查与知识导航
 
-`knowledge.json`登记[检查与删减导航](../检查与删减导航.md)及知识来源的标题、检索别名、owner和代码关系，不裁决语义。与routes分别负责问题片段和调用链；`query_project_knowledge.py --check`核对导航引用，查询按hash更新本地缓存。使用与覆盖范围见[Agent知识库](../Agent知识库.md)。
+`knowledge.json`登记[检查与删减导航](../指南/检查与删减导航.md)及知识来源的标题、检索别名、owner和代码关系，不裁决语义。与routes分别负责问题片段和调用链；`query_project_knowledge.py --check`核对导航引用，查询按hash更新本地缓存。使用与覆盖范围见[Agent知识库](../指南/Agent知识库.md)。

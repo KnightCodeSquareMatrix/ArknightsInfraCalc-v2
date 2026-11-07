@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/排班模式.md；docs/定时换班.md；docs/SCHEDULE_ROTATION.md
+> 替代项：docs/排班/排班模式.md；docs/排班/定时换班.md；docs/排班/SCHEDULE_ROTATION.md
 > 历史原因：ABC 三队轮换实施计划快照，当前规则与实现入口已迁入 current owner
 > 快照日期：2026-07-18
 > 摘要：保存 ABC 三队轮换早期实施工序和历史决策
@@ -217,7 +217,7 @@ pub struct ShiftScores {
   cargo test -p infra-core
   cargo run -p infra-cli -- verify --all
   ```
-- 文档回写：`docs/PROJECT_MAP.md`（新模块路由）、`docs/BASE_ASSIGNMENT.md`（αβγ 模式说明）。
+- 文档回写：`docs/PROJECT_MAP.md`（新模块路由）、`docs/架构/BASE_ASSIGNMENT.md`（αβγ 模式说明）。
 
 ---
 

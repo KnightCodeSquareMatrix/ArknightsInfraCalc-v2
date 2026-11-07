@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/TODO/体系注册表后续缺口.md
+> 替代项：docs/架构/ORCHESTRATION_LAYER.md；docs/TODO/详情/核心求解/体系注册表后续缺口.md
 > 历史原因：Phase 0-1 已落地，仍有效开放项已拆到合法 active change
 > 快照日期：2026-07-18
 > 摘要：保存组合体系规范化审计和历史迁移阶段
@@ -202,7 +202,7 @@
 
 验收：
 
-- `docs/ORCHESTRATION_LAYER.md`、`docs/BASE_ASSIGNMENT.md`、`docs/SCHEDULE_ROTATION.md` 中 `witch_long_beta fixed`、`blackkey_closure fixed` 的描述被替换。
+- `docs/架构/ORCHESTRATION_LAYER.md`、`docs/架构/BASE_ASSIGNMENT.md`、`docs/排班/SCHEDULE_ROTATION.md` 中 `witch_long_beta fixed`、`blackkey_closure fixed` 的描述被替换。
 
 ### Phase 1：贸易 meta 角色化
 

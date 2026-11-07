@@ -16,7 +16,7 @@
 - 错误 envelope；
 - legacy `method: "plan"` 路径协议。
 
-上述协议见 [前端对接说明](../docs/FRONTEND_CLI.md) 和 [Serve 指南](../docs/FRONTEND_SERVE_GUIDE.md)。
+上述协议见 [前端对接说明](../docs/接入与前端/FRONTEND_CLI.md) 和 [Serve 指南](../docs/接入与前端/FRONTEND_SERVE_GUIDE.md)。
 
 ## 2. 参数结构
 

@@ -2,7 +2,7 @@
 
 > 文档角色：decision
 > 生命周期状态：proposed
-> 当前真源：docs/定时换班.md；docs/SCHEDULE_ROTATION.md；docs/排班模式.md
+> 当前真源：docs/排班/定时换班.md；docs/排班/SCHEDULE_ROTATION.md；docs/排班/排班模式.md
 > 摘要：规定办公室轮换按实际心情消耗计算连续工作时长，不按 profile 或干员姓名写死换班规则
 
 > 日期：2026-08-20
@@ -146,7 +146,7 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 3. 提取事务性连续预算 helper：候选临时落位，完成该 shift 最终上下文求值，失败则完整回滚并尝试下一候选。
 4. 用 `HashMap<RoomId, Vec<AssignedOperator>>` 保存连续段中的普通办公室成员；绑定成员继续走 resolved dependency、消费方 presence 和原有 bind 路径。
 5. 在所有 profile 的最终 report 上运行闭环终验；不缩小现有 `validate_profile_rotation` 的检查范围，并显式处理“整轮无休息边界”：累计净消耗大于零时拒绝，累计为零时允许。
-6. 同步更新 `docs/定时换班.md`、`docs/SCHEDULE_ROTATION.md` 所引用的旧办公室范围。ADR 0008 accepted 后，旧裁决必须在正文中明确被本 ADR 替代，不能让 current canonical 保留冲突表述。
+6. 同步更新 `docs/排班/定时换班.md`、`docs/排班/SCHEDULE_ROTATION.md` 所引用的旧办公室范围。ADR 0008 accepted 后，旧裁决必须在正文中明确被本 ADR 替代，不能让 current canonical 保留冲突表述。
 7. 通过终态断言与真实 CLI 检查连续预算边界、`12/6/6`、自定义 `8/8/8` 与 `5/7/10`、跨周期首尾、整轮正净消耗拒绝与零净消耗允许、多办公室房间稳定、绑定成员缺席及斥罪数据驱动行为；不新增源码测试。
 
 ## 后果
@@ -181,7 +181,7 @@ prefix_cost + drain_per_hour(prefix_end_context) * safety_margin
 - 生产设施、中枢、会客室、Mower 和宿舍责任不被本 ADR 改写；
 - 其他未被本 ADR 明确替代的排班决策保持有效。
 
-接受本 ADR 后，必须同步更新 `docs/定时换班.md` §1.1/§5.2 和 `docs/SCHEDULE_ROTATION.md` 对 ABC 验证范围的表述，避免“ABC 不做完整循环 hard validation”被理解为办公室也不验证。
+接受本 ADR 后，必须同步更新 `docs/排班/定时换班.md` §1.1/§5.2 和 `docs/排班/SCHEDULE_ROTATION.md` 对 ABC 验证范围的表述，避免“ABC 不做完整循环 hard validation”被理解为办公室也不验证。
 
 ### 按姓名特判斥罪
 

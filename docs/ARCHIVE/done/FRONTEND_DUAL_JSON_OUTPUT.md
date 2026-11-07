@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 替代项：docs/FRONTEND_CLI.md
+> 替代项：docs/接入与前端/FRONTEND_CLI.md
 > 历史原因：接口能力已完成并吸收到前端 CLI current owner
 > 快照日期：2026-07-18
 > 摘要：保存前端双 JSON 输出实施完成记录
@@ -30,7 +30,7 @@
 |-----------|------|
 | `crates/infra-cli/src/commands/plan.rs` | 修正 `--json` stdout 为纯 profile JSON |
 | `crates/infra-cli/src/commands/layout.rs` | 同步修正 `layout analyze --json` stdout 为纯 profile JSON |
-| `docs/FRONTEND_CLI.md` | 固化前端双 JSON 文件读取契约 |
+| `docs/接入与前端/FRONTEND_CLI.md` | 固化前端双 JSON 文件读取契约 |
 | `docs/TODO/README.md` | 登记当前 TODO |
 
 ## 验收
@@ -43,4 +43,4 @@
 
 ## 完成后归档
 
-完成后移动到 `docs/ARCHIVE/done/`，并更新 `docs/FRONTEND_CLI.md`。
+完成后移动到 `docs/ARCHIVE/done/`，并更新 `docs/接入与前端/FRONTEND_CLI.md`。

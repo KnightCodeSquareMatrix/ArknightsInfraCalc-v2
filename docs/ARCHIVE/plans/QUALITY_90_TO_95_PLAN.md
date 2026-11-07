@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md；docs/TODO/CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md；docs/QUALITY_AND_AUDIT.md
+> 替代项：docs/TODO/详情/性能质量/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md；docs/TODO/详情/性能质量/CONDITIONAL_ROOM_RESPONSE_BAKE_PLAN.md；docs/质量与维护/QUALITY_AND_AUDIT.md
 > 历史原因：暂停的综合质量方案已拆给具名 active change 和 current quality owner
 > 快照日期：2026-07-18
 > 摘要：保存 90 到 95 质量提升候选方案的历史背景
@@ -603,11 +603,11 @@ trace 至少能解释：
 
 1. `AGENTS.md`
 2. `docs/INDEX.md`
-3. `docs/MANUFACTURE_STATUS.md`
-4. `docs/BASE_ASSIGNMENT.md`
-5. `docs/ORCHESTRATION_LAYER.md`
+3. `docs/机制/MANUFACTURE_STATUS.md`
+4. `docs/架构/BASE_ASSIGNMENT.md`
+5. `docs/架构/ORCHESTRATION_LAYER.md`
 6. `docs/INTERNAL/CROSS_FACILITY.md`
-7. `docs/SCORING_MODEL.md`
+7. `docs/机制/SCORING_MODEL.md`
 8. 本文档
 
 然后只读定位以下代码入口：

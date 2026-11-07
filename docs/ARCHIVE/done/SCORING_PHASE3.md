@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 替代项：docs/EFFICIENCY_MODEL.md；docs/SCORING_MODEL.md
+> 替代项：docs/机制/EFFICIENCY_MODEL.md；docs/机制/SCORING_MODEL.md
 > 历史原因：评分分量和 policy 已吸收到 current owner
 > 快照日期：2026-07-18
 > 摘要：保存评分 Phase 3 实施完成记录
@@ -11,7 +11,7 @@
 > 来源：[SCORING_REFACTOR_PLAN.md](../plans/SCORING_REFACTOR_PLAN.md) Phase 3
 > 完成日期：2026-06-24
 > 约束：新增接口，不接真实公式，不改变当前排序行为。
-> 当前说明：本归档记录的是旧 Phase 3。当日后续已按公孙长乐意见改为**分量化评分 policy**，不再等待贸易-制造平衡公式；当前实现见 `crates/infra-core/src/scoring/components.rs` 和 [SCORING_MODEL.md](../../SCORING_MODEL.md)，历史计划见 [SCORING_REFACTOR_PLAN.md](../plans/SCORING_REFACTOR_PLAN.md)。
+> 当前说明：本归档记录的是旧 Phase 3。当日后续已按公孙长乐意见改为**分量化评分 policy**，不再等待贸易-制造平衡公式；当前实现见 `crates/infra-core/src/scoring/components.rs` 和 [SCORING_MODEL.md](../../机制/SCORING_MODEL.md)，历史计划见 [SCORING_REFACTOR_PLAN.md](../plans/SCORING_REFACTOR_PLAN.md)。
 
 ## 目标
 

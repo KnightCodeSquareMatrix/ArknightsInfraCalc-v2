@@ -2,7 +2,7 @@
 
 > 文档角色：decision
 > 生命周期状态：accepted
-> 当前真源：docs/CONTROL_CENTER_ASSIGNMENT.md；docs/公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md；docs/公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md
+> 当前真源：docs/机制/CONTROL_CENTER_ASSIGNMENT.md；docs/公孙长乐的体系分析文档/ROSEMARY_PERCEPTION_CHAIN.md；docs/公孙长乐的体系分析文档/AUTOMATION_GROUP_CHAIN.md
 > 摘要：恢复历史回退后中枢候选、动态 producer 与二发电宿舍数值的责任边界
 
 > 日期：2026-08-18

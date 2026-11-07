@@ -10,6 +10,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import doc_layout
+
 
 CASE_ID_RE = re.compile(r"^FB-\d{8}-\d{6}$")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -100,8 +102,13 @@ def check_tracking(repo: Path, *, verify_local: bool) -> list[str]:
             errors.append(f"invalid feedback bundle digest: {case.case_id}")
         if availability != "local-only":
             errors.append(f"feedback availability must be local-only: {case.case_id}")
-        if case.status not in {"closed", "duplicate-covered"} and "docs/TODO/" not in case.closure:
-            errors.append(f"open feedback must link an active change: {case.case_id}")
+        if case.status not in {"closed", "duplicate-covered"}:
+            targets = re.findall(r"docs/TODO/详情/[^\s`;|)]+\.md", case.closure)
+            if not targets:
+                errors.append(f"open feedback must link an active change detail: {case.case_id}")
+            for target in targets:
+                if not target.startswith(doc_layout.ACTIVE_DETAILS_ROOT + "/") or not (repo / target).is_file():
+                    errors.append(f"open feedback has invalid active detail: {case.case_id}: {target}")
         if verify_local:
             bundle = repo / "feedback" / source_match.group(1)
             if not bundle.is_dir():

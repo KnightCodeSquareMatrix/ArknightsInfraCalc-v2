@@ -2,7 +2,7 @@
 
 > 文档角色：decision
 > 生命周期状态：accepted
-> 当前真源：docs/定时换班.md；docs/排班模式.md；docs/接口/CLI与Worker.md；docs/CONTROL_CENTER_ASSIGNMENT.md；docs/模块/贸易求解.md
+> 当前真源：docs/排班/定时换班.md；docs/排班/排班模式.md；docs/接口/CLI与Worker.md；docs/机制/CONTROL_CENTER_ASSIGNMENT.md；docs/模块/贸易求解.md
 > 摘要：记录六项十月排班需求在各自语义边界内的交付状态，不把局部实现或工作区草稿合并宣称为整体完成
 > 代码范围：crates/infra-core/src/schedule/；crates/infra-core/src/search/control.rs；crates/infra-core/src/layout/orchestrate/；crates/infra-cli/src/commands/
 > 核验基线：代码基线 `cb73864`（2026-10-22）；会话审计快照 `f425b5f`，并参考其后的各项提交与本地 evidence
@@ -41,10 +41,10 @@
 | 事项 | 判定 | 已提交实现 / 证据 | 仍开放或不应推导 |
 |---|---|---|---|
 | 主备 24/24 | **完成（已提交范围）** | `3569b90` 建立两班各 24h、48h 周期；`fb2f2f5` 完成菲亚目标回到备班正常 Trade 候选、最终动作筛选、诊断与输出。回池目标不是强制 anchor，必须由正常 Trade 搜索选中并通过最终 assignment、ready 和周期心情检查。历史 release gate 与 Astra 复核记录见 `target/codex-runs/fiammetta-2424-20261020-r7/`。 | `cb73864` 之后的泛型二/三班 WIP 会改动同一排班源码；它不是本 ADR 声明已验收的 24/24 新改动。历史 gate 仅证明列出的输入和已注册断言，不证明全局最优或游戏端执行。 |
-| 挂件组合启用开关 | **完成（CLI / Worker 产品接口）** | `fa7ec47` 提供默认关闭和 CLI 开关；`22418b9` 接通 Worker / `plan.compute` v6；`6717a15` 把莱茵 receiver 和迷迭香宿舍感知位纳入受控范围。请求未传时默认关闭；开启仅允许受控主动挂件参与，不保证被选中。会话与历史开关验收见 `target/codex-runs/opencode-six-topics-20261019/` 的 `support-switch` 提取及 `docs/TODO/排班工作交接-20261015.md`。 | 独立网站是否实际传参或线上版本是否启用未核实。此开关不等于通用 `SupportPool` / `SupportClaim`、延迟承诺或全局收益优化；自然读数、普通同房及鸿雪/深巡的豁免按现有合同保持。 |
+| 挂件组合启用开关 | **完成（CLI / Worker 产品接口）** | `fa7ec47` 提供默认关闭和 CLI 开关；`22418b9` 接通 Worker / `plan.compute` v6；`6717a15` 把莱茵 receiver 和迷迭香宿舍感知位纳入受控范围。请求未传时默认关闭；开启仅允许受控主动挂件参与，不保证被选中。会话与历史开关验收见 `target/codex-runs/opencode-six-topics-20261019/` 的 `support-switch` 提取及 `docs/TODO/详情/排班轮换/排班工作交接-20261015.md`。 | 独立网站是否实际传参或线上版本是否启用未核实。此开关不等于通用 `SupportPool` / `SupportClaim`、延迟承诺或全局收益优化；自然读数、普通同房及鸿雪/深巡的豁免按现有合同保持。 |
 | 绮良、鸿雪、图耶四赤金核心 | **专用准入与排班完成；完整 Trade 择优未完成** | 规范名为 `pozyomka_durin`。`01cba30` 建立准入，`fb6dffd` 修正三核心条件、两/三站分房与同步轮休；`206edb4` 记录交付及比较缺口。243/342 专用入口、建议队友可省略、E1 回普通 core、实际 bind 负例及同源码 release 证据记录于 `target/codex-runs/pozy-gold-unit-20261020/`。 | 四赤金完整 Plan 尚未与普通完整 Trade Plan 同场生成、执行并按已裁决的 `TradeEfficiency::final_efficiency` 比较。`228/228` 六 profile 默认 Box gate 不表示其中选中过四赤金，也不证明全局最优；普通两线鸿雪/图耶同房路径不是四赤金准入证明。 |
-| 中枢心情角色补位和轮换 | **基础补位/轮休已有；具体选位偏好与整体顺序收敛未完成专项证明** | 中枢候选固定归属、逐班准入、MoodModel 效果结算和周期心情检查已有实现与历史证据；普通补位及相关修复见 `3b79e6c`、归档修复方案 `docs/ARCHIVE/done/中枢轮休与心情补位修复方案.md`，release 周期心情记录见 `target/codex-runs/rotation-cycle-mood-20261004/`。 | 维什戴尔/魔王、玛恩纳/笑脸等具体偏好及“每类尽量单独使用”没有在全部生产余位结果中专项证明；“尽量”未被裁决为跨类别硬互斥。同一全局恢复族最多一个 owner 与不同合法效果仍可叠加必须区分。提交 `457dfb3` 不在 `cb73864` 祖先链上；不能将该提交的完整顺序选位改动当成本分支已交付。完整中枢顺序选位仍见 `docs/TODO/中枢效果账本与顺序选位重构.md` 的 ready-on-request 边界。 |
-| 自动轮换换班方法 | **CLI/core计算入口已实现；验收见当前记录** | 2026-10-11 会话已确定计算入口的主体规则：每站一主一替、工作成员互斥、主力优先；除宿舍挂件 1+1 和发电＋制造自动化外禁止跨站协同；2026-10-29更新为按输入H1/H2撑满并评估，替代历史首人红脸/36h窗口；不排菲亚、不排普通宿舍、不模拟真实错班/恢复；正常输出效率。 | 当前入口为 `plan --rotation auto@H1/H2`，独立逐站主备排班；完整边界见[自动轮换](../自动轮换.md)。定时 generic 2/3 班只接受有序时长并生成定时计划。用户于 2026-10-24 明确，1+1 与 `support_combinations_enable` 只作为实现兼容核对，不再列为待用户裁决；本轮不接网站、MAA 或部署。2026-10-28已裁决不做恢复及周期心情硬门禁、宿舍1＋1不受支持总开关控制。 |
+| 中枢心情角色补位和轮换 | **基础补位/轮休已有；具体选位偏好与整体顺序收敛未完成专项证明** | 中枢候选固定归属、逐班准入、MoodModel 效果结算和周期心情检查已有实现与历史证据；普通补位及相关修复见 `3b79e6c`、归档修复方案 `docs/ARCHIVE/done/中枢轮休与心情补位修复方案.md`，release 周期心情记录见 `target/codex-runs/rotation-cycle-mood-20261004/`。 | 维什戴尔/魔王、玛恩纳/笑脸等具体偏好及“每类尽量单独使用”没有在全部生产余位结果中专项证明；“尽量”未被裁决为跨类别硬互斥。同一全局恢复族最多一个 owner 与不同合法效果仍可叠加必须区分。提交 `457dfb3` 不在 `cb73864` 祖先链上；不能将该提交的完整顺序选位改动当成本分支已交付。完整中枢顺序选位仍见 `docs/TODO/详情/核心求解/中枢效果账本与顺序选位重构.md` 的 ready-on-request 边界。 |
+| 自动轮换换班方法 | **CLI/core计算入口已实现；验收见当前记录** | 2026-10-11 会话已确定计算入口的主体规则：每站一主一替、工作成员互斥、主力优先；除宿舍挂件 1+1 和发电＋制造自动化外禁止跨站协同；2026-10-29更新为按输入H1/H2撑满并评估，替代历史首人红脸/36h窗口；不排菲亚、不排普通宿舍、不模拟真实错班/恢复；正常输出效率。 | 当前入口为 `plan --rotation auto@H1/H2`，独立逐站主备排班；完整边界见[自动轮换](../排班/自动轮换.md)。定时 generic 2/3 班只接受有序时长并生成定时计划。用户于 2026-10-24 明确，1+1 与 `support_combinations_enable` 只作为实现兼容核对，不再列为待用户裁决；本轮不接网站、MAA 或部署。2026-10-28已裁决不做恢复及周期心情硬门禁、宿舍1＋1不受支持总开关控制。 |
 | 泡泡 / 火神优先搓玉 | **工作区实现中；未完成交付** | 用户已定自动优先、无产品开关、沿用轮休。当前共享工作树有普通二/三班 named 与 generic 的配对预占、首个合法三级源石制造房选择、α 归属、对应轮休 bind、最终态 gate 和 Worker v7 改动；ADR 0011 草案记载 release build、generic ABC 与主备 representative/high-owned 各 `38/38`，证据位于 `target/codex-runs/generic-two-three-originium-completion-20261021/`。 | 源码、Worker v7 契约、pair canonical、测试草稿和 ADR 0011 均未提交；ADR 0011 自身标记 `in-progress`。真实完整 Box 的“pair 局部预占失败 → 普通 peak 成功并 warning，且同输入显式 gate 失败”见证仍缺；`gpt-6.1-sol` 结论为 `CONTINUE`，不是 `PASS`。四班路径、跨 layout 完整方案效率比较及全局最优不在本单元范围。 |
 
 ### D3. 状态词的解释
@@ -61,6 +61,6 @@
 3. 中枢基础轮休修复不等同于完整落实所有组合偏好；不得把“尽量单独”静默变成硬禁配。
 4. 自动轮换作为独立计算入口由 `plan --rotation auto@H1/H2` 实现，验收和交付以其当前记录为准，不能借用 timed rotation 完成状态。
 5. 泡泡 / 火神当前 WIP 不得计为 `cb73864` 的已提交交付，不得把 `CONTINUE` 或运行批次通过率写成独立复核 `PASS`。
-6. 本 ADR 不关闭或替换 `docs/TODO/排班统一内核重构方案.md`、中枢顺序选位 active-change、泡泡 / 火神 ADR 实现阶段或其他 tracker；各领域 current owner 仍按上述文档和接口页维护。
+6. 本 ADR 不关闭或替换 `docs/TODO/详情/排班轮换/排班统一内核重构方案.md`、中枢顺序选位 active-change、泡泡 / 火神 ADR 实现阶段或其他 tracker；各领域 current owner 仍按上述文档和接口页维护。
 
 以上状态只由对应 owner 新提交的实现、同源码 release evidence、适用的独立复核和同步后的 current 文档更新。对本次只读核对没有重新运行 build、CLI、MAA、batch 或 invariant gate 的事实保持明确记录。

@@ -1,6 +1,6 @@
 //! 赤金生产线链式结算（贸易站内按进驻顺序迭代）。
 //!
-//! **L2 域短路**（见 `docs/EFFECT_ATOM_DESIGN.md` §8.5）：`skill_table` 中对应 buff 的
+//! **L2 域短路**（见 `docs/机制/EFFECT_ATOM_DESIGN.md` §8.5）：`skill_table` 中对应 buff 的
 //! `atoms` 为空是刻意委托，不在此重复建模为 EffectAtom。
 //!
 //! 真实制造赤金线数由 `TradeRoomInput::gold_production_lines` 注入；

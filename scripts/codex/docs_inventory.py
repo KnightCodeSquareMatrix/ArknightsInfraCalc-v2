@@ -4,14 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+import doc_layout
 
-SCHEMA_VERSION = 3
+
+SCHEMA_VERSION = 5
 META_KEYS = {
     "文档角色",
     "生命周期状态",
@@ -31,6 +34,7 @@ META_KEYS = {
     "核验基线",
     "机制依赖",
     "知识库桥接",
+    "所属工作流",
 }
 ROLES = {
     "canonical",
@@ -41,13 +45,7 @@ ROLES = {
     "evidence",
     "archive",
 }
-ROLE_ALIASES = {
-    "module-reference": "current-reference",
-    "call-chain": "current-reference",
-    "compatibility-reference": "current-reference",
-    "index-reference": "current-reference",
-    "system-bridge": "current-reference",
-}
+ROLE_ALIASES: dict[str, str] = {}
 ROLE_STATES = {
     "canonical": {"current"},
     "current-reference": {"current"},
@@ -59,8 +57,11 @@ ROLE_STATES = {
 }
 GENERATED_SECTIONS = {
     "canonical": ("<!-- BEGIN GENERATED CANONICAL -->", "<!-- END GENERATED CANONICAL -->"),
-    "active": ("<!-- BEGIN GENERATED ACTIVE CHANGES -->", "<!-- END GENERATED ACTIVE CHANGES -->"),
     "decisions": ("<!-- BEGIN GENERATED DECISIONS -->", "<!-- END GENERATED DECISIONS -->"),
+    "workstreams": ("<!-- BEGIN GENERATED WORKSTREAMS -->", "<!-- END GENERATED WORKSTREAMS -->"),
+    "tracker": ("<!-- BEGIN GENERATED DETAILS -->", "<!-- END GENERATED DETAILS -->"),
+    "domain": ("<!-- BEGIN GENERATED DOMAIN DOCUMENTS -->", "<!-- END GENERATED DOMAIN DOCUMENTS -->"),
+    "catalog": ("<!-- BEGIN GENERATED DOCUMENT CATALOG -->", "<!-- END GENERATED DOCUMENT CATALOG -->"),
 }
 META_RE = re.compile(r"^>\s*([^：:]+)[：:]\s*(.*?)\s*$")
 H1_RE = re.compile(r"^#\s+(.+?)\s*$")
@@ -283,7 +284,8 @@ def _path_role_errors(document: Document) -> list[str]:
     if path.startswith("plans/"):
         errors.append(f"root plans must not contain Markdown: {path}")
     if path.startswith("docs/TODO/"):
-        expected = "current-reference" if path == "docs/TODO/README.md" else "active-change"
+        current_paths = {doc_layout.ACTIVE_INDEX, *doc_layout.ACTIVE_TRACKERS}
+        expected = "current-reference" if path in current_paths else "active-change"
         if role != expected:
             errors.append(f"TODO path must use {expected} role: {path}")
     elif path.startswith("docs/ADR/") and role != "decision":
@@ -296,8 +298,10 @@ def _path_role_errors(document: Document) -> list[str]:
         errors.append(f"tracked feedback Markdown must be evidence/current-reference: {path}")
     elif path.startswith("docs/") and role in {"active-change", "archive"}:
         errors.append(f"current docs path cannot use {role} role: {path}")
-    if role == "active-change" and not (path.startswith("docs/TODO/") and path != "docs/TODO/README.md"):
-        errors.append(f"active-change role is only allowed under docs/TODO: {path}")
+    if role == "active-change" and not doc_layout.under(path, doc_layout.ACTIVE_DETAILS_ROOT):
+        errors.append(
+            f"active-change role is only allowed under {doc_layout.ACTIVE_DETAILS_ROOT}: {path}"
+        )
     if role == "decision" and not path.startswith("docs/ADR/"):
         errors.append(f"decision role is only allowed under docs/ADR: {path}")
     if role == "archive" and not path.startswith("docs/ARCHIVE/"):
@@ -306,6 +310,10 @@ def _path_role_errors(document: Document) -> list[str]:
         errors.append(f"evidence role requires a named evidence root: {path}")
     if role in {"canonical", "generated-reference"} and not path.startswith("docs/"):
         errors.append(f"{role} role is only allowed in docs current paths: {path}")
+    if path.startswith("docs/") and path.count("/") == 1 and path not in doc_layout.ROOT_REFERENCE_FILES:
+        errors.append(f"docs root may only contain the three reference hubs: {path}")
+    if path.startswith(doc_layout.GENERATED_ROOT + "/") and role != "generated-reference":
+        errors.append(f"generated index path must use generated-reference role: {path}")
     return errors
 
 
@@ -319,8 +327,8 @@ def validate_document(document: Document) -> list[str]:
         errors.append(f"invalid lifecycle status {status!r} for {role}: {document.path}")
     if role != "canonical" and "self" in document.owners:
         errors.append(f"only canonical documents may use self as current owner: {document.path}")
-    structured = document.path.startswith(("docs/模块/", "docs/调用链/", "docs/接口/"))
-    if (role == "canonical" or structured) and not document.metadata.get("摘要"):
+    structured = document.path.startswith(doc_layout.STRUCTURED_ROOTS)
+    if role not in {"archive"} and not document.metadata.get("摘要"):
         errors.append(f"document summary is required: {document.path}")
     errors.extend(_path_role_errors(document))
 
@@ -331,7 +339,7 @@ def validate_document(document: Document) -> list[str]:
             errors.append(f"canonical current owner must be self: {document.path}")
     elif role in {"active-change", "decision", "generated-reference", "evidence"} or (
         role == "current-reference" and structured
-    ):
+    ) or document.path in doc_layout.DOMAIN_READERS.values():
         if not document.owners:
             errors.append(f"{role} document requires current owner links: {document.path}")
     elif role == "archive" and not (
@@ -347,11 +355,75 @@ def validate_document(document: Document) -> list[str]:
     for owner in document.owners:
         if owner != "self" and (not _is_repo_path(owner) or any(char in owner for char in "*?[")):
             errors.append(f"current owner must be a concrete repository path: {document.path}: {owner}")
+    if role == "active-change":
+        group = _active_group(document.path)
+        tracker = document.metadata.get("所属工作流", "")
+        if group is None:
+            errors.append(f"active change must be directly under a known detail group: {document.path}")
+        elif tracker != doc_layout.ACTIVE_DETAIL_GROUPS.get(group):
+            expected = doc_layout.ACTIVE_DETAIL_GROUPS.get(group, "?")
+            errors.append(
+                f"active change must declare its group tracker as 所属工作流: {document.path}: "
+                f"expected {expected}, got {tracker or '<missing>'}"
+            )
+    return errors
+
+
+def _active_group(path: str) -> str | None:
+    root = doc_layout.ACTIVE_DETAILS_ROOT + "/"
+    if not path.startswith(root):
+        return None
+    parts = path[len(root):].split("/")
+    if len(parts) != 2 or parts[0] not in doc_layout.ACTIVE_DETAIL_GROUPS:
+        return None
+    return parts[0]
+
+
+def _active_layout_errors(repo: Path) -> list[str]:
+    """Keep the active-work area to trackers, groups, and group attachments."""
+    active_root = repo / doc_layout.ACTIVE_ROOT
+    details_root = repo / doc_layout.ACTIVE_DETAILS_ROOT
+    if not active_root.is_dir():
+        return [f"active work root is missing: {doc_layout.ACTIVE_ROOT}"]
+
+    errors: list[str] = []
+    allowed_top_files = {
+        Path(doc_layout.ACTIVE_INDEX).name,
+        *(Path(tracker).name for tracker in doc_layout.ACTIVE_TRACKERS),
+    }
+    details_name = Path(doc_layout.ACTIVE_DETAILS_ROOT).name
+    for child in sorted(active_root.iterdir(), key=lambda item: item.name):
+        if child.name == details_name and child.is_dir():
+            continue
+        if not child.is_file() or child.name not in allowed_top_files:
+            errors.append(
+                f"{doc_layout.ACTIVE_ROOT} may only contain README, trackers, and {details_name}/: "
+                f"{_repo_relative(repo, child)}"
+            )
+
+    if not details_root.is_dir():
+        errors.append(f"active details root is missing: {doc_layout.ACTIVE_DETAILS_ROOT}")
+        return errors
+
+    allowed_groups = set(doc_layout.ACTIVE_DETAIL_GROUPS)
+    for child in sorted(details_root.iterdir(), key=lambda item: item.name):
+        if not child.is_dir() or child.name not in allowed_groups:
+            errors.append(
+                f"{doc_layout.ACTIVE_DETAILS_ROOT} may only contain known workstream groups: "
+                f"{_repo_relative(repo, child)}"
+            )
+            continue
+        for nested in sorted(child.iterdir(), key=lambda item: item.name):
+            if not nested.is_file():
+                errors.append(
+                    "active detail groups may contain files and attachments, not nested directories: "
+                    f"{_repo_relative(repo, nested)}"
+                )
     return errors
 
 
 def validate_inventory(repo: Path, documents: list[Document]) -> list[str]:
-    errors: list[str] = []
+    errors: list[str] = _active_layout_errors(repo)
     by_path = {document.path: document for document in documents}
     for document in documents:
         errors.extend(validate_document(document))
@@ -380,6 +452,20 @@ def validate_inventory(repo: Path, documents: list[Document]) -> list[str]:
                 errors.append(f"current owner must be a governed current document: {document.path}: {owner}")
             elif target.role not in {"canonical", "current-reference"}:
                 errors.append(f"current owner is not current truth: {document.path}: {owner}")
+    required_current = {
+        doc_layout.INDEX,
+        doc_layout.PROJECT_MAP,
+        doc_layout.LIFECYCLE,
+        doc_layout.ACTIVE_INDEX,
+        *doc_layout.ACTIVE_TRACKERS,
+        *doc_layout.DOMAIN_READERS.values(),
+    }
+    for path in sorted(required_current):
+        document = by_path.get(path)
+        if document is None:
+            errors.append(f"required documentation hub is missing: {path}")
+        elif document.role not in {"current-reference", "canonical"}:
+            errors.append(f"documentation hub must use current-reference or canonical role: {path}")
     return sorted(set(errors))
 
 
@@ -396,12 +482,77 @@ def render_canonical_table(documents: Iterable[Document]) -> str:
     return "\n".join(lines)
 
 
-def render_active_table(documents: Iterable[Document]) -> str:
-    rows = [document for document in documents if document.role == "active-change"]
-    lines = ["| 文件 | 状态 | 用途 |", "|---|---|---|"]
-    for document in sorted(rows, key=lambda item: item.path):
-        link = Path(document.path).name.replace(" ", "%20")
-        lines.append(f"| [{document.title}]({link}) | `{document.status}` | {document.metadata['摘要']} |")
+def _cell(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ")
+
+
+def _relative_markdown_link(source: str, target: str) -> str:
+    return (
+        posixpath.relpath(target, posixpath.dirname(source))
+        .replace(" ", "%20")
+        .replace("(", "%28")
+        .replace(")", "%29")
+    )
+
+
+def _active_documents(documents: Iterable[Document], group: str) -> list[Document]:
+    prefix = f"{doc_layout.ACTIVE_DETAILS_ROOT}/{group}/"
+    return sorted(
+        (document for document in documents if document.role == "active-change" and document.path.startswith(prefix)),
+        key=lambda document: document.path,
+    )
+
+
+def render_workstream_table(documents: Iterable[Document]) -> str:
+    documents = list(documents)
+    lines = ["| 工作流 | 活动项 | 状态分布 | 入口 |", "|---|---:|---|---|"]
+    for group, tracker in doc_layout.ACTIVE_DETAIL_GROUPS.items():
+        items = _active_documents(documents, group)
+        counts: dict[str, int] = {}
+        for item in items:
+            counts[item.status] = counts.get(item.status, 0) + 1
+        statuses = "、".join(f"`{status}` {counts[status]}" for status in sorted(counts)) or "无"
+        link = _relative_markdown_link(doc_layout.ACTIVE_INDEX, tracker)
+        lines.append(f"| {group} | {len(items)} | {statuses} | [{Path(tracker).stem}]({link}) |")
+    return "\n".join(lines)
+
+
+def render_tracker_table(documents: Iterable[Document], tracker: str) -> str:
+    group = next(
+        (name for name, path in doc_layout.ACTIVE_DETAIL_GROUPS.items() if path == tracker),
+        None,
+    )
+    if group is None:
+        raise InventoryError(f"unknown workstream tracker: {tracker}")
+    lines = ["| 事项 | 状态 | 当前边界 / 下一动作 | 详情 |", "|---|---|---|---|"]
+    for document in _active_documents(documents, group):
+        link = _relative_markdown_link(tracker, document.path)
+        summary = _cell(document.metadata.get("摘要", "-"))
+        lines.append(f"| {_cell(document.title)} | `{document.status}` | {summary} | [详情]({link}) |")
+    if len(lines) == 2:
+        lines.append("| 当前无开放事项 | - | - | - |")
+    return "\n".join(lines)
+
+
+def render_domain_table(documents: Iterable[Document], readme: str) -> str:
+    domain_root = posixpath.dirname(readme)
+    rows = sorted(
+        (
+            document
+            for document in documents
+            if document.path.startswith(domain_root + "/") and document.path != readme
+        ),
+        key=lambda document: document.path,
+    )
+    lines = ["| 文档 | 角色 | 状态 | 摘要 |", "|---|---|---|---|"]
+    for document in rows:
+        link = _relative_markdown_link(readme, document.path)
+        summary = _cell(document.metadata.get("摘要", "-"))
+        lines.append(
+            f"| [{_cell(document.title)}]({link}) | `{document.role}` | `{document.status}` | {summary} |"
+        )
+    if len(lines) == 2:
+        lines.append("| 当前无文档 | - | - | - |")
     return "\n".join(lines)
 
 
@@ -416,6 +567,61 @@ def render_decision_table(documents: Iterable[Document]) -> str:
     return "\n".join(lines)
 
 
+def render_document_catalog(documents: Iterable[Document], catalog: str) -> str:
+    grouped: dict[str, list[Document]] = {}
+    for document in documents:
+        parts = Path(document.path).parts
+        if parts and parts[0] in {"docs", "feedback"}:
+            if len(parts) == 2:
+                group = "docs 根入口" if parts[0] == "docs" else "feedback"
+            else:
+                group = f"{parts[0]}/{parts[1]}"
+        else:
+            group = parts[0] if parts else "其他"
+        grouped.setdefault(group, []).append(document)
+    lines: list[str] = []
+    for group in sorted(grouped):
+        lines.extend([f"## {group}", "", "| 文档 | 角色 | 状态 | 摘要 |", "|---|---|---|---|"])
+        for document in sorted(grouped[group], key=lambda item: item.path):
+            link = _relative_markdown_link(catalog, document.path)
+            summary = _cell(document.metadata.get("摘要", "-"))
+            lines.append(
+                f"| [{_cell(document.title)}]({link}) | `{document.role}` | `{document.status}` | {summary} |"
+            )
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+def _validate_workstream_links(documents: list[Document]) -> list[str]:
+    errors: list[str] = []
+    by_path = {document.path: document for document in documents}
+    link_re = re.compile(r"\[[^]]*\]\(([^)]+)\)")
+    for group, tracker in doc_layout.ACTIVE_DETAIL_GROUPS.items():
+        tracker_doc = by_path.get(tracker)
+        if tracker_doc is None:
+            continue
+        begin, end = GENERATED_SECTIONS["tracker"]
+        if begin not in tracker_doc.text or end not in tracker_doc.text:
+            errors.append(f"workstream tracker lacks generated detail markers: {tracker}")
+            continue
+        body = tracker_doc.text.split(begin, 1)[1].split(end, 1)[0]
+        linked: list[str] = []
+        for target in link_re.findall(body):
+            local = target.split("#", 1)[0]
+            if not local or "://" in local:
+                continue
+            resolved = posixpath.normpath(posixpath.join(posixpath.dirname(tracker), local))
+            linked.append(resolved)
+        expected = [document.path for document in _active_documents(documents, group)]
+        if sorted(linked) != sorted(expected):
+            errors.append(
+                f"workstream tracker must link each {group} detail exactly once: {tracker}: "
+                f"missing={sorted(set(expected) - set(linked))} extra={sorted(set(linked) - set(expected))} "
+                f"duplicates={sorted(item for item in set(linked) if linked.count(item) > 1)}"
+            )
+    return errors
+
+
 def replace_generated_section(text: str, section: str, body: str) -> str:
     begin, end = GENERATED_SECTIONS[section]
     replacement = f"{begin}\n{body}\n{end}"
@@ -425,17 +631,27 @@ def replace_generated_section(text: str, section: str, body: str) -> str:
     raise InventoryError(f"generated section markers are missing: {section}")
 
 
-def _generated_targets(repo: Path, documents: list[Document]) -> dict[str, tuple[Path, str]]:
-    return {
-        "canonical": (repo / "docs/INDEX.md", render_canonical_table(documents)),
-        "active": (repo / "docs/TODO/README.md", render_active_table(documents)),
-        "decisions": (repo / "docs/INDEX.md", render_decision_table(documents)),
-    }
+def _generated_targets(repo: Path, documents: list[Document]) -> list[tuple[str, Path, str]]:
+    targets = [
+        ("canonical", repo / doc_layout.INDEX, render_canonical_table(documents)),
+        ("decisions", repo / doc_layout.INDEX, render_decision_table(documents)),
+        ("workstreams", repo / doc_layout.ACTIVE_INDEX, render_workstream_table(documents)),
+        ("catalog", repo / doc_layout.DOCUMENT_CATALOG, render_document_catalog(documents, doc_layout.DOCUMENT_CATALOG)),
+    ]
+    targets.extend(
+        ("tracker", repo / tracker, render_tracker_table(documents, tracker))
+        for tracker in doc_layout.ACTIVE_TRACKERS
+    )
+    targets.extend(
+        ("domain", repo / readme, render_domain_table(documents, readme))
+        for readme in doc_layout.DOMAIN_READERS.values()
+    )
+    return targets
 
 
 def check_generated_sections(repo: Path, documents: list[Document]) -> list[str]:
     errors: list[str] = []
-    for section, (path, body) in _generated_targets(repo, documents).items():
+    for section, path, body in _generated_targets(repo, documents):
         try:
             text = path.read_text(encoding="utf-8")
             expected = replace_generated_section(text, section, body)
@@ -448,7 +664,7 @@ def check_generated_sections(repo: Path, documents: list[Document]) -> list[str]
 
 
 def write_generated_sections(repo: Path, documents: list[Document]) -> None:
-    for section, (path, body) in _generated_targets(repo, documents).items():
+    for section, path, body in _generated_targets(repo, documents):
         text = path.read_text(encoding="utf-8")
         path.write_text(replace_generated_section(text, section, body), encoding="utf-8")
 
@@ -458,7 +674,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--check", action="store_true", help="run hard checks, including generated index sections")
     parser.add_argument("--report", action="store_true", help="print inventory violations only")
-    parser.add_argument("--write-indexes", action="store_true")
+    parser.add_argument(
+        "--write-indexes",
+        action="store_true",
+        help="regenerate generated sections from the current inventory",
+    )
     return parser
 
 
@@ -469,7 +689,19 @@ def main() -> int:
     errors.extend(validate_inventory(repo, documents))
     if args.write_indexes and not errors:
         write_generated_sections(repo, documents)
+        if args.check:
+            # Generated trackers contain the links checked below. Reload after
+            # the write so a combined write-and-check uses the rendered text,
+            # rather than the stale inventory captured before generation.
+            documents, reload_errors = load_inventory(repo)
+            errors.extend(reload_errors)
+            errors.extend(validate_inventory(repo, documents))
     if args.check:
+        # Detail discovery precedes tracker rendering.  Validate the one-to-one
+        # tracker links after an optional write so adding a detail does not
+        # create a bootstrap cycle: no write because the table is stale, while
+        # the table cannot be refreshed without the write.
+        errors.extend(_validate_workstream_links(documents))
         errors.extend(check_generated_sections(repo, documents))
     if errors:
         for error in sorted(set(errors)):

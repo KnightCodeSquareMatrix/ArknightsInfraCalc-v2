@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：historical
-> 替代项：docs/排班模式.md；docs/定时换班.md；docs/SCHEDULE_ROTATION.md
+> 替代项：docs/排班/排班模式.md；docs/排班/定时换班.md；docs/排班/SCHEDULE_ROTATION.md
 > 历史原因：三队轮换落地前的可行性分析，当前事实以实现参考为准
 > 快照日期：2026-07-18
 > 摘要：保存 ABC 三队轮换的历史可行性分析

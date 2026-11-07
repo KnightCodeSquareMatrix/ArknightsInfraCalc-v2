@@ -2,7 +2,7 @@
 
 > 文档角色：decision
 > 生命周期状态：proposed
-> 当前真源：docs/模块/贸易求解.md；docs/调用链/plan请求.md；docs/排班模式.md
+> 当前真源：docs/模块/贸易求解.md；docs/调用链/plan请求.md；docs/排班/排班模式.md
 > 摘要：评估十月排班剩余两项（四赤金完整候选比较、自动轮换入口）的实现难度，列出必须由用户裁决的事项，并给出按单一意图拆分的修改路线
 > 代码范围：crates/infra-core/src/layout/orchestrate/；crates/infra-core/src/layout/assign.rs；crates/infra-core/src/schedule/；crates/infra-cli/src/commands/
 > 核验基线：代码基线 `36c21d1`（2026-10-26）；本文未运行 build、CLI 或 invariant gate
@@ -118,7 +118,7 @@
 ### 2.2 现状事实
 
 - 没有 `auto_rotation` 标识符。`--rotation` 只接受 `named | main-backup@H1/H2 | abc@H1/H2/H3`；Worker `plan.compute` v7 的 `rotation` 是六个命名 profile 加通用 topology，`v1–v6` 为闭集。
-- [排班模式.md](../排班模式.md) 第 30 行要求自动轮换定义自己的状态，且不能靠给 `timed_rotation` 加布尔开关冒充。因此不扩展 `TimedRotationProfile`，也不复用 `TeamRotationReport`（定时语义的班次、休息队、每日加权、宿舍与周期心情都会一并带入）。
+- [排班模式.md](../排班/排班模式.md) 第 30 行要求自动轮换定义自己的状态，且不能靠给 `timed_rotation` 加布尔开关冒充。因此不扩展 `TimedRotationProfile`，也不复用 `TeamRotationReport`（定时语义的班次、休息队、每日加权、宿舍与周期心情都会一并带入）。
 - 可复用的骨架（待核，来自子代理笔记）：`solve_owned_peak_assignment` 求主班；`solve_policy_disjoint_backup` 以主班已占姓名剔除后求备班；`fill_owner_office_seats` / `repair_owner_meeting_seats`。这些是 `team_rotation.rs` 私有函数，需要提升可见性或在同文件新增入口。
 - 备班剔除口径用 `operator_names()`，包含宿舍成员，会把常驻宿舍挂件也从备班剔除，与"宿舍挂件可供主备共用"冲突（待核）。
 
@@ -171,7 +171,7 @@
 
 ### 自动轮换
 
-1. **U6 文档**：更新 `docs/排班模式.md` 第 17、30 行与 `docs/GLOSSARY.md` 第 110 行（"按组合耗尽触发" 与已裁决的 "首人红脸或 36 小时" 不一致），新建自动轮换 canonical 语义页。
+1. **U6 文档**：更新 `docs/排班/排班模式.md` 第 17、30 行与 `docs/指南/GLOSSARY.md` 第 110 行（"按组合耗尽触发" 与已裁决的 "首人红脸或 36 小时" 不一致），新建自动轮换 canonical 语义页。
 2. **U7 分类表**：显式列出每个体系、规则、alternative、角色与 producer 的"允许 / 禁止 / 委托"，缺项 fail-closed。
 3. **U8 准入接线**：把 U7 接到所有候选入口，并加最终态断言。
 4. **U9 二态求解与报告类型**：主备互斥、缺员补位与标注、`AutoRotationReport`、`layout auto-rotation` 子命令。
@@ -201,7 +201,7 @@ python3 scripts/codex/check_repository_facts.py
 - 网站、MAA、Worker schema 新版本与部署。
 - Mower 动态换班、全基建连续心情最优化。
 - 菲亚、普通宿舍与错班模拟（自动轮换已明确不做）。
-- 已有文档矛盾的统一整理（`docs/TODO/排班统一内核重构方案.md` 第 714 行与 781、869 行；`docs/调用链/plan请求.md` 第 60 行与 62 行）。它们只在此处登记，不在本 ADR 中修改。
+- 已有文档矛盾的统一整理（`docs/TODO/详情/排班轮换/排班统一内核重构方案.md` 第 714 行与 781、869 行；`docs/调用链/plan请求.md` 第 60 行与 62 行）。它们只在此处登记，不在本 ADR 中修改。
 
 ## 后果
 
@@ -214,5 +214,5 @@ python3 scripts/codex/check_repository_facts.py
 - [ADR 0012](0012-october-rotation-delivery-boundaries.md) 的第 45、47 行与关闭边界 2、4。
 - [ADR 0013](0013-four-gold-trade-core-candidate.md) 的 D3、D4。
 - [贸易求解](../模块/贸易求解.md) 与 [plan 请求调用链](../调用链/plan请求.md) 中关于首个可行候选与缺失比较器的记录。
-- [排班模式](../排班模式.md)、[排班统一内核重构方案](../TODO/排班统一内核重构方案.md) 的 r24 检查点。
+- [排班模式](../排班/排班模式.md)、[排班统一内核重构方案](../TODO/详情/排班轮换/排班统一内核重构方案.md) 的 r24 检查点。
 - 自动轮换用户原话与裁决：`target/codex-runs/opencode-six-topics-20261019/readable/`（本地证据，不入库）。

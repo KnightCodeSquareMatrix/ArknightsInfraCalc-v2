@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build and push infra-cli to the remote Quality runner.
 
-Implements docs/QUALITY_CHECK_CLI_UPDATE.md (embeddedData hot-path, no bake):
+Implements docs/质量与维护/QUALITY_CHECK_CLI_UPDATE.md (embeddedData hot-path, no bake):
 
     python3 scripts/update_solver_quality.py
 

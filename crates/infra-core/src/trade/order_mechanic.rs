@@ -1,4 +1,4 @@
-//! **L2 域短路**（见 `docs/EFFECT_ATOM_DESIGN.md` §8.6）：订单类型与分布 → 等效贸易效率%。
+//! **L2 域短路**（见 `docs/机制/EFFECT_ATOM_DESIGN.md` §8.6）：订单类型与分布 → 等效贸易效率%。
 //! L1 `order_mechanic` phase 只打 tag；本模块算分布、单位产出与 `mechanic_equiv_eff_pct`。
 
 use serde::Serialize;

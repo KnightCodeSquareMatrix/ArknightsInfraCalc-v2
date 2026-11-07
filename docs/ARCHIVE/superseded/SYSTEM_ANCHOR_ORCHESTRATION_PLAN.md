@@ -2,13 +2,13 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/BASE_ASSIGNMENT.md
+> 替代项：docs/架构/ORCHESTRATION_LAYER.md；docs/架构/BASE_ASSIGNMENT.md
 > 历史原因：anchor 语义已由通用 Rule 到 AssignmentPlan 主路径接管
 > 快照日期：2026-07-18
 > 摘要：保存体系 anchor 编排方案的被替代设计
 
 > 历史原状态：ready
-> 来源：[ORCHESTRATION_LAYER.md](../../ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](../../BASE_ASSIGNMENT.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../plans/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、`docs/公孙长乐的体系分析文档/`
+> 来源：[ORCHESTRATION_LAYER.md](../../架构/ORCHESTRATION_LAYER.md)、[BASE_ASSIGNMENT.md](../../架构/BASE_ASSIGNMENT.md)、[SYSTEM_REGISTRY_NORMALIZATION_REPORT.md](../plans/SYSTEM_REGISTRY_NORMALIZATION_REPORT.md)、`docs/公孙长乐的体系分析文档/`
 >
 > **范围划分**：本文聚焦**数据驱动 registry 子集**——`base_systems.json` schema 如何表达 anchor / min_pick / constraint，能用声明静态表达的体系走这条路。带运行期降级决策树的复杂体系（迷迭香 / 红松林 / 自动化 / 深巡乌尔比安）走**代码化体系层**，接口与 anchor 三态见 [CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md](CODEIZED_SYSTEM_ORCHESTRATION_PLAN.md)。两条路径产出同一套中间语义，汇合到统一 `AssignmentPlan`。
 
@@ -209,9 +209,9 @@ pub struct AnchorSlot {
 | `crates/infra-core/src/layout/assign/manufacture_fill.rs` | 先补制造 anchor，再补普通制造 |
 | `crates/infra-core/src/layout/assign/team_fill.rs` | 轮换半区复用 anchor fill |
 | `data/base_systems.json` | 迁移迷迭香、自动化、红松林为 anchor / optional / min_pick |
-| `docs/ORCHESTRATION_LAYER.md` | 更新 System schema 与流水线事实 |
-| `docs/BASE_ASSIGNMENT.md` | 更新落位顺序与职责边界 |
-| `docs/SCHEDULE_ROTATION.md` | 更新 shift_bind 与 anchor 在轮换中的关系 |
+| `docs/架构/ORCHESTRATION_LAYER.md` | 更新 System schema 与流水线事实 |
+| `docs/架构/BASE_ASSIGNMENT.md` | 更新落位顺序与职责边界 |
+| `docs/排班/SCHEDULE_ROTATION.md` | 更新 shift_bind 与 anchor 在轮换中的关系 |
 
 ## 回归矩阵
 
@@ -231,7 +231,7 @@ pub struct AnchorSlot {
 
 完成后移动到 `docs/ARCHIVE/done/`，并更新：
 
-- [ORCHESTRATION_LAYER.md](../../ORCHESTRATION_LAYER.md)
-- [BASE_ASSIGNMENT.md](../../BASE_ASSIGNMENT.md)
-- [SCHEDULE_ROTATION.md](../../SCHEDULE_ROTATION.md)
-- [SYSTEM_CHAINS.md](../../SYSTEM_CHAINS.md)
+- [ORCHESTRATION_LAYER.md](../../架构/ORCHESTRATION_LAYER.md)
+- [BASE_ASSIGNMENT.md](../../架构/BASE_ASSIGNMENT.md)
+- [SCHEDULE_ROTATION.md](../../排班/SCHEDULE_ROTATION.md)
+- [SYSTEM_CHAINS.md](../../架构/SYSTEM_CHAINS.md)

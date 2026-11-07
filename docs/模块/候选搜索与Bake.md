@@ -2,8 +2,8 @@
 
 > 文档角色：current-reference
 > 生命周期状态：current
-> 当前真源：docs/SCORING_MODEL.md; docs/PERFORMANCE_ENGINEERING.md
-> 机制依赖：docs/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
+> 当前真源：docs/机制/SCORING_MODEL.md; docs/质量与维护/PERFORMANCE_ENGINEERING.md
+> 机制依赖：docs/机制/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
 > 摘要：定位候选池、Plan 门禁、域搜索、排序与 Bake 回退的完整链路。
 > 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
 > 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,trade_allocation}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}`
@@ -114,8 +114,8 @@ query miss 只在两域 `try_baked_*` 入口按固定枚举累计一次；compat
 
 所有排班模式保留最初名单ETA试算；2026-11-05已补齐非中枢正常技能与体系候选，已有中枢检查和Fallback例外保持；搜索不再做本房、双中枢或固定主力预算准入，memo移除这些状态，仅保留数值收益layout、模式与H。制造≥12小时负心情差身份排除已删除，真实积分与暖机保留。自动与定时均可尝试Bake，依真实结算状态及有效窗口决定适用性。
 
-终态核对实际结构、Plan、显式挂件归属与快照；工时不足仅诊断，显式 gate 核对提示准确性，不恢复每房两名单×两中枢工作预算拒绝或全站协同枚举。详见[自动轮换](../自动轮换.md)。
-制造体系试排直接调用原实时制造搜索，保留请求memo与实际收益上下文。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。
+终态核对实际结构、Plan、显式挂件归属与快照；工时不足仅诊断，显式 gate 核对提示准确性，不恢复每房两名单×两中枢工作预算拒绝或全站协同枚举。详见[自动轮换](../排班/自动轮换.md)。
+制造体系试排直接调用原实时制造搜索，保留请求memo与实际收益上下文。额外条件响应表已按2026-10-31真实动态上下文测速结果删除：其复用收益不足以抵消全量生成和排序成本。候选、排序和保证等级保持，取舍证据见[搜索性能与Bake边界](../质量与维护/PERFORMANCE_ENGINEERING.md#制造体系试排的缓存取舍2026-10-31)。
 
 ### 流式生成与外部排序（2026-11-02）
 
@@ -129,7 +129,7 @@ bench --runs N 在同一进程顺序执行N次相同输入，各次独立trace�
 
 全量30,337,349行外部排序与旧payload逐字节相同，生成192.505s，GNU time峰值RSS65.35MiB、无swap。运行时仍加载完整compact表及dense索引：兼容bench首轮init26.08s，RSS约2.71GiB；5次热请求搜索中位开启0.961ms/关闭3.644ms，真实命中2次贸易+1次制造，结果相同。
 
-前一轮三班38个Box开启/关闭零命中且完整产物相同，属于修复前证据。2026-11-02用户纠正“自动排版不需要绕过bake，这是agent的误解”：已移除两域搜索入口的自动禁用；布局兼容比较只排除选择评价窗口的auto_rotation/work_hours，真实名单、global注入等机制状态仍精确比较。有效评价窗口沿LayoutContext::evaluation_hours取值，自动制造也按该窗口拒绝固定行不能表达的ramp；mood和peer-reset等原条件保持。这是cache/fallback支持域扩展；等价依据限于调度字段不参与冻结响应且原动态依赖门禁仍成立，不改变候选、目标或机制；不是允许任意动态布局读固定表。serve预热不保证后续请求能命中。具体RIIC-Web原生客户端实测、自动CLI及验收见docs/PERFORMANCE_ENGINEERING.md后续段。
+前一轮三班38个Box开启/关闭零命中且完整产物相同，属于修复前证据。2026-11-02用户纠正“自动排版不需要绕过bake，这是agent的误解”：已移除两域搜索入口的自动禁用；布局兼容比较只排除选择评价窗口的auto_rotation/work_hours，真实名单、global注入等机制状态仍精确比较。有效评价窗口沿LayoutContext::evaluation_hours取值，自动制造也按该窗口拒绝固定行不能表达的ramp；mood和peer-reset等原条件保持。这是cache/fallback支持域扩展；等价依据限于调度字段不参与冻结响应且原动态依赖门禁仍成立，不改变候选、目标或机制；不是允许任意动态布局读固定表。serve预热不保证后续请求能命中。具体RIIC-Web原生客户端实测、自动CLI及验收见docs/质量与维护/PERFORMANCE_ENGINEERING.md后续段。
 
 
 实际兼容自动正例已用release core入口验证：auto=true、work_hours=Some(12)、其余为表基准的静态制造查询Required命中，best/top及计数与live一致；加入暖机状态后Required报Ramp、Auto回live。因此自动模式可用兼容Bake行，真实布局状态失配仍回live。验证不证明任意自动布局支持。

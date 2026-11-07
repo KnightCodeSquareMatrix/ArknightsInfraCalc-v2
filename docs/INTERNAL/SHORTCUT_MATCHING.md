@@ -7,6 +7,7 @@
 > 代码锚点：`crates/infra-core/src/trade/shortcut.rs::{load_trade_shortcuts,resolve_trade_shortcut,trade_station_exclusive_violation}`; `crates/infra-core/src/trade/segment.rs::{load_trade_segments,match_registered_trade_segment}`; `crates/infra-core/src/trade/solver.rs::solve_trade_with_shift_inner`; `crates/infra-core/src/search/role_pick.rs::pick_trade_role_hit`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/TRADE_COMMUNITY_UNIT_OUTPUT.md`
 > 核验基线：`947f1a2`
+> 摘要：说明贸易 shortcut/segment 的真实匹配顺序、结算边界和诊断入口
 
 求解顺序是：输入等级/互斥校验 → L1 phase → `order_eff_pre` → 赤金时尝试 registered segment 和 shortcut → 命中则构造 mechanic + community unit output → 未命中回 L2 `resolve_order_mechanic`。shortcut 只消费实际三人、tier、manifest 和 order context，不生成候选、不改变 Plan admission。
 

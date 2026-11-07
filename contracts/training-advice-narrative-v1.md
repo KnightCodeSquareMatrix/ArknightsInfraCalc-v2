@@ -69,4 +69,4 @@ GET  /training_advice.narrative/{task_id}
 - Redis Connection Refused/Timeout 时跳过任务和 LLM；POST 若带可验证 report 则直接 fallback；
 - `plan.compute` 不等待 narrator，也不依赖 narrator 成功。
 
-详见 [自然语言推荐层设计](../docs/练卡推荐相关/自然语言推荐层设计.md)。
+详见 [自然语言推荐层设计](../docs/产品与训练/自然语言推荐层设计.md)。

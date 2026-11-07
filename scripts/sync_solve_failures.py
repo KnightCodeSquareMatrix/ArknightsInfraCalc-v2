@@ -144,7 +144,7 @@ LEDGER_TEMPLATE = """# Solve-Failure Evidence Ledger（求解失败证据台账�
 
 > 文档角色：evidence
 > 生命周期状态：current
-> 当前真源：docs/QUALITY_AND_AUDIT.md
+> 当前真源：docs/质量与维护/QUALITY_AND_AUDIT.md
 > 摘要：登记无用户反馈的求解失败证据族（`evidence/<日期>-<错误族>/raw-runs/`）。
 
 与 `feedback/TRACKING.md` 分工：反馈台账记用户反馈；本台账记 solver 自身失败族（无反馈入口的失败 `serve` 运行）。

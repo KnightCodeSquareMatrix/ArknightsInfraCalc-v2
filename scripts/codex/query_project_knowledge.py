@@ -15,6 +15,7 @@ import sys
 import time
 
 from _query_output import QueryError, add_output_arguments, emit
+import doc_layout
 from docs_inventory import InventoryError, parse_document, split_values
 
 REPO = Path(__file__).resolve().parents[2]
@@ -147,8 +148,8 @@ def code_chunks(path: str, text: str) -> list[dict]:
 
 
 def navigation() -> tuple[dict, list[Path]]:
-    nav_path = safe_path("docs/agent-index/knowledge.json")
-    routes_path = safe_path("docs/agent-index/routes.json")
+    nav_path = safe_path(doc_layout.KNOWLEDGE)
+    routes_path = safe_path(doc_layout.ROUTES)
     nav = json.loads(nav_path.read_text())
     routes = json.loads(routes_path.read_text())
     if nav.get("schema") != 1 or not isinstance(nav.get("cards"), list):
@@ -163,8 +164,11 @@ def source_index(use_cache: bool) -> tuple[list[dict], dict, list[Path], dict]:
                     *REPO.joinpath("crates").rglob("*.rs")])
     cache_path = REPO / "target/codex-runs/knowledge-index.json"
     old: dict = {}
-    parser_hash = digest(Path(__file__).read_bytes() +
-                         (REPO / "scripts/codex/docs_inventory.py").read_bytes())
+    parser_hash = digest(
+        Path(__file__).read_bytes()
+        + (REPO / "scripts/codex/docs_inventory.py").read_bytes()
+        + (REPO / "scripts/codex/doc_layout.py").read_bytes()
+    )
     if use_cache and cache_path.is_file():
         try:
             candidate = json.loads(cache_path.read_text())

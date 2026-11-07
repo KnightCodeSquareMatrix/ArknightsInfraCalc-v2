@@ -7,6 +7,7 @@
 > 代码锚点：`crates/infra-core/src/trade/shortcut.rs::CommunityUnitOutputRule`; `crates/infra-core/src/trade/shortcut.rs::validate_trade_shortcuts`; `crates/infra-core/src/trade/solver.rs::resolve_unit_output`; `crates/infra-core/src/trade/unit_output.rs::{compute_unit_output,daily_yield}`
 > 关联链路：`docs/模块/贸易求解.md`; `docs/INTERNAL/SHORTCUT_MATCHING.md`
 > 核验基线：`947f1a2`；2026-10-29但书单点核对使用固定知识库`977b6ab`与当前回归输入
+> 摘要：说明特殊贸易组合单位产出的数据锚、精度与验证入口
 
 特殊组合的社区单位产出是 L3 产出锚，不由等效效率反推，除非条目标记 `derived_from_rounded_equivalent`。每个改变单位产出的 shortcut 必须同时声明 source 和 precision；非有限、非正数、缺来源或重复 id 在加载时失败。
 

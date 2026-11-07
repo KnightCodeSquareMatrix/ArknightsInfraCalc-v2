@@ -293,7 +293,7 @@ reviewer 对每个改动文件至少问：
 
 不以行数作为验收目标；以“删除重复后仍能阻止已知高风险错误”为准。
 
-### 6.2 `docs/MAINTENANCE_MODE.md`
+### 6.2 `docs/质量与维护/MAINTENANCE_MODE.md`
 
 唯一负责：
 
@@ -305,7 +305,7 @@ reviewer 对每个改动文件至少问：
 
 不再全文重复验证日志 schema，只链接质量文档和证据工具。
 
-### 6.3 `docs/QUALITY_AND_AUDIT.md`
+### 6.3 `docs/质量与维护/QUALITY_AND_AUDIT.md`
 
 作为验证与完成证明的单一文字真源，唯一负责：
 
@@ -318,7 +318,7 @@ reviewer 对每个改动文件至少问：
 
 其他文档不再复制这些段落。
 
-### 6.4 `docs/SYSTEM_AUDIT_WORKFLOW.md`
+### 6.4 `docs/质量与维护/SYSTEM_AUDIT_WORKFLOW.md`
 
 限定为 `formal-audit` 模式，唯一负责：
 
@@ -464,10 +464,10 @@ scripts/codex/render_evidence.py
 docs_impact:
   status: updated | not-needed | blocked
   checked:
-    - docs/SCHEDULE_ROTATION.md
-    - docs/FRONTEND_CLI.md
+    - docs/排班/SCHEDULE_ROTATION.md
+    - docs/接入与前端/FRONTEND_CLI.md
   updated:
-    - docs/SCHEDULE_ROTATION.md
+    - docs/排班/SCHEDULE_ROTATION.md
   reason: 修改了三队轮换的用户可见行为；MAA JSON 结构没有变化
 ```
 

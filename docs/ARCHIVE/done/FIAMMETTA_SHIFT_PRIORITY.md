@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 替代项：docs/Fiammetta.md；docs/SCHEDULE_ROTATION.md
+> 替代项：docs/排班/Fiammetta.md；docs/排班/SCHEDULE_ROTATION.md
 > 历史原因：规则和实现状态已吸收到 current owner
 > 快照日期：2026-07-18
 > 摘要：保存菲亚梅塔班次优先级实施完成记录
@@ -48,4 +48,4 @@ opts.enable_gongsun_fiammetta_priority();
 | `crates/infra-cli/src/commands/plan.rs` | CLI 主入口，设置 `maa_opts` 的地方 |
 | `crates/infra-cli/src/commands/layout.rs` | layout 子命令，同上 |
 | `crates/infra-cli/src/commands/serve.rs` | 前端常驻 worker 的 plan 导出入口 |
-| `docs/Fiammetta.md` | 当前行为、已确认规则与后续策略边界 |
+| `docs/排班/Fiammetta.md` | 当前行为、已确认规则与后续策略边界 |

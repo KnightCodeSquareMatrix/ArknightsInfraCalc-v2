@@ -1,4 +1,4 @@
-//! 全局资源 producer / consumer / 转化边注册表（权威清单见 `docs/EFFECT_ATOM_DESIGN.md` §8.13）。
+//! 全局资源 producer / consumer / 转化边注册表（权威清单见 `docs/机制/EFFECT_ATOM_DESIGN.md` §8.13）。
 
 use super::key::GlobalResourceKey;
 

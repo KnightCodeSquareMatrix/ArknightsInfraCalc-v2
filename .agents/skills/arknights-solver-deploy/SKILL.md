@@ -69,7 +69,7 @@ release 归档本身不得携带求解器。
 
 - 该流程只更新主站与开发环境的共享求解器，不触碰 quality-check 的
   独立 bundle 投递；quality-check 更新见 `scripts/update_solver_quality.py`
-  与 `docs/QUALITY_CHECK_CLI_UPDATE.md`。
+  与 `docs/质量与维护/QUALITY_CHECK_CLI_UPDATE.md`。
 - 网站 release 发布由前端仓库 GitHub Actions 驱动；本仓库只负责求解器制品
   与批准摘要，不构建或推送网站代码。
 - 机制/数据语义问题和新功能不在部署流程内，按根 `AGENTS.md` 另起任务。

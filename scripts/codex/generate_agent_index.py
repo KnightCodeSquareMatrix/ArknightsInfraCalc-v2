@@ -5,20 +5,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import posixpath
 import re
 from pathlib import Path
 
+import doc_layout
+
 
 def load_registry(repo: Path) -> dict:
-    return json.loads((repo / "docs/agent-index/routes.json").read_text(encoding="utf-8"))
+    return json.loads((repo / doc_layout.ROUTES).read_text(encoding="utf-8"))
 
 
 def link(repo: Path, target: str, from_path: str) -> str:
-    source = (repo / from_path).parent
-    relative = Path(target)
-    if target.startswith("docs/"):
-        relative = Path("../") / relative.relative_to("docs")
-    return relative.as_posix()
+    return posixpath.relpath(target, posixpath.dirname(from_path)).replace(" ", "%20")
 
 
 def render_routes(repo: Path, registry: dict) -> str:
@@ -43,11 +42,11 @@ def render_routes(repo: Path, registry: dict) -> str:
         lines.append("")
         lines.append("**入口**：" + "；".join(f"`{item}`" for item in route["entrypoints"]))
         lines.append("")
-        lines.append(f"**完整调用链**：[{route['chain_doc']}]({link(repo, route['chain_doc'], 'docs/生成索引/Agent路由.md')})")
+        lines.append(f"**完整调用链**：[{route['chain_doc']}]({link(repo, route['chain_doc'], doc_layout.ROUTES_PAGE)})")
         lines.append("")
-        lines.append("**模块 owner**：" + "；".join(f"[{item}]({link(repo, item, 'docs/生成索引/Agent路由.md')})" for item in route["module_docs"]))
+        lines.append("**模块 owner**：" + "；".join(f"[{item}]({link(repo, item, doc_layout.ROUTES_PAGE)})" for item in route["module_docs"]))
         lines.append("")
-        lines.append("**机制引用**：" + "；".join(f"[{item}]({link(repo, item.split('#', 1)[0], 'docs/生成索引/Agent路由.md')}{'#' + item.split('#', 1)[1] if '#' in item else ''})" for item in route["mechanics"]))
+        lines.append("**机制引用**：" + "；".join(f"[{item}]({link(repo, item.split('#', 1)[0], doc_layout.ROUTES_PAGE)}{'#' + item.split('#', 1)[1] if '#' in item else ''})" for item in route["mechanics"]))
         lines.append("")
         if route.get("vault_refs"):
             lines.append(f"**知识库原文（vault @ {registry['vault_commit']}）**：" + "；".join(f"`{item}`" for item in route["vault_refs"]))
@@ -100,8 +99,15 @@ def render_code_map(repo: Path, registry: dict) -> str:
         lines.append(f"| `{command}` | `crates/infra-cli/src/main.rs::run` | {', '.join(f'`{x}`' for x in refs) or '按 docs/接口/ 定向检索'} |")
     lines.extend(["", "## 注册调用链", "", "| 链 ID | 链路文档 |", "|---|---|"])
     for route in registry["routes"]:
-        lines.append(f"| `{route['id']}` | [{route['chain_doc']}]({link(repo, route['chain_doc'], 'docs/生成索引/代码与文档地图.md')}) |")
+        lines.append(f"| `{route['id']}` | [{route['chain_doc']}]({link(repo, route['chain_doc'], doc_layout.CODE_MAP_PAGE)}) |")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def expected_outputs(repo: Path, registry: dict) -> dict[Path, str]:
+    return {
+        repo / doc_layout.ROUTES_PAGE: render_routes(repo, registry),
+        repo / doc_layout.CODE_MAP_PAGE: render_code_map(repo, registry),
+    }
 
 
 def main() -> int:
@@ -111,10 +117,7 @@ def main() -> int:
     args = parser.parse_args()
     repo = args.repo_root.resolve()
     registry = load_registry(repo)
-    outputs = {
-        repo / "docs/生成索引/Agent路由.md": render_routes(repo, registry),
-        repo / "docs/生成索引/代码与文档地图.md": render_code_map(repo, registry),
-    }
+    outputs = expected_outputs(repo, registry)
     mismatches = []
     for path, expected in outputs.items():
         actual = path.read_text(encoding="utf-8") if path.exists() else ""

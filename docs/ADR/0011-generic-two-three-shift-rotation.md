@@ -2,7 +2,7 @@
 
 > 文档角色：decision
 > 生命周期状态：accepted
-> 当前真源：docs/定时换班.md；docs/排班模式.md；docs/泡泡火神源石优先.md
+> 当前真源：docs/排班/定时换班.md；docs/排班/排班模式.md；docs/排班/泡泡火神源石优先.md
 > 摘要：为普通二班/三班增加输入时长并共用终态收尾，在全部该范围内强制泡泡/火神源石预占
 
 > 日期：2026-10-21
@@ -40,7 +40,7 @@
 ### D3. 泡泡/火神在范围内全局强制
 
 - 对本 ADR 范围内的所有普通二班/三班轮换，若泡泡至少 E1、火神 E2，且蓝图存在首个合法源石制造房，则无产品开关地建立强制预占；适用范围不再仅限 ABC。
-- 房间选择沿用 `docs/泡泡火神源石优先.md` 当前口径：按蓝图顺序选首个合法的三级源石制造房（制造、源石配方、容量至少三）。不得按收益换房或扩成所有设施/所有候选比较。实现须确认蓝图容量与等级约束的实际关系，不能在代码和 canonical 间留下不一致。
+- 房间选择沿用 `docs/排班/泡泡火神源石优先.md` 当前口径：按蓝图顺序选首个合法的三级源石制造房（制造、源石配方、容量至少三）。不得按收益换房或扩成所有设施/所有候选比较。实现须确认蓝图容量与等级约束的实际关系，不能在代码和 canonical 间留下不一致。
 - 泡泡与火神是同房 hard anchors，并按既有用户决定属于 α 队；α 应由通用拓扑放到最长时段。若有 12 小时或更长时段则优先覆盖该时段；没有 12 小时时也不得因此关闭强制预占。不得写死 `shift == 0`、某个固定班数下标或 `duration == 12` 来代替时长/队伍事实。若最长班并列，沿用既有确定性队伍/状态规则，不新增由单个房间或 fixture 决定的 tie-break。
 - 两人按所选拓扑的现有轮休关系作为不可拆的组合：三队 ABC 保持两班工作、一班休息；二队主备跟随 α 主队与 β 备队状态，不把 ABC 的 2/1 计数硬套给二班。第三席继续使用普通合法制造候选；候选耗尽时保留 pair、短员并按既有 warning 口径报告，不把缺第三人升级成求解错误。
 - 若资格或合法房不成立，规则不适用，执行原有排班且不产生本规则 warning。若满足条件但预占候选无法完成，正常产品路径保留可用的普通排班并给可定位 warning；显式 `--assert-invariants` 必须指出最终 assignment 未满足强制预占。这里的“全局强制”表示所有适用二/三班都必须尝试并优先满足，不表示把质量诊断升级为用户可见的 solver error。
@@ -80,7 +80,7 @@
 - **该源码基线的历史实现与验收**：共享工作区在基线 `7916d908192e3833ff1cf13e60c7bbebfcac9c29` 上的普通二/三班、Worker v7、泡泡/火神预占及关联文档修改，经 `cargo fmt --all` 与 fresh `cargo build --release -p infra-cli` 后由 release CLI 验收。泛型 ABC `14/10/12` 和泛型主备 `14/10` 各对 representative + high-owned 持久 Box 做 `--assert-invariants` Python batch，均为 38/38；eligible named 主备 `2` 的完整 Box gate 通过，generic ABC 普通 pair、generic 主备 30/18 pair、named 和泛型旧时序、三种总周期、输入最长班/并列最长班、菲亚、Worker v7 replay/v6 拒绝及 MAA projection 另有逐场景证据。fresh binary 和全部日志见 `target/codex-runs/generic-two-three-originium-completion-20261021/manifest.json`。该 evidence 绑定上述历史源码基线和 diff，不等同于当前共享工作区的重新验收。
 - **独立复核状态**：DeepSeek stage review 为 `CONTINUE`，确认两处编译调用修复和已覆盖正常路径，但要求真实完整 Box 触发“pair 局部预占失败 → 普通峰值成功 + warning”，并在同场景显式 gate 失败。rotation/MAA review 确认导出按最终 assignment 与实际班时投影；仍未验证 MAA 执行端对“显式宿舍成员 + autofill”组合的实际解释，不把文件生成等同于游戏内执行。用户随后指定的 `gpt-6.1-sol` 独立复核未发现已证实回归，但因缺少 pair-fallback 见证返回 `CONTINUE`。前两次代表/高持有批次使用 named `3`，后续补跑的两个 generic topology batch 才是泛型批量覆盖。
 - **未闭合边界**：`main-backup@30/18` 正常入口保留 pair 与完整排班但 warning；其显式 gate 因 `rotation_cycle_mood` 失败，而不是 pair 丢失，所以不能充当 pair 预占失败的普通/显式配对证据。eligible Box 的 ABC `16/16/4` pair 联合探测分别在 b-174-382、b-101-424 被独立控制室 candidate/ETA 约束拒绝，未得到 final report，不算预占负例。pair-only 短员产物只证明缺第三席边界，不证明完整 Box 普通补位融合。高持有 named `3` batch 为 9/10；唯一 b-112-404 是普通入口 warning-only 对应的既有周期心情 gate 负例，不是求解无解。以上失败与未验证项均保留在 evidence，不重分类为通过。
-- **最终复核与范围**：按配置启动 Sol reviewer `gpt-5.6-sol` 返回 `Unknown model gpt-5.6-sol`；之后按用户指定的 `gpt-6.1-sol` 对冻结 diff 与 evidence 复核，结论为 `CONTINUE`，没有指出已证实回归，但要求补齐 pair-preclaim 局部失败的完整 Box 普通输出与同输入 gate 负例。因此 assertion diff 尚未获得 Sol `PASS`，ADR 实现状态保持 `in-progress`。本阶段验收未运行源码测试；源码测试不替代真实 Box 与 invariant gate。不扩大四班路径，也不关闭 `docs/TODO/排班统一内核重构方案.md` §7。
+- **最终复核与范围**：按配置启动 Sol reviewer `gpt-5.6-sol` 返回 `Unknown model gpt-5.6-sol`；之后按用户指定的 `gpt-6.1-sol` 对冻结 diff 与 evidence 复核，结论为 `CONTINUE`，没有指出已证实回归，但要求补齐 pair-preclaim 局部失败的完整 Box 普通输出与同输入 gate 负例。因此 assertion diff 尚未获得 Sol `PASS`，ADR 实现状态保持 `in-progress`。本阶段验收未运行源码测试；源码测试不替代真实 Box 与 invariant gate。不扩大四班路径，也不关闭 `docs/TODO/详情/排班轮换/排班统一内核重构方案.md` §7。
 
 ## 后果
 

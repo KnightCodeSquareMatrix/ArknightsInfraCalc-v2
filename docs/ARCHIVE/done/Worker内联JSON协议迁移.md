@@ -2,8 +2,8 @@
 
 > 文档角色：archive
 > 生命周期状态：completed
-> 当前真源：docs/FRONTEND_CLI.md
-> 替代项：docs/FRONTEND_CLI.md；docs/INFRA_CLI.md
+> 当前真源：docs/接入与前端/FRONTEND_CLI.md
+> 替代项：docs/接入与前端/FRONTEND_CLI.md；docs/接入与前端/INFRA_CLI.md
 > 历史原因：实现与本地验证已完成；集成部署和 legacy 退役分别由独立 active change 跟踪
 > 快照日期：2026-07-22
 > 摘要：统一 CLI 与常驻 Worker 的 Plan 编排，并将前端主链路迁移到无路径的内联 JSON 请求和响应
@@ -103,8 +103,8 @@
 - 当前 `cargo test -p infra-core` 为 554 passed / 7 failed；本轮未改 `infra-core`，且七个精确失败测试均已在 detached clean `HEAD` `181ed63` 复现，因此作为既有基线保留，不伪装为通过。
 - 前端 test、lint、build、diff check 和真实 Worker Full E2 通过；Full E2 返回 profile v4、3 个 rotation shifts、3 个 MAA plans 和非空 room lines。
 - 负向证据覆盖第二请求 `WORKER_BUSY`、busy health 不 ping、timeout/close 各只发送一次且不重试、持久化失败不改变 success、流式 2 MiB 精确边界、旧 Worker 拒绝、损坏或空 profile/MAA/rotation 拒绝、shift/plan 数量不一致拒绝及 UTF-8 label 截断；测试 Worker 与 body checker 均保存在前端仓库 `fixtures/`。
-- 集成与部署验收已拆至 `docs/TODO/Worker内联JSON集成与部署验收.md`，状态为 `ready-on-request`。
-- legacy 删除已拆至 `docs/TODO/Worker旧路径协议清理.md`，状态为 `blocked`，部署 inventory 仍是删除门禁。
+- 集成与部署验收已拆至 `docs/TODO/详情/接口产品/Worker内联JSON集成与部署验收.md`，状态为 `ready-on-request`。
+- legacy 删除已拆至 `docs/TODO/详情/接口产品/Worker旧路径协议清理.md`，状态为 `blocked`，部署 inventory 仍是删除门禁。
 - 后端证据 manifest：`target/codex-runs/worker-inline-json-implementation/manifest.json`；前端证据 manifest：`target/codex-runs/worker-inline-json-frontend/manifest.json`。
 
 ## 非目标与延期

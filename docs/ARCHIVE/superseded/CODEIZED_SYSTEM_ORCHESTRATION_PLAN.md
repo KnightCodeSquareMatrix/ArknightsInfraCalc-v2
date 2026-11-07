@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 替代项：docs/ORCHESTRATION_LAYER.md；docs/BASE_ASSIGNMENT.md
+> 替代项：docs/架构/ORCHESTRATION_LAYER.md；docs/架构/BASE_ASSIGNMENT.md
 > 历史原因：代码化体系分派方案已被声明式通用编排层替代
 > 快照日期：2026-07-18
 > 摘要：保存代码化体系编排层的被替代方案
@@ -206,7 +206,7 @@ seed/pinned
 
 完成后移动到 `docs/ARCHIVE/done/`，并更新：
 
-- [ORCHESTRATION_LAYER.md](../../ORCHESTRATION_LAYER.md)：System schema 与两路径汇合事实。
-- [BASE_ASSIGNMENT.md](../../BASE_ASSIGNMENT.md)：anchor 三态落位顺序与职责边界。
-- [SCHEDULE_ROTATION.md](../../SCHEDULE_ROTATION.md)：shift_bind 与 anchor 在轮换中的关系。
-- [SYSTEM_CHAINS.md](../../SYSTEM_CHAINS.md)：代码化体系层覆盖的体系清单。
+- [ORCHESTRATION_LAYER.md](../../架构/ORCHESTRATION_LAYER.md)：System schema 与两路径汇合事实。
+- [BASE_ASSIGNMENT.md](../../架构/BASE_ASSIGNMENT.md)：anchor 三态落位顺序与职责边界。
+- [SCHEDULE_ROTATION.md](../../排班/SCHEDULE_ROTATION.md)：shift_bind 与 anchor 在轮换中的关系。
+- [SYSTEM_CHAINS.md](../../架构/SYSTEM_CHAINS.md)：代码化体系层覆盖的体系清单。

@@ -2,7 +2,7 @@
 
 > 文档角色：archive
 > 生命周期状态：superseded
-> 替代项：docs/TODO/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md；docs/CONTROL_CENTER_ASSIGNMENT.md
+> 替代项：docs/TODO/详情/性能质量/DYNAMIC_PRODUCER_BAKED_SEARCH_PLAN.md；docs/机制/CONTROL_CENTER_ASSIGNMENT.md
 > 历史原因：联合穷举方案已回退，当前动态 producer 设计由现行 canonical 和 A+ active-change 承接
 > 摘要：保留已回退动态 producer 联合搜索方案的性能证据、限制和保证边界
 

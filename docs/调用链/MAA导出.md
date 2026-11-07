@@ -1,12 +1,12 @@
 # MAA 导出与导入调用链
 
-> 文档角色：call-chain
+> 文档角色：current-reference
 > 生命周期状态：current
 > 当前真源：docs/模块/导出与岗位状态.md
-> 机制依赖：docs/知识库引用.md；vault:docs/5-换班操作/定时换班.md
+> 机制依赖：docs/机制/知识库引用.md；vault:docs/5-换班操作/定时换班.md
 > 摘要：沿最终轮换报告定位 MAA 写出、读回和字段责任
 > 代码范围：crates/infra-core/src/export/maa.rs、crates/infra-cli/src/commands/plan_compute.rs
-> 知识库桥接：docs/知识库引用.md（机制正文与版本由隔壁知识库裁决）
+> 知识库桥接：docs/机制/知识库引用.md（机制正文与版本由隔壁知识库裁决）
 > 代码锚点：`crates/infra-core/src/export/maa.rs::{build_from_team_rotation,build_plan,resolve_drones,load_maa_schedule,assignment_from_maa_plan}`
 > 关联链路：docs/调用链/定时轮换.md、docs/模块/导出与岗位状态.md
 > 核验基线：菲亚 24/24 Worker plan/plan.compute 与 MAA 投影证据见 `target/codex-runs/fiammetta-2424-20261020-r7/manifest.json`
@@ -23,7 +23,7 @@ MAA export 是最终状态的序列化适配器，不重新选择机制、岗位
 | `rooms.recycle` | 已投影 | 每个蓝图回收站写一个 `MaaRecycleSlot`，字段仅为 `operators`，成员直接来自该房间的最终 `BaseAssignment`。 |
 | `operatorsA` / `operatorsB` | 不在本次输出范围 | MAA 的 A/B 是训练室字段；回收站遵循普通 `operators` 名单，不沿用旧 A/B 草案。 |
 
-官方 [MAA 基建排班协议示例](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/zh-cn/protocol/base-scheduling-schema.md#L153-L156) 中，`rooms.recycle` 是与制造、贸易同级的数组，示例项为 `{ "operators": ["芬", "克洛丝"] }`；固定版本 [schema](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/maa-infra.schema.json#L189-L195) 将其限制为最多一个普通房间项。该协议仅证明所查上游提交的字段，不代表所有 MAA 发布版 GUI 均已启用；export 只投影、不补选。回收站轮换设计及新旧协议差异见 [回收站设计稿 §7](../TODO/回收站选人放人与轮换设计.md#7-plancompute-v8-契约)。
+官方 [MAA 基建排班协议示例](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/zh-cn/protocol/base-scheduling-schema.md#L153-L156) 中，`rooms.recycle` 是与制造、贸易同级的数组，示例项为 `{ "operators": ["芬", "克洛丝"] }`；固定版本 [schema](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/5dd0ea8aac66921f6a307359bca3a84bdfcc9441/docs/maa-infra.schema.json#L189-L195) 将其限制为最多一个普通房间项。该协议仅证明所查上游提交的字段，不代表所有 MAA 发布版 GUI 均已启用；export 只投影、不补选。回收站轮换设计及新旧协议差异见 [回收站设计稿 §7](../TODO/详情/核心求解/回收站选人放人与轮换设计.md#7-后续-plancompute-v8-契约)。
 
 ## 写出链
 
