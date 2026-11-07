@@ -1,5 +1,8 @@
 # ArknightsInfraCalc v2
 
+> **本仓库仅用于展示，不授权任何使用、复制或二次开发。**
+> 公开不构成许可；全部权利保留。详见 [LICENSE](LICENSE) 与文末 [授权与使用限制](#授权与使用限制)。
+
 一个面向《明日方舟》基建的效率求解、体系编排与轮换导出引擎。
 
 它解决的不是“把三个最高百分比干员放进一间房”，而是：在玩家实际练度、房间容量、同一干员不能重复上岗、同房互斥、跨设施资源、体系硬核心和跨班绑定同时存在时，仍然给出可解释、可复现的排班。
@@ -165,7 +168,7 @@ RTK 通过 `~/.codex/hooks.json` 的 `PreToolUse` 调用 `rtk hook codex`，首�
 进入本项目的 Codex（一条命令，脚本自己起代理、起容器、退出时收代理）：
 
 ```powershell
-& "C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/arknights-v2-container/codex-dev.ps1"
+& "<control-dir>/arknights-v2-container/codex-dev.ps1"
 ```
 
 常用变体：
@@ -196,7 +199,7 @@ Windows PowerShell 5.1 可能同时存在 `Path`/`PATH`/`path` 三个键，导�
 
 容器需要 SSH 客户端才能用 `git@` 远端；镜像已装 `openssh-client`。密钥放在独立命名卷 `arknights-v2-ssh`，挂到 `/home/developer/.ssh`，权限为目录 700、私钥 600。
 
-密钥按目标主机 IP 命名：`114.66.55.78_id_rsa`、`114.66.55.78_ed25519`（含 `.pub`）。`110.42.33.126_id_rsa` 与 `211.161.232.77_id_rsa` 是指向 `114.66.55.78_id_rsa` 的符号链接，因为这三个主机共用同一把私钥；`config` 的 `IdentityFile` 已同步为新名字。`id_rsa` 保留为兼容链接，`scripts/export_quality_feedback.py` 等按旧名引用密钥的脚本不受影响。原 WSL 与 Windows 的 `~/.ssh` 均未改动。
+密钥按目标主机 IP 命名：`<host-a>_id_rsa`、`<host-a>_ed25519`（含 `.pub`）。`<host-b>_id_rsa` 与 `<host-c>_id_rsa` 是指向 `<host-a>_id_rsa` 的符号链接，因为这三个主机共用同一把私钥；`config` 的 `IdentityFile` 已同步为新名字。`id_rsa` 保留为兼容链接，`scripts/export_quality_feedback.py` 等按旧名引用密钥的脚本不受影响。原 WSL 与 Windows 的 `~/.ssh` 均未改动。
 
 **这是新增的一份私钥副本**：任何能执行 `docker` 或进入容器的人都能读到它。不要在共享机器上保留该卷；不再需要时用 `docker volume rm arknights-v2-ssh` 删除（容器需先停止）。
 
@@ -208,7 +211,7 @@ Magpie 与清洗代理不在容器里，也不由编辑器管理。日常可用 
 
 ```powershell
 $name = 'ArknightsV2 Magpie Stack'
-$script = 'C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/tools/start-agent-stack-hidden.ps1'
+$script = '<control-dir>/tools/start-agent-stack-hidden.ps1'
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
@@ -222,7 +225,7 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 
 脚本只补起未在监听的端口，重复执行不会起第二份；`codex-dev.ps1` 检测到端口已监听时也只复用、退出时不会停掉自启的实例。
 
-验证状态（2026-11-04）：已安装并启动 Docker Desktop 4.98.0（当前用户安装，WSL 2 后端）；Windows 控制目录为 `C:/Users/KnightCode/WorkBuddy/2026-11-04-18-23-50/arknights-v2-container`。已复制源码、Git 与未提交改动（含用户明确批准的 `.env`/`.aws`），未复制根 target、虚拟环境和 Python 缓存；原 Ubuntu 项目保留。镜像构建、普通用户卷权限、容器内 release 构建、Worker ping（v1–v7）通过。归档流 SHA256 核对 37908 个文件无内容差异（排除可变 Git index），但核对期间原 `.git` 目录变化导致 tar 非零退出，不宣称严格冻结快照。Agent 路由和文档清单检查通过；repository facts 检查因历史 Ubuntu 绝对链接及未迁移 target 证据失败，未改写历史文档。完整 plan 求解、批量终态验收和 GDB 调试尚未运行；不修改机制，不新增或运行源码测试。后续开发只在卷内进行，原 Ubuntu 仓库不会自动同步。
+验证状态（2026-11-04）：已安装并启动 Docker Desktop 4.98.0（当前用户安装，WSL 2 后端）；Windows 控制目录为 `<control-dir>/arknights-v2-container`。已复制源码、Git 与未提交改动（本地运行时密钥另存，不进入仓库），未复制根 target、虚拟环境和 Python 缓存；原 Ubuntu 项目保留。镜像构建、普通用户卷权限、容器内 release 构建、Worker ping（v1–v7）通过。归档流 SHA256 核对 37908 个文件无内容差异（排除可变 Git index），但核对期间原 `.git` 目录变化导致 tar 非零退出，不宣称严格冻结快照。Agent 路由和文档清单检查通过；repository facts 检查因历史 Ubuntu 绝对链接及未迁移 target 证据失败，未改写历史文档。完整 plan 求解、批量终态验收和 GDB 调试尚未运行；不修改机制，不新增或运行源码测试。后续开发只在卷内进行，原 Ubuntu 仓库不会自动同步。
 
 ## 正确性优先，也认真对待性能
 
@@ -252,6 +255,75 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 
 这不意味着仓库永远没有 bug；它意味着一个结果可以追到文档口径、数据条目、解释阶段、搜索边界、回归断言和实际 CLI 输出，而不是只能相信一张最终截图。
 
+## Agent 治理
+
+这个仓库除了是求解器，也是一个**多 agent 协作的受控环境**。
+
+让 Codex、Claude Code、opencode 三类工具在同一个复杂代码库上并行工作而不互相破坏，在这里被当成一等工程问题，而不是靠提示词祈祷。治理的对象不是"agent 说了什么"，而是三件可检查的事：**它依据什么、它保证到什么程度、它留下了什么证据。**
+
+### 规则分三层
+
+| 层 | 内容 | 违反时 |
+|----|------|--------|
+| 硬约束 | 覆盖他人改动、destructive git、自行建分支、越层写机制、为单个 fixture 写特判 | 不许自行变通，只能提修改建议 |
+| 默认工作方式 | 先摸底再派、先写完成条件再写代码、按风险匹配验证 | 可按任务裁剪，偏离时须写一行"通常 X，这次 Y，因为 Z" |
+| 先问再做 | 改产品语义、降低保证等级、push/部署/删数据、两份 canonical 冲突 | 必须停下来问 |
+
+### 真源顺序
+
+用户当前裁决 > 领域 canonical 文档 > 代码与生成的 help（证明实现事实）> JSON / CSV / fixture / Bake / 旧输出。
+
+两份 canonical 冲突时**停止该处实现并交回用户裁决**——不允许从代码或 top hit 去猜。这条顺序决定了 agent 在意见不一致时该信谁，而不是信"看起来更顺"的那个。
+
+### 分层边界：谁不许做什么
+
+- `L1` interpreter 只认 `buff_id`，不认干员中文名；
+- `L3` shortcut 只结算实际组合，不负责选型或进编；
+- `CLI` / export 只编排调用和忠实输出，不写机制、不重新决策；
+- `shift_bind` 只负责已入选成员同上同下，不能代替 required anchor。
+
+边界写进规则的目的不是整洁，是**防止某个 agent 在下游补偿上游的错误**：修在哪，就修在最早放行错误状态的那个 owner 上。
+
+### 保证等级：不许把启发式说成最优
+
+任何改动候选集合、剪枝、分解、目标、top-K、Bake 或 cache 的变更，必须声明它属于哪一类：
+
+`hard_constraint` / `safe_reduction` / `heuristic` / `policy` / `approximation` / `unknown`
+
+无法证明完整时，**不许声称全局最优**。这个约束同时存在于契约 schema、代码注释和 agent 规则三处，口径一致。
+
+### 证据义务："做完了"与"证明做完了"是两件事
+
+契约把任务状态和证明状态分开记录：
+
+- `taskState`：`queued` / `running` / `waiting` / `succeeded` / `failed` / `cancelled` / `expired` / `blocked`
+- `proofState`：`pending` / `verified` / `partial` / `failed` / `blocked` / `not_run`
+
+每条 claim 必须携带 `source_layer`（user / canonical / code / generated_help / json_fixture / evidence / agent_inference / external_source）、`confidence` 与 `guarantee_class`。遇到真源冲突、或只查到"没有"时，用 `canonical_conflict` 和 `negative_evidence` 显式记下来，而不是悄悄略过。
+
+### 跨 runtime 能力矩阵
+
+[`contracts/agent-harness-capability-matrix-v0.json`](contracts/agent-harness-capability-matrix-v0.json) 把 opencode-native、mimo-code、claude-agent-sdk、openai-responses-multi-agent 逐项对齐：`spawn` / `parallel` / `wait` / `cancel` / `resume` / `structured_result` / `worktree` / `sandbox` / `trace` / `evidence_execution`。
+
+状态只允许三种：`available` / `documented` / `unverified`。矩阵里**大量条目诚实地标着 `unverified`**——没测过就是没测过，矩阵不是宣传页。
+
+### 委派与核对
+
+- 派活前先自己摸底：数据在哪个文件、什么格式、分布在哪几个目录；摸不清就接着摸，不把"想办法查"整个交出去；
+- 子代理只回答**一个具体事实**，交付原始输出而不是结论；
+- 子代理的报告是线索，不是事实；会改变决定的结论、以及一切否定结论（"没有""不存在"），必须回原文或原始数据核对；
+- 两份报告冲突时回原始数据裁决，**不采信最新的那份**。
+
+### 上下文预算
+
+长任务里上下文是稀缺资源，所以查询走定向入口而非整文件读：`query_rotation_report.py`、`query_runtime_data.py`、`index_research_reports.py`，默认输出上限 6000 字符，需要时用 `--full` 回取。规则里同时写死一句：**截断不等于完整证据**。
+
+### 门禁落在脚本上，不靠自觉
+
+`preflight_harness.py`、`completion_gate.py`、`check_task_scope.py`、`check_repository_facts.py`、`docs_inventory.py --check`、`generate_agent_index.py --check`，以及选人 / 排班 / 导出类改动必须通过的不变量断言（终态 `--assert-invariants` 加批量 box 复核）。
+
+协议本体定义在 [`contracts/agent-harness-v0.schema.json`](contracts/agent-harness-v0.schema.json)（Agent Harness Protocol v0），协作规则入口见 [AGENTS.md](AGENTS.md)（被 `CLAUDE.md` 通过 `@AGENTS.md` 复用）。
+
 ## 从哪里开始读
 
 | 你是谁 / 想做什么 | 入口 |
@@ -264,6 +336,7 @@ Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Princi
 | 想运行 CLI 或接前端 | [docs/接口/CLI与Worker.md](docs/接口/CLI与Worker.md)、[docs/接口/输入输出与兼容.md](docs/接口/输入输出与兼容.md) |
 | 想判断结果或性能是否可信 | [docs/质量与维护/QUALITY_AND_AUDIT.md](docs/质量与维护/QUALITY_AND_AUDIT.md)、[docs/质量与维护/PERFORMANCE_ENGINEERING.md](docs/质量与维护/PERFORMANCE_ENGINEERING.md) |
 | 想理解机制映射 | [docs/机制/知识库引用.md](docs/机制/知识库引用.md) → [输入与技能映射](docs/模块/输入与技能映射.md) |
+| 想理解 Agent 治理与协作协议 | [Agent 治理](#agent-治理) → [agent-harness-v0.schema.json](contracts/agent-harness-v0.schema.json) → [AGENTS.md](AGENTS.md) |
 | 想理解编排与轮换 | [排班与轮换](docs/模块/排班与轮换.md)、[定时轮换调用链](docs/调用链/定时轮换.md) |
 | 想修 bug / 审计体系 | [AGENTS.md](AGENTS.md)、[错误与诊断](docs/接口/错误与诊断.md)、[docs/质量与维护/QUALITY_AND_AUDIT.md](docs/质量与维护/QUALITY_AND_AUDIT.md) |
 | 想查文件和模块 | [docs/INDEX.md](docs/INDEX.md)、[docs/PROJECT_MAP.md](docs/PROJECT_MAP.md) |
@@ -289,6 +362,12 @@ docs/                当前事实、领域语义、维护流程、TODO 与归档
 scripts/             数据构建与审计脚本
 ```
 
-## License
+## 授权与使用限制
 
-MIT
+**本项目以源码可见方式公开，仅供展示，不授权任何使用或二次开发。全部权利保留。**
+
+公开不构成许可。未经作者事先书面许可，不得运行、部署、集成、复制、镜像、转载、修改、演绎、拆分模块、创建衍生作品，或将其用于产品、服务、课程、论文、竞赛、外包交付等任何商业或非商业用途。
+
+允许的行为仅有三类：通过 GitHub 或搜索引擎浏览阅读；在注明出处与本声明的前提下为评论、讨论、教学引用少量片段；以及 GitHub 平台为提供浏览、索引、备份与安全扫描所必需的技术性处理。
+
+本项目按"现状"提供，不附带任何担保。完整条款见 [LICENSE](LICENSE)。
