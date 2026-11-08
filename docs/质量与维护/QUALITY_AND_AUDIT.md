@@ -178,6 +178,8 @@ NEXT_IMPLEMENTATION_UNIT:
 4. 比较前后结果时使用同一输入集合和保证范围，复用 `scripts/assert_rotation_invariants.py --compare-to`；明确变化项与未变化项。失败数量相同不能证明没有新增错误。
 5. 既有检查失败仍须核对领域依据与实际行为；删除源码测试不等于修复了它曾报告的差异。历史测试日志保留为调查材料，不再作为当前执行要求或业务真源。
 
+Mechanical Checks 的批量入口显式使用 `--box-source repository`，从 Git 跟踪的既有收集样本构造 representative 与实际持有数不少于 300 的 high-owned 两组；本地默认仍用持久集合。任一请求组为空或样本发现失败时，runner 在构建、求解前以批次错误返回非零，不允许“checked=0”标成验收通过。样本覆盖和输入来源由批量 runner 负责，Rust `--assert-invariants` 仍独立检查最终 assignment；具体命令及计数口径见 [批量入口说明](../../scripts/codex/README.md#批量验收进度)。
+
 ## 6. Bake 安全门禁
 
 Bake 是加速载体，不是业务真源。预计算结果只有在候选结构和所有相关上下文与生成模型兼容时才能使用；新写的进度文档不能替代领域裁决或作为机制真源。

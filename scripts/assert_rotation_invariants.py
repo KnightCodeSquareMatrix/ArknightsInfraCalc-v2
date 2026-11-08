@@ -22,6 +22,8 @@ GROUPS = {
     "representative": ROOT / "data/fixtures/box-bundles/collected/collected_operboxes",
     "high-owned": ROOT / "data/fixtures/box-bundles/high-owned",
 }
+REPOSITORY_BOX_DIR = "data/fixtures/collected_operboxes/collected_operboxes"
+HIGH_OWNED_MIN = 300
 
 
 class BatchProgress:
@@ -178,6 +180,8 @@ def source_state() -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--group", choices=["representative", "high-owned", "all"], default="all")
+    parser.add_argument("--box-source", choices=["persistent", "repository"], default="persistent",
+                        help="persistent 使用本地持久集合；repository 使用 Git 跟踪的既有样本并按实际持有数筛选 high-owned")
     parser.add_argument("--rotation", default="3")
     parser.add_argument("--layout", type=Path)
     parser.add_argument("--output-dir", type=Path)
@@ -207,16 +211,33 @@ def main() -> int:
         parser.error("--compare-to 需要同时指定 --output-dir")
     if args.output_dir:
         args.output_dir.mkdir(parents=True, exist_ok=False)
-    groups = GROUPS.items() if args.group == "all" else [(args.group, GROUPS[args.group])]
     binary = Path(args.binary)
     if not binary.is_absolute():
         binary = ROOT / binary
 
-    work = [(group, box_path) for group, directory in groups
-            for box_path in sorted(directory.glob("*.json"))
-            if not box_path.stem.endswith("_profile")]
-    progress = BatchProgress(args.output_dir, len(work), args.progress_interval)
+    progress = BatchProgress(args.output_dir, 0, args.progress_interval)
     try:
+        selected_groups = list(GROUPS) if args.group == "all" else [args.group]
+        if args.box_source == "repository":
+            tracked = subprocess.check_output(
+                ["git", "ls-files", "-z", "--", REPOSITORY_BOX_DIR], cwd=ROOT
+            ).decode("utf-8").split("\0")
+            boxes = sorted(ROOT / path for path in tracked
+                           if path.endswith(".json") and not Path(path).stem.endswith("_profile"))
+            high_owned = [path for path in boxes
+                          if sum(operator.get("own", True) for operator in
+                                 json.loads(path.read_text(encoding="utf-8"))) >= HIGH_OWNED_MIN]
+            sources = {"representative": boxes, "high-owned": high_owned}
+        else:
+            sources = {group: sorted(path for path in GROUPS[group].glob("*.json")
+                                    if not path.stem.endswith("_profile"))
+                       for group in selected_groups}
+        missing = [group for group in selected_groups if not sources[group]]
+        if missing:
+            raise ValueError(f"no operboxes in requested groups: {', '.join(missing)} "
+                             f"(box source: {args.box_source})")
+        work = [(group, path) for group in selected_groups for path in sources[group]]
+        progress.update(total=len(work))
         if not args.skip_build:
             subprocess.run(["cargo", "build", "--release", "-p", "infra-cli"], cwd=ROOT, check=True)
         return run_batch(args, binary, work, progress)
@@ -313,6 +334,7 @@ def run_batch(args, binary: Path, work: list[tuple[str, Path]], progress: BatchP
     if args.output_dir:
         (args.output_dir / "summary.json").write_text(json.dumps({
             "rotation": args.rotation,
+            "box_source": args.box_source,
             "layout": str(args.layout) if args.layout else None,
             "no_fiammetta": args.no_fiammetta,
             "binary": str(binary),

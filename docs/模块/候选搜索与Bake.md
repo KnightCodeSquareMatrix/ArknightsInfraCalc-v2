@@ -5,7 +5,7 @@
 > 当前真源：docs/机制/SCORING_MODEL.md; docs/质量与维护/PERFORMANCE_ENGINEERING.md
 > 机制依赖：docs/机制/知识库引用.md；vault:docs/1-基础设定/设施与进驻/基建总览.md；vault:docs/3-组合库/组合注册表.md
 > 摘要：定位候选池、Plan 门禁、域搜索、排序与 Bake 回退的完整链路。
-> 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`; `data/baked/`
+> 代码范围：`crates/infra-core/src/{pool,search,bake.rs,candidate.rs}`; `crates/infra-cli/src/commands/{bake,profile}.rs`
 > 代码锚点：`crates/infra-core/src/pool/base.rs::{build_roster_pool,filter_pool}`; `crates/infra-core/src/search/{trade,manufacture,control,power,trade_allocation}.rs`; `crates/infra-core/src/bake.rs::{bake_catalogs,load_baked_catalog,try_baked_trade_search}`
 > 关联链路：`docs/调用链/技能到房间结算.md`; `docs/调用链/跨设施状态刷新.md`
 > 核验基线：`01cbec5`; `target/codex-runs/trade-final-efficiency-unit-20261020-r2/`; `out/trade-final-efficiency-unit-20261020/baked-final-r2/`
