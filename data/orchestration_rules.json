@@ -737,7 +737,7 @@
               "min_count": 2,
               "max_count": 2,
               "selection": "all_available",
-              "same_room": true
+              "same_room": false
             }
           ],
           "bind_all": true

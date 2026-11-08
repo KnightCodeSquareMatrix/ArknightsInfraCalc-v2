@@ -4752,19 +4752,19 @@ pub fn collect_final_rotation_issues(
                     .control_operators()
                     .iter()
                     .any(|operator| operator.name == "八幡海铃" && operator.elite >= 2);
-                let consumers_together = blueprint.rooms.iter().any(|room| {
-                    room.kind == FacilityKind::TradePost
-                        && ["伺夜", "贝洛内"].iter().all(|name| {
-                            shift
+                let consumers_in_trade = ["伺夜", "贝洛内"].iter().all(|name| {
+                    blueprint.rooms.iter().any(|room| {
+                        room.kind == FacilityKind::TradePost
+                            && shift
                                 .assignment
                                 .operators_in(&room.id)
                                 .iter()
                                 .any(|operator| operator.name == *name && operator.elite >= 2)
-                        })
+                    })
                 });
-                if !source_present || !consumers_together {
+                if !source_present || !consumers_in_trade {
                     return Err(Error::msg(format!(
-                        "assert-invariants siracusa_peak_selected_team failed in shift {}: active trio requires E2 control source and both E2 consumers in one trade room",
+                        "assert-invariants siracusa_peak_selected_team failed in shift {}: active trio requires E2 control source and both E2 consumers in trade rooms",
                         shift.index + 1
                     )));
                 }

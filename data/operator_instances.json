@@ -5,7 +5,8 @@
       "name": "CONFESS-47",
       "tier": "tier_0",
       "tags": [
-        "cc.g.laterano"
+        "cc.g.laterano",
+        "cc.g.platform"
       ],
       "facilities": {
         "power": {
@@ -20,7 +21,8 @@
       "name": "CONFESS-47",
       "tier": "tier_up",
       "tags": [
-        "cc.g.laterano"
+        "cc.g.laterano",
+        "cc.g.platform"
       ],
       "facilities": {
         "power": {
@@ -71,7 +73,9 @@
     "Friston-3@tier_0": {
       "name": "Friston-3",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -84,7 +88,9 @@
     "Friston-3@tier_up": {
       "name": "Friston-3",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -98,7 +104,9 @@
     "GALLUS²@tier_0": {
       "name": "GALLUS²",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -111,7 +119,9 @@
     "GALLUS²@tier_up": {
       "name": "GALLUS²",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.platform"
+      ],
       "facilities": {
         "power": {
           "buff_ids": [
@@ -385,7 +395,9 @@
     "临光@tier_0": {
       "name": "临光",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -398,7 +410,9 @@
     "临光@tier_up": {
       "name": "临光",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -647,9 +661,7 @@
     "八幡海铃@tier_0": {
       "name": "八幡海铃",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.siracusa"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -662,9 +674,7 @@
     "八幡海铃@tier_up": {
       "name": "八幡海铃",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.siracusa"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -767,9 +777,7 @@
     "凛御银灰@tier_0": {
       "name": "凛御银灰",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.karlan"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -782,9 +790,7 @@
     "凛御银灰@tier_up": {
       "name": "凛御银灰",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.karlan"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -1643,7 +1649,9 @@
     "机械师@tier_0": {
       "name": "机械师",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.elite_op"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -1992,7 +2000,9 @@
     "巫恋@tier_0": {
       "name": "巫恋",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.siracusa"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -2005,7 +2015,9 @@
     "巫恋@tier_up": {
       "name": "巫恋",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.siracusa"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -2207,9 +2219,7 @@
     "怒潮凛冬@tier_0": {
       "name": "怒潮凛冬",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.usaut"
-      ],
+      "tags": [],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -2222,9 +2232,7 @@
     "怒潮凛冬@tier_up": {
       "name": "怒潮凛冬",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.usaut"
-      ],
+      "tags": [],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -2330,9 +2338,7 @@
     "戴菲恩@tier_up": {
       "name": "戴菲恩",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.glasgow"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2504,7 +2510,9 @@
     "摩根@tier_0": {
       "name": "摩根",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.glasgow"
+      ],
       "facilities": {
         "dorm": {
           "buff_ids": [
@@ -2591,9 +2599,7 @@
     "斩业星熊@tier_up": {
       "name": "斩业星熊",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.lgd"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -2931,7 +2937,9 @@
     "杏仁@tier_0": {
       "name": "杏仁",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.blacksteel"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -2944,7 +2952,9 @@
     "杏仁@tier_up": {
       "name": "杏仁",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.blacksteel"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3041,7 +3051,9 @@
     "杰西卡@tier_0": {
       "name": "杰西卡",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.blacksteel"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3318,7 +3330,9 @@
       "name": "正义骑士号",
       "tier": "tier_0",
       "tags": [
-        "cc.g.platform"
+        "cc.g.platform",
+        "cc.g.pinus",
+        "cc.g.knight"
       ],
       "facilities": {
         "power": {
@@ -3333,7 +3347,9 @@
       "name": "正义骑士号",
       "tier": "tier_up",
       "tags": [
-        "cc.g.platform"
+        "cc.g.platform",
+        "cc.g.pinus",
+        "cc.g.knight"
       ],
       "facilities": {
         "power": {
@@ -3488,7 +3504,9 @@
     "泰拉大陆调查团@tier_0": {
       "name": "泰拉大陆调查团",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -3501,7 +3519,9 @@
     "泰拉大陆调查团@tier_up": {
       "name": "泰拉大陆调查团",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.monhun"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -3684,9 +3704,7 @@
     "涤火杰西卡@tier_0": {
       "name": "涤火杰西卡",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.blacksteel"
-      ],
+      "tags": [],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -3699,9 +3717,7 @@
     "涤火杰西卡@tier_up": {
       "name": "涤火杰西卡",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.blacksteel"
-      ],
+      "tags": [],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -4362,7 +4378,10 @@
     "焰尾@tier_0": {
       "name": "焰尾",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.pinus",
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -4375,7 +4394,10 @@
     "焰尾@tier_up": {
       "name": "焰尾",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.pinus",
+        "cc.g.knight"
+      ],
       "facilities": {
         "control": {
           "buff_ids": [
@@ -6948,7 +6970,9 @@
     "雪猎@tier_0": {
       "name": "雪猎",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.karlan"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -6961,7 +6985,9 @@
     "雪猎@tier_up": {
       "name": "雪猎",
       "tier": "tier_up",
-      "tags": [],
+      "tags": [
+        "cc.g.karlan"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -7195,7 +7221,9 @@
     "香草@tier_0": {
       "name": "香草",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.blacksteel"
+      ],
       "facilities": {
         "manufacture": {
           "buff_ids": [
@@ -7675,9 +7703,7 @@
     "淬羽赫默@tier_0": {
       "name": "淬羽赫默",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.rhine"
-      ],
+      "tags": [],
       "facilities": {
         "office": {
           "buff_ids": [
@@ -7794,7 +7820,9 @@
     "斥罪@tier_0": {
       "name": "斥罪",
       "tier": "tier_0",
-      "tags": [],
+      "tags": [
+        "cc.g.siracusa"
+      ],
       "facilities": {
         "office": {
           "buff_ids": [
@@ -8516,6 +8544,374 @@
       "tier": "tier_0",
       "tags": [
         "cc.g.laterano"
+      ],
+      "facilities": {}
+    },
+    "芙兰卡@tier_0": {
+      "name": "芙兰卡",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.blacksteel"
+      ],
+      "facilities": {}
+    },
+    "芙兰卡@tier_up": {
+      "name": "芙兰卡",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.blacksteel"
+      ],
+      "facilities": {}
+    },
+    "寻澜@tier_0": {
+      "name": "寻澜",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.blacksteel"
+      ],
+      "facilities": {}
+    },
+    "寻澜@tier_up": {
+      "name": "寻澜",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.blacksteel"
+      ],
+      "facilities": {}
+    },
+    "烛煌@tier_0": {
+      "name": "烛煌",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.elite_op"
+      ],
+      "facilities": {}
+    },
+    "机械师@tier_up": {
+      "name": "机械师",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.elite_op"
+      ],
+      "facilities": {}
+    },
+    "达格达@tier_0": {
+      "name": "达格达",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {}
+    },
+    "达格达@tier_up": {
+      "name": "达格达",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {}
+    },
+    "因陀罗@tier_0": {
+      "name": "因陀罗",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {}
+    },
+    "因陀罗@tier_up": {
+      "name": "因陀罗",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.glasgow"
+      ],
+      "facilities": {}
+    },
+    "耶拉@tier_0": {
+      "name": "耶拉",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {}
+    },
+    "耶拉@tier_up": {
+      "name": "耶拉",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {}
+    },
+    "极光@tier_0": {
+      "name": "极光",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {}
+    },
+    "极光@tier_up": {
+      "name": "极光",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.karlan"
+      ],
+      "facilities": {}
+    },
+    "星熊@tier_0": {
+      "name": "星熊",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.lgd"
+      ],
+      "facilities": {}
+    },
+    "星熊@tier_up": {
+      "name": "星熊",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.lgd"
+      ],
+      "facilities": {}
+    },
+    "梅尔@tier_0": {
+      "name": "梅尔",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.rhine"
+      ],
+      "facilities": {}
+    },
+    "布洛卡@tier_0": {
+      "name": "布洛卡",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "布洛卡@tier_up": {
+      "name": "布洛卡",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "铃兰@tier_0": {
+      "name": "铃兰",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "铃兰@tier_up": {
+      "name": "铃兰",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "贾维@tier_0": {
+      "name": "贾维",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "贾维@tier_up": {
+      "name": "贾维",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "奥斯塔@tier_0": {
+      "name": "奥斯塔",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "奥斯塔@tier_up": {
+      "name": "奥斯塔",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "伺夜@tier_0": {
+      "name": "伺夜",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "忍冬@tier_0": {
+      "name": "忍冬",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "忍冬@tier_up": {
+      "name": "忍冬",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "荒芜拉普兰德@tier_0": {
+      "name": "荒芜拉普兰德",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "荒芜拉普兰德@tier_up": {
+      "name": "荒芜拉普兰德",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "复奏@tier_0": {
+      "name": "复奏",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "复奏@tier_up": {
+      "name": "复奏",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.siracusa"
+      ],
+      "facilities": {}
+    },
+    "年@tier_0": {
+      "name": "年",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.sui"
+      ],
+      "facilities": {}
+    },
+    "年@tier_up": {
+      "name": "年",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.sui"
+      ],
+      "facilities": {}
+    },
+    "真理@tier_0": {
+      "name": "真理",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {}
+    },
+    "真理@tier_up": {
+      "name": "真理",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {}
+    },
+    "烈夏@tier_0": {
+      "name": "烈夏",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {}
+    },
+    "苦艾@tier_0": {
+      "name": "苦艾",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {}
+    },
+    "苦艾@tier_up": {
+      "name": "苦艾",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.usaut"
+      ],
+      "facilities": {}
+    },
+    "耀骑士临光@tier_0": {
+      "name": "耀骑士临光",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "耀骑士临光@tier_up": {
+      "name": "耀骑士临光",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "瑕光@tier_0": {
+      "name": "瑕光",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "瑕光@tier_up": {
+      "name": "瑕光",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "鞭刃@tier_0": {
+      "name": "鞭刃",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "鞭刃@tier_up": {
+      "name": "鞭刃",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.knight"
+      ],
+      "facilities": {}
+    },
+    "砾@tier_0": {
+      "name": "砾",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.knight"
       ],
       "facilities": {}
     }
