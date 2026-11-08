@@ -260,6 +260,8 @@ def remote_deploy_script(
         remote_data_tmp=/root/infra-cli-data.tar.gz
         expected_data_sha256={shlex.quote(local_data_sha256)}
         trusted_data="$app_root/shared/bin-data"
+        shared_data_link="$trusted_bin/data"
+        shared_data_link_created=0
         public_health_arg={shlex.quote(public_health_arg)}
 
         echo "=== 0. upload sanity ==="
@@ -319,6 +321,9 @@ def remote_deploy_script(
           elif [[ "$data_installed" == "1" ]]; then
             mv -T "$trusted_data" "$backup_dir/failed-bin-data"
           fi
+          if [[ "$shared_data_link_created" == "1" ]]; then
+            rm -- "$shared_data_link"
+          fi
           echo "restored_shared_sha=$old_sha" >&2
         }}
         # Exit 76 is emitted only after this foreground deployment has restored
@@ -339,6 +344,13 @@ def remote_deploy_script(
         fi
         mv -T "$data_stage" "$trusted_data"
         data_installed=1
+        if [[ -L "$shared_data_link" ]]; then
+          test "$(readlink -f "$shared_data_link")" = "$trusted_data"
+        else
+          test ! -e "$shared_data_link"
+          ln -s ../bin-data "$shared_data_link"
+          shared_data_link_created=1
+        fi
         install -m 0755 -o root -g root "$remote_tmp" "$trusted_bin/infra-cli.new"
         printf '%s\\n' "$expected_sha256" > "$sidecar.new"
         chmod 0644 "$sidecar.new"
@@ -393,6 +405,7 @@ def remote_deploy_script(
         test "$(cat "$sidecar")" = "$expected_sha256"
         test "$(sha256sum "$installed_solver" | cut -d ' ' -f 1)" = "$expected_sha256"
         installed_data="$current_release/$runtime_subdir/bin/data"
+        test "$(readlink -f "$shared_data_link")" = "$trusted_data"
         cmp "$trusted_data/.solver-data.sha256" "$installed_data/.solver-data.sha256"
         (cd "$trusted_data" && sha256sum --check --quiet .solver-data.sha256)
         (cd "$installed_data" && sha256sum --check --quiet .solver-data.sha256)

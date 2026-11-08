@@ -29,6 +29,8 @@ release 归档本身不得携带求解器。
   同行 `infra-cli.sha256`（root:root 0644，单行小写 SHA-256）。
 - 外置运行时数据：`<app_root>/shared/bin-data`，由 helper 注入 release 的
   `bin/data`。网站优先使用这些数据，不能只更新 ELF 而保留旧技能与规则。
+  `shared/bin/data` 链接到 `../bin-data`，使 active-cli 指向 shared ELF 时也
+  使用同版外置数据，避免 root 探活生成的内置缓存阻止服务账户启动。
   部署脚本从当前提交打包 `data/`，排除 `baked/`、反馈种子和收集的 Box；
   `fixtures/` 仅保留引擎运行时依赖的标准 `243/`，
   携带逐文件 `.solver-data.sha256` 和来源 `.solver-data-commit`，激活后核对
