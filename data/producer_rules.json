@@ -11,7 +11,7 @@
     {
       "id": "trade_siracusa_scaling",
       "source_buff_id": "control_tra_limit&spd2[000]",
-      "admission": "deferred_optional",
+      "admission": "plan_required",
       "target_facility": "trade",
       "schedule_relation": "exact_presence"
     },

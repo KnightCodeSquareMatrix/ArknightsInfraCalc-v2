@@ -203,7 +203,7 @@
     },
     {
       "id": "rosemary_perception",
-      "priority": 21,
+      "priority": 18,
       "tier": "cross_station",
       "skip_registry_ids": ["human_fireworks_pure"],
       "alternatives": [
@@ -708,6 +708,36 @@
               "min_count": 2,
               "max_count": 3,
               "selection": "all_available"
+            }
+          ],
+          "bind_all": true
+        }
+      ]
+    },
+    {
+      "id": "siracusa_trade",
+      "priority": 19,
+      "tier": "cross_station",
+      "alternatives": [
+        {
+          "id": "full_trio",
+          "roles": [
+            {
+              "id": "control_core",
+              "facility": "control_center",
+              "candidates": [{ "name": "八幡海铃", "elite": 2 }]
+            },
+            {
+              "id": "trade_members",
+              "facility": "trade_post",
+              "candidates": [
+                { "name": "伺夜", "elite": 2 },
+                { "name": "贝洛内", "elite": 2 }
+              ],
+              "min_count": 2,
+              "max_count": 2,
+              "selection": "all_available",
+              "same_room": true
             }
           ],
           "bind_all": true
