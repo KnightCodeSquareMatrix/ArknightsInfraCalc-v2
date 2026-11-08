@@ -1677,8 +1677,8 @@
         },
         {
           "condition": {
-            "partner_in_room": {
-              "name": "能天使"
+            "tag_present_in_room": {
+              "tag": "cc.angel"
             }
           },
           "action": {

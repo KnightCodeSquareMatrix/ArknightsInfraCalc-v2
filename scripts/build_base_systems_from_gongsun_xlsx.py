@@ -21,7 +21,7 @@ CURATED_SYSTEMS = [
     {
         "id": "rosemary_perception",
         "label": "迷迭香感知链：黑键贸+夕中枢+感知宿舍+迷迭香赤金（243-高配3班 peak）",
-        "priority": 21,
+        "priority": 18,
         "shift_modes": ["peak"],
         "xlsx_hint": "243-高配3班 peak：黑键+迷迭香+夕+感知宿舍",
         "slots": [
@@ -92,17 +92,50 @@ CURATED_SYSTEMS = [
     },
     {
         "id": "snhunt_monhun_control",
-        "label": "怪猎中枢：火龙S黑角+麒麟R夜刀（木天蓼；贸易由搜索填缝）",
-        "priority": 10,
-        "exclusive_group": "meta_chain",
+        "label": "怪猎中枢：火龙S黑角+麒麟R夜刀（木天蓼；需调查团消费方）",
+        "tier": "cross_station",
+        "priority": 11,
+        "exclusive_group": "control_global_effect",
         "shift_modes": ["peak"],
+        "bind_all": True,
         "xlsx_hint": "泰拉大陆调查团(+怪猎中枢)",
         "slots": [
             {
                 "facility": "control",
                 "operators": [
-                    {"name": "火龙S黑角", "elite": 2},
-                    {"name": "麒麟R夜刀", "elite": 2},
+                    {"name": "火龙S黑角", "elite": 0},
+                    {"name": "麒麟R夜刀", "elite": 0},
+                ],
+            },
+            {
+                "facility": "trade_post",
+                "fill": "search",
+                "required_count": 1,
+                "operators": [{"name": "泰拉大陆调查团", "elite": 0}],
+            },
+        ],
+    },
+    {
+        "id": "snhunt_monhun_control_factory",
+        "label": "怪猎中枢制造消费：火龙S黑角+麒麟R夜刀+调查团",
+        "tier": "cross_station",
+        "priority": 11,
+        "exclusive_group": "control_global_effect",
+        "shift_modes": ["peak"],
+        "bind_all": True,
+        "xlsx_hint": "泰拉大陆调查团(+怪猎中枢)",
+        "slots": [
+            {
+                "facility": "control",
+                "operators": [
+                    {"name": "火龙S黑角", "elite": 0},
+                    {"name": "麒麟R夜刀", "elite": 0},
+                ],
+            },
+            {
+                "facility": "factory",
+                "operators": [
+                    {"name": "泰拉大陆调查团", "elite": 0, "min_level": 30},
                 ],
             },
         ],

@@ -22,7 +22,7 @@ NEW_SKILLS = [
                 "phase_order": 20,
             },
             {
-                "condition": {"partner_in_room": {"name": "能天使"}},
+                "condition": {"tag_present_in_room": {"tag": "cc.angel"}},
                 "action": {"kind": "add_flat_eff", "params": {"value": 25.0}},
                 "phase": "constant",
                 "phase_order": 21,

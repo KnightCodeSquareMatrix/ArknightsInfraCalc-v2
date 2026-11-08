@@ -4714,6 +4714,63 @@ pub fn collect_final_rotation_issues(
         validate_final_bind_cycle(blueprint, report)
             .map_err(|error| Error::msg(format!("assert-invariants {error}")))?;
     });
+    check!("siracusa_peak_selected_team", {
+        let selected = std::iter::once(&report.peak_plan)
+            .chain(&report.assignment_plans)
+            .any(|plan| {
+                plan.selected_rules
+                    .iter()
+                    .any(|rule| rule.rule_id == "siracusa_trade")
+            });
+        if selected {
+            let members = ["八幡海铃", "伺夜", "贝洛内"];
+            for name in members {
+                if operbox
+                    .progress_of(name)
+                    .is_none_or(|progress| progress.elite < 2)
+                {
+                    return Err(Error::msg(format!(
+                        "assert-invariants siracusa_peak_selected_team failed: selected core {name} is not owned at E2"
+                    )));
+                }
+            }
+            for shift in &report.shifts {
+                let active = shift.assignment.iter_rooms().any(|room| {
+                    blueprint
+                        .room(&room.room_id)
+                        .is_some_and(|spec| spec.kind != FacilityKind::Dormitory)
+                        && room
+                            .operators
+                            .iter()
+                            .any(|operator| members.contains(&operator.name.as_str()))
+                });
+                if !active {
+                    continue;
+                }
+                let source_present = shift
+                    .assignment
+                    .control_operators()
+                    .iter()
+                    .any(|operator| operator.name == "八幡海铃" && operator.elite >= 2);
+                let consumers_in_trade = ["伺夜", "贝洛内"].iter().all(|name| {
+                    blueprint.rooms.iter().any(|room| {
+                        room.kind == FacilityKind::TradePost
+                            && shift
+                                .assignment
+                                .operators_in(&room.id)
+                                .iter()
+                                .any(|operator| operator.name == *name && operator.elite >= 2)
+                    })
+                });
+                if !source_present || !consumers_in_trade {
+                    return Err(Error::msg(format!(
+                        "assert-invariants siracusa_peak_selected_team failed in shift {}: active trio requires E2 control source and both E2 consumers in trade rooms",
+                        shift.index + 1
+                    )));
+                }
+            }
+        }
+    });
     check!("fiammetta_enabled", {
         if fiammetta_enable == Some(false) {
             if let Some((shift_index, action)) =

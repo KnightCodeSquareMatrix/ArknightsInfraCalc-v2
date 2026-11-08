@@ -99,6 +99,10 @@ python3 scripts/assert_rotation_invariants.py --status target/codex-runs/task/ba
 
 批量入口默认使用 `target/release/infra-cli`，构建也使用 release。指定 `--output-dir` 后，从构建阶段开始原子更新 `progress.json`，每盒实际完成时更新；终端进度默认至少间隔 15 秒，可用 `--progress-interval` 调整（0 为每盒输出）。`last_result` 是最后完成盒，不声称是当前运行盒；并行后盒先完成时进度也立即可见。
 
+本地默认 `--box-source persistent` 使用 `data/fixtures/box-bundles/` 的两个持久集合。CI 显式使用 `--box-source repository`，只读取 Git 跟踪的 `data/fixtures/collected_operboxes/collected_operboxes/` 中的 Box JSON，排除 `_profile.json`；representative 使用全部样本，high-owned 按实际 `own` 为真的人数不少于 300 筛选，不按文件名或 JSON 总行数判断。当前为 26＋9 次调用，两个组的重复样本分别运行并保留组名。该选样属于验证覆盖 policy，不修改求解器候选或最优性保证。
+
+任一请求组为空，或 repository 来源的样本发现、持有数解析失败时，批次在构建和求解之前返回 2，`progress.json` 标记失败并记录原因；不把空集合当作成功，也不回退到其他来源。`summary.json` 记录 `box_source`，`--status` 仍可独立读取失败快照。
+
 状态区分 `running/completed/failed` 与 `build/solve/compare/finished` 阶段，带完成数、各类失败数、更新时间、耗时和证据路径。比较结束后才记录最终退出码；构建、进程启动或产物写入异常记录批次错误并返回 2，不混入盒级错误类别。已有超时分类、最终 `summary.json` 和失败原因保留。
 
 `--status` 只读取并验证快照，不构建、不求解；读取成功返回 0，即使记录的批次退出码非零。快照显示的是最后记录状态，不能证明进程仍存活；缺失/损坏返回 2。

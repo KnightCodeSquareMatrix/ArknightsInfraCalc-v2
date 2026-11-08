@@ -55,6 +55,51 @@ fn cross_station() -> OperatorTier {
     OperatorTier::CrossStation
 }
 
+/// A rule prefix obeys the same hard control conflicts as ordinary control search.
+/// Settlement owns effect-source legality; rule priority only decides which prefix survives.
+fn control_prefix_is_legal(
+    ctx: &RuleCompileContext<'_>,
+    assignment: &BaseAssignment,
+) -> Result<bool> {
+    let assigned = assignment.control_operators();
+    if assigned.len() < 2 {
+        return Ok(true);
+    }
+    let control: Vec<_> = assigned
+        .iter()
+        .map(|op| (op.name.clone(), op.elite))
+        .collect();
+    if crate::mood::default_mood_model()?.control_global_recovery_has_conflict(&control) {
+        return Ok(false);
+    }
+    let layout = crate::layout::resolve_control_input_layout(
+        ctx.blueprint,
+        assignment,
+        ctx.instances,
+        ctx.table,
+        ctx.mood,
+        None,
+    )?;
+    let operators = assigned
+        .iter()
+        .map(|op| crate::control::ControlOperator {
+            name: op.name.clone(),
+            elite: op.elite,
+            buff_ids: ctx.instances.resolve_control_buff_ids(&op.name, op.tier()),
+            tags: ctx.instances.tags_for(&op.name, op.tier()),
+        })
+        .collect();
+    let result = crate::control::solve_control(
+        &crate::control::ControlRoomInput {
+            operators,
+            mood: ctx.mood,
+            layout,
+        },
+        ctx.table,
+    );
+    Ok(!result.effect_ledger.has_conflicting_effect_sources())
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(super) struct AlternativeSpec {
     pub id: String,
@@ -571,6 +616,9 @@ pub(super) fn compile_rules(
                     continue;
                 };
                 candidate_reserves.extend(reserves);
+                if !control_prefix_is_legal(ctx, &candidate_assignment)? {
+                    continue;
+                }
                 placed = Some((
                     candidate_assignment,
                     candidate_used,

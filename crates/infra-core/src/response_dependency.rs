@@ -37,6 +37,8 @@ pub enum ResponseField {
 pub enum ProducerAdmission {
     DeferredOptional,
     ExcludedAutomatic,
+    /// Selection and schedule dependencies belong to a fixed Plan rule, not a presence mask.
+    /// Ordinary control fill may still select this operator for another capability.
     PlanRequired,
     NormalObservation,
     PolicyManaged,
@@ -326,7 +328,9 @@ fn validate_producer_rule_catalog(
     for rule in &catalog.rules {
         if !matches!(
             rule.admission,
-            ProducerAdmission::DeferredOptional | ProducerAdmission::ExcludedAutomatic
+            ProducerAdmission::DeferredOptional
+                | ProducerAdmission::ExcludedAutomatic
+                | ProducerAdmission::PlanRequired
         ) {
             return Err(format!(
                 "producer rule {} uses unsupported admission {:?}",
@@ -505,7 +509,10 @@ pub fn resolve_assignment_producer_dependencies(
     let catalog = producer_rule_catalog(table)?;
     let mut resolved = Vec::new();
     for rule in &catalog.rules {
-        if rule.admission == ProducerAdmission::ExcludedAutomatic {
+        if matches!(
+            rule.admission,
+            ProducerAdmission::ExcludedAutomatic | ProducerAdmission::PlanRequired
+        ) {
             continue;
         }
         let mut producers: Vec<_> = assignment

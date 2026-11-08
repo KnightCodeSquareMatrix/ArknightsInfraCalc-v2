@@ -210,7 +210,7 @@ fn compile_plan_once(
     registry_sustain_hours: Option<f64>,
     control_work_hours: Option<f64>,
 ) -> Result<(AssignmentPlan, BaseAssignment)> {
-    // priority >= 19 是用户确认的硬/主要体系；先于 legacy registry 编译。
+    // 先行体系含感知18；保证叙拉古/焰尾19、感知18先于龙门14、怪猎三人11。
     let mut compiled = compile_rules(
         catalog,
         &RuleCompileContext {
@@ -228,7 +228,7 @@ fn compile_plan_once(
         &std::collections::HashSet::new(),
         skip_system_ids,
         disabled_conditional_packs,
-        19..=i32::MAX,
+        18..=i32::MAX,
     )?;
     let mut registry_skip = skip_system_ids.clone();
     registry_skip.extend(compiled.skip_registry_ids.iter().cloned());
@@ -298,7 +298,7 @@ fn compile_plan_once(
         .iter()
         .filter_map(|claim| claim.exclusive_group.clone())
         .collect();
-    // priority <= 18 的软候选只读取主要体系和 registry 都落位后的真实空位。
+    // priority <= 17 的后序候选只读取先行体系和 registry 落位后的真实空位。
     let late = compile_rules(
         catalog,
         &RuleCompileContext {
@@ -326,7 +326,7 @@ fn compile_plan_once(
             .collect(),
         &registry_skip,
         disabled_conditional_packs,
-        i32::MIN..=18,
+        i32::MIN..=17,
     )?;
     let mut late = late;
     // Mujica is the lowest-priority complete control combination: any other
