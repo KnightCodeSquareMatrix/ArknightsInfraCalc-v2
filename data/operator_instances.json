@@ -2000,9 +2000,7 @@
     "巫恋@tier_0": {
       "name": "巫恋",
       "tier": "tier_0",
-      "tags": [
-        "cc.g.siracusa"
-      ],
+      "tags": [],
       "facilities": {
         "trade": {
           "buff_ids": [
@@ -2015,9 +2013,7 @@
     "巫恋@tier_up": {
       "name": "巫恋",
       "tier": "tier_up",
-      "tags": [
-        "cc.g.siracusa"
-      ],
+      "tags": [],
       "facilities": {
         "trade": {
           "buff_ids": [
