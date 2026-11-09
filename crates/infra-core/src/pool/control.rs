@@ -150,11 +150,8 @@ pub(crate) fn auto_rotation_control_roster(
             if buff_ids.iter().any(|buff_id| {
                 catalog.rules.iter().any(|rule| {
                     rule.source_buff_id == *buff_id
-                        && matches!(
-                            rule.admission,
-                            crate::response_dependency::ProducerAdmission::DeferredOptional
-                                | crate::response_dependency::ProducerAdmission::PlanRequired
-                        )
+                        && rule.admission
+                            == crate::response_dependency::ProducerAdmission::DeferredOptional
                 })
             }) {
                 forbidden_names.insert(name.clone());

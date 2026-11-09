@@ -35,7 +35,7 @@ serve plan.compute ───┘                 │
 
 ## 阶段二：共享 Plan 编排
 
-Peak规则阶段先编译priority≥18的Rule，再按registry自身顺序处理登记体系，最后编译priority≤17的Rule。因此焰尾／叙拉古19先于感知18，感知先于龙门14及有调查团消费的怪猎11；同为19时沿目录稳定顺序。叙拉古三人均持有且精二才提交，八幡在中枢、伺夜与贝洛内均在贸易岗位，两人不强制同站，并生成整组三人绑定；不按阵营标签追加巫恋等成员。规则候选提交前以中枢结算前快照复用恢复与账本来源合法性检查，冲突时回退后选alternative。该串行policy不保证跨体系全局最优。
+2026-11-09取消叙拉古固定组预占，保留priority≥18的先行Rule、registry、priority≤17的后序Rule；感知18、龙门14、怪猎消费变体11及中枢前缀合法性检查不变。中枢来源候选先选，贸易消费该分支的实际中枢状态选人，最后解析实际producer依赖；不为伺夜、贝洛内创建先于中枢选择的固定组三人承诺。
 
 本次 WIP 提交的 `plan_compute::compute_plan_inner` 使用 request-based probe：
 
@@ -66,8 +66,6 @@ Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不
 若 probe 失败，`PlanComputeFailure` 可能带 partial rotation；`plan.compute` 在未启用断言时会序列化 partial `rotation` 与 `error`，CLI `plan` 则返回失败。
 
 ## 阶段三：可选断言、profile 与 MAA
-
-已选叙拉古Rule还由`siracusa_peak_selected_team`从最终assignment核对真实精二持有、中枢来源及两名消费者的贸易岗位，允许同站或分站；同班与轮休继续由共享bind gate核对。断言失败不进入profile或MAA投影。
 
 1. `assert_invariants=true` 时，对当前 rotation 调用 `assert_final_rotation_invariants`，按实际制造技能检查清零组合的同房资格与制造房容量，并检查各班贸易房黑键—巫恋禁同站、杜林在岗人数、跨贸易站产线来源、读取者效率、已选鸿雪杜林核心的四条真实赤金线门槛及已选拆站方案的最终站位。失败立即停止，不继续 profile/MAA。
 2. 请求 profile 时，`build_box_profile_from_current_probe` 消费同一个 current probe，避免为 profile 再跑一次用户 rotation；baseline 比较在 profile 阶段独立读取。

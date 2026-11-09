@@ -8910,6 +8910,38 @@
         "cc.g.knight"
       ],
       "facilities": {}
+    },
+    "医生@tier_0": {
+      "name": "医生",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.rainbow"
+      ],
+      "facilities": {}
+    },
+    "导火索@tier_0": {
+      "name": "导火索",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.rainbow"
+      ],
+      "facilities": {}
+    },
+    "艾拉@tier_0": {
+      "name": "艾拉",
+      "tier": "tier_0",
+      "tags": [
+        "cc.g.rainbow"
+      ],
+      "facilities": {}
+    },
+    "罗德岛隐秘队@tier_up": {
+      "name": "罗德岛隐秘队",
+      "tier": "tier_up",
+      "tags": [
+        "cc.g.snhunt"
+      ],
+      "facilities": {}
     }
   }
 }
