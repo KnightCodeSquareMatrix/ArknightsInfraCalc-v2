@@ -28,7 +28,7 @@ serve plan.compute ───┘                 │
 ## 阶段一：适配与加载
 
 - CLI：`commands/plan.rs::plan_cmd` 首先拒绝 `--help` 和独立的 `-h`（`--maa-title -h` 中的 `-h` 仍为标题值），因此不加载输入、不运行排班、不写 profile；随后解析 `--layout`、`--operbox`、`--baseline`、`--rotation`、`--top`、`--prefer`、输出路径和 `--assert-invariants`，再加载 `BaseBlueprint`、`OperBox`、`OperatorInstances`、`SkillTable`。
-- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v7 嵌入 schema。v7 保留旧 named rotation，并允许普通主备/ABC 使用 topology + `shift_hours`；v1–v6 wire 不变，v6 拒绝该对象。该 v7 代码与契约属于本次 WIP 提交，未完成 fresh release 验收或部署。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
+- Worker `plan.compute`：`serve::handle_request` 先解析 envelope；`handle_plan_compute` 读取 `schema_version`，选择 v1–v8 嵌入 schema。v7 保留旧 named rotation，并允许普通主备/ABC 使用 topology + `shift_hours`；v1–v6 wire 不变，v6 拒绝该对象。该 v7 代码与契约属于本次 WIP 提交，未完成 fresh release 验收或部署。旧 v3–v5 body 若请求已删除的独立龙巫 profile，会在进入求解前明确失败。其余请求继续执行 schema 校验、布局语义校验和 `inline_operbox`。
 - Worker `plan`：`handle_plan` 在反序列化路径参数前拒绝旧龙巫 wire；其他请求默认加载 243/full-e2，调用同一 `compute_plan`。
 
 布局语义校验拒绝超出 1–5 级的宿舍 `level`。旧 `dorm_ambience_level` 可读取但不参与结算；`dorm_beds` 仅负责容量；旧 `scenario.initial_global.monster_cuisine` 可读取但会从初始资源池忽略。CLI 文件加载与 Worker 内联布局使用同一 `BaseBlueprint::validate`，不会把这些遗留字段当作当前料理来源。其他真正非法输入仍在此阶段返回，不应进入 solver 根因分析。
@@ -94,3 +94,9 @@ Rosemary alternative 要求候选 Plan 真实感知至少 60；50–59 时它不
 ## 自动轮换排班分派
 
 `plan --rotation auto@H1/H2`由公共core模式/时长请求解析后转入[自动轮换调用链](自动轮换.md)，加载同一蓝图、账号与技能数据。主备来源、Plan、搜索、普通完成复用core；输出独立逐站排班JSON/文本，`--json`只打印排班JSON。该入口不经过定时profile、Worker plan_compute或MAA，也不建立换班事件。
+
+### Worker v8 自动请求
+
+`handle_plan_compute` 完成相同的 schema、布局和 operbox 校验后，按请求类型分派：定时仍进 `compute_plan_for_plan_compute`；自动进 `auto_protocol::compute_auto_result`，调用原 `schedule_auto_rotation` 并在转换前执行请求感知的 auto invariant gate。此处只增加协议边界，不把自动结果送入 timed finalizer。
+
+同一自动报告的最终 assignment 进入已有只读效率 evaluator；两态指标按输入 H 加权形成展示估算。主力组合通过 `BoxProfileMetrics` 复用画像生成，房间指标复用练卡入口，两份 assignment 通过 `build_from_auto_rotation` 复用 MAA 房间投影。完整菲亚事件和逐房状态随 `rotation.auto_rotation` 返回，原 CLI 原始报告保持不变。字段、展示键和执行能力边界见[协议合同](../接口/输入输出与兼容.md#v8-自动轮换协议转换)。

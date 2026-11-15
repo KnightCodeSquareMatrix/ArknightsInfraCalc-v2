@@ -14,7 +14,7 @@ mod rotation_types;
 mod shift_bind;
 mod team_rotation;
 
-pub use base_rotation::evaluate_base_assignment_efficiencies;
+pub use base_rotation::{average_assignment_production, evaluate_base_assignment_efficiencies};
 pub use rotation_types::{
     AutoRotationTiming, DailyProduction, DailyTotals, DormRestPlan, DroneAction, FacilityHalf,
     FiammettaShiftAction, GenericRotationTiming, RoomEfficiencyLine, RotationRequest,

@@ -1,4 +1,5 @@
 mod advice;
+mod auto_protocol;
 mod bake;
 mod debug;
 mod layout;

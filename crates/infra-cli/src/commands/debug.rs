@@ -282,6 +282,10 @@ fn rerun_cmd(args: &[String]) -> Result<(), Error> {
     ) = if request.method == "plan.compute" {
         super::serve::validate_recorded_plan_compute_params(&request.params)
             .map_err(|error| Error::msg(format!("recorded plan.compute contract: {error}")))?;
+        let rotation = &request.params["options"]["rotation"];
+        if rotation.as_str() == Some("auto") || rotation["topology"].as_str() == Some("auto") {
+            return Err(Error::msg("debug rerun currently supports timed rotations only; reproduce auto with plan --rotation auto@H1/H2 using the recorded layout and operbox"));
+        }
         let params: PlanComputeParams = serde_json::from_value(request.params.clone())
             .map_err(|error| Error::msg(format!("plan.compute params parse: {error}")))?;
         let labels = (
