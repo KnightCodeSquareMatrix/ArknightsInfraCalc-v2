@@ -12,7 +12,9 @@
 
 本页只记录接口和模块责任。游戏机制由机制知识库提供；求解器的候选、编排和结算行为由 `infra-core` 的领域文档与代码提供。
 
-当前 Worker 支持 v1–v7。本地最终release已验证ping、v7 ABC8/8/8、主备8/16及未知方法错误后正常退出；消费者以实际 `ping` 和契约 hash 为准。
+当前 Worker 支持 v1–v8，v8 新增自动轮换协议转换；消费者以实际 `ping` 和契约 hash 为准。历史 v7 的 ABC8/8/8、主备8/16验收记录仍保留在本页末尾。
+
+2026-11-16 在 Windows release 完成 v8 协议验收：58 帧含 47 次成功计算、8 次预期非法输入拒绝、未知方法错误和两次 ping；自动 35 盒与普通主备 35 盒分别通过终态断言。同一自动原始报告与协议投影的人员、逐房状态、警告、Plan、菲亚事件及 MAA 名单一致。证据保留在 `target/codex-runs/auto-protocol-adapter/`；本机无可用 Docker，本次未验证 Linux 制品或部署。文档索引检查通过；目录与仓库事实检查因基线已有更新汇报的“统计范围”元数据键失败，未修改该无关文档。
 
 ## 用户可见入口
 
@@ -45,13 +47,13 @@
 
 ## 常驻 Worker
 
-`serve_cmd` 启动时加载运行时表、编译七个 `plan.compute` JSON Schema，并计算每个 schema 的 SHA-256 与当前可执行文件指纹。随后逐行读取 stdin：
+`serve_cmd` 启动时加载运行时表、编译八个 `plan.compute` JSON Schema，并计算每个 schema 的 SHA-256 与当前可执行文件指纹。随后逐行读取 stdin：
 
 ```text
 JSON request line → handle_request → method handler → JSON response line
 ```
 
-支持 `ping`、`plan`、`plan.compute`。当前 `ping` 返回协议版本、支持的 schema 版本（v1–v7）、每版本契约 hash、solver 可执行文件 hash、构建 commit 和时间；部署消费者仍须以实际响应为准。`plan.compute` v7 保留 v6 named rotation 字符串，并增加普通主备/ABC 的 topology + `shift_hours` 对象；v1–v6 schema 文件与 wire 含义不变，v6 保持闭集。v3–v5 历史 schema 可结构解析旧龙巫 wire，但解码后会在求解前明确返回 `PLAN_FAILED`，不等于该 profile 仍受支持，也不会走普通主备 fallback；v1/v2 未包含该枚举。空白行跳过；EOF 正常退出；单行超过 8 MiB 返回 `FRAME_TOO_LARGE` 后继续读取下一行；非 UTF-8 返回 `INVALID_UTF8`。
+支持 `ping`、`plan`、`plan.compute`。当前 `ping` 返回协议版本、支持的 schema 版本（v1–v8）、每版本契约 hash、solver 可执行文件 hash、构建 commit 和时间；部署消费者仍须以实际响应为准。`plan.compute` v7 保留 v6 named rotation 字符串，并增加普通主备/ABC 的 topology + `shift_hours` 对象；v1–v6 schema 文件与 wire 含义不变，v6 保持闭集。v3–v5 历史 schema 可结构解析旧龙巫 wire，但解码后会在求解前明确返回 `PLAN_FAILED`，不等于该 profile 仍受支持，也不会走普通主备 fallback；v1/v2 未包含该枚举。空白行跳过；EOF 正常退出；单行超过 8 MiB 返回 `FRAME_TOO_LARGE` 后继续读取下一行；非 UTF-8 返回 `INVALID_UTF8`。
 
 Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 warnings 返回，profile、MAA、rotation summary 和练卡建议读取同一完整结果。半成品不进入练卡建议；`PartialRotation` 仅保留已完成报告之后真实评估故障的诊断用途。协议、输入、资源/执行故障与显式 assert-invariants 失败沿原 error/PLAN_FAILED 边界，详见[错误与诊断](错误与诊断.md)。
 
@@ -69,9 +71,9 @@ Worker stdout 保持 JSONL。普通排班质量问题随已完成 rotation 的 w
 
 ## 自动排班入口
 
-`plan --rotation auto@H1/H2` 通过公共模式/时长请求解析后分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出排班。支持 `--no-fiammetta`、`--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站排班，`--json`时只输出排班JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚按既定优先级支持实际目标同房跨主备，输出宿舍及双方心情交换记录，支持`--no-fiammetta`且gate核对请求开关、实际续班、Plan依赖和共享恢复预算。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整排班。正常工作技能候选在初始建池按对应设施及H1/H2试算，随机Fallback不做心情或技能检查；后续心情不足保留正常结果与质量提示，显式gate核对提示准确性以及身份、Plan和快照。不再证明任意零散成员或主备混搭不存在偶发跨站协同（保证边界见`docs/排班/自动轮换.md` §2.10）。第一次主力完成后固定；合法替补候选耗尽保留真实缺额并输出当前排班，不回选主力或缩短时长。Worker plan_compute仍为定时契约；Check通过此独立CLI入口接自动排班。ping保留`auto_rotation.fiammetta_policy="static_priority"`顺序能力声明，并增加`continuous_targets=true`及`exchange_cycle=true`实际续班能力，旧bundle未声明时不得静默接收开启请求。MAA未扩展。
+`plan --rotation auto@H1/H2` 通过公共模式/时长请求解析后分派 `plan.rs::auto_rotation_cmd`，只加载输入、调用core并输出排班。支持 `--no-fiammetta`、`--operbox`、`--layout`、`--top`、`--prefer`、`--rotation-out`、`--output-dir`、`--assert-invariants`、`--json`；JSON在显式路径写入（output-dir下为auto_rotation.json），stdout默认中文逐站排班，`--json`时只输出排班JSON。逐站显示主力/替补、普通效率或充能/支援速度/中枢贸易与各制造配方及办公会客加成、窗口、缺额，常驻宿舍挂件单列。拒绝profile、MAA、baseline、prefix shadow和菲亚候选输出；菲亚按既定优先级支持实际目标同房跨主备，输出宿舍及双方心情交换记录，支持`--no-fiammetta`且gate核对请求开关、实际续班、Plan依赖和共享恢复预算。宿舍1＋1不受主动支持总开关影响。auto gate在写文件前检查最终两态；缺员是成功的不完整排班。正常工作技能候选在初始建池按对应设施及H1/H2试算，随机Fallback不做心情或技能检查；后续心情不足保留正常结果与质量提示，显式gate核对提示准确性以及身份、Plan和快照。不再证明任意零散成员或主备混搭不存在偶发跨站协同（保证边界见`docs/排班/自动轮换.md` §2.10）。第一次主力完成后固定；合法替补候选耗尽保留真实缺额并输出当前排班，不回选主力或缩短时长。Worker plan.compute v8 另通过 auto_protocol 只读转换同一自动报告；原 Check 独立 CLI 入口继续保留。ping保留`auto_rotation.fiammetta_policy="static_priority"`顺序能力声明，并增加`continuous_targets=true`及`exchange_cycle=true`实际续班能力，旧bundle未声明时不得静默接收开启请求。MAA 在 v8 中仅投影两套岗位，不承载菲亚连续执行；详见[输入输出与兼容](输入输出与兼容.md#v8-自动轮换协议转换)。
 
-自动排班明确输入主力/替补两段时长，裸 `auto` 返回补时长错误；例如 `auto@24/12`。输出 `timing.shift_hours`保存输入，两态的`evaluation_hours`分别为H1/H2，ETA首人只解释可工作时间。CLI模式/时长解析共用core请求，Worker仍只接受既有定时合同。
+自动排班明确输入主力/替补两段时长，裸 `auto` 返回补时长错误；例如 `auto@24/12`。输出 `timing.shift_hours`保存输入，两态的`evaluation_hours`分别为H1/H2，ETA首人只解释可工作时间。CLI模式/时长解析共用core请求，Worker v8 接受 topology=auto 与两项 shift_hours；v1–v7 保持定时合同。
 
 自动轮换 `plan --rotation auto@H1/H2` 现与普通 plan 共用性能 trace；标签为实际布局和 Box 路径，guard 包含数据加载、求解及终态验收，退出时输出 schema2 汇总。阶段耗时仍为包含子调用的口径，不能相加；失败和提前返回也保留汇总。
 

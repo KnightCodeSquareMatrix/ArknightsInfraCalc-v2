@@ -238,6 +238,32 @@ pub fn build_from_team_rotation(
     ))
 }
 
+/// 仅投影自动模式的两份最终岗位，不生成定时动作、宿舍补位或菲亚单目标动作。
+pub fn build_from_auto_rotation(
+    blueprint: &BaseBlueprint,
+    report: &crate::schedule::AutoRotationReport,
+    opts: &MaaExportOptions,
+) -> Result<MaaSchedule> {
+    let plans = [(&report.main_assignment, "主力"), (&report.backup_assignment, "替补")]
+        .into_iter()
+        .zip(report.timing.shift_hours)
+        .map(|((assignment, label), hours)| build_plan(blueprint, &PlanInput {
+            assignment,
+            name: format!("自动轮换 · {label} · {hours}h"),
+            description: "逐站队列配置；不表示全基建同步换班。菲亚连续服务记录见 auto_rotation.fiammetta，MAA 单目标动作保持关闭。".into(),
+            dorm_autofill: false,
+            fiammetta_target: None,
+            fiammetta_priority: &[],
+            drone: None,
+        }))
+        .collect();
+    let mut schedule = wrap_schedule(opts, plans, Some("主力/替补"));
+    schedule.description = Some(
+        "自动轮换两套岗位配置；不包含逐站换班时刻、普通宿舍恢复或菲亚连续交换执行指令。".into(),
+    );
+    Ok(schedule)
+}
+
 fn wrap_schedule(
     opts: &MaaExportOptions,
     plans: Vec<MaaPlan>,

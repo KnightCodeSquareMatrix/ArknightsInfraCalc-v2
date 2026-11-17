@@ -27,7 +27,7 @@ use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const PLAN_SCHEMA_VERSION: u32 = 7;
+const PLAN_SCHEMA_VERSION: u32 = 8;
 const COMPAT_PLAN_SCHEMA_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const PLAN_COMPUTE_SCHEMA_V1_JSON: &str =
@@ -44,6 +44,8 @@ const PLAN_COMPUTE_SCHEMA_V6_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v6.schema.json");
 const PLAN_COMPUTE_SCHEMA_V7_JSON: &str =
     include_str!("../../../../contracts/plan-compute-v7.schema.json");
+const PLAN_COMPUTE_SCHEMA_V8_JSON: &str =
+    include_str!("../../../../contracts/plan-compute-v8.schema.json");
 const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_LAYOUT_ROOMS: usize = 64;
 const MAX_LABEL_BYTES: usize = 200;
@@ -72,6 +74,7 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_schema_v5: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V5_JSON)?,
         plan_schema_v6: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V6_JSON)?,
         plan_schema_v7: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V7_JSON)?,
+        plan_schema_v8: compile_plan_compute_schema(PLAN_COMPUTE_SCHEMA_V8_JSON)?,
         plan_contract_sha256_v1: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V1_JSON),
         plan_contract_sha256_v2: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V2_JSON),
         plan_contract_sha256_v3: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V3_JSON),
@@ -79,6 +82,7 @@ pub fn serve_cmd(args: &[String]) -> Result<(), Error> {
         plan_contract_sha256_v5: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V5_JSON),
         plan_contract_sha256_v6: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V6_JSON),
         plan_contract_sha256_v7: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V7_JSON),
+        plan_contract_sha256_v8: plan_contract_sha256(PLAN_COMPUTE_SCHEMA_V8_JSON),
         solver_executable_sha256: solver_executable_sha256().unwrap_or_else(|err| {
             eprintln!("infra-cli serve: could not fingerprint executable: {err}");
             String::new()
@@ -230,6 +234,7 @@ struct ServeState {
     plan_schema_v5: JSONSchema,
     plan_schema_v6: JSONSchema,
     plan_schema_v7: JSONSchema,
+    plan_schema_v8: JSONSchema,
     plan_contract_sha256_v1: String,
     plan_contract_sha256_v2: String,
     plan_contract_sha256_v3: String,
@@ -237,6 +242,7 @@ struct ServeState {
     plan_contract_sha256_v5: String,
     plan_contract_sha256_v6: String,
     plan_contract_sha256_v7: String,
+    plan_contract_sha256_v8: String,
     solver_executable_sha256: String,
     solver: SolverBuildInfo,
 }
@@ -313,6 +319,7 @@ pub(super) fn validate_recorded_plan_compute_params(
         5 => PLAN_COMPUTE_SCHEMA_V5_JSON,
         6 => PLAN_COMPUTE_SCHEMA_V6_JSON,
         7 => PLAN_COMPUTE_SCHEMA_V7_JSON,
+        8 => PLAN_COMPUTE_SCHEMA_V8_JSON,
         other => {
             return Err(Error::msg(format!(
                 "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
@@ -399,28 +406,28 @@ struct PlanResult {
 }
 
 #[derive(Debug, Serialize)]
-struct PlanComputeResult {
-    schema_version: u32,
+pub(super) struct PlanComputeResult<R = RotationSummary> {
+    pub(super) schema_version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    profile: Option<BoxProfile>,
-    rotation: Option<RotationSummary>,
+    pub(super) profile: Option<BoxProfile>,
+    pub(super) rotation: Option<R>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    maa: Option<MaaSchedule>,
+    pub(super) maa: Option<MaaSchedule>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    training_advice: Option<PlayerTrainingAdviceReport>,
+    pub(super) training_advice: Option<PlayerTrainingAdviceReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<PlanComputeResultError>,
+    pub(super) error: Option<PlanComputeResultError>,
 }
 
 #[derive(Debug, Serialize)]
-struct PlanComputeResultError {
+pub(super) struct PlanComputeResultError {
     code: &'static str,
     stage: &'static str,
     message: String,
 }
 
 #[derive(Debug, Serialize)]
-struct RotationSummary {
+pub(super) struct RotationSummary {
     profile: TimedRotationProfile,
     daily: DailyTotals,
     shifts: Vec<RotationShiftSummary>,
@@ -518,9 +525,10 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                 "pong": true,
                 "protocol_version": PROTOCOL_VERSION,
                 "plan_schema_version": COMPAT_PLAN_SCHEMA_VERSION,
-                "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6, 7],
+                "supported_plan_schema_versions": [1, 2, 3, 4, 5, 6, 7, 8],
                 "auto_rotation": {
                     "entry": "plan --rotation auto@H1/H2",
+                    "plan_compute_schema_version": 8,
                     "fiammetta_policy": "static_priority",
                     "continuous_targets": true,
                     "exchange_cycle": true,
@@ -534,6 +542,7 @@ fn handle_request(state: &ServeState, line: &str) -> ServeResponse<serde_json::V
                     "5": state.plan_contract_sha256_v5,
                     "6": state.plan_contract_sha256_v6,
                     "7": state.plan_contract_sha256_v7,
+                    "8": state.plan_contract_sha256_v8,
                 },
                 "solver_executable_sha256": state.solver_executable_sha256,
                 "solver_git_commit": state.solver.git_commit,
@@ -709,6 +718,7 @@ fn handle_plan_compute(
         5 => &state.plan_schema_v5,
         6 => &state.plan_schema_v6,
         7 => &state.plan_schema_v7,
+        8 => &state.plan_schema_v8,
         other => {
             return Err(Error::msg(format!(
                 "unsupported plan schema version {other}; expected 1 through {PLAN_SCHEMA_VERSION}"
@@ -721,7 +731,8 @@ fn handle_plan_compute(
             .and_then(|options| options.get("rotation")),
     )?;
     validate_plan_compute_params(schema, &params, schema_version)?;
-    let params: PlanComputeParams = serde_json::from_value(params)?;
+    let params: PlanComputeParams<super::auto_protocol::PlanRotationRequest> =
+        serde_json::from_value(params)?;
     if params.options.top == 0 || params.options.top > MAX_TOP_K {
         return Err(Error::msg(format!("top must be between 1 and {MAX_TOP_K}")));
     }
@@ -740,6 +751,24 @@ fn handle_plan_compute(
     let operbox_label = validated_label(params.labels.operbox, "inline-operbox", "operbox label")?;
     let operbox = inline_operbox(params.operbox)?;
 
+    let rotation_request = match params.options.rotation.to_core() {
+        infra_core::schedule::RotationRequest::Timed(request) => request,
+        infra_core::schedule::RotationRequest::Auto(timing) => {
+            return super::auto_protocol::compute_auto_result(
+                PlanResources {
+                    instances: &state.instances,
+                    table: &state.table,
+                },
+                &params.layout,
+                &operbox,
+                (&layout_label, &operbox_label),
+                &params.options,
+                timing,
+                &state.training_advice_knowledge,
+            );
+        }
+    };
+
     let attempt = compute_plan_for_plan_compute(
         PlanResources {
             instances: &state.instances,
@@ -752,7 +781,7 @@ fn handle_plan_compute(
             operbox_label: &operbox_label,
             baseline_operbox: None,
             top_k: params.options.top,
-            rotation_request: params.options.rotation,
+            rotation_request,
             system_preferences: &params.options.system_preferences,
             maa_title: params.options.maa_title.as_deref(),
             fiammetta_candidates_out: None,
@@ -829,25 +858,35 @@ fn build_plan_compute_training_advice(
     knowledge: &TrainingAdviceKnowledge,
     rotation: Option<&TeamRotationReport>,
 ) -> PlayerTrainingAdviceReport {
+    build_training_advice_from_room_lines(
+        operbox,
+        blueprint,
+        knowledge,
+        rotation
+            .into_iter()
+            .flat_map(|rotation| rotation.shifts.iter())
+            .flat_map(|shift| shift.efficiencies.room_lines.iter()),
+    )
+}
+
+pub(super) fn build_training_advice_from_room_lines<'a>(
+    operbox: &OperBox,
+    blueprint: &BaseBlueprint,
+    knowledge: &TrainingAdviceKnowledge,
+    lines: impl Iterator<Item = &'a RoomEfficiencyLine>,
+) -> PlayerTrainingAdviceReport {
+    let lines: Vec<_> = lines.collect();
     let mut context = PlayerAdviceContext::from_blueprint(blueprint);
-    if let Some(rotation) = rotation {
-        context.trade_average_efficiency_percent = average_station_skill_efficiency_percent(
-            rotation
-                .shifts
-                .iter()
-                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
-            |line| line.trade_efficiency,
-            |line| line.trade_skill_efficiency,
-        );
-        context.manufacturing_average_efficiency_percent = average_station_skill_efficiency_percent(
-            rotation
-                .shifts
-                .iter()
-                .flat_map(|shift| shift.efficiencies.room_lines.iter()),
-            |line| line.manufacture_efficiency,
-            |line| line.manufacture_skill_efficiency,
-        );
-    }
+    context.trade_average_efficiency_percent = average_station_skill_efficiency_percent(
+        lines.iter().copied(),
+        |line| line.trade_efficiency,
+        |line| line.trade_skill_efficiency,
+    );
+    context.manufacturing_average_efficiency_percent = average_station_skill_efficiency_percent(
+        lines.iter().copied(),
+        |line| line.manufacture_efficiency,
+        |line| line.manufacture_skill_efficiency,
+    );
     build_player_training_advice(operbox, knowledge, &context)
 }
 

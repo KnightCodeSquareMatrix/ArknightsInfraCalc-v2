@@ -17,14 +17,14 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PlanComputeParams {
+pub(super) struct PlanComputeParams<R: Default = TimedRotationRequest> {
     pub schema_version: u32,
     pub layout: BaseBlueprint,
     pub operbox: Vec<OperBoxEntry>,
     #[serde(default)]
     pub labels: PlanComputeLabels,
     #[serde(default)]
-    pub options: PlanComputeOptions,
+    pub options: PlanComputeOptions<R>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -38,9 +38,9 @@ pub(super) struct PlanComputeLabels {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PlanComputeOptions {
+pub(super) struct PlanComputeOptions<R: Default = TimedRotationRequest> {
     #[serde(default)]
-    pub rotation: TimedRotationRequest,
+    pub rotation: R,
     #[serde(default = "default_top_k")]
     pub top: usize,
     #[serde(default)]

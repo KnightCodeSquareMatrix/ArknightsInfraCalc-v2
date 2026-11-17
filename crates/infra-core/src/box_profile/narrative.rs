@@ -31,12 +31,13 @@ pub fn render_box_profile_narrative(profile: &BoxProfile) -> String {
     }
     out.push('\n');
 
-    let rotation_heading =
-        if profile.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
-            "【36h 周期归一化日均】"
-        } else {
-            "【24h 三队轮休加权】"
-        };
+    let rotation_heading = if profile.daily_is_estimate == Some(true) {
+        "【按输入主备时长估算均值】"
+    } else if profile.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
+        "【36h 周期归一化日均】"
+    } else {
+        "【24h 三队轮休加权】"
+    };
     out.push_str(rotation_heading);
     out.push('\n');
     out.push_str(&format!(

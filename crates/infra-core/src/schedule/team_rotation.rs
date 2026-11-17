@@ -40,10 +40,9 @@ use super::dorm_finalizer;
 use super::fiammetta_events;
 use super::rotation_scoring::clear_production_efficiencies;
 use super::rotation_types::{
-    validate_rotation_duration_hours, DailyProduction, DailyTotals, DormRestPlan, DroneAction,
-    FacilityHalf, FiammettaShiftAction, RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies,
-    ShiftTransition, TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult,
-    TimedRotationProfile,
+    validate_rotation_duration_hours, DailyTotals, DormRestPlan, DroneAction, FacilityHalf,
+    FiammettaShiftAction, RoomEfficiencyLine, RuntimeShiftBind, ShiftEfficiencies, ShiftTransition,
+    TeamAssignment, TeamLabel, TeamRotationReport, TeamShiftResult, TimedRotationProfile,
 };
 use super::shift_bind::{shift_binds_from_plan, team_of_operator, validate_final_bind_cycle};
 
@@ -614,54 +613,6 @@ fn rotation_cycle_rest_warnings(
             )
         })
         .collect()
-}
-
-fn average_cycle_production(
-    blueprint: &BaseBlueprint,
-    shifts: &[TeamShiftResult],
-) -> DailyProduction {
-    let total_hours: f64 = shifts.iter().map(|shift| shift.duration_hours).sum();
-    if total_hours <= 0.0 {
-        return DailyProduction::default();
-    }
-    let mut output = DailyProduction::default();
-    for shift in shifts {
-        for line in &shift.efficiencies.room_lines {
-            let Some(room) = blueprint.room(&RoomId::new(line.room_id.clone())) else {
-                continue;
-            };
-            let weight = shift.duration_hours / total_hours;
-            match room.product {
-                Some(RoomProduct::Trade {
-                    order: crate::trade::input::TradeOrderKind::Gold,
-                }) => {
-                    output.lmd += line.trade_output_per_day * weight;
-                }
-                Some(RoomProduct::Trade {
-                    order: crate::trade::input::TradeOrderKind::Originium,
-                }) => {
-                    output.orundum += line.trade_output_per_day * weight;
-                }
-                Some(RoomProduct::Factory {
-                    recipe: crate::types::RecipeKind::Gold,
-                }) => {
-                    output.pure_gold += line.manufacture_output_per_day * weight;
-                }
-                Some(RoomProduct::Factory {
-                    recipe: crate::types::RecipeKind::BattleRecord,
-                }) => {
-                    output.battle_records += line.manufacture_output_per_day * weight;
-                }
-                Some(RoomProduct::Factory {
-                    recipe: crate::types::RecipeKind::Originium,
-                }) => {
-                    output.originium_shards += line.manufacture_output_per_day * weight;
-                }
-                _ => {}
-            }
-        }
-    }
-    output
 }
 
 fn abc_control_work_hours(team: TeamLabel, shift_hours: [f64; 3]) -> f64 {
@@ -2912,7 +2863,14 @@ fn finalize_timed_rotation(
             .map(|shift| shift.weighted_manufacture)
             .sum(),
         power: report.shifts.iter().map(|shift| shift.weighted_power).sum(),
-        production: average_cycle_production(blueprint, &report.shifts),
+        production: super::average_assignment_production(
+            blueprint,
+            &report
+                .shifts
+                .iter()
+                .map(|shift| (shift.duration_hours, &shift.efficiencies))
+                .collect::<Vec<_>>(),
+        ),
     };
     let mut construction_warnings: Vec<_> = report
         .warnings

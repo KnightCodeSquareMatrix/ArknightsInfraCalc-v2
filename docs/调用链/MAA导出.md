@@ -81,3 +81,7 @@ build_dorm_slots 按最终 assignment 生成宿舍槽位。普通休息短缺的
 | 无人机房错 | drone_action 的 RoomProduct、resolve_drones |
 | 宿舍被补人 | 最终 assignment 的 dorm_autofill、二班休班队 policy、build_plan |
 | 导入练度错 | assignment_from_maa_plan 的 OperBox elite 查询 |
+
+## 自动轮换的岗位投影
+
+Worker v8 的 `auto_protocol::compute_auto_result → build_from_auto_rotation → build_plan/build_rooms` 从 `AutoRotationReport.main_assignment/backup_assignment` 生成两份房间名单。它不经过 `TeamRotationReport`，不启用宿舍 autofill、无人机或菲亚单目标动作。计划描述明确两态不是全基建同步换班表，完整菲亚多目标/重复交换留在 `rotation.auto_rotation.fiammetta`；`maa_execution_complete=false`，不能以两份 MAA 名单证明连续交换可执行。

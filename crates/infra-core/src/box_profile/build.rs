@@ -7,7 +7,8 @@ use crate::error::Result;
 use crate::instances::OperatorInstances;
 use crate::layout::BaseBlueprint;
 use crate::operbox::{default_operbox_full_e2_path, OperBox};
-use crate::schedule::{TimedRotationProfile, TimedRotationRequest};
+use crate::schedule::{DailyTotals, TimedRotationProfile, TimedRotationRequest};
+use crate::search::{ManuSearchReport, TradeSearchReport};
 use crate::skill_table::SkillTable;
 use crate::tier::PromotionTier;
 
@@ -111,10 +112,41 @@ pub struct RotationSnapshot {
     pub daily_power_efficiency: Efficiency,
 }
 
+/// 已定岗位的只读画像输入，不负责搜索或排班。
+pub struct BoxProfileMetrics<'a> {
+    pub owned: usize,
+    pub tier_up_owned: usize,
+    pub trade_pool_ready: usize,
+    pub manufacture_pool_ready: usize,
+    pub trade_report: &'a TradeSearchReport,
+    pub manu_report: &'a ManuSearchReport,
+    pub daily: &'a DailyTotals,
+    pub daily_is_estimate: bool,
+    pub rotation_profile: TimedRotationProfile,
+}
+
+impl<'a> From<&'a LayoutProbe> for BoxProfileMetrics<'a> {
+    fn from(probe: &'a LayoutProbe) -> Self {
+        Self {
+            owned: probe.owned,
+            tier_up_owned: probe.tier_up_owned,
+            trade_pool_ready: probe.trade_pool_ready,
+            manufacture_pool_ready: probe.manufacture_pool_ready,
+            trade_report: &probe.trade_report,
+            manu_report: &probe.manu_report,
+            daily: &probe.rotation.daily,
+            rotation_profile: probe.rotation.profile,
+            daily_is_estimate: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct BoxProfile {
     pub schema_version: u32,
     pub rotation_profile: TimedRotationProfile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub daily_is_estimate: Option<bool>,
     pub layout_label: String,
     pub operbox_label: String,
     pub baseline_label: String,
@@ -174,6 +206,28 @@ pub fn build_box_profile_from_current_probe(
     operbox_label: &str,
     options: &BoxProfileOptions,
 ) -> Result<BoxProfile> {
+    build_box_profile_from_metrics(
+        &BoxProfileMetrics::from(current),
+        blueprint,
+        operbox,
+        instances,
+        table,
+        layout_label,
+        operbox_label,
+        options,
+    )
+}
+
+pub fn build_box_profile_from_metrics(
+    current: &BoxProfileMetrics<'_>,
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    layout_label: &str,
+    operbox_label: &str,
+    options: &BoxProfileOptions,
+) -> Result<BoxProfile> {
     let schedule_path = options
         .baseline_schedule
         .clone()
@@ -195,7 +249,7 @@ pub fn build_box_profile_from_current_probe(
 
     Ok(assemble_box_profile(
         current,
-        &baseline,
+        &BoxProfileMetrics::from(&baseline),
         operbox,
         layout_label,
         operbox_label,
@@ -205,8 +259,8 @@ pub fn build_box_profile_from_current_probe(
 }
 
 fn assemble_box_profile(
-    current: &LayoutProbe,
-    baseline: &LayoutProbe,
+    current: &BoxProfileMetrics<'_>,
+    baseline: &BoxProfileMetrics<'_>,
     operbox: &OperBox,
     layout_label: &str,
     operbox_label: &str,
@@ -222,7 +276,8 @@ fn assemble_box_profile(
 
     BoxProfile {
         schema_version: 4,
-        rotation_profile: current.rotation.profile,
+        rotation_profile: current.rotation_profile,
+        daily_is_estimate: current.daily_is_estimate.then_some(true),
         layout_label: layout_label.to_string(),
         operbox_label: operbox_label.to_string(),
         baseline_label,
@@ -241,11 +296,11 @@ fn assemble_box_profile(
     }
 }
 
-pub(super) fn rotation_snapshot(probe: &LayoutProbe) -> RotationSnapshot {
+pub(super) fn rotation_snapshot(probe: &BoxProfileMetrics<'_>) -> RotationSnapshot {
     RotationSnapshot {
-        daily_trade_efficiency: probe.rotation.daily.trade,
-        daily_manufacture_efficiency: probe.rotation.daily.manufacture,
-        daily_power_efficiency: probe.rotation.daily.power,
+        daily_trade_efficiency: probe.daily.trade,
+        daily_manufacture_efficiency: probe.daily.manufacture,
+        daily_power_efficiency: probe.daily.power,
     }
 }
 
@@ -272,8 +327,8 @@ fn severity(gap: f64, warn: f64, critical: f64) -> GapSeverity {
 }
 
 pub(super) fn build_domains(
-    current: &LayoutProbe,
-    baseline: &LayoutProbe,
+    current: &BoxProfileMetrics<'_>,
+    baseline: &BoxProfileMetrics<'_>,
     options: &BoxProfileOptions,
 ) -> Vec<DomainMetric> {
     let mut out = Vec::new();
@@ -392,48 +447,46 @@ pub(super) fn build_domains(
         });
     }
 
-    let gap = efficiency_gap(current.rotation.daily.trade, baseline.rotation.daily.trade);
-    let (trade_label, manufacture_label) =
-        if options.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
-            (
-                "轮休·36h周期归一化日均贸易加权",
-                "轮休·36h周期归一化日均制造加权",
-            )
-        } else {
-            ("轮休·24h贸易加权", "轮休·24h制造加权")
-        };
+    let gap = efficiency_gap(current.daily.trade, baseline.daily.trade);
+    let (trade_label, manufacture_label) = if current.daily_is_estimate {
+        ("自动·按输入时长估算贸易均值", "自动·按输入时长估算制造均值")
+    } else if options.rotation_profile == crate::schedule::TimedRotationProfile::Abc12_12_12 {
+        (
+            "轮休·36h周期归一化日均贸易加权",
+            "轮休·36h周期归一化日均制造加权",
+        )
+    } else {
+        ("轮休·24h贸易加权", "轮休·24h制造加权")
+    };
     out.push(DomainMetric {
         id: "rotation_trade",
         label: trade_label,
         current: ComboSnapshot {
             operators: vec![],
-            final_efficiency: current.rotation.daily.trade,
+            final_efficiency: current.daily.trade,
             mechanic_equivalent_efficiency: None,
         },
         baseline: ComboSnapshot {
             operators: vec![],
-            final_efficiency: baseline.rotation.daily.trade,
+            final_efficiency: baseline.daily.trade,
             mechanic_equivalent_efficiency: None,
         },
         gap_ratio: gap,
         severity: severity(gap, options.gap_warn, options.gap_critical),
     });
 
-    let gap = efficiency_gap(
-        current.rotation.daily.manufacture,
-        baseline.rotation.daily.manufacture,
-    );
+    let gap = efficiency_gap(current.daily.manufacture, baseline.daily.manufacture);
     out.push(DomainMetric {
         id: "rotation_manufacture",
         label: manufacture_label,
         current: ComboSnapshot {
             operators: vec![],
-            final_efficiency: current.rotation.daily.manufacture,
+            final_efficiency: current.daily.manufacture,
             mechanic_equivalent_efficiency: None,
         },
         baseline: ComboSnapshot {
             operators: vec![],
-            final_efficiency: baseline.rotation.daily.manufacture,
+            final_efficiency: baseline.daily.manufacture,
             mechanic_equivalent_efficiency: None,
         },
         gap_ratio: gap,
@@ -565,10 +618,17 @@ pub(super) fn build_flags(domains: &[DomainMetric]) -> Vec<String> {
 
 pub(super) fn build_narration_hints(
     domains: &[DomainMetric],
-    current: &LayoutProbe,
-    baseline: &LayoutProbe,
+    current: &BoxProfileMetrics<'_>,
+    baseline: &BoxProfileMetrics<'_>,
 ) -> Vec<String> {
     let mut hints = Vec::new();
+
+    if current.daily_is_estimate {
+        hints.push(
+            "组合指标取主力实际岗位；均值按输入主备时长估算，不模拟逐站换班或普通宿舍恢复。"
+                .to_string(),
+        );
+    }
 
     if let (Some(g), Some(bg)) = (
         current.trade_report.gold_order_line.as_ref(),

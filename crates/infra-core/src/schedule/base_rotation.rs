@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::efficiency::Efficiency;
 use crate::error::Result;
 use crate::instances::OperatorInstances;
-use crate::layout::{resolve_base, BaseAssignment, BaseBlueprint, FacilityKind};
+use crate::layout::{
+    resolve_base, BaseAssignment, BaseBlueprint, FacilityKind, RoomId, RoomProduct,
+};
 use crate::manufacture::input::ManuRoomInput;
 use crate::manufacture::solve_manufacture_with_shift;
 use crate::power::aggregate_power_efficiency;
@@ -13,7 +15,7 @@ use crate::skill_table::SkillTable;
 use crate::trade::input::TradeRoomInput;
 use crate::trade::solve_trade_with_shift;
 
-use super::rotation_types::{RoomEfficiencyLine, ShiftEfficiencies};
+use super::rotation_types::{DailyProduction, RoomEfficiencyLine, ShiftEfficiencies};
 
 /// 对编制逐房求贸易/制造/发电直接效率（满心情）；`shift_hours` 影响发电爬升与产出折算。
 pub fn evaluate_base_assignment_efficiencies(
@@ -235,4 +237,53 @@ pub fn evaluate_base_assignment_efficiencies(
         power_efficiency,
         room_lines,
     })
+}
+
+/// 对既定岗位的单位日产出按输入时长加权；调用方负责说明周期或估算语义。
+pub fn average_assignment_production(
+    blueprint: &BaseBlueprint,
+    states: &[(f64, &ShiftEfficiencies)],
+) -> DailyProduction {
+    let total_hours: f64 = states.iter().map(|(hours, _)| hours).sum();
+    if total_hours <= 0.0 {
+        return DailyProduction::default();
+    }
+    let mut output = DailyProduction::default();
+    for (hours, efficiencies) in states {
+        for line in &efficiencies.room_lines {
+            let Some(room) = blueprint.room(&RoomId::new(line.room_id.clone())) else {
+                continue;
+            };
+            let weight = hours / total_hours;
+            match room.product {
+                Some(RoomProduct::Trade {
+                    order: crate::trade::input::TradeOrderKind::Gold,
+                }) => {
+                    output.lmd += line.trade_output_per_day * weight;
+                }
+                Some(RoomProduct::Trade {
+                    order: crate::trade::input::TradeOrderKind::Originium,
+                }) => {
+                    output.orundum += line.trade_output_per_day * weight;
+                }
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Gold,
+                }) => {
+                    output.pure_gold += line.manufacture_output_per_day * weight;
+                }
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::BattleRecord,
+                }) => {
+                    output.battle_records += line.manufacture_output_per_day * weight;
+                }
+                Some(RoomProduct::Factory {
+                    recipe: crate::types::RecipeKind::Originium,
+                }) => {
+                    output.originium_shards += line.manufacture_output_per_day * weight;
+                }
+                _ => {}
+            }
+        }
+    }
+    output
 }
