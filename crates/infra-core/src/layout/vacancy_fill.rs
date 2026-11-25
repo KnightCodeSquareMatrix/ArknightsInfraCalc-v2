@@ -198,13 +198,36 @@ pub(crate) fn ordinary_room_compatible(
         let Ok(model) = crate::mood::default_mood_model() else {
             return false;
         };
+        let Ok(layout) = crate::layout::resolve_control_input_layout(
+            blueprint,
+            assignment,
+            instances,
+            table,
+            model.mood_cap,
+            None,
+        ) else {
+            return false;
+        };
+        let settled = crate::control::solve_control(
+            &crate::control::ControlRoomInput {
+                operators,
+                mood: model.mood_cap,
+                layout,
+            },
+            table,
+        );
+        // 自动技能补位不能重新引入中枢选位已排除的无效感染力；随机 Fallback 仍独立。
+        if assignment.auto_rotation
+            && members.iter().any(|op| op.name == "琴柳" && op.elite >= 2)
+            && settled
+                .effect_ledger
+                .value(crate::control::ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED)
+                <= 0.0
+        {
+            return false;
+        }
         return !model.control_global_recovery_has_conflict(&control)
-            && !crate::control::solve_control(
-                &crate::control::ControlRoomInput::with_operators(operators),
-                table,
-            )
-            .effect_ledger
-            .has_conflicting_effect_sources()
+            && !settled.effect_ledger.has_conflicting_effect_sources()
             && assignment
                 .control_rotation_admission
                 .as_ref()

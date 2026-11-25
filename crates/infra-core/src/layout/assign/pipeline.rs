@@ -213,12 +213,26 @@ fn run_shift_pipeline_with_producer_pruning(
             let optional_precision;
             if options.auto_rotation {
                 optional_precision = false;
-                // Plan controls are already in the assignment; only fill missing slots before
-                // entering the single production fill shared with the ordinary prefix path.
+                super::fill_plan_office(
+                    run.blueprint,
+                    run.operbox,
+                    run.instances,
+                    run.table,
+                    run.options,
+                    plan,
+                    &mut run.assignment,
+                )?;
+                run.used.extend(run.assignment.occupied_operator_names());
                 if run.assignment.control_operators().len() < 5 {
-                    let producer_layout = run.resolve_snapshot(false)?;
-                    let saileach_best_office_pct =
-                        best_available_office_pct(&run, &producer_layout)?;
+                    let producer_layout = crate::layout::resolve_control_input_layout(
+                        run.blueprint,
+                        &run.assignment,
+                        run.instances,
+                        run.table,
+                        run.options.mood,
+                        Some(run.durin_plan),
+                    )?;
+                    let saileach_best_office_pct = Some(producer_layout.office_hire_spd_pct);
                     if !fill_peak_control(
                         &mut run,
                         plan,
