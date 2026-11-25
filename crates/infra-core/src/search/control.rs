@@ -846,13 +846,7 @@ fn search_control_in_order(
         }
         let result = evaluate(ops);
         if result.effect_ledger.has_conflicting_effect_sources()
-            || !(!ops.iter().any(|op| op.name == "琴柳")
-                || options.saileach_required
-                || options.saileach_best_office_pct.is_none_or(|best| {
-                    let other: Vec<_> =
-                        ops.iter().filter(|op| op.name != "琴柳").cloned().collect();
-                    5.0 + best + evaluate(&other).office_hire_spd_pct < 30.0
-                }))
+            || !admits_saileach_office(ops, table, options)
         {
             return None;
         }
@@ -1382,32 +1376,8 @@ pub(crate) fn search_control_combos_with_eligibility(
             if result.effect_ledger.has_conflicting_effect_sources() {
                 return None;
             }
-            if !options.saileach_required
-                && operators.iter().any(|operator| operator.name == "琴柳")
-            {
-                if let Some(best_office_pct) = options.saileach_best_office_pct {
-                    let other_control = solve_control(
-                        &ControlRoomInput {
-                            operators: operators
-                                .iter()
-                                .filter(|operator| operator.name != "琴柳")
-                                .cloned()
-                                .collect(),
-                            mood,
-                            layout: layout.clone(),
-                        },
-                        table,
-                    );
-                    if 5.0
-                        + best_office_pct
-                        + other_control
-                            .effect_ledger
-                            .value(ControlEffectKey::OFFICE_HIRE_SPEED)
-                        >= 30.0
-                    {
-                        return None;
-                    }
-                }
+            if !admits_saileach_office(&operators, table, options) {
+                return None;
             }
             let control_operators = operators
                 .iter()
@@ -1442,9 +1412,7 @@ pub(crate) fn search_control_combos_with_eligibility(
                     .value(ControlEffectKey::MANUFACTURE_GLOBAL_PRODUCTIVITY),
                 office_global_pct: if layout.office_room_count > 0 {
                     {
-                        result
-                            .effect_ledger
-                            .value(ControlEffectKey::OFFICE_HIRE_SPEED)
+                        result.office_hire_spd_pct
                     }
                 } else {
                     0.0
@@ -1506,4 +1474,32 @@ pub(crate) fn search_control_combos_with_eligibility(
         },
     );
     Ok(result)
+}
+
+/// 选位可提供已落位或最高可用办公室值；触发公式只委托中枢解释器。
+fn admits_saileach_office(
+    operators: &[ControlOperator],
+    table: &SkillTable,
+    options: &ControlSearchOptions,
+) -> bool {
+    if options.saileach_required || !operators.iter().any(|op| op.name == "琴柳") {
+        return true;
+    }
+    let Some(office_pct) = options.saileach_best_office_pct else {
+        return true;
+    };
+    let mut layout = options.layout.clone();
+    layout.office_hire_spd_pct = office_pct;
+    let settled = solve_control(
+        &ControlRoomInput {
+            operators: operators.to_vec(),
+            mood: options.mood,
+            layout,
+        },
+        table,
+    );
+    settled
+        .effect_ledger
+        .value(ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED)
+        > 0.0
 }

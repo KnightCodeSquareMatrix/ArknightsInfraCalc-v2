@@ -6,6 +6,8 @@ pub enum ControlEffectDomain {
     Trade,
     Manufacture,
     Office,
+    /// 条件成立后的独立联络加成，与普通办公室区域相加。
+    OfficeConditional,
     Meeting,
 }
 
@@ -37,6 +39,10 @@ impl ControlEffectKey {
     };
     pub const OFFICE_HIRE_SPEED: Self = Self {
         domain: ControlEffectDomain::Office,
+        unit: ControlEffectUnit::HireSpeedPct,
+    };
+    pub const OFFICE_CONDITIONAL_HIRE_SPEED: Self = Self {
+        domain: ControlEffectDomain::OfficeConditional,
         unit: ControlEffectUnit::HireSpeedPct,
     };
     pub const MEETING_CLUE_SPEED: Self = Self {
@@ -130,6 +136,11 @@ impl ControlEffectLedger {
 
     pub fn value(&self, key: ControlEffectKey) -> f64 {
         self.values.get(&key).copied().unwrap_or(0.0)
+    }
+
+    pub fn office_hire_speed_pct(&self) -> f64 {
+        self.value(ControlEffectKey::OFFICE_HIRE_SPEED)
+            + self.value(ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED)
     }
 
     pub fn records(&self) -> &[ControlEffectRecord] {
