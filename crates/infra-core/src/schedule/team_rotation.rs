@@ -9234,10 +9234,6 @@ pub(crate) fn solve_policy_backup_with_continuous_targets(
         {
             seed.set_room(room.id.clone(), main.operators_in(&room.id).to_vec());
         }
-        // 主力已完成并冻结；备中枢只使用剩余工作成员。
-        super::auto_rotation::select_control(
-            blueprint, &available, instances, table, options, &mut seed,
-        )?;
         if targets.is_empty() {
             return solve_owned_peak_seed(
                 blueprint,

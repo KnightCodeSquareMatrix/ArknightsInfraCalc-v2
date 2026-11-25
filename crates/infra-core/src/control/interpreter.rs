@@ -166,6 +166,10 @@ fn solve_control_inner(
     let atoms = collect_control_atoms(&ctx.operators, table);
     let mut trace_events = trace_enabled.then(Vec::new);
     for (atom, atom_id, owner, source_buff_id) in atoms {
+        // 联络阈值消费本次已结算的普通办公室区域，不读输入快照的旧中枢值。
+        if matches!(atom.condition, Some(Condition::OfficeHireSpeedBelow { .. })) {
+            ctx.effect_ledger.freeze();
+        }
         let condition_status = evaluate_condition(&atom.condition, &ctx, &owner);
         if condition_status == ControlConditionStatus::Failed {
             if let Some(events) = &mut trace_events {
@@ -240,7 +244,7 @@ fn solve_control_inner(
             global,
             inject: ctx.inject,
             operator_mood_drains,
-            office_hire_spd_pct: ctx.effect_ledger.value(ControlEffectKey::OFFICE_HIRE_SPEED),
+            office_hire_spd_pct: ctx.effect_ledger.office_hire_speed_pct(),
             meeting_speed_pct: ctx
                 .effect_ledger
                 .value(ControlEffectKey::MEETING_CLUE_SPEED),
@@ -277,7 +281,15 @@ fn collect_control_atoms<'a>(
     atoms.sort_by(|(a, _, _, _), (b, _, _, _)| {
         let pa = a.phase.sort_key();
         let pb = b.phase.sort_key();
-        pa.cmp(&pb).then(a.phase_order.cmp(&b.phase_order))
+        pa.cmp(&pb)
+            // 同阶段的联络条件必须晚于全部普通来源，包括同 phase_order 的来源。
+            .then_with(|| {
+                matches!(a.condition, Some(Condition::OfficeHireSpeedBelow { .. })).cmp(&matches!(
+                    b.condition,
+                    Some(Condition::OfficeHireSpeedBelow { .. })
+                ))
+            })
+            .then(a.phase_order.cmp(&b.phase_order))
     });
     atoms
 }
@@ -325,7 +337,8 @@ fn evaluate_condition(
             Some(ctx.layout.field_momentum() > ctx.layout.external_momentum())
         }
         Condition::OfficeHireSpeedBelow { n } => Some(
-            5.0 + ctx.layout.control_office_hire_spd_pct + ctx.layout.office_hire_spd_pct
+            5.0 + ctx.effect_ledger.value(ControlEffectKey::OFFICE_HIRE_SPEED)
+                + ctx.layout.office_hire_spd_pct
                 < *n as f64,
         ),
         Condition::PlatformCountGte { min } => Some(ctx.layout.platform_count_in_power >= *min),
@@ -480,13 +493,13 @@ fn apply_global_inject(
     });
     match &atom.action {
         Action::GlobalInjectOfficeHireSpeed { value } => {
-            ctx.effect_ledger.record_max(
-                owner,
-                source_buff_id,
-                atom_id,
-                ControlEffectKey::OFFICE_HIRE_SPEED,
-                *value,
-            );
+            let key = if matches!(atom.condition, Some(Condition::OfficeHireSpeedBelow { .. })) {
+                ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED
+            } else {
+                ControlEffectKey::OFFICE_HIRE_SPEED
+            };
+            ctx.effect_ledger
+                .record_max(owner, source_buff_id, atom_id, key, *value);
             return trace_enabled.then_some(ControlTraceOutcome::SpecialRule {
                 rule: "control_office_hire_speed".to_string(),
             });

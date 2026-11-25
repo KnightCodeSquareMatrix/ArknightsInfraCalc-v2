@@ -192,59 +192,6 @@ fn continuous_target_drains(
         .collect())
 }
 
-pub(crate) fn select_control(
-    blueprint: &BaseBlueprint,
-    operbox: &OperBox,
-    instances: &OperatorInstances,
-    table: &SkillTable,
-    options: &AssignBaseOptions,
-    seed: &mut BaseAssignment,
-) -> Result<()> {
-    if !blueprint
-        .rooms
-        .iter()
-        .any(|room| room.kind == FacilityKind::ControlCenter)
-    {
-        return Ok(());
-    }
-    let control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
-    let mut pool =
-        crate::pool::build_control_pool_with_fillers(&control_operbox, instances, table)?;
-    crate::pool::admit_control_roster(
-        &mut pool,
-        options.control_work_hours,
-        options.mood,
-        &seed
-            .control_operators()
-            .into_iter()
-            .map(|op| op.name)
-            .collect(),
-    )?;
-    let layout = crate::layout::resolve_base(
-        blueprint,
-        seed,
-        Some(instances),
-        Some(table),
-        options.mood,
-        None,
-    )?
-    .layout;
-    let mut used = seed.operator_names();
-    crate::layout::assign_control_with_saileach(
-        seed,
-        &pool,
-        table,
-        &layout,
-        options,
-        &[],
-        &Default::default(),
-        None,
-        false,
-        None,
-        &mut used,
-    )
-}
-
 fn fixed_main_backup_error(stage: &str, reason: impl std::fmt::Display) -> Error {
     Error::msg(format!(
         "自动轮换：当前固定主力下未找到兼容替补方案（{stage}）；第一次主力保持不变：{reason}"
@@ -276,7 +223,6 @@ pub fn schedule_auto_rotation(
     let mut seed = BaseAssignment::default();
     seed.auto_rotation = true;
     seed.work_hours = Some(options.shift_hours);
-    select_control(blueprint, &operbox, instances, table, &options, &mut seed)?;
     let main = super::team_rotation::solve_owned_peak_seed(
         blueprint,
         &operbox,
@@ -876,6 +822,14 @@ pub fn assert_auto_rotation_invariants(
             model.mood_cap,
             None,
         )?;
+        if !crate::layout::auto_saileach_assignment_compatible(
+            blueprint, assignment, instances, table,
+        )? {
+            return Err(Error::msg(format!(
+                "assert-invariants auto_saileach_actual_office failed: shift {}",
+                index + 1,
+            )));
+        }
         for room_rotation in &report.rooms {
             let state = if index == 0 {
                 &room_rotation.main

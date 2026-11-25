@@ -67,3 +67,7 @@ Peak 复用动态中枢 presence 枚举，每个分支按当前贸易 role/房�
 办公室先落位属于顺序 policy，不能据此声称办公室与中枢联合选人的全局最优。辅助岗位的终态心情预算是已确认的硬约束；构造时的排序、试放顺序和普通补位仍是各自具名 policy。
 
 检查 control trace、ledger records、global inject explanation、最终 assignment invariant。固定候选用 `layout eval --explain-json`；整班用 `plan --assert-invariants` 和 243/high-owned fixture。中枢技能原文与同种效果规则回知识库引用，本文只记录实现责任和状态流。
+
+2026-11-25自动主备改为Plan执行后先复用普通办公室填位，再由公共Peak中枢选位读取`resolve_control_input_layout`；不再预选空办公室seed的中枢。Plan保留成员和已提交占用先于办公室排序；替补菲亚目标已由Plan锚点落位。
+
+琴柳的独立条件加成使用`OFFICE_CONDITIONAL_HIRE_SPEED`，普通中枢联络光环使用`OFFICE_HIRE_SPEED`。同阶段先结算普通来源，再由解释器按基础5%＋实际办公室技能＋普通中枢联络值判断严格低于30%；条件成立后的独立20%与普通区域相加，各区域内部仍取最高。顺序不受中枢成员排列影响。搜索两条路径消费同一解释器结果，不再各自抄阈值公式；正常中枢补位也读取实际办公室快照。自动随机补位按2026-11-26用户裁决保留琴柳实际触发条件，复用同一解释器，不新增阈值公式；最终门禁包含Fallback成员。固定知识库感染力释义明确该先后与叠加关系；不以候选准入补偿错误结算。

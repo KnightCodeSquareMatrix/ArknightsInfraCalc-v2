@@ -133,6 +133,69 @@ fn modeled_candidates(
     })
 }
 
+fn resolve_assignment_control(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<crate::control::ControlCenterResult> {
+    let model = crate::mood::default_mood_model()?;
+    let layout = crate::layout::resolve_control_input_layout(
+        blueprint,
+        assignment,
+        instances,
+        table,
+        model.mood_cap,
+        None,
+    )?;
+    let operators = assignment
+        .control_operators()
+        .iter()
+        .map(|operator| crate::control::ControlOperator {
+            name: operator.name.clone(),
+            elite: operator.elite,
+            buff_ids: instances.resolve_control_buff_ids(&operator.name, operator.tier()),
+            tags: instances.tags_for(&operator.name, operator.tier()),
+        })
+        .collect();
+    Ok(crate::control::solve_control(
+        &crate::control::ControlRoomInput {
+            operators,
+            mood: model.mood_cap,
+            layout,
+        },
+        table,
+    ))
+}
+
+fn has_active_saileach_effect(settled: &crate::control::ControlCenterResult) -> bool {
+    settled.effect_ledger.records().iter().any(|record| {
+        record.source_operator == "琴柳"
+            && record.key == crate::control::ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED
+            && record.effective_value > 0.0
+    })
+}
+
+/// 自动选人和随机补位都不能使中枢琴柳失效；机制仍由中枢解释器结算。
+pub(crate) fn auto_saileach_assignment_compatible(
+    blueprint: &BaseBlueprint,
+    assignment: &BaseAssignment,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+) -> Result<bool> {
+    if !assignment.auto_rotation
+        || !assignment
+            .control_operators()
+            .iter()
+            .any(|operator| operator.name == "琴柳")
+    {
+        return Ok(true);
+    }
+    Ok(has_active_saileach_effect(&resolve_assignment_control(
+        blueprint, assignment, instances, table,
+    )?))
+}
+
 pub(crate) fn ordinary_room_compatible(
     blueprint: &BaseBlueprint,
     assignment: &BaseAssignment,
@@ -182,15 +245,6 @@ pub(crate) fn ordinary_room_compatible(
         return crate::search::manufacture_peers_compatible(&operators, table);
     }
     if room.kind == FacilityKind::ControlCenter {
-        let operators: Vec<_> = members
-            .iter()
-            .map(|operator| crate::control::ControlOperator {
-                name: operator.name.clone(),
-                elite: operator.elite,
-                buff_ids: instances.resolve_control_buff_ids(&operator.name, operator.tier()),
-                tags: instances.tags_for(&operator.name, operator.tier()),
-            })
-            .collect();
         let control = members
             .iter()
             .map(|operator| (operator.name.clone(), operator.elite))
@@ -198,13 +252,18 @@ pub(crate) fn ordinary_room_compatible(
         let Ok(model) = crate::mood::default_mood_model() else {
             return false;
         };
+        let Ok(settled) = resolve_assignment_control(blueprint, assignment, instances, table)
+        else {
+            return false;
+        };
+        if assignment.auto_rotation
+            && members.iter().any(|op| op.name == "琴柳")
+            && !has_active_saileach_effect(&settled)
+        {
+            return false;
+        }
         return !model.control_global_recovery_has_conflict(&control)
-            && !crate::control::solve_control(
-                &crate::control::ControlRoomInput::with_operators(operators),
-                table,
-            )
-            .effect_ledger
-            .has_conflicting_effect_sources()
+            && !settled.effect_ledger.has_conflicting_effect_sources()
             && assignment
                 .control_rotation_admission
                 .as_ref()
@@ -338,9 +397,22 @@ pub(crate) fn fill_workplace_vacancies(
             }
             let mut operators = assignment.operators_in(&room.id).to_vec();
             while operators.len() < room.operator_capacity() {
-                let Some(candidate) = remaining.pop() else {
+                let mut selected = None;
+                for index in (0..remaining.len()).rev() {
+                    let mut trial = assignment.clone();
+                    let mut trial_operators = operators.clone();
+                    trial_operators.push(remaining[index].clone());
+                    trial.set_room(room.id.clone(), trial_operators);
+                    if auto_saileach_assignment_compatible(blueprint, &trial, instances, table)? {
+                        selected = Some(index);
+                        break;
+                    }
+                }
+                let Some(index) = selected else {
                     break;
                 };
+                // 被拒绝者保留给后续设施；本房没有兼容候选时保留缺位。
+                let candidate = remaining.remove(index);
                 used.insert(candidate.name.clone());
                 operators.push(candidate.clone());
                 assignment.fallback_operators.push(candidate.name.clone());

@@ -59,7 +59,8 @@ pub use system::{
 pub use tier::OperatorTier;
 pub(crate) use vacancy_fill::plan_admits_workplace_candidate;
 pub(crate) use vacancy_fill::{
-    fill_workplace_vacancies, ordinary_room_compatible, ordinary_workplace,
+    auto_saileach_assignment_compatible, fill_workplace_vacancies, ordinary_room_compatible,
+    ordinary_workplace,
 };
 pub use workforce::{
     is_elite_operator, is_platform_operator, WorkforceIndex, TAG_DURIN, TAG_ELITE_OPERATOR,

@@ -337,6 +337,59 @@ pub fn assign_shift_with_plan(
     Ok(select_four_gold_trade_winner(blueprint, enabled, disabled))
 }
 
+/// 普通办公室选位的单一入口；已提交席位与 Plan 保留成员先于候选排序。
+#[allow(clippy::too_many_arguments)]
+fn fill_plan_office(
+    blueprint: &BaseBlueprint,
+    operbox: &OperBox,
+    instances: &OperatorInstances,
+    table: &SkillTable,
+    options: &AssignBaseOptions,
+    plan: &AssignmentPlan,
+    assignment: &mut BaseAssignment,
+) -> Result<HashSet<String>> {
+    let mut excluded: HashSet<_> = plan.excluded_operators.iter().cloned().collect();
+    excluded.extend(plan.anchors.iter().map(|anchor| anchor.operator.clone()));
+    excluded.extend(
+        plan.rotation_reserves
+            .iter()
+            .flat_map(|reserve| reserve.operators.iter().cloned()),
+    );
+    let layout = crate::layout::resolve_base(
+        blueprint,
+        assignment,
+        Some(instances),
+        Some(table),
+        options.mood,
+        Some(operbox.durin_dorm_planning_count(instances)),
+    )?
+    .layout;
+    excluded.extend(assignment.occupied_operator_names());
+    let office_operbox = operbox.keeping_only(
+        &operbox
+            .roster_for_facility(FacilityKind::Office)
+            .names()
+            .cloned()
+            .collect(),
+    );
+    let office_candidates = crate::office::rank_candidates(
+        &office_operbox,
+        &layout,
+        options.mood,
+        options.shift_hours,
+        &excluded,
+    );
+    crate::office::fill_vacancies(
+        assignment,
+        blueprint,
+        &office_candidates,
+        |_, trial, room, candidate| {
+            crate::layout::plan_admits_workplace_candidate(plan, trial, room, candidate)
+        },
+    );
+    Ok(excluded)
+}
+
 pub(crate) fn complete_standalone_assignment(
     blueprint: &BaseBlueprint,
     operbox: &OperBox,
@@ -359,53 +412,15 @@ pub(crate) fn complete_standalone_assignment(
     } else {
         HashSet::new()
     };
-    let mut excluded: HashSet<_> = result.plan.excluded_operators.iter().cloned().collect();
-    excluded.extend(
-        result
-            .plan
-            .anchors
-            .iter()
-            .map(|anchor| anchor.operator.clone()),
-    );
-    excluded.extend(
-        result
-            .plan
-            .rotation_reserves
-            .iter()
-            .flat_map(|reserve| reserve.operators.iter().cloned()),
-    );
-    let layout = crate::layout::resolve_base(
+    let excluded = fill_plan_office(
         blueprint,
-        &result.assignment,
-        Some(instances),
-        Some(table),
-        options.mood,
-        Some(operbox.durin_dorm_planning_count(instances)),
-    )?
-    .layout;
-    excluded.extend(result.assignment.occupied_operator_names());
-    let office_operbox = operbox.keeping_only(
-        &operbox
-            .roster_for_facility(FacilityKind::Office)
-            .names()
-            .cloned()
-            .collect(),
-    );
-    let office_candidates = crate::office::rank_candidates(
-        &office_operbox,
-        &layout,
-        options.mood,
-        options.shift_hours,
-        &excluded,
-    );
-    crate::office::fill_vacancies(
+        operbox,
+        instances,
+        table,
+        options,
+        &result.plan,
         &mut result.assignment,
-        blueprint,
-        &office_candidates,
-        |_, trial, room, candidate| {
-            crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
-        },
-    );
+    )?;
     let roster = operbox.roster_excluding(&excluded);
     let mut candidates: Vec<_> = roster
         .names()
