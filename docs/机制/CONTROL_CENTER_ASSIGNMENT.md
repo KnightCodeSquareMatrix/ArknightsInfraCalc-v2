@@ -67,3 +67,5 @@ Peak 复用动态中枢 presence 枚举，每个分支按当前贸易 role/房�
 办公室先落位属于顺序 policy，不能据此声称办公室与中枢联合选人的全局最优。辅助岗位的终态心情预算是已确认的硬约束；构造时的排序、试放顺序和普通补位仍是各自具名 policy。
 
 检查 control trace、ledger records、global inject explanation、最终 assignment invariant。固定候选用 `layout eval --explain-json`；整班用 `plan --assert-invariants` 和 243/high-owned fixture。中枢技能原文与同种效果规则回知识库引用，本文只记录实现责任和状态流。
+
+2026-11-25自动模式的体系禁用来源在`OperBox`岗位policy中统一裁剪，清单与范围见[自动轮换](../排班/自动轮换.md#214-2026-11-25-体系关键岗位禁用)。

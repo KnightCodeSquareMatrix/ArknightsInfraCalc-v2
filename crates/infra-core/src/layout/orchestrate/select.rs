@@ -109,7 +109,7 @@ pub(crate) fn build_plan_with_runtime_and_disabled_packs(
     }
     super::rules::configure_support_admission(
         &mut catalog,
-        support_combinations_enable || seed.auto_rotation,
+        support_combinations_enable && !seed.auto_rotation,
     );
     // Admit each possible fixed Rule member before a concrete alternative is
     // claimed. Removing an unqualified choice does not dismantle a live bind.

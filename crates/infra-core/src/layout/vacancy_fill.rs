@@ -238,6 +238,7 @@ pub(crate) fn fill_workplace_vacancies(
     candidates: &[AssignedOperator],
     instances: &OperatorInstances,
     table: &SkillTable,
+    permits_role: impl Fn(&RoomBlueprint, &AssignedOperator) -> bool,
     mut admits: impl FnMut(&BaseAssignment, &RoomBlueprint, &AssignedOperator) -> bool,
 ) -> Result<Vec<(RoomId, AssignedOperator)>> {
     let registry = SupportRegistry::load_default_shared()?;
@@ -290,6 +291,7 @@ pub(crate) fn fill_workplace_vacancies(
                     break;
                 }
                 if used.contains(&candidate.name)
+                    || !permits_role(room, candidate)
                     || instances.get(&candidate.name, candidate.tier()).is_none()
                     || candidate_is_skillless(room.kind, candidate, instances, &registry)
                         != skillless
@@ -338,9 +340,13 @@ pub(crate) fn fill_workplace_vacancies(
             }
             let mut operators = assignment.operators_in(&room.id).to_vec();
             while operators.len() < room.operator_capacity() {
-                let Some(candidate) = remaining.pop() else {
+                let Some(index) = remaining
+                    .iter()
+                    .rposition(|candidate| permits_role(room, candidate))
+                else {
                     break;
                 };
+                let candidate = remaining.remove(index);
                 used.insert(candidate.name.clone());
                 operators.push(candidate.clone());
                 assignment.fallback_operators.push(candidate.name.clone());

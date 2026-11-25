@@ -290,6 +290,11 @@ pub fn assign_shift_with_plan(
 ) -> Result<AssignShiftResult> {
     let _memo_scope = crate::search::ensure_search_memo_scope();
     let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let admitted = if options.auto_rotation {
+        admitted.with_auto_rotation_bans(instances, table)?
+    } else {
+        admitted
+    };
     let operbox = &admitted;
     let enabled = assign_shift_with_preclaimed_plan(
         blueprint,
@@ -346,19 +351,12 @@ pub(crate) fn complete_standalone_assignment(
     result: &mut AssignShiftResult,
 ) -> Result<()> {
     let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
-    let operbox = &admitted;
-    let control_operbox;
-    let forbidden_control_names = if options.auto_rotation {
-        control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
-        operbox
-            .owned
-            .keys()
-            .filter(|name| !control_operbox.owns(name))
-            .cloned()
-            .collect::<HashSet<_>>()
+    let admitted = if options.auto_rotation {
+        admitted.with_auto_rotation_bans(instances, table)?
     } else {
-        HashSet::new()
+        admitted
     };
+    let operbox = &admitted;
     let mut excluded: HashSet<_> = result.plan.excluded_operators.iter().cloned().collect();
     excluded.extend(
         result
@@ -422,13 +420,9 @@ pub(crate) fn complete_standalone_assignment(
         &candidates,
         instances,
         table,
+        |room, candidate| operbox.admits_facility_policy(&candidate.name, room.kind),
         |trial, room, candidate| {
             if !operbox.admits_facility(&candidate.name, room.kind) {
-                return false;
-            }
-            if room.kind == FacilityKind::ControlCenter
-                && forbidden_control_names.contains(&candidate.name)
-            {
                 return false;
             }
             crate::layout::plan_admits_workplace_candidate(&result.plan, trial, room, candidate)
@@ -644,6 +638,11 @@ where
     let _memo_scope = crate::search::ensure_search_memo_scope();
     blueprint.validate()?;
     let admitted = operbox.with_roster_eta(blueprint, instances, options.shift_hours)?;
+    let admitted = if options.auto_rotation {
+        admitted.with_auto_rotation_bans(instances, table)?
+    } else {
+        admitted
+    };
     let operbox = &admitted;
 
     let mut planning_seed = planning_seed.clone();

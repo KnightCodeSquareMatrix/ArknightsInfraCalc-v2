@@ -1,3 +1,4 @@
+mod auto_rotation;
 mod xlsx;
 
 use std::collections::{HashMap, HashSet};
@@ -34,6 +35,8 @@ pub struct OperBox {
     pub owned: HashMap<String, OperatorProgress>,
     /// 自动排班在搜索前冻结的按设施初始 ETA 资格；不删除其他岗位资格。
     facility_eta_exclusions: HashMap<String, HashSet<String>>,
+    /// 模式岗位禁用独立于 ETA；重算工时和释放辅助岗位 ETA 都不能清空。
+    facility_policy_exclusions: HashMap<String, Vec<crate::layout::FacilityKind>>,
 }
 
 impl OperBox {
@@ -96,6 +99,7 @@ impl OperBox {
             entries,
             owned,
             facility_eta_exclusions: HashMap::new(),
+            facility_policy_exclusions: HashMap::new(),
         })
     }
 
@@ -124,34 +128,50 @@ impl OperBox {
     }
 
     pub fn trade_roster(&self, instances: &OperatorInstances) -> Roster {
-        Self::facility_roster(self, instances, "trade")
+        Self::facility_roster(
+            self,
+            instances,
+            "trade",
+            crate::layout::FacilityKind::TradePost,
+        )
     }
 
     pub fn manufacture_roster(&self, instances: &OperatorInstances) -> Roster {
-        Self::facility_roster(self, instances, "manufacture")
+        Self::facility_roster(
+            self,
+            instances,
+            "manufacture",
+            crate::layout::FacilityKind::Factory,
+        )
     }
 
     pub fn power_roster(&self, instances: &OperatorInstances) -> Roster {
-        Self::facility_roster(self, instances, "power")
+        Self::facility_roster(
+            self,
+            instances,
+            "power",
+            crate::layout::FacilityKind::PowerPlant,
+        )
     }
 
     pub fn control_roster(&self, instances: &OperatorInstances) -> Roster {
-        Self::facility_roster(self, instances, "control")
+        Self::facility_roster(
+            self,
+            instances,
+            "control",
+            crate::layout::FacilityKind::ControlCenter,
+        )
     }
 
-    fn facility_roster(&self, instances: &OperatorInstances, facility: &str) -> Roster {
-        let eta_key = if facility == "manufacture" {
-            "factory"
-        } else {
-            facility
-        };
+    fn facility_roster(
+        &self,
+        instances: &OperatorInstances,
+        facility: &str,
+        kind: crate::layout::FacilityKind,
+    ) -> Roster {
         let mut roster = Roster::default();
         for (name, progress) in &self.owned {
-            if self
-                .facility_eta_exclusions
-                .get(eta_key)
-                .is_some_and(|names| names.contains(name))
-            {
+            if !self.admits_facility(name, kind) {
                 continue;
             }
             let tier = PromotionTier::from_progress(*progress);
@@ -170,11 +190,23 @@ impl OperBox {
         name: &str,
         facility: crate::layout::FacilityKind,
     ) -> bool {
-        crate::mood::facility_key(facility).is_none_or(|key| {
-            self.facility_eta_exclusions
-                .get(key)
-                .is_none_or(|names| !names.contains(name))
-        })
+        self.admits_facility_policy(name, facility)
+            && crate::mood::facility_key(facility).is_none_or(|key| {
+                self.facility_eta_exclusions
+                    .get(key)
+                    .is_none_or(|names| !names.contains(name))
+            })
+    }
+
+    /// 随机 Fallback 只遵守岗位 ban，不借此重加心情、技能或组合准入。
+    pub(crate) fn admits_facility_policy(
+        &self,
+        name: &str,
+        facility: crate::layout::FacilityKind,
+    ) -> bool {
+        self.facility_policy_exclusions
+            .get(name)
+            .is_none_or(|facilities| !facilities.contains(&facility))
     }
 
     pub(crate) fn roster_for_facility(&self, facility: crate::layout::FacilityKind) -> Roster {
@@ -272,6 +304,7 @@ impl OperBox {
                 .collect(),
             owned: self.owned_subset(excluded),
             facility_eta_exclusions: self.facility_eta_exclusions.clone(),
+            facility_policy_exclusions: self.facility_policy_exclusions.clone(),
         }
     }
 
@@ -291,6 +324,7 @@ impl OperBox {
                 .map(|(k, v)| (k.clone(), *v))
                 .collect(),
             facility_eta_exclusions: self.facility_eta_exclusions.clone(),
+            facility_policy_exclusions: self.facility_policy_exclusions.clone(),
         }
     }
 
