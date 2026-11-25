@@ -207,9 +207,7 @@ pub(crate) fn select_control(
     {
         return Ok(());
     }
-    let control_operbox = crate::pool::auto_rotation_control_roster(operbox, instances, table)?;
-    let mut pool =
-        crate::pool::build_control_pool_with_fillers(&control_operbox, instances, table)?;
+    let mut pool = crate::pool::build_control_pool_with_fillers(operbox, instances, table)?;
     crate::pool::admit_control_roster(
         &mut pool,
         options.control_work_hours,
@@ -271,7 +269,9 @@ pub fn schedule_auto_rotation(
     options.skip_standalone_control = true;
     options.shift_hours = timing.shift_hours[0];
     options.mood = crate::mood::default_mood_model()?.mood_cap;
-    let source = operbox.excluding(&["菲亚梅塔".to_string()].into_iter().collect());
+    let source = operbox
+        .with_auto_rotation_bans(instances, table)?
+        .excluding(&["菲亚梅塔".to_string()].into_iter().collect());
     let operbox = source.with_auto_roster_eta(blueprint, instances, timing.shift_hours[0])?;
     let mut seed = BaseAssignment::default();
     seed.auto_rotation = true;
@@ -470,11 +470,6 @@ pub fn schedule_auto_rotation(
         &backup.assignment,
         instances,
         table,
-    )?;
-    validate_explicit_supports(
-        blueprint,
-        [&main.assignment, &backup.assignment],
-        [&main.plan, &backup.plan],
     )?;
     let model = crate::mood::default_mood_model()?;
     let main_eta =
@@ -728,11 +723,6 @@ pub fn assert_auto_rotation_invariants(
         period,
         &report.fiammetta.exchanges,
     )?;
-    validate_explicit_supports(
-        blueprint,
-        [&report.main_assignment, &report.backup_assignment],
-        [&report.assignment_plans[0], &report.assignment_plans[1]],
-    )?;
     let expected_rooms = blueprint
         .rooms
         .iter()
@@ -795,6 +785,7 @@ pub fn assert_auto_rotation_invariants(
     {
         let admitted =
             operbox.with_auto_roster_eta(blueprint, instances, report.timing.shift_hours[index])?;
+        let policy = operbox.with_auto_rotation_bans(instances, table)?;
         let mut fallback_seen = std::collections::HashSet::new();
         for name in &assignment.fallback_operators {
             if !fallback_seen.insert(name)
@@ -812,6 +803,16 @@ pub fn assert_auto_rotation_invariants(
             }
         }
         for room in &blueprint.rooms {
+            for operator in assignment.operators_in(&room.id) {
+                if !policy.admits_facility_policy(&operator.name, room.kind) {
+                    return Err(Error::msg(format!(
+                        "assert-invariants auto_system_role_ban failed: shift {} {} {}",
+                        index + 1,
+                        room.id.0,
+                        operator.name,
+                    )));
+                }
+            }
             if assignment.operators_in(&room.id).iter().any(|operator| {
                 !assignment.fallback_operators.contains(&operator.name)
                     && !admitted.admits_facility(&operator.name, room.kind)
@@ -1120,38 +1121,4 @@ fn auto_work_duration_issues(
     issues.sort();
     issues.dedup();
     Ok(issues)
-}
-
-/// 独立从两个最终 Plan 和实际岗位重建显式挂件归属。
-fn validate_explicit_supports(
-    blueprint: &BaseBlueprint,
-    assignments: [&BaseAssignment; 2],
-    plans: [&AssignmentPlan; 2],
-) -> Result<()> {
-    let mut claims = std::collections::BTreeMap::new();
-    for (assignment, plan) in assignments.into_iter().zip(plans) {
-        claims = crate::layout::claim_support_rooms(
-            assignment,
-            &plan.anchors,
-            &plan.active_dependencies,
-            &claims,
-        )
-        .ok_or_else(|| Error::msg("assert-invariants auto_explicit_support_ownership failed"))?;
-        for support in claims.keys() {
-            if !blueprint
-                .rooms
-                .iter()
-                .filter(|room| room.kind == FacilityKind::Dormitory)
-                .any(|room| {
-                    assignment
-                        .operators_in(&room.id)
-                        .iter()
-                        .any(|op| op.name == *support)
-                })
-            {
-                return Err(Error::msg("assert-invariants auto_constant_support failed"));
-            }
-        }
-    }
-    Ok(())
 }

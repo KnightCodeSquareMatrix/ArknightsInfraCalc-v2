@@ -1443,6 +1443,7 @@ fn rotation_vacancy_commit(
         &candidates,
         instances,
         table,
+        |room, candidate| operbox.admits_facility_policy(&candidate.name, room.kind),
         |trial, room, candidate| {
             if !crate::layout::plan_admits_workplace_candidate(plan, trial, room, candidate) {
                 return false;
@@ -9226,7 +9227,6 @@ pub(crate) fn solve_policy_backup_with_continuous_targets(
         let mut seed = BaseAssignment::default();
         seed.auto_rotation = true;
         seed.work_hours = Some(shift_hours);
-        seed.auto_dorm_support_rooms = main.auto_dorm_support_rooms.clone();
         for room in blueprint
             .rooms
             .iter()

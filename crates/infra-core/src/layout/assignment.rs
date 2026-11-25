@@ -201,8 +201,6 @@ pub struct BaseAssignment {
     pub(crate) auto_rotation: bool,
     #[serde(skip)]
     pub(crate) work_hours: Option<f64>,
-    #[serde(skip)]
-    pub(crate) auto_dorm_support_rooms: std::collections::BTreeMap<String, RoomId>,
     #[serde(default)]
     rooms: Vec<RoomAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

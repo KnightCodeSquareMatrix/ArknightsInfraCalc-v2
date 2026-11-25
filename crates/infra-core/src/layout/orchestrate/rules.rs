@@ -36,8 +36,6 @@ pub(super) struct RuleCatalog {
 pub(super) struct RuleSpec {
     pub id: String,
     pub priority: i32,
-    #[serde(default)]
-    pub auto_only: bool,
     #[serde(default = "cross_station")]
     pub tier: OperatorTier,
     /// Only one selected rule in the same group may enter the plan.
@@ -497,9 +495,6 @@ pub(super) fn compile_rules(
     }
 
     for rule in rules {
-        if rule.auto_only && !seed.auto_rotation {
-            continue;
-        }
         if !priority_range.contains(&rule.priority) {
             continue;
         }
@@ -631,7 +626,7 @@ pub(super) fn compile_rules(
                 break;
             }
             let Some((
-                mut candidate_assignment,
+                candidate_assignment,
                 _candidate_used,
                 candidate_anchors,
                 candidate_constraints,
@@ -648,29 +643,6 @@ pub(super) fn compile_rules(
                 &candidate_roles,
                 &candidate_anchors,
             );
-            if seed.auto_rotation {
-                let anchors: Vec<_> = out
-                    .anchors
-                    .iter()
-                    .chain(&candidate_anchors)
-                    .cloned()
-                    .collect();
-                let dependencies: Vec<_> = out
-                    .active_dependencies
-                    .iter()
-                    .chain(&candidate_dependencies)
-                    .cloned()
-                    .collect();
-                let Some(claims) = super::auto_support::claim_support_rooms(
-                    &candidate_assignment,
-                    &anchors,
-                    &dependencies,
-                    &seed.auto_dorm_support_rooms,
-                ) else {
-                    continue;
-                };
-                candidate_assignment.auto_dorm_support_rooms = claims;
-            }
             let operators: Vec<String> = candidate_anchors
                 .iter()
                 .map(|anchor: &SystemAnchor| anchor.operator.clone())
@@ -2086,35 +2058,15 @@ pub(super) fn restrict_auto_rotation_catalog(catalog: &mut RuleCatalog) {
         rule.alternatives
             .retain(|alternative| match rule.id.as_str() {
                 "trade_core" => true,
-                _ if rule.auto_only => true,
                 "automation_group" => !alternative
                     .roles
                     .iter()
                     .any(|role| role.facility == FacilityKind::ControlCenter),
-                "rhine_receivers" => {
-                    alternative
-                        .roles
-                        .iter()
-                        .filter(|role| !role.proactive_support)
-                        .count()
-                        == 1
-                }
                 _ => alternative
                     .roles
                     .iter()
                     .all(|role| role.facility == FacilityKind::ControlCenter),
             });
-        if rule.id == "rhine_receivers" {
-            for alternative in &mut rule.alternatives {
-                for role in &mut alternative.roles {
-                    if role.proactive_support {
-                        role.min_count = 1;
-                        role.max_count = 1;
-                        role.facilities.clear();
-                    }
-                }
-            }
-        }
     }
 }
 
