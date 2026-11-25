@@ -822,51 +822,13 @@ pub fn assert_auto_rotation_invariants(
             model.mood_cap,
             None,
         )?;
-        if assignment
-            .control_operators()
-            .iter()
-            .any(|op| op.name == "琴柳")
-            && !assignment
-                .fallback_operators
-                .iter()
-                .any(|name| name == "琴柳")
-        {
-            let layout = crate::layout::resolve_control_input_layout(
-                blueprint,
-                assignment,
-                instances,
-                table,
-                model.mood_cap,
-                None,
-            )?;
-            let operators = assignment
-                .control_operators()
-                .iter()
-                .map(|op| crate::control::ControlOperator {
-                    name: op.name.clone(),
-                    elite: op.elite,
-                    buff_ids: instances.resolve_control_buff_ids(&op.name, op.tier()),
-                    tags: instances.tags_for(&op.name, op.tier()),
-                })
-                .collect();
-            let settled = crate::control::solve_control(
-                &crate::control::ControlRoomInput {
-                    operators,
-                    mood: model.mood_cap,
-                    layout,
-                },
-                table,
-            );
-            if !settled.effect_ledger.records().iter().any(|record| {
-                record.source_operator == "琴柳"
-                    && record.key == crate::control::ControlEffectKey::OFFICE_CONDITIONAL_HIRE_SPEED
-                    && record.effective_value > 0.0
-            }) {
-                return Err(Error::msg(format!(
-                    "assert-invariants auto_saileach_actual_office failed: shift {}",
-                    index + 1,
-                )));
-            }
+        if !crate::layout::auto_saileach_assignment_compatible(
+            blueprint, assignment, instances, table,
+        )? {
+            return Err(Error::msg(format!(
+                "assert-invariants auto_saileach_actual_office failed: shift {}",
+                index + 1,
+            )));
         }
         for room_rotation in &report.rooms {
             let state = if index == 0 {
